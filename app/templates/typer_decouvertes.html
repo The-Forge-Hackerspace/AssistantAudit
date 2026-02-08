@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Typer les Équipements - Scan {{ scan.id }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .checklist-section {
+        display: none;
+    }
+    .checklist-section.active {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Accueil</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('scan.liste_scans', site_id=scan.site.id) }}">{{ scan.site.nom }} - Scans</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('scan.detail_scan', scan_id=scan.id) }}">Scan #{{ scan.id }}</a></li>
+            <li class="breadcrumb-item active">Typage</li>
+        </ol>
+    </nav>
+
+    <!-- En-tête -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="text-primary"><i class="bi bi-tags"></i> Étape 2/2: Typer les Équipements et Checklist</h1>
+            <p class="text-muted">Définissez le type de chaque équipement et sélectionnez les éléments de checklist d'audit</p>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('scan.typer_decouvertes', scan_id=scan.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
+        {% for item in hosts_with_existing %}
+        {% set host = item.host %}
+        {% set existing = item.existing %}
+        
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="bi bi-hdd-network"></i> {{ host.hostname or host.ip_address }}
+                    {% if existing %}
+                        <span class="badge bg-warning ms-2">
+                            <i class="bi bi-exclamation-triangle"></i> Équipement existant
+                        </span>
+                    {% endif %}
+                </h5>
+                <small class="text-muted">
+                    IP: {{ host.ip_address }} | 
+                    MAC: {{ host.mac_address or 'N/A' }} | 
+                    Ports: {{ host.ports_open_count }}
+                </small>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Type d'équipement -->
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label"><strong>Type d'Équipement</strong> <span class="text-danger">*</span></label>
+                        <select class="form-select type-selector" name="type_{{ host.id }}" data-host-id="{{ host.id }}" required>
+                            <option value="">-- Sélectionner --</option>
+                            <option value="reseau">🔌 Équipement Réseau (Switch, Routeur, WiFi)</option>
+                            <option value="serveur">💻 Serveur (Windows, Linux, Hyperviseur)</option>
+                            <option value="firewall">🛡️ Firewall / Pare-feu</option>
+                        </select>
+                    </div>
+
+                    <!-- Action (si équipement existant) -->
+                    {% if existing %}
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label"><strong>Action</strong></label>
+                        <select class="form-select" name="action_{{ host.id }}">
+                            <option value="update">🔄 Mettre à jour l'équipement existant</option>
+                            <option value="create">➕ Créer une nouvelle entrée</option>
+                        </select>
+                        <small class="text-muted">Équipement actuel: {{ existing.hostname }} ({{ existing.type_equipement }})</small>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Checklists par type (affichées dynamiquement) -->
+                
+                <!-- Checklist Réseau -->
+                <div class="checklist-section" id="checklist_reseau_{{ host.id }}">
+                    <hr>
+                    <h6 class="text-primary"><i class="bi bi-check2-square"></i> Checklist d'Audit - Équipement Réseau</h6>
+                    {% if templates_reseau %}
+                        <div class="row">
+                            {% for template in templates_reseau %}
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           name="checklist_{{ host.id }}_{{ template.id }}" 
+                                           id="check_{{ host.id }}_{{ template.id }}">
+                                    <label class="form-check-label" for="check_{{ host.id }}_{{ template.id }}">
+                                        {{ template.label }}
+                                        {% if template.description %}
+                                        <br><small class="text-muted">{{ template.description }}</small>
+                                        {% endif %}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Aucun template de checklist disponible pour ce type.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Checklist Serveur -->
+                <div class="checklist-section" id="checklist_serveur_{{ host.id }}">
+                    <hr>
+                    <h6 class="text-primary"><i class="bi bi-check2-square"></i> Checklist d'Audit - Serveur</h6>
+                    {% if templates_serveur %}
+                        <div class="row">
+                            {% for template in templates_serveur %}
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           name="checklist_{{ host.id }}_{{ template.id }}" 
+                                           id="check_{{ host.id }}_{{ template.id }}">
+                                    <label class="form-check-label" for="check_{{ host.id }}_{{ template.id }}">
+                                        {{ template.label }}
+                                        {% if template.description %}
+                                        <br><small class="text-muted">{{ template.description }}</small>
+                                        {% endif %}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Aucun template de checklist disponible pour ce type.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Checklist Firewall -->
+                <div class="checklist-section" id="checklist_firewall_{{ host.id }}">
+                    <hr>
+                    <h6 class="text-primary"><i class="bi bi-check2-square"></i> Checklist d'Audit - Firewall</h6>
+                    {% if templates_firewall %}
+                        <div class="row">
+                            {% for template in templates_firewall %}
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           name="checklist_{{ host.id }}_{{ template.id }}" 
+                                           id="check_{{ host.id }}_{{ template.id }}">
+                                    <label class="form-check-label" for="check_{{ host.id }}_{{ template.id }}">
+                                        {{ template.label }}
+                                        {% if template.description %}
+                                        <br><small class="text-muted">{{ template.description }}</small>
+                                        {% endif %}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Aucun template de checklist disponible pour ce type.</p>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Boutons -->
+        <div class="row">
+            <div class="col">
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="bi bi-check-circle"></i> Créer les Équipements
+                </button>
+                <a href="{{ url_for('scan.valider_decouvertes', scan_id=scan.id) }}" class="btn btn-secondary btn-lg">
+                    <i class="bi bi-arrow-left-circle"></i> Retour
+                </a>
+            </div>
+        </div>
+
+    </form>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Afficher la checklist correspondant au type sélectionné
+document.addEventListener('DOMContentLoaded', function() {
+    const typeSelectors = document.querySelectorAll('.type-selector');
+    
+    typeSelectors.forEach(selector => {
+        selector.addEventListener('change', function() {
+            const hostId = this.dataset.hostId;
+            const selectedType = this.value;
+            
+            // Masquer toutes les checklists pour cet hôte
+            document.querySelectorAll(`[id^="checklist_"][id$="_${hostId}"]`).forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Afficher la checklist du type sélectionné
+            if (selectedType) {
+                const checklistSection = document.getElementById(`checklist_${selectedType}_${hostId}`);
+                if (checklistSection) {
+                    checklistSection.classList.add('active');
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

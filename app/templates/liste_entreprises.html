@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Entreprises{% endblock %}
+
+{% block content %}
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h1><i class="bi bi-building text-primary"></i> Entreprises Clientes</h1>
+    </div>
+</div>
+
+<div class="row">
+    {% if entreprises %}
+        {% for entreprise in entreprises %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 card-hover">
+                <div class="card-body">
+                    <h5 class="card-title">{{ entreprise.nom }}</h5>
+                    
+                    {% if entreprise.siret %}
+                    <p class="text-muted small mb-2">
+                        <i class="bi bi-hash"></i> {{ entreprise.siret }}
+                    </p>
+                    {% endif %}
+                    
+                    {% if entreprise.secteur_activite %}
+                    <p class="text-muted small mb-3">
+                        <i class="bi bi-briefcase"></i> {{ entreprise.secteur_activite }}
+                    </p>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between text-muted small mb-3">
+                        <span><i class="bi bi-folder"></i> {{ entreprise.audits.count() }} audit(s)</span>
+                        <span><i class="bi bi-people"></i> {{ entreprise.contacts.count() }} contact(s)</span>
+                    </div>
+                    
+                    <a href="{{ url_for('entreprise.entreprise_detail', entreprise_id=entreprise.id) }}" 
+                       class="btn btn-outline-primary btn-sm w-100">
+                        <i class="bi bi-eye"></i> Voir détails
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <i class="bi bi-info-circle"></i> Aucune entreprise enregistrée.
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}

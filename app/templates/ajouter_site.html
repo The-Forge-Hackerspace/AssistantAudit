@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Ajouter un Site{% endblock %}
+
+{% block content %}
+
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        
+        <div class="mb-4">
+            <h1><i class="bi bi-geo-alt-fill text-primary"></i> Ajouter un Site</h1>
+            <p class="text-muted">Projet : <strong>{{ audit.nom_projet }}</strong></p>
+            <p class="text-muted">Entreprise : <strong>{{ audit.entreprise.nom }}</strong></p>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Informations du Site</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="mb-3">
+                        <label for="nom_site" class="form-label">
+                            Nom du site <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="nom_site" name="nom_site" required
+                               placeholder="Ex: Siège social Paris, Data Center Lyon...">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="adresse_site" class="form-label">
+                            Adresse complète
+                        </label>
+                        <textarea class="form-control" id="adresse_site" name="adresse_site" rows="3"
+                                  placeholder="Numéro, rue, code postal, ville"></textarea>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('audit.audit_detail', audit_id=audit.id) }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Annuler
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Ajouter le Site
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
