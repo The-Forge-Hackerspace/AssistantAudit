@@ -108,6 +108,10 @@
                                 <input type="number" class="form-control" name="storage_gb" min="0" value="{{ cpu_info.get('storage_gb', '') }}" placeholder="Ex: 2048">
                             </div>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Modèle CPU</strong></label>
+                            <input type="text" class="form-control" name="cpu_model" value="{{ cpu_info.get('cpu_model', '') }}" placeholder="Ex: Intel Xeon E5-2620, AMD EPYC 7742">
+                        </div>
                     </div>
                 </div>
 

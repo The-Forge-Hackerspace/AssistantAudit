@@ -13,7 +13,7 @@ load_dotenv(os.path.join(basedir, '.env'))
 class Config:
     """Configuration de base commune à tous les environnements"""
     # Clé secrète — DOIT être définie via variable d'environnement en production
-    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-only-insecure-key-change-me-in-production'
 
     # Base de données
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
@@ -57,9 +57,9 @@ class ProductionConfig(Config):
     @classmethod
     def init_app(cls, app):
         """Vérifications spécifiques à la production"""
-        # Vérifier que SECRET_KEY est définie explicitement
-        if app.config['SECRET_KEY'] == 'dev-secret-key-change-in-production':
-            raise ValueError("SECRET_KEY must be set for production!")
+        # Vérifier que SECRET_KEY est définie explicitement via variable d'environnement
+        if not os.environ.get('SECRET_KEY'):
+            raise ValueError("SECRET_KEY must be set via environment variable for production!")
 
 
 config = {

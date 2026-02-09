@@ -8,7 +8,7 @@ from app.models import (
     Equipement, EquipementReseau, EquipementServeur, EquipementFirewall, 
     EquipementAuditStatus, ScanReseau, ChecklistTemplate, EquipementChecklist
 )
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 
 
@@ -318,7 +318,7 @@ def init_sample_data():
         
         scan1 = ScanReseau(
             site_id=site1_1.id,
-            date_scan=datetime.now() - timedelta(days=7),
+            date_scan=datetime.now(timezone.utc) - timedelta(days=7),
             type_scan="NMAP",
             nombre_hosts_trouves=8,
             nombre_ports_ouverts=34,
@@ -328,7 +328,7 @@ def init_sample_data():
         
         scan2 = ScanReseau(
             site_id=site1_2.id,
-            date_scan=datetime.now() - timedelta(days=3),
+            date_scan=datetime.now(timezone.utc) - timedelta(days=3),
             type_scan="OPENVAS",
             nombre_hosts_trouves=12,
             nombre_ports_ouverts=28,
@@ -338,7 +338,7 @@ def init_sample_data():
         
         scan3 = ScanReseau(
             site_id=site2_1.id,
-            date_scan=datetime.now() - timedelta(days=1),
+            date_scan=datetime.now(timezone.utc) - timedelta(days=1),
             type_scan="QUALYS",
             nombre_hosts_trouves=15,
             nombre_ports_ouverts=45,

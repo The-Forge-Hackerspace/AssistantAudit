@@ -9,6 +9,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import datetime, timezone
 
 from config import config
@@ -21,6 +23,11 @@ login_manager.login_message = 'Veuillez vous connecter pour accéder à cette pa
 login_manager.login_message_category = 'warning'
 migrate = Migrate()
 csrf = CSRFProtect()
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
 
 
 def configure_logging(app):
@@ -63,11 +70,23 @@ def create_app(config_name=None):
     # Création du dossier uploads s'il n'existe pas
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+    # Création du dossier instance pour la base de données SQLite
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    if db_uri.startswith('sqlite:///'):
+        db_path = db_uri.replace('sqlite:///', '')
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
     # Initialisation des extensions
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
+    limiter.init_app(app)
+
+    # Appeler init_app de la config si disponible (ProductionConfig)
+    config_class = config.get(config_name, config['default'])
+    if hasattr(config_class, 'init_app'):
+        config_class.init_app(app)
 
     # Configuration du logging
     configure_logging(app)
@@ -79,7 +98,7 @@ def create_app(config_name=None):
         # User loader pour Flask-Login
         @login_manager.user_loader
         def load_user(user_id):
-            return models.User.query.get(int(user_id))
+            return db.session.get(models.User, int(user_id))
 
         # Import et enregistrement des blueprints
         from .routes.main import main_bp

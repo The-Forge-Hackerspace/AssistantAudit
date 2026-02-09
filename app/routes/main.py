@@ -16,15 +16,15 @@ main_bp = Blueprint('main', __name__)
 @login_required
 def index():
     """Page d'accueil - Liste des audits avec statistiques"""
-    page = 1
     audits = Audit.query.order_by(Audit.date_debut.desc()).all()
     entreprises = Entreprise.query.all()
 
+    # Calculer les statistiques depuis les données déjà chargées
     stats = {
-        'total_audits': Audit.query.count(),
-        'audits_en_cours': Audit.query.filter_by(status=AuditStatus.EN_COURS).count(),
-        'audits_nouveaux': Audit.query.filter_by(status=AuditStatus.NOUVEAU).count(),
-        'total_entreprises': Entreprise.query.count()
+        'total_audits': len(audits),
+        'audits_en_cours': sum(1 for a in audits if a.status == AuditStatus.EN_COURS),
+        'audits_nouveaux': sum(1 for a in audits if a.status == AuditStatus.NOUVEAU),
+        'total_entreprises': len(entreprises)
     }
 
     return render_template('index.html', audits=audits, entreprises=entreprises, stats=stats)

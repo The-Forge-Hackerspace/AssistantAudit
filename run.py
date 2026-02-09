@@ -22,9 +22,16 @@ def make_shell_context():
         'Audit': Audit,
         'Site': Site,
         'Equipement': Equipement,
+        'EquipementReseau': EquipementReseau,
+        'EquipementServeur': EquipementServeur,
+        'EquipementFirewall': EquipementFirewall,
         'ScanReseau': ScanReseau,
+        'ScanHost': ScanHost,
+        'ScanPort': ScanPort,
+        'ChecklistTemplate': ChecklistTemplate,
+        'EquipementChecklist': EquipementChecklist,
     }
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=app.config.get('DEBUG', False))

@@ -4,7 +4,7 @@ Routes de gestion des scans réseau : Nmap, validation, typage
 import os
 import subprocess
 import logging
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_required
@@ -94,7 +94,7 @@ def lancer_scan_nmap(site_id):
 
             if result.returncode != 0:
                 logger.error(f'Nmap erreur: {result.stderr}')
-                flash(f'❌ Erreur lors de l\'exécution de Nmap: {result.stderr}', 'danger')
+                flash('Erreur lors de l\'exécution de Nmap. Vérifiez la cible et réessayez.', 'danger')
                 return redirect(url_for('scan.lancer_scan_nmap', site_id=site_id))
 
             # Lecture du fichier XML
@@ -105,9 +105,8 @@ def lancer_scan_nmap(site_id):
             with open(xml_path, 'r') as f:
                 xml_content = f.read()
 
-            # Parse XML
-            tree = ET.parse(xml_path)
-            root = tree.getroot()
+            # Parse XML depuis le contenu déjà lu
+            root = ET.fromstring(xml_content)
 
             # Créer l'enregistrement ScanReseau (stocker le chemin, pas le XML complet)
             scan = ScanReseau(
@@ -236,7 +235,7 @@ def lancer_scan_nmap(site_id):
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erreur lors du scan: {str(e)}', exc_info=True)
-            flash(f'❌ Erreur lors du scan : {str(e)}', 'danger')
+            flash('Erreur lors du scan. Veuillez réessayer.', 'danger')
             return redirect(url_for('scan.lancer_scan_nmap', site_id=site_id))
 
     return render_template('lancer_scan_nmap.html', site=site)
@@ -371,7 +370,7 @@ def typer_decouvertes(scan_id):
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erreur lors du typage: {str(e)}', exc_info=True)
-            flash(f'❌ Erreur lors de la création des équipements : {str(e)}', 'danger')
+            flash('Erreur lors de la création des équipements. Veuillez réessayer.', 'danger')
             return redirect(url_for('scan.typer_decouvertes', scan_id=scan_id))
 
     # Récupérer les templates de checklist

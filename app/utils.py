@@ -5,8 +5,10 @@ import os
 import re
 import ipaddress
 import logging
+from functools import wraps
 from datetime import datetime
-from flask import current_app
+from flask import current_app, abort
+from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 logger = logging.getLogger(__name__)
@@ -275,5 +277,82 @@ def validate_siret(siret):
     siret = siret.strip()
     if not re.match(r'^\d{14}$', siret):
         return False, "Le SIRET doit contenir exactement 14 chiffres"
+
+    return True, None
+
+
+def admin_required(f):
+    """
+    Décorateur qui restreint l'accès aux administrateurs uniquement.
+    Doit être utilisé après @login_required.
+    """
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if current_user.role != 'admin':
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def validate_mac_address(mac):
+    """
+    Valide le format d'une adresse MAC.
+
+    Args:
+        mac: Adresse MAC à valider
+
+    Returns:
+        tuple: (bool, str|None) - (valide, message d'erreur)
+    """
+    if not mac:
+        return True, None  # Optionnel
+
+    mac = mac.strip()
+    # Accepter les formats AA:BB:CC:DD:EE:FF et AA-BB-CC-DD-EE-FF
+    if not re.match(r'^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$', mac):
+        return False, "Format d'adresse MAC invalide. Utilisez le format AA:BB:CC:DD:EE:FF"
+
+    return True, None
+
+
+def validate_ip_address(ip):
+    """
+    Valide le format d'une adresse IP (v4 ou v6).
+
+    Args:
+        ip: Adresse IP à valider
+
+    Returns:
+        tuple: (bool, str|None) - (valide, message d'erreur)
+    """
+    if not ip:
+        return False, "L'adresse IP est requise"
+
+    ip = ip.strip()
+    try:
+        ipaddress.ip_address(ip)
+        return True, None
+    except ValueError:
+        return False, "Format d'adresse IP invalide"
+
+
+def validate_email(email):
+    """
+    Valide le format d'une adresse email.
+
+    Args:
+        email: Adresse email à valider
+
+    Returns:
+        tuple: (bool, str|None) - (valide, message d'erreur)
+    """
+    if not email:
+        return True, None  # Optionnel
+
+    email = email.strip()
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(pattern, email):
+        return False, f"Format d'email invalide : {email}"
 
     return True, None

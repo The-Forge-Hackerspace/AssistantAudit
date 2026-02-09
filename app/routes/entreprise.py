@@ -47,7 +47,22 @@ def modifier_entreprise(entreprise_id):
 
     if request.method == 'POST':
         try:
-            entreprise.nom = request.form.get('nom', '').strip()
+            new_nom = request.form.get('nom', '').strip()
+
+            # Validation du nom
+            if not new_nom:
+                flash('Le nom de l\'entreprise est requis.', 'danger')
+                return redirect(url_for('entreprise.modifier_entreprise', entreprise_id=entreprise_id))
+
+            # Vérification d'unicité du nom
+            existing = Entreprise.query.filter(
+                Entreprise.nom == new_nom, Entreprise.id != entreprise.id
+            ).first()
+            if existing:
+                flash(f'Une entreprise avec le nom "{new_nom}" existe déjà.', 'danger')
+                return redirect(url_for('entreprise.modifier_entreprise', entreprise_id=entreprise_id))
+
+            entreprise.nom = new_nom
             entreprise.adresse = request.form.get('adresse', '')
             entreprise.secteur_activite = request.form.get('secteur_activite', '')
             entreprise.presentation_desc = request.form.get('presentation_desc', '')
@@ -79,7 +94,7 @@ def modifier_entreprise(entreprise_id):
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erreur lors de la modification de l\'entreprise: {str(e)}', exc_info=True)
-            flash(f'❌ Erreur lors de la mise à jour : {str(e)}', 'danger')
+            flash('Erreur lors de la mise à jour. Veuillez réessayer.', 'danger')
             return redirect(url_for('entreprise.modifier_entreprise', entreprise_id=entreprise_id))
 
     return render_template('modifier_entreprise.html', entreprise=entreprise)

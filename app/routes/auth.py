@@ -1,12 +1,15 @@
 """
 Routes d'authentification : login, logout, gestion utilisateurs
 """
+import re
 import logging
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from app import db
 from app.models import User
+from app import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +17,7 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute", methods=["POST"])
 def login():
     """Page de connexion"""
     if current_user.is_authenticated:
@@ -46,6 +50,9 @@ def login():
         flash(f'Bienvenue, {user.nom_complet or user.username} !', 'success')
 
         next_page = request.args.get('next')
+        # Protection contre l'Open Redirect : rejeter les URLs absolues
+        if next_page and urlparse(next_page).netloc != '':
+            next_page = None
         return redirect(next_page or url_for('main.index'))
 
     return render_template('auth/login.html')
@@ -76,6 +83,24 @@ def profile():
 
         if len(new_password) < 8:
             flash('Le nouveau mot de passe doit contenir au moins 8 caractères.', 'danger')
+            return render_template('auth/profile.html')
+
+        # Vérification de la complexité du mot de passe
+        if not re.search(r'[A-Z]', new_password):
+            flash('Le mot de passe doit contenir au moins une majuscule.', 'danger')
+            return render_template('auth/profile.html')
+        if not re.search(r'[a-z]', new_password):
+            flash('Le mot de passe doit contenir au moins une minuscule.', 'danger')
+            return render_template('auth/profile.html')
+        if not re.search(r'[0-9]', new_password):
+            flash('Le mot de passe doit contenir au moins un chiffre.', 'danger')
+            return render_template('auth/profile.html')
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', new_password):
+            flash('Le mot de passe doit contenir au moins un caractère spécial.', 'danger')
+            return render_template('auth/profile.html')
+
+        if current_user.check_password(new_password):
+            flash('Le nouveau mot de passe doit être différent de l\'ancien.', 'danger')
             return render_template('auth/profile.html')
 
         if new_password != confirm_password:
