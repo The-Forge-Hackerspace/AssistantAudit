@@ -16,6 +16,10 @@ instance/
 .webassets-cache
 *.db
 
+# Logs
+logs/
+*.log
+
 # Uploads
 uploads/*
 !uploads/.gitkeep
