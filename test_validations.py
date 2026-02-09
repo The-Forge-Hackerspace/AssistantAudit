@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, os.path.abspath('.'))
 
 from app import create_app
-from app.routes import (
+from app.utils import (
     allowed_file, 
     validate_file_type, 
     create_audit_folder_structure,

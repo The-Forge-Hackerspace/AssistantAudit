@@ -9,6 +9,7 @@ from app.models import (
     Site, Equipement, EquipementReseau, EquipementServeur, EquipementFirewall,
     EquipementAuditStatus, ChecklistTemplate, EquipementChecklist, ChecklistStatut
 )
+from app.utils import validate_ip_address, validate_mac_address
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +27,13 @@ def liste_equipements(site_id):
     equipements_serveur = EquipementServeur.query.filter_by(site_id=site_id).all()
     equipements_firewall = EquipementFirewall.query.filter_by(site_id=site_id).all()
 
-    # Statistiques d'audit
+    # Calculer les statistiques depuis les données déjà chargées
+    all_equips = equipements_reseau + equipements_serveur + equipements_firewall
     stats = {
-        'total': len(equipements_reseau) + len(equipements_serveur) + len(equipements_firewall),
-        'conforme': Equipement.query.filter_by(site_id=site_id, status_audit=EquipementAuditStatus.CONFORME).count(),
-        'a_auditer': Equipement.query.filter_by(site_id=site_id, status_audit=EquipementAuditStatus.A_AUDITER).count(),
-        'non_conforme': Equipement.query.filter_by(site_id=site_id, status_audit=EquipementAuditStatus.NON_CONFORME).count()
+        'total': len(all_equips),
+        'conforme': sum(1 for e in all_equips if e.status_audit == EquipementAuditStatus.CONFORME),
+        'a_auditer': sum(1 for e in all_equips if e.status_audit == EquipementAuditStatus.A_AUDITER),
+        'non_conforme': sum(1 for e in all_equips if e.status_audit == EquipementAuditStatus.NON_CONFORME)
     }
 
     return render_template(
@@ -55,11 +57,14 @@ def detail_equipement(equipement_id):
 @equipement_bp.route('/equipement/<int:equipement_id>/audit', methods=['GET', 'POST'])
 @login_required
 def auditer_equipement(equipement_id):
-    """Audit d'un équipement - modification du statut et notes"""
+    """Audit d'un équipement - modification du statut, notes et checklist"""
     equipement = Equipement.query.get_or_404(equipement_id)
 
     if request.method == 'POST':
         try:
+            from datetime import datetime, timezone
+            from flask_login import current_user as audit_user
+
             # Mise à jour du statut d'audit
             nouveau_status = request.form.get('status_audit')
             if nouveau_status:
@@ -68,18 +73,35 @@ def auditer_equipement(equipement_id):
             # Mise à jour des notes d'audit
             equipement.notes_audit = request.form.get('notes_audit', '')
 
+            # Mise à jour des items de checklist
+            for item in equipement.checklist_items:
+                statut_key = f'checklist_statut_{item.id}'
+                commentaire_key = f'checklist_commentaire_{item.id}'
+                new_statut = request.form.get(statut_key)
+                new_commentaire = request.form.get(commentaire_key, '')
+
+                if new_statut:
+                    try:
+                        item.statut = ChecklistStatut(new_statut)
+                        item.commentaire = new_commentaire.strip() or None
+                        item.date_verification = datetime.now(timezone.utc)
+                        item.verifie_par = audit_user.nom_complet or audit_user.username
+                    except (KeyError, ValueError):
+                        pass
+
             db.session.commit()
             logger.info(f'Équipement {equipement_id} audité: {equipement.status_audit.value}')
-            flash(f'✅ Équipement "{equipement.hostname}" est maintenant {equipement.status_audit.value}', 'success')
+            flash(f'✅ Audit de "{equipement.hostname}" mis à jour avec succès', 'success')
             return redirect(url_for('equipement.detail_equipement', equipement_id=equipement.id))
 
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erreur lors de l\'audit: {str(e)}', exc_info=True)
-            flash(f'❌ Erreur lors de l\'audit : {str(e)}', 'danger')
+            flash('Erreur lors de l\'audit. Veuillez réessayer.', 'danger')
             return redirect(url_for('equipement.auditer_equipement', equipement_id=equipement_id))
 
-    return render_template('auditer_equipement.html', equipement=equipement)
+    checklist_items = equipement.checklist_items.all()
+    return render_template('auditer_equipement.html', equipement=equipement, checklist_items=checklist_items)
 
 
 @equipement_bp.route('/equipement/<int:equipement_id>/modifier', methods=['GET', 'POST'])
@@ -120,6 +142,7 @@ def modifier_equipement(equipement_id):
                 cpu_cores = parse_int_field('cpu_cores')
                 ram_gb = parse_int_field('ram_gb')
                 storage_gb = parse_int_field('storage_gb')
+                cpu_model = request.form.get('cpu_model', '').strip()
                 cpu_ram_info = {}
                 if cpu_cores is not None:
                     cpu_ram_info['cpu_cores'] = cpu_cores
@@ -127,6 +150,8 @@ def modifier_equipement(equipement_id):
                     cpu_ram_info['ram_gb'] = ram_gb
                 if storage_gb is not None:
                     cpu_ram_info['storage_gb'] = storage_gb
+                if cpu_model:
+                    cpu_ram_info['cpu_model'] = cpu_model
                 equipement.cpu_ram_info = cpu_ram_info or None
 
             elif isinstance(equipement, EquipementFirewall):
@@ -147,7 +172,7 @@ def modifier_equipement(equipement_id):
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erreur lors de la modification de l\'équipement: {str(e)}', exc_info=True)
-            flash(f'❌ Erreur lors de la mise à jour : {str(e)}', 'danger')
+            flash('Erreur lors de la mise à jour. Veuillez réessayer.', 'danger')
             return redirect(url_for('equipement.modifier_equipement', equipement_id=equipement_id))
 
     return render_template('modifier_equipement.html', equipement=equipement)
@@ -175,7 +200,19 @@ def ajouter_equipement(site_id):
                 return redirect(url_for('equipement.ajouter_equipement', site_id=site_id))
 
             if not ip_address:
-                flash("❌ L'adresse IP est obligatoire", 'danger')
+                flash("L'adresse IP est obligatoire", 'danger')
+                return redirect(url_for('equipement.ajouter_equipement', site_id=site_id))
+
+            # Validation du format IP
+            ip_valid, ip_error = validate_ip_address(ip_address)
+            if not ip_valid:
+                flash(f'{ip_error}', 'danger')
+                return redirect(url_for('equipement.ajouter_equipement', site_id=site_id))
+
+            # Validation du format MAC si fourni
+            mac_valid, mac_error = validate_mac_address(mac_address)
+            if not mac_valid:
+                flash(f'{mac_error}', 'danger')
                 return redirect(url_for('equipement.ajouter_equipement', site_id=site_id))
 
             # Vérifier si l'IP existe déjà sur ce site
@@ -201,6 +238,7 @@ def ajouter_equipement(site_id):
                 cpu_cores_raw = request.form.get('cpu_cores', '').strip()
                 ram_gb_raw = request.form.get('ram_gb', '').strip()
                 storage_gb_raw = request.form.get('storage_gb', '').strip()
+                cpu_model = request.form.get('cpu_model', '').strip()
 
                 cpu_ram_info = {}
                 if cpu_cores_raw.isdigit():
@@ -209,6 +247,8 @@ def ajouter_equipement(site_id):
                     cpu_ram_info['ram_gb'] = int(ram_gb_raw)
                 if storage_gb_raw.isdigit():
                     cpu_ram_info['storage_gb'] = int(storage_gb_raw)
+                if cpu_model:
+                    cpu_ram_info['cpu_model'] = cpu_model
 
                 equipement = EquipementServeur(
                     site_id=site_id, ip_address=ip_address,
@@ -257,7 +297,7 @@ def ajouter_equipement(site_id):
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erreur lors de l\'ajout de l\'équipement: {str(e)}', exc_info=True)
-            flash(f'❌ Erreur lors de l\'ajout : {str(e)}', 'danger')
+            flash('Erreur lors de l\'ajout. Veuillez réessayer.', 'danger')
             return redirect(url_for('equipement.ajouter_equipement', site_id=site_id))
 
     # Récupérer les templates de checklist pour chaque type

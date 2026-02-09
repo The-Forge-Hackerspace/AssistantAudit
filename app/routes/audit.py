@@ -41,6 +41,12 @@ def nouveau_projet():
             entreprise_id = request.form.get('entreprise_id')
 
             if entreprise_id:
+                # Cast en int et valider
+                try:
+                    entreprise_id = int(entreprise_id)
+                except (ValueError, TypeError):
+                    flash('ID entreprise invalide.', 'danger')
+                    return redirect(url_for('audit.nouveau_projet'))
                 # Utiliser une entreprise existante
                 entreprise = db.session.get(Entreprise, entreprise_id)
                 if not entreprise:
@@ -88,6 +94,14 @@ def nouveau_projet():
                     db.session.add(entreprise)
                     db.session.flush()  # Pour obtenir l'ID
 
+            # === ÉTAPE 3 : CRÉATION AUDIT ===
+
+            nom_projet = request.form.get('nom_projet', '').strip()
+
+            if not nom_projet:
+                flash('Le nom du projet est requis.', 'danger')
+                return redirect(url_for('audit.nouveau_projet'))
+
             # === CRÉER LA STRUCTURE DE DOSSIERS POUR L'AUDIT ===
             audit_folder = create_audit_folder_structure(entreprise.nom, datetime.now())
 
@@ -114,14 +128,6 @@ def nouveau_projet():
                 db.session.add(contact)
                 contacts_created += 1
                 contact_index += 1
-
-            # === ÉTAPE 3 : CRÉATION AUDIT ===
-
-            nom_projet = request.form.get('nom_projet', '').strip()
-
-            if not nom_projet:
-                flash('Le nom du projet est requis.', 'danger')
-                return redirect(url_for('audit.nouveau_projet'))
 
             # Upload des fichiers administratifs de manière centralisée
             admin_folder = f'{audit_folder}/bloc_01_administratif'
@@ -172,7 +178,7 @@ def nouveau_projet():
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erreur lors de la création du projet: {str(e)}', exc_info=True)
-            flash(f'❌ Erreur lors de la création du projet : {str(e)}', 'danger')
+            flash('Erreur lors de la création du projet. Veuillez réessayer.', 'danger')
             return redirect(url_for('audit.nouveau_projet'))
 
     # GET - Affichage du formulaire
@@ -228,7 +234,7 @@ def ajouter_site(audit_id):
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erreur lors de l\'ajout du site: {str(e)}', exc_info=True)
-            flash(f'❌ Erreur lors de l\'ajout du site : {str(e)}', 'danger')
+            flash('Erreur lors de l\'ajout du site. Veuillez réessayer.', 'danger')
             return redirect(url_for('audit.ajouter_site', audit_id=audit_id))
 
     return render_template('ajouter_site.html', audit=audit)
@@ -299,7 +305,7 @@ def modifier_audit(audit_id):
         except Exception as e:
             db.session.rollback()
             logger.error(f'Erreur lors de la modification de l\'audit: {str(e)}', exc_info=True)
-            flash(f'❌ Erreur lors de la mise à jour : {str(e)}', 'danger')
+            flash('Erreur lors de la mise à jour. Veuillez réessayer.', 'danger')
             return redirect(url_for('audit.modifier_audit', audit_id=audit_id))
 
     return render_template('modifier_audit.html', audit=audit)

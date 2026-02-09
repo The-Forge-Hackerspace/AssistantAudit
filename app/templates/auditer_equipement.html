@@ -66,11 +66,57 @@
                         <!-- Notes d'audit -->
                         <div class="mb-4">
                             <label for="notes_audit" class="form-label"><strong>Notes d'Audit</strong></label>
-                            <textarea class="form-control" id="notes_audit" name="notes_audit" rows="6" placeholder="Entrez vos observations...">{{ equipement.notes_audit or '' }}</textarea>
+                            <textarea class="form-control" id="notes_audit" name="notes_audit" rows="4" placeholder="Entrez vos observations...">{{ equipement.notes_audit or '' }}</textarea>
                             <small class="form-text text-muted">
                                 Incluez tout problème trouvé, les actions correctives recommandées, ou les points de conformité vérifiés.
                             </small>
                         </div>
+
+                        <!-- Checklist d'audit -->
+                        {% if checklist_items %}
+                        <hr>
+                        <h5 class="mb-3"><i class="fas fa-tasks"></i> Checklist d'Audit ({{ checklist_items|length }} items)</h5>
+                        <p class="text-muted small">Pour chaque point de contrôle, sélectionnez un statut et ajoutez un commentaire si nécessaire.</p>
+                        
+                        {% for item in checklist_items %}
+                        <div class="card mb-3 border-start border-3 {% if item.statut.value == 'conforme' %}border-success{% elif item.statut.value == 'non_conforme' %}border-danger{% elif item.statut.value == 'non_applicable' %}border-secondary{% else %}border-warning{% endif %}">
+                            <div class="card-body">
+                                <div class="row align-items-start">
+                                    <div class="col-md-12 mb-2">
+                                        <strong>{{ item.template.label }}</strong>
+                                        {% if item.template.description %}
+                                        <br><small class="text-muted">{{ item.template.description }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <label class="form-label small"><strong>Statut</strong></label>
+                                        <select class="form-select form-select-sm" name="checklist_statut_{{ item.id }}">
+                                            <option value="non_verifie" {% if item.statut.value == 'non_verifie' %}selected{% endif %}>⚠ Non vérifié</option>
+                                            <option value="conforme" {% if item.statut.value == 'conforme' %}selected{% endif %}>✓ Conforme</option>
+                                            <option value="non_conforme" {% if item.statut.value == 'non_conforme' %}selected{% endif %}>✗ Non conforme</option>
+                                            <option value="non_applicable" {% if item.statut.value == 'non_applicable' %}selected{% endif %}>N/A Non applicable</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-8 mb-2">
+                                        <label class="form-label small"><strong>Commentaire</strong></label>
+                                        <input type="text" class="form-control form-control-sm" 
+                                               name="checklist_commentaire_{{ item.id }}" 
+                                               value="{{ item.commentaire or '' }}"
+                                               placeholder="Observation, recommandation...">
+                                    </div>
+                                </div>
+                                {% if item.verifie_par %}
+                                <small class="text-muted">
+                                    Vérifié par {{ item.verifie_par }}
+                                    {% if item.date_verification %}
+                                     le {{ item.date_verification.strftime('%d/%m/%Y %H:%M') }}
+                                    {% endif %}
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
 
                         <!-- Boutons -->
                         <div class="d-flex gap-2">
