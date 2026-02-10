@@ -1,0 +1,127 @@
+framework:
+  ref_id: server_windows_audit
+  name: "Audit Serveur Windows"
+  description: "Référentiel d'audit pour les serveurs Windows Server"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "Système & Mises à jour"
+      controls:
+        - id: WSRV-001
+          title: "OS supporté"
+          description: "La version de Windows Server est encore supportée par Microsoft"
+          severity: critical
+          check_type: manual
+          evidence_required: true
+          remediation: "Migrer vers une version Windows Server supportée."
+
+        - id: WSRV-002
+          title: "Mises à jour installées"
+          description: "Les mises à jour de sécurité sont à jour (< 30 jours)"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Installer les mises à jour manquantes via WSUS/Windows Update."
+
+        - id: WSRV-003
+          title: "Politique WSUS/Windows Update"
+          description: "Le serveur est rattaché à un serveur WSUS ou une politique de mise à jour"
+          severity: high
+          check_type: manual
+          remediation: "Configurer le rattachement à WSUS ou une politique de mise à jour centralisée."
+
+    - name: "Comptes & Authentification"
+      controls:
+        - id: WSRV-010
+          title: "Compte Administrateur local renommé"
+          description: "Le compte Administrator par défaut est renommé"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Renommer le compte Administrator local via GPO ou localement."
+
+        - id: WSRV-011
+          title: "Politique de mot de passe locale"
+          description: "La politique de mot de passe locale impose la complexité et un minimum de 12 caractères"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer la politique de mot de passe locale ou via GPO."
+
+        - id: WSRV-012
+          title: "Verrouillage de compte configuré"
+          description: "Le verrouillage automatique après tentatives échouées est configuré"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Configurer le verrouillage après 5 tentatives avec un délai de 30 minutes."
+
+    - name: "Services & Rôles"
+      controls:
+        - id: WSRV-020
+          title: "Rôles et fonctionnalités documentés"
+          description: "Les rôles installés sont documentés et justifiés"
+          severity: medium
+          check_type: manual
+          remediation: "Documenter chaque rôle installé et supprimer ceux non nécessaires."
+
+        - id: WSRV-021
+          title: "Services inutiles désactivés"
+          description: "Les services Windows non nécessaires sont désactivés"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Désactiver les services non nécessaires (Print Spooler, etc. si non utilisés)."
+
+    - name: "Réseau & Pare-feu"
+      controls:
+        - id: WSRV-030
+          title: "Pare-feu Windows activé"
+          description: "Le pare-feu Windows est activé sur tous les profils"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Activer le pare-feu Windows sur les profils Domaine, Privé et Public."
+
+        - id: WSRV-031
+          title: "RDP sécurisé"
+          description: "L'accès RDP est restreint (NLA activé, port non-standard, ou désactivé)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Activer NLA, restreindre via firewall et/ou changer le port par défaut."
+
+    - name: "Journalisation & Supervision"
+      controls:
+        - id: WSRV-040
+          title: "Audit des événements configuré"
+          description: "La politique d'audit Windows est configurée (succès et échecs)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer la stratégie d'audit avancée via GPO."
+
+        - id: WSRV-041
+          title: "Taille des journaux ajustée"
+          description: "La taille des journaux d'événements est suffisante (>= 100 MB)"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Augmenter la taille des journaux d'événements à au moins 100 MB."
+
+        - id: WSRV-042
+          title: "Centralisation des logs"
+          description: "Les logs sont envoyés vers un serveur central (SIEM, WEC, Syslog)"
+          severity: high
+          check_type: manual
+          remediation: "Configurer la centralisation des logs via WEC ou agent SIEM."
+
+    - name: "Sauvegarde & Récupération"
+      controls:
+        - id: WSRV-050
+          title: "Sauvegarde configurée"
+          description: "Le serveur est sauvegardé régulièrement"
+          severity: critical
+          check_type: manual
+          evidence_required: true
+          remediation: "Mettre en place une sauvegarde régulière avec test de restauration."
+
+        - id: WSRV-051
+          title: "Antivirus/EDR installé et à jour"
+          description: "Une solution antivirus/EDR est installée, active et à jour"
+          severity: critical
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Installer et configurer un antivirus/EDR avec mise à jour automatique."
