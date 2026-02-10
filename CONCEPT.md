@@ -1,184 +1,345 @@
-# Plan de développement - AssistantAudit
+# AssistantAudit — Concept & Feuille de Route
+
+> **Document vivant** — Dernière mise à jour : Juillet 2025
+> Ce fichier est notre boussole : il décrit la vision, l'architecture, les décisions prises et l'avancement réel du projet.
+
+---
 
 ## 🎯 Vision
 
-Un outil d'audit d'infrastructure inspiré de CISO Assistant, mais centré sur l'audit technique d'infrastructure, avec des référentiels d'audit par type d'équipement et des outils intégrés.
+Un outil d'audit d'infrastructure IT inspiré de CISO Assistant, mais centré sur **l'audit technique d'infrastructure**, avec :
+
+- Des **référentiels d'audit par type d'équipement** (firewall, switch, serveur, AD, M365…)
+- Des **outils intégrés** de collecte et d'évaluation automatique
+- Un **moteur Monkey365** pour l'audit cloud Microsoft 365
+- Une **interface web moderne** pour piloter les campagnes d'audit
+- Un **système de scoring** automatique de la conformité
 
 ---
 
-## 📐 Architecture Conceptuelle
+## 📐 Architecture Réelle du Projet
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│                  AssistantAudit                      │
-├─────────────────────────────────────────────────────┤
-│  UI Layer (Frontend)                                │
-│  ┌─────────┐ ┌──────────┐ ┌───────────┐            │
-│  │Dashboard│ │Campagnee │ │Rapports   │            │
-│  │         │ │d'audit   │ │& Exports  │            │
-│  └─────────┘ └──────────┘ └───────────┘            │
-├─────────────────────────────────────────────────────┤
-│  Core Engine                                        │
-│  ┌──────────────┐ ┌─────────────┐ ┌──────────────┐ │
-│  │Référentiels  │ │Moteur       │ │Scoring &     │ │
-│  │d'audit       │ │d'évaluation │ │Conformité    │ │
-│  │(Frameworks)  │ │             │ │              │ │
-│  └──────────────┘ └─────────────┘ └──────────────┘ │
-├─────────────────────────────────────────────────────┤
-│  Outils Intégrés                                    │
-│  ┌────────┐ ┌────────┐ ┌────────┐ ┌─────────────┐ │
-│  │Scanner │ │Config  │ │Collecte│ │Analyse      │ │
-│  │Réseau  │ │Parser  │ │Auto    │ │Auto         │ │
-│  └────────┘ └────────┘ └────────┘ └─────────────┘ │
-├─────────────────────────────────────────────────────┤
-│  Data Layer (SQLite/PostgreSQL)                     │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      AssistantAudit                          │
+├──────────────────────────────────────────────────────────────┤
+│  Frontend (Next.js 16 + React + Tailwind + shadcn/ui)       │
+│  ┌───────────┐ ┌──────────┐ ┌───────────┐ ┌──────────────┐ │
+│  │ Dashboard │ │Gestion   │ │ Audits &  │ │ Référentiels │ │
+│  │ & Stats   │ │Entreprise│ │ Campagnes │ │ & Contrôles  │ │
+│  └───────────┘ └──────────┘ └───────────┘ └──────────────┘ │
+├──────────────────────────────────────────────────────────────┤
+│  API REST (FastAPI + Pydantic v2 + JWT OAuth2)              │
+│  45 endpoints — Documentation Swagger auto-générée          │
+├──────────────────────────────────────────────────────────────┤
+│  Core Engine                                                │
+│  ┌───────────────┐ ┌──────────────┐ ┌──────────────────┐   │
+│  │ Référentiels  │ │ Moteur       │ │ Scoring &        │   │
+│  │ dynamiques    │ │ d'évaluation │ │ Conformité auto  │   │
+│  │ (12 YAML)     │ │              │ │                  │   │
+│  └───────────────┘ └──────────────┘ └──────────────────┘   │
+│  ┌───────────────┐ ┌──────────────┐                        │
+│  │ Monkey365     │ │ Versioning   │                        │
+│  │ Bridge (M365) │ │ frameworks   │                        │
+│  └───────────────┘ └──────────────┘                        │
+├──────────────────────────────────────────────────────────────┤
+│  Outils Intégrés (Phase 4 — à venir)                        │
+│  ┌────────┐ ┌────────┐ ┌────────┐ ┌─────────────┐         │
+│  │Scanner │ │Config  │ │Collecte│ │Analyse      │         │
+│  │Réseau  │ │Parser  │ │Auto    │ │Auto         │         │
+│  └────────┘ └────────┘ └────────┘ └─────────────┘         │
+├──────────────────────────────────────────────────────────────┤
+│  Data Layer (SQLAlchemy 2.0 + Alembic)                      │
+│  SQLite (dev) → PostgreSQL (prod)                           │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📋 Plan en 6 phases
+## 🛠️ Stack Technique (Choix définitifs)
 
-### **Phase 1 — Fondations & Modèle de données** (Semaines 1-3)
+| Couche | Technologie | Statut |
+| -------- | ------------- | -------- |
+| **Backend** | Python 3.13 + FastAPI | ✅ En place |
+| **ORM** | SQLAlchemy 2.0 + Alembic | ✅ En place |
+| **Validation** | Pydantic v2 | ✅ En place |
+| **Auth** | JWT (python-jose) + bcrypt direct + OAuth2 | ✅ En place |
+| **BDD** | SQLite (dev) → PostgreSQL (prod) | ✅ SQLite actif |
+| **Frontend** | Next.js 16 + React + TypeScript | ✅ En place |
+| **UI Components** | shadcn/ui + Tailwind CSS v4 | ✅ En place |
+| **HTTP Client** | Axios avec intercepteur JWT | ✅ En place |
+| **Icônes** | Lucide React | ✅ En place |
+| **Référentiels** | YAML dynamiques (sync SHA-256) | ✅ En place |
+| **Cloud Audit** | Monkey365 (PowerShell) | ✅ Bridge prêt |
+| **Rapports** | Jinja2 + WeasyPrint | 🔜 Phase 5 |
+| **Outils** | python-nmap, paramiko, pywinrm, ldap3 | 🔜 Phase 4 |
+| **Déploiement** | Docker + Docker Compose | ✅ Fichiers prêts |
 
-**Objectif** : Poser l'architecture et le modèle de données central.
+---
 
-| Tâche | Détail |
-| ------- | -------- |
-| Stack technique | Python (backend), FastAPI ou Django, SQLite puis PostgreSQL |
-| Modèle de données | Définir les entités clés (voir ci-dessous) |
-| Structure projet | Monorepo avec séparation backend/frontend |
-| Auth basique | Gestion des utilisateurs/rôles |
-
-**Modèle de données clé :**
+## 📁 Structure Réelle du Projet
 
 ```text
-Référentiel (Framework)
-  └── Catégorie (Category)
-       └── Point de contrôle (Control)
-            └── Critère d'évaluation (Requirement)
-
-Campagne d'audit (Audit Campaign)
-  └── Périmètre (Scope) → liste d'équipements
-       └── Équipement (Asset)
-            └── Évaluation (Assessment)
-                 └── Résultat par contrôle (ControlResult)
-                      - statut: conforme/non-conforme/partiel/N-A
-                      - preuve (evidence)
-                      - score
-                      - recommandation
+AssistantAudit/
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/              # 8 routeurs : auth, entreprises, sites,
+│   │   │                        #   equipements, audits, frameworks,
+│   │   │                        #   assessments, health
+│   │   ├── core/                # config, database, security, deps
+│   │   ├── models/              # 8 modèles SQLAlchemy (user, entreprise,
+│   │   │                        #   site, equipement, audit, framework,
+│   │   │                        #   assessment, scan)
+│   │   ├── schemas/             # Schémas Pydantic v2 (in/out/update)
+│   │   ├── services/            # Logique métier (auth, framework,
+│   │   │                        #   assessment, monkey365)
+│   │   └── tools/               # Monkey365 runner (parser, mapper),
+│   │                            #   collectors, config_parsers, nmap_scanner
+│   ├── alembic/                 # 2 migrations
+│   ├── tests/                   # Tests API
+│   ├── instance/                # SQLite DB
+│   ├── init_db.py               # Script d'initialisation (admin + frameworks)
+│   ├── test_phase1.py           # 38 tests Phase 1
+│   ├── test_phase2.py           # 55 tests Phase 1+2
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/
+│   │   ├── app/                 # Pages Next.js (App Router)
+│   │   │   ├── page.tsx         # Dashboard (stats, audits, campagnes)
+│   │   │   ├── login/page.tsx   # Page de connexion JWT
+│   │   │   ├── layout.tsx       # Layout racine + Providers
+│   │   │   └── providers.tsx    # AuthProvider + AuthGuard
+│   │   ├── components/          # app-layout (sidebar), auth-guard,
+│   │   │   └── ui/              #   + 20 composants shadcn/ui
+│   │   ├── contexts/            # AuthContext (login/logout/refresh)
+│   │   ├── services/            # API services (axios calls)
+│   │   ├── types/               # Types TypeScript complets
+│   │   └── lib/                 # api-client (axios + JWT interceptor)
+│   ├── .env.local               # NEXT_PUBLIC_API_URL
+│   └── package.json
+│
+├── frameworks/                  # 12 référentiels YAML
+│   ├── firewall_audit.yaml
+│   ├── switch_audit.yaml
+│   ├── server_windows_audit.yaml
+│   ├── server_linux_audit.yaml
+│   ├── active_directory_audit.yaml
+│   ├── wifi_audit.yaml
+│   ├── sauvegarde_audit.yaml
+│   ├── peripheriques_audit.yaml
+│   ├── m365_audit.yaml
+│   ├── messagerie_audit.yaml
+│   ├── vpn_audit.yaml
+│   └── dns_dhcp_audit.yaml
+│
+├── API.md                       # Documentation 45 endpoints
+├── ARCHITECTURE.md              # Architecture technique
+├── CONCEPT.md                   # ← Ce fichier (feuille de route)
+├── README.md
+├── docker-compose.yml
+└── Dockerfile
 ```
 
 ---
 
-### **Phase 2 — Moteur de Référentiels** (Semaines 4-6)
+## 📋 Plan en 6 Phases — État d'avancement
 
-**Objectif** : Vos mini-audits deviennent des référentiels structurés.
+### ✅ Phase 1 — Fondations & Modèle de données (TERMINÉE)
 
-| Tâche | Détail |
-| ------- | -------- |
-| Format de référentiel | YAML/JSON pour définir chaque référentiel |
-| Import/Export | Charger des référentiels depuis des fichiers |
-| Référentiels initiaux | Convertir vos audits existants (Firewall, Switch, Serveur, AD, Wi-Fi...) |
-| Versioning | Versionner les référentiels |
+**Objectif** : Poser l'architecture, le modèle de données et l'API REST complète.
 
-**Exemple de structure YAML pour un référentiel :**
+| Tâche | Détail | Statut |
+| -------- | ------------- | -------- |
+| Stack technique | Python 3.13 + FastAPI + SQLAlchemy 2.0 | ✅ |
+| Modèle de données | 8 entités (User, Entreprise, Site, Equipement, Audit, Framework, Assessment, Scan) | ✅ |
+| Structure projet | Monorepo backend/frontend/frameworks | ✅ |
+| Auth JWT | Inscription, login, refresh token, rôles (admin/auditor/viewer) | ✅ |
+| CRUD complet | 45 endpoints REST pour toutes les entités | ✅ |
+| Migrations | Alembic configuré avec 2 migrations | ✅ |
+| Tests | 38 tests automatisés — tous passent | ✅ |
+| CORS | Configuré pour localhost:3000 et localhost:5173 | ✅ |
+| Docker | Dockerfile + docker-compose.yml | ✅ |
 
-````yaml
-framework:
-  name: "Audit Firewall"
-  version: "1.0"
-  description: "Référentiel d'audit pour les pare-feu"
-  categories:
-    - name: "Configuration Générale"
-      controls:
-        - id: FW-001
-          title: "Firmware à jour"
-          description: "Le firmware du pare-feu est à la dernière version stable"
-          severity: high
-          check_type: manual  # ou automatic
-          evidence_required: true
-          remediation: "Mettre à jour vers la dernière version stable"
-        - id: FW-002
-          title: "Accès administration sécurisé"
-          description: "L'accès admin est limité à HTTPS/SSH uniquement"
-          severity: high
-          check_type: automatic
-          auto_check: "check_admin_protocols"
+**Modèle de données implémenté :**
 
-    - name: "Règles de filtrage"
-      controls:
-        - id: FW-010
-          title: "Règle deny-all par défaut"
-          description: "Une règle deny all est présente en fin de politique"
-          severity: critical
-          check_type: semi-automatic
-        - id: FW-011
-          title: "Pas de règle any-any"
-          description: "Aucune règle n'autorise tout le trafic"
-          severity: critical
-          check_type: automatic
-          auto_check: "check_any_any_rules"
+```text
+User (admin/auditor/viewer)
+  └── Entreprise
+       └── Site
+            └── Equipement (type: serveur, firewall, switch...)
 
-    - name: "Journalisation"
-      controls:
-        - id: FW-020
-          title: "Logging activé"
-          description: "Les logs sont activés et envoyés vers un SIEM/Syslog"
-          severity: high
-          check_type: semi-automatic
-````
+Framework (référentiel YAML)
+  └── categories[] → controls[]
+       └── Versionné (parent_version_id, ref_id unique + version)
 
-**Liste de référentiels à créer (vos mini-audits) :**
+Audit (campagne d'audit)
+  └── Campaign (lien audit ↔ framework)
+       └── Assessment (évaluation d'un équipement)
+            └── ControlResult (résultat par contrôle)
+                 ├── status: compliant/non_compliant/partial/not_applicable
+                 ├── evidence (preuve)
+                 ├── score (0-100)
+                 └── recommendation
 
-1. 🔥 Firewall (Fortinet, Palo Alto, pfSense...)
-2. 🔀 Switch / Infrastructure réseau
-3. 🖥️ Serveur Windows
-4. 🐧 Serveur Linux
-5. 📁 Active Directory
-6. 📶 Wi-Fi
-7. 💾 Sauvegarde
-8. 🖨️ Imprimantes / Périphériques
-9. ☁️ Services Cloud (M365, Azure AD)
-10. 📧 Messagerie
-11. 🔒 VPN
-12. 🌐 DNS / DHCP
+Score (calculé automatiquement par assessment)
+  ├── total_controls
+  ├── compliant_count / non_compliant_count
+  ├── compliance_score (%)
+  └── by_severity {critical, high, medium, low}
+```
+
+**Décisions techniques Phase 1 :**
+
+- **bcrypt direct** au lieu de passlib (déprécié avec Python 3.13)
+- **python-jose** pour les JWT
+- **SQLite** en dev avec chemin absolu pour éviter les problèmes de CWD
+- **Pydantic v2** avec `model_config = ConfigDict(from_attributes=True)`
+- **Scoring automatique** : calcul du score de conformité à chaque évaluation
 
 ---
 
-### **Phase 3 — Interface Utilisateur** (Semaines 7-10)
+### ✅ Phase 2 — Moteur de Référentiels (TERMINÉE)
 
-**Objectif** : Interface web pour gérer les audits.
+**Objectif** : Référentiels YAML structurés, versioning, export, et pont Monkey365.
 
-| Tâche | Détail |
-| ------- | -------- |
-| Frontend | React, Vue.js, ou Svelte |
-| Dashboard | Vue d'ensemble des campagnes, scores globaux |
-| Gestion des campagnes | Créer, suivre, clôturer un audit |
-| Évaluation interactive | Remplir point par point avec preuves |
-| Visualisation | Graphiques radar par catégorie, jauges de conformité |
+| Tâche | Détail | Statut |
+| ------- | ------------- | -------- |
+| Format YAML | Structure standardisée pour tous les référentiels | ✅ |
+| Import dynamique | Chargement depuis fichiers YAML avec sync auto | ✅ |
+| 12 référentiels | Firewall, Switch, Windows, Linux, AD, Wi-Fi, Sauvegarde, Périphériques, M365, Messagerie, VPN, DNS/DHCP | ✅ |
+| Versioning | Clone de framework avec incrémentation de version | ✅ |
+| Export YAML | Endpoint d'export de framework vers YAML | ✅ |
+| Sync dynamique | SHA-256 hash-based, sync au démarrage + endpoint POST /sync | ✅ |
+| Monkey365 bridge | Parser JSON + Mapper règles → contrôles + Simulation | ✅ |
+| Tests | 55 tests automatisés (Phase 1 + 2) — tous passent | ✅ |
 
-**Écrans principaux :**
+**Les 12 référentiels :**
+
+| # | Référentiel | Fichier YAML | Contrôles |
+| -------- | ------------- | -------- | --------- |
+| 1 | 🔥 Firewall | `firewall_audit.yaml` | Config, règles, logs, HA, VPN |
+| 2 | 🔀 Switch | `switch_audit.yaml` | VLAN, STP, ACL, monitoring |
+| 3 | 🖥️ Serveur Windows | `server_windows_audit.yaml` | OS, AD, services, sécurité |
+| 4 | 🐧 Serveur Linux | `server_linux_audit.yaml` | SSH, firewall, users, logs |
+| 5 | 📁 Active Directory | `active_directory_audit.yaml` | GPO, comptes, réplication |
+| 6 | 📶 Wi-Fi | `wifi_audit.yaml` | SSID, chiffrement, auth, rogue |
+| 7 | 💾 Sauvegarde | `sauvegarde_audit.yaml` | Politique, tests, offsite |
+| 8 | 🖨️ Périphériques | `peripheriques_audit.yaml` | Firmware, accès, réseau |
+| 9 | ☁️ Microsoft 365 | `m365_audit.yaml` | Entra ID, Exchange, SPO, Teams |
+| 10 | 📧 Messagerie | `messagerie_audit.yaml` | SPF, DKIM, DMARC, anti-spam |
+| 11 | 🔒 VPN | `vpn_audit.yaml` | Tunnels, auth, chiffrement |
+| 12 | 🌐 DNS / DHCP | `dns_dhcp_audit.yaml` | Zones, DNSSEC, baux, scopes |
+
+**Mécanisme de sync dynamique :**
 
 ```text
-📊 Dashboard
-  ├── Campagnes en cours
-  ├── Score global de conformité
-  └── Alertes (non-conformités critiques)
+Au démarrage du serveur :
+  1. Scan du dossier frameworks/*.yaml
+  2. Calcul SHA-256 de chaque fichier
+  3. Comparaison avec source_hash en base
+  4. Si nouveau fichier → import automatique
+  5. Si hash différent → mise à jour du framework
+  6. Log détaillé des changements
 
-📋 Campagne d'audit
+Endpoint POST /api/v1/frameworks/sync :
+  → Même logique, déclenchable manuellement
+  → Retourne le détail : nouveaux, mis à jour, inchangés
+```
+
+**Décisions techniques Phase 2 :**
+
+- **SHA-256** pour détecter les changements dans les fichiers YAML
+- **`source_hash`** colonne ajoutée au modèle Framework
+- **`engine_config`** JSON pour stocker la config Monkey365 dans le framework M365
+- **`UniqueConstraint("ref_id", "version")`** pour gérer les versions
+- **Simulation Monkey365** : endpoint de test sans environnement PowerShell réel
+
+---
+
+### 🔄 Phase 3 — Interface Utilisateur (EN COURS)
+
+**Objectif** : Interface web moderne pour piloter les audits.
+
+**Choix de stack frontend (décidé en session) :**
+
+- **Next.js 16** (App Router, Turbopack)
+- **React + TypeScript**
+- **Tailwind CSS v4** + **shadcn/ui** (20 composants installés)
+- **Axios** avec intercepteur JWT automatique
+- **js-cookie** pour le stockage des tokens
+- **Lucide React** pour les icônes
+
+**Approche progressive — Dashboard en premier, puis CRUD.**
+
+| Tâche | Détail | Statut |
+| ------- | ------------- | -------- |
+| Initialisation Next.js | Projet créé, shadcn/ui configuré | ✅ |
+| Système d'auth | AuthContext, login page, AuthGuard, JWT cookies | ✅ |
+| Layout principal | Sidebar avec navigation groupée, avatar utilisateur | ✅ |
+| Dashboard | 6 stat cards, audits récents, campagnes avec scores, grille référentiels | ✅ |
+| Page Entreprises | Liste, création, modification, suppression | 🔜 |
+| Page Sites | CRUD avec lien vers entreprise parente | 🔜 |
+| Page Équipements | CRUD avec lien vers site parent | 🔜 |
+| Page Audits | Liste des campagnes, création, suivi | 🔜 |
+| Page Référentiels | Détail des frameworks, catégories, contrôles | 🔜 |
+| Page Évaluation | Interface contrôle par contrôle avec preuves | 🔜 |
+| Visualisation | Graphiques radar, jauges de conformité | 🔜 |
+
+**Ce qui est déjà fonctionnel :**
+
+```text
+📊 Dashboard (page d'accueil après login)
+  ├── 6 cartes statistiques (Entreprises, Audits, Sites, Équipements, Référentiels, Campagnes)
+  ├── Liste des audits récents avec statut et date
+  ├── Campagnes en cours avec barre de progression et score de conformité
+  └── Grille des référentiels disponibles avec nombre de catégories/contrôles
+
+🔐 Authentification
+  ├── Page de login avec formulaire username/password
+  ├── Stockage JWT dans cookies (access_token + refresh_token)
+  ├── Intercepteur Axios : injection automatique du token dans les requêtes
+  ├── Redirect automatique vers /login si token expiré (401)
+  └── AuthGuard : protection de toutes les routes
+
+🧭 Navigation (Sidebar)
+  ├── Général → Dashboard
+  ├── Gestion → Entreprises, Sites, Équipements
+  ├── Audit → Projets d'audit, Référentiels
+  └── Footer → Avatar utilisateur, rôle, menu (profil, déconnexion)
+```
+
+**Écrans restants à développer :**
+
+```text
+📋 Page Entreprises
+  ├── Tableau avec recherche et pagination
+  ├── Dialog de création/modification
+  └── Actions (voir sites, supprimer)
+
+🏢 Page Sites
+  ├── Filtrage par entreprise
+  ├── CRUD complet
+  └── Lien vers équipements du site
+
+🖥️ Page Équipements
+  ├── Filtrage par site / type
+  ├── CRUD complet
+  └── Historique des audits
+
+📋 Page Audit (Campagne)
   ├── Infos client / périmètre
   ├── Équipements à auditer
   ├── Référentiels appliqués
-  └── Progression
+  └── Progression globale
 
-✅ Évaluation
+✅ Page Évaluation
   ├── Liste des contrôles (par catégorie)
-  ├── Statut par contrôle
+  ├── Statut par contrôle (dropdown)
   ├── Zone de preuve (screenshot, texte, fichier)
   └── Zone de recommandation
 
-📈 Rapports
+📈 Rapports (Phase 5)
   ├── Synthèse exécutive
   ├── Détail par équipement
   ├── Plan de remédiation priorisé
@@ -187,12 +348,14 @@ framework:
 
 ---
 
-### **Phase 4 — Outils Intégrés** (Semaines 11-15)
+### 🔜 Phase 4 — Outils Intégrés (PLANIFIÉE)
 
-**Objectif** : Automatiser une partie de la collecte et de l'évaluation.
+**Objectif** : Automatiser la collecte et l'évaluation technique.
+
+#### Phase 4a — Outils infrastructure
 
 | Outil | Fonction | Technologie |
-| ------- | ---------- | ------------- |
+| -------- | ------------- | -------- |
 | **Scanner réseau** | Découverte d'assets, ports ouverts | Nmap (python-nmap) |
 | **Config Parser** | Analyser les configs exportées (Fortinet, Cisco...) | Parsers custom Python |
 | **Collecte WinRM/SSH** | Récupérer infos serveurs automatiquement | Paramiko, pywinrm |
@@ -201,78 +364,44 @@ framework:
 | **Vérificateur SSL/TLS** | Tester les certificats et protocoles | ssl, cryptography |
 | **Benchmark CIS** | Comparer configs vs CIS Benchmarks | Scripts d'évaluation |
 
-````python
-"""
-Exemple d'outil intégré : Analyseur de config Fortinet
-"""
-from dataclasses import dataclass
-from typing import list
+#### Phase 4b — Monkey365 pour M365/Azure (Bridge prêt)
 
+Le bridge Monkey365 est déjà implémenté en Phase 2 :
 
-@dataclass
-class FirewallFinding:
-    control_id: str
-    status: str  # "compliant", "non_compliant", "partial"
-    evidence: str
-    details: str
+- `tools/monkey365_runner/parser.py` — Parse les JSON de sortie Monkey365
+- `tools/monkey365_runner/mapper.py` — Mappe les findings vers les contrôles via `engine_rule_id`
+- `services/monkey365_service.py` — `run_scan_and_map()` (réel) + `simulate_scan()` (dev/test)
 
+**Workflow M365 :**
 
-class FortiGateConfigAnalyzer:
-    def __init__(self, config_text: str):
-        self.config = config_text
-        self.findings: list[FirewallFinding] = []
+```text
+1. Campagne avec référentiel M365 → config auth tenant
+2. Lancement Monkey365 via bridge Python → PowerShell
+3. Parse JSON résultats → Mapping auto vers contrôles
+4. Pré-remplissage des statuts + preuves
+5. Revue manuelle par l'auditeur
+6. Rapport final
+```
 
-    def check_any_any_rules(self) -> FirewallFinding:
-        """FW-011: Vérifie l'absence de règles any-any"""
-        # Parse les policies
-        dangerous_rules = []
-        in_policy = False
-        current_policy = {}
+**Ce que Monkey365 couvre :**
 
-        for line in self.config.split('\n'):
-            line = line.strip()
-            if 'edit' in line and in_policy:
-                if (current_policy.get('srcaddr') == 'all' and
-                    current_policy.get('dstaddr') == 'all' and
-                    current_policy.get('action') == 'accept'):
-                    dangerous_rules.append(current_policy.get('id', 'unknown'))
-                current_policy = {}
-            if 'config firewall policy' in line:
-                in_policy = True
-            if 'set srcaddr' in line and '"all"' in line:
-                current_policy['srcaddr'] = 'all'
-            if 'set dstaddr' in line and '"all"' in line:
-                current_policy['dstaddr'] = 'all'
-            if 'set action accept' in line:
-                current_policy['action'] = 'accept'
-
-        if dangerous_rules:
-            return FirewallFinding(
-                control_id="FW-011",
-                status="non_compliant",
-                evidence=f"Règles any-any détectées: {dangerous_rules}",
-                details="Des règles autorisant tout le trafic ont été trouvées"
-            )
-        return FirewallFinding(
-            control_id="FW-011",
-            status="compliant",
-            evidence="Aucune règle any-any détectée",
-            details=""
-        )
-
-    def run_all_checks(self) -> list[FirewallFinding]:
-        self.findings.append(self.check_any_any_rules())
-        # ... autres checks
-        return self.findings
-````
+| Domaine | Exemples de checks |
+| -------- | ------------------- |
+| **Entra ID** | MFA, Conditional Access, PIM, Guest policies |
+| **Exchange Online** | Transport rules, DKIM/DMARC/SPF, Audit logging |
+| **SharePoint Online** | Partage externe, accès anonyme, versioning |
+| **OneDrive** | Politique de partage, sync client |
+| **Teams** | Guest access, external sharing, meeting policies |
+| **Compliance Center** | DLP, Retention, Audit logs |
+| **Azure** | NSG, Storage, Key Vault, VMs, RBAC |
 
 ---
 
-### **Phase 5 — Rapports & Remédiation** (Semaines 16-18)
+### 🔜 Phase 5 — Rapports & Remédiation (PLANIFIÉE)
 
 | Tâche | Détail |
 | ------- | -------- |
-| Génération PDF | Rapport d'audit complet avec jinja2 + weasyprint |
+| Génération PDF | Rapport d'audit complet avec Jinja2 + WeasyPrint |
 | Export Word | Template .docx personnalisable (python-docx) |
 | Plan de remédiation | Priorisation automatique par sévérité et effort |
 | Suivi des remédiations | Statut des actions correctives |
@@ -280,680 +409,181 @@ class FortiGateConfigAnalyzer:
 
 ---
 
-### **Phase 6 — Fonctionnalités Avancées** (Semaines 19+)
+### 🔜 Phase 6 — Fonctionnalités Avancées (PLANIFIÉE)
 
 | Tâche | Détail |
 | ------- | -------- |
 | Multi-tenant | Gestion de plusieurs clients |
-| API REST | Intégration avec d'autres outils |
 | Scheduling | Planification d'audits récurrents |
 | IA/LLM | Suggestions de remédiation assistées par IA |
 | Marketplace de référentiels | Partage communautaire |
 | Intégration SIEM | Import de données depuis Wazuh, Elastic... |
+| Notifications | Alertes email/webhook sur événements |
 
 ---
 
-## 🛠️ Stack Technique Recommandée
+## 🔑 Décisions Techniques Clés
 
-| Couche | Technologie | Justification |
-| ------- | ---------- | ------------- |
-| Backend | **Python + FastAPI** | Rapide, async, bonne doc auto (Swagger) |
-| Frontend | **Vue.js 3 + Vuetify** ou **React + MUI** | Composants riches pour dashboards |
-| BDD | **SQLite** (dev) → **PostgreSQL** (prod) | Comme CISO Assistant |
-| ORM | **SQLAlchemy + Alembic** | Migrations de schéma |
-| Rapports | **Jinja2 + WeasyPrint** | Génération PDF |
-| Outils | **python-nmap, paramiko, pywinrm, ldap3** | Collecte automatisée |
-| Déploiement | **Docker + Docker Compose** | Facilité de déploiement |
-| Auth | **JWT + OAuth2** | Sécurité standard |
+### Authentification
+
+- **bcrypt direct** (pas passlib, déprécié avec Python 3.13)
+- **python-jose** pour encoder/décoder les JWT
+- **OAuth2PasswordRequestForm** de FastAPI
+- Tokens stockés dans **cookies** côté frontend (pas localStorage)
+- Rôles : `admin`, `auditor`, `viewer` — vérification via dépendance FastAPI
+
+### Base de données
+
+- **SQLite** en développement (fichier `instance/assistantaudit.db`)
+- Chemin absolu construit depuis `BASE_DIR` pour éviter les problèmes de CWD
+- **Alembic** pour les migrations (2 migrations : schéma initial + phase 2)
+- Migration vers **PostgreSQL** prévue pour la production
+
+### Frameworks dynamiques
+
+- Les référentiels YAML dans `frameworks/` sont la **source de vérité**
+- **SHA-256** hash du fichier stocké en base (`source_hash`)
+- **Sync automatique** au démarrage du serveur (lifespan FastAPI)
+- **POST /api/v1/frameworks/sync** pour déclencher manuellement
+- Modification du YAML → mise à jour automatique au prochain démarrage
+
+### Frontend
+
+- **Next.js App Router** (pas Pages Router)
+- **shadcn/ui** — composants copiés dans le projet (pas de dépendance externe)
+- **Intercepteur Axios** — ajoute le JWT à chaque requête, redirige vers `/login` sur 401
+- **AuthGuard** — composant wrapper qui protège toutes les routes
+- **Approche progressive** — Dashboard fonctionnel d'abord, puis pages CRUD
 
 ---
 
-## 📁 Structure de Projet Suggérée
+## 📊 Métriques du Projet
 
-```text
-AssistantAudit/
-├── backend/
-│   ├── app/
-│   │   ├── api/           # Routes FastAPI
-│   │   ├── core/          # Config, sécurité, settings
-│   │   ├── models/        # Modèles SQLAlchemy
-│   │   ├── schemas/       # Schémas Pydantic
-│   │   ├── services/      # Logique métier
-│   │   └── tools/         # Outils intégrés (scanners, parsers)
-│   ├── migrations/        # Alembic
-│   └── tests/
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── views/
-│   │   ├── stores/
-│   │   └── services/
-├── frameworks/            # Référentiels YAML
-│   ├── firewall_audit.yaml
-│   ├── switch_audit.yaml
-│   ├── server_windows.yaml
-│   ├── active_directory.yaml
-│   └── ...
-├── templates/             # Templates de rapports
-│   ├── report_pdf.html
-│   └── report_docx.py
-├── docker-compose.yml
-└── README.md
+| Métrique | Valeur |
+| -------- | ------- |
+| Endpoints API | 45 |
+| Tests automatisés | 55 (tous ✅) |
+| Modèles SQLAlchemy | 8 |
+| Référentiels YAML | 12 |
+| Composants shadcn/ui | 20 |
+| Migrations Alembic | 2 |
+
+---
+
+## 🧪 Tests & Qualité
+
+### Comment lancer les tests backend
+
+```bash
+# 1. Arrêter le serveur s'il tourne
+# 2. Supprimer la base existante
+del backend\instance\assistantaudit.db
+
+# 3. Réinitialiser la base (crée admin + importe les 12 frameworks)
+cd backend
+python init_db.py
+
+# 4. Lancer le serveur
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# 5. Lancer les tests (dans un autre terminal)
+cd backend
+python test_phase2.py
+```
+
+**Identifiants admin** : `admin` / `Admin@2026!`
+
+### Comment lancer le frontend
+
+```bash
+cd frontend
+npm run dev
+# → http://localhost:3000
 ```
 
 ---
 
-## ✅ Prochaine action recommandée
+## 📝 Journal de Bord
 
-1. **Commencer par Phase 1** : Initialiser le projet, définir le modèle de données
-2. **En parallèle** : Convertir vos mini-audits existants en fichiers YAML (Phase 2)
-3. Créer un prototype fonctionnel minimal : un référentiel → une campagne → un rapport
+### Session 1 — Phase 1 : Fondations
 
-Voulez-vous que je commence par initialiser la structure du projet, créer le modèle de données, ou convertir un de vos mini-audits en référentiel YAML ?
+- Création du projet FastAPI complet
+- 8 modèles, schémas, services, routes
+- Auth JWT avec bcrypt
+- 38 tests passent
+- Analyse de gaps → ajout Alembic, scoring, rôles
 
-User: Alors il faut aussi pensé qu'on va faires Audit M365 pour ça je pensais me baser en backend sur Monkey 365 pour ça
+### Session 2 — Phase 2 : Référentiels & Monkey365
 
-GitHub Copilot:
+- Versioning des frameworks (clone + version++)
+- Export YAML d'un framework
+- 5 nouveaux référentiels (total 12)
+- Bridge Monkey365 : parser JSON, mapper, service de simulation
+- 55 tests passent
 
-# Intégration Monkey365 pour l'Audit M365
+### Session 3 — Frameworks Dynamiques
 
-Excellente idée ! **Monkey365** est un outil PowerShell open-source mature qui audite M365, Azure AD et Azure. L'intégrer comme moteur backend pour la partie cloud est très pertinent.
+- Ajout `source_hash` SHA-256 sur les frameworks
+- Sync automatique au démarrage du serveur
+- Endpoint POST /frameworks/sync
+- Les YAML sont désormais la source de vérité
+
+### Session 4 — Phase 3 : Frontend (en cours)
+
+- Choix du stack : Next.js + React + TypeScript + Tailwind + shadcn/ui
+- Installation de 20 composants UI
+- Pages créées : login, dashboard, layout avec sidebar
+- Système d'auth complet : AuthContext, AuthGuard, intercepteur JWT
+- Dashboard avec stats live depuis l'API
+- Bug fix : gestion des scores null (`toFixed` sur undefined)
 
 ---
 
-## 🐒 Ce que Monkey365 couvre déjà
+## 🗺️ Prochaines Étapes (Phase 3 suite)
 
-| Domaine | Exemples de checks |
-| --------- | ------------------- |
-| **Entra ID (Azure AD)** | MFA, Conditional Access, PIM, Guest policies, Password policies |
-| **Exchange Online** | Transport rules, DKIM/DMARC/SPF, Audit logging, Mailbox permissions |
-| **SharePoint Online** | Partage externe, accès anonyme, versioning |
-| **OneDrive** | Politique de partage, sync client |
-| **Teams** | Guest access, external sharing, meeting policies |
-| **Compliance Center** | DLP, Retention, eDiscovery, Audit logs |
-| **Azure** | NSG, Storage, Key Vault, VMs, RBAC |
+1. **Pages CRUD** : Entreprises, Sites, Équipements (tableaux + formulaires)
+2. **Page Audits** : Création de campagne, sélection framework + équipements
+3. **Page Évaluation** : Interface contrôle par contrôle avec statut + preuve
+4. **Page Référentiels** : Vue détaillée des frameworks avec catégories et contrôles
+5. **Visualisation** : Graphiques de conformité (radar, jauges, tendances)
 
 ---
 
-## 📐 Architecture d'intégration
+## 🐒 Détail technique : Intégration Monkey365
+
+### Architecture du bridge
 
 ```text
-AssistantAudit
+AssistantAudit (Python/FastAPI)
 │
-├── Core Engine
-│   ├── Référentiels YAML
-│   │   ├── firewall_audit.yaml
-│   │   ├── m365_audit.yaml          ◄── Mappé aux règles Monkey365
-│   │   ├── azure_ad_audit.yaml      ◄── Mappé aux règles Monkey365
-│   │   └── ...
-│   │
-│   └── Evaluation Engine
-│       ├── Local Tools (nmap, parsers...)
-│       └── Monkey365 Bridge ◄────────────────────┐
-│                                                   │
-├── tools/                                          │
-│   ├── monkey365_runner/                           │
-│   │   ├── executor.py      # Pilote Monkey365     │
-│   │   ├── parser.py        # Parse les résultats  │
-│   │   ├── mapper.py        # Mappe vers contrôles │
-│   │   └── config.py        # Configuration auth   │
-│   │                                               │
-│   └── ...                                         │
-│                                                   │
-└── integrations/                                   │
-    └── monkey365/           # Submodule ou install  ┘
-        └── (clone du repo Monkey365)
+├── tools/monkey365_runner/
+│   ├── parser.py        # Parse les JSON de sortie Monkey365
+│   ├── mapper.py        # Mappe findings → contrôles via engine_rule_id
+│   └── config.py        # Configuration auth tenant
+│
+├── services/
+│   └── monkey365_service.py
+│       ├── run_scan_and_map()    # Exécution réelle (PowerShell)
+│       └── simulate_scan()       # Simulation pour dev/test
+│
+└── Référentiel m365_audit.yaml
+    └── engine: "monkey365"
+    └── engine_config: {provider, rulesets, auth_methods}
+    └── Chaque contrôle a un engine_rule_id mappé
 ```
 
----
-
-## 🔧 Comment intégrer Monkey365
-
-### Approche 1 : Exécution PowerShell depuis Python (Recommandée)
-
-````python
-"""
-Bridge Python → Monkey365 (PowerShell)
-Exécute Monkey365 et récupère les résultats JSON
-"""
-import subprocess
-import json
-import os
-from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional
-from enum import Enum
-
-
-class M365Provider(str, Enum):
-    MICROSOFT365 = "Microsoft365"
-    AZURE = "Azure"
-    ENTRA_ID = "EntraID"
-
-
-class AuthMethod(str, Enum):
-    INTERACTIVE = "interactive"
-    CLIENT_CREDENTIALS = "client_credentials"
-    CERTIFICATE = "certificate"
-
-
-@dataclass
-class Monkey365Config:
-    provider: M365Provider = M365Provider.MICROSOFT365
-    auth_method: AuthMethod = AuthMethod.CLIENT_CREDENTIALS
-    tenant_id: str = ""
-    client_id: str = ""
-    client_secret: str = ""
-    certificate_path: Optional[str] = None
-    output_dir: str = "./monkey365_output"
-    rulesets: list[str] = field(default_factory=lambda: [
-        "cis_m365_benchmark"
-    ])
-    # Plugins spécifiques à exécuter (vide = tous)
-    plugins: list[str] = field(default_factory=list)
-
-
-class Monkey365Executor:
-    """
-    Exécute Monkey365 via PowerShell et récupère les résultats
-    """
-
-    def __init__(self, config: Monkey365Config):
-        self.config = config
-        self.monkey365_path = self._find_monkey365()
-        self.output_dir = Path(config.output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-
-    def _find_monkey365(self) -> Path:
-        """Localise l'installation de Monkey365"""
-        possible_paths = [
-            Path("./integrations/monkey365/Invoke-Monkey365.ps1"),
-            Path(os.environ.get("MONKEY365_PATH", "")),
-        ]
-        for p in possible_paths:
-            if p.exists():
-                return p
-        raise FileNotFoundError(
-            "Monkey365 non trouvé. Installer avec: "
-            "git submodule add https://github.com/silverhack/monkey365 "
-            "integrations/monkey365"
-        )
-
-    def _build_command(self, scan_id: str) -> str:
-        """Construit la commande PowerShell pour Monkey365"""
-        output_path = self.output_dir / scan_id
-
-        # Construction du script PowerShell
-        ps_script = f"""
-        Import-Module '{self.monkey365_path.parent}' -Force
-
-        $params = @{{
-            Instance       = '{self.config.provider.value}'
-            Analysis       = @({', '.join(f"'{p}'" for p in self._get_analysis_list())})
-            ExportTo       = @('JSON', 'HTML')
-            OutDir         = '{output_path}'
-            TenantId       = '{self.config.tenant_id}'
-        }}
-        """
-
-        if self.config.auth_method == AuthMethod.CLIENT_CREDENTIALS:
-            ps_script += f"""
-        $clientSecret = ConvertTo-SecureString '{self.config.client_secret}' -AsPlainText -Force
-        $credential = New-Object System.Management.Automation.PSCredential(
-            '{self.config.client_id}', $clientSecret
-        )
-        $params['AppCredential'] = $credential
-        $params['ConfidentialApp'] = $true
-        """
-        elif self.config.auth_method == AuthMethod.CERTIFICATE:
-            ps_script += f"""
-        $params['ClientId'] = '{self.config.client_id}'
-        $params['CertificateThumbprint'] = '{self.config.certificate_path}'
-        """
-
-        if self.config.rulesets:
-            ruleset_paths = ', '.join(
-                f"'{self.monkey365_path.parent / 'rulesets' / r}.json'"
-                for r in self.config.rulesets
-            )
-            ps_script += f"""
-        $params['RuleSets'] = @({ruleset_paths})
-        """
-
-        ps_script += """
-        Invoke-Monkey365 @params
-        """
-
-        return ps_script
-
-    def _get_analysis_list(self) -> list[str]:
-        """Retourne la liste des plugins/analyses à exécuter"""
-        if self.config.plugins:
-            return self.config.plugins
-
-        # Par défaut selon le provider
-        default_analyses = {
-            M365Provider.MICROSOFT365: [
-                "ExchangeOnline", "SharePointOnline",
-                "MicrosoftTeams", "MicrosoftForms",
-                "Purview"
-            ],
-            M365Provider.ENTRA_ID: [
-                "EntraID", "EntraIDIdentityGovernance",
-                "ConditionalAccess"
-            ],
-            M365Provider.AZURE: [
-                "Compute", "Networking", "Storage",
-                "KeyVault", "RBAC", "Monitor"
-            ]
-        }
-        return default_analyses.get(self.config.provider, [])
-
-    async def run_scan(self, scan_id: str) -> dict:
-        """
-        Lance un scan Monkey365 et retourne les résultats parsés
-        """
-        ps_command = self._build_command(scan_id)
-
-        # Écrire le script temporaire
-        script_path = self.output_dir / f"{scan_id}_script.ps1"
-        script_path.write_text(ps_command, encoding='utf-8')
-
-        try:
-            process = subprocess.run(
-                [
-                    "pwsh", "-NoProfile", "-NonInteractive",
-                    "-ExecutionPolicy", "Bypass",
-                    "-File", str(script_path)
-                ],
-                capture_output=True,
-                text=True,
-                timeout=3600  # 1h max
-            )
-
-            if process.returncode != 0:
-                return {
-                    "status": "error",
-                    "scan_id": scan_id,
-                    "error": process.stderr,
-                    "stdout": process.stdout
-                }
-
-            # Parser les résultats JSON générés par Monkey365
-            results = self._parse_output(scan_id)
-            return {
-                "status": "success",
-                "scan_id": scan_id,
-                "results": results
-            }
-
-        except subprocess.TimeoutExpired:
-            return {
-                "status": "timeout",
-                "scan_id": scan_id,
-                "error": "Scan exceeded 1 hour timeout"
-            }
-        finally:
-            # Nettoyer le script temporaire
-            if script_path.exists():
-                script_path.unlink()
-
-    def _parse_output(self, scan_id: str) -> list[dict]:
-        """Parse les fichiers JSON de sortie Monkey365"""
-        output_path = self.output_dir / scan_id
-        results = []
-
-        # Monkey365 génère des JSON dans le répertoire de sortie
-        for json_file in output_path.rglob("*.json"):
-            try:
-                data = json.loads(json_file.read_text(encoding='utf-8'))
-                if isinstance(data, list):
-                    results.extend(data)
-                elif isinstance(data, dict):
-                    results.append(data)
-            except json.JSONDecodeError:
-                continue
-
-        return results
-````
-
-### Mapper les résultats Monkey365 → Référentiel AssistantAudit
-
-````python
-"""
-Mappe les findings Monkey365 vers les contrôles du référentiel AssistantAudit
-"""
-from dataclasses import dataclass
-from typing import Optional
-
-
-@dataclass
-class MappedFinding:
-    control_id: str          # ID dans notre référentiel (ex: M365-EXO-001)
-    monkey365_rule_id: str   # ID de la règle Monkey365
-    title: str
-    status: str              # compliant / non_compliant / partial / not_assessed
-    severity: str            # critical / high / medium / low / info
-    evidence: str            # Preuve collectée
-    affected_resources: list[str]
-    remediation: str
-    cis_reference: Optional[str] = None
-
-
-class Monkey365Mapper:
-    """
-    Mappe les résultats Monkey365 vers le format AssistantAudit
-    """
-
-    # Mapping entre les règles Monkey365 et nos contrôles
-    RULE_MAPPING = {
-        # Exchange Online
-        "monkey365_eo_audit_enabled": {
-            "control_id": "M365-EXO-001",
-            "category": "Exchange Online - Journalisation"
-        },
-        "monkey365_eo_transport_rules": {
-            "control_id": "M365-EXO-010",
-            "category": "Exchange Online - Transport"
-        },
-        "monkey365_eo_dkim_enabled": {
-            "control_id": "M365-EXO-020",
-            "category": "Exchange Online - Authentification Email"
-        },
-        "monkey365_eo_dmarc_policy": {
-            "control_id": "M365-EXO-021",
-            "category": "Exchange Online - Authentification Email"
-        },
-
-        # Entra ID
-        "monkey365_aad_mfa_status": {
-            "control_id": "M365-AAD-001",
-            "category": "Entra ID - Authentification"
-        },
-        "monkey365_aad_conditional_access": {
-            "control_id": "M365-AAD-010",
-            "category": "Entra ID - Accès Conditionnel"
-        },
-        "monkey365_aad_guest_policy": {
-            "control_id": "M365-AAD-020",
-            "category": "Entra ID - Identités Externes"
-        },
-        "monkey365_aad_password_policy": {
-            "control_id": "M365-AAD-030",
-            "category": "Entra ID - Mots de passe"
-        },
-
-        # SharePoint Online
-        "monkey365_spo_external_sharing": {
-            "control_id": "M365-SPO-001",
-            "category": "SharePoint Online - Partage"
-        },
-        "monkey365_spo_anonymous_links": {
-            "control_id": "M365-SPO-002",
-            "category": "SharePoint Online - Partage"
-        },
-
-        # Teams
-        "monkey365_teams_external_access": {
-            "control_id": "M365-TEAMS-001",
-            "category": "Teams - Accès Externe"
-        },
-        "monkey365_teams_guest_access": {
-            "control_id": "M365-TEAMS-002",
-            "category": "Teams - Accès Invité"
-        },
-    }
-
-    @classmethod
-    def map_results(cls, monkey365_results: list[dict]) -> list[MappedFinding]:
-        """Convertit les résultats Monkey365 en findings AssistantAudit"""
-        mapped = []
-
-        for finding in monkey365_results:
-            rule_id = finding.get("idSuffix", finding.get("id", ""))
-            mapping = cls.RULE_MAPPING.get(rule_id)
-
-            if not mapping:
-                # Règle non mappée — on la garde quand même
-                control_id = f"M365-UNMAPPED-{rule_id}"
-            else:
-                control_id = mapping["control_id"]
-
-            # Monkey365 utilise des niveaux : Good, Warning, Fail, Info, Manual
-            status_map = {
-                "Good": "compliant",
-                "Pass": "compliant",
-                "Warning": "partial",
-                "Fail": "non_compliant",
-                "Info": "info",
-                "Manual": "not_assessed"
-            }
-
-            severity_map = {
-                "critical": "critical",
-                "high": "high",
-                "medium": "medium",
-                "low": "low",
-                "info": "info"
-            }
-
-            mapped.append(MappedFinding(
-                control_id=control_id,
-                monkey365_rule_id=rule_id,
-                title=finding.get("title", finding.get("checkName", "")),
-                status=status_map.get(
-                    finding.get("level", finding.get("status", "")),
-                    "not_assessed"
-                ),
-                severity=severity_map.get(
-                    finding.get("severity", "medium"), "medium"
-                ),
-                evidence=str(finding.get("output", finding.get("rawData", ""))),
-                affected_resources=finding.get(
-                    "affectedResources",
-                    finding.get("resources", [])
-                ),
-                remediation=finding.get(
-                    "remediation",
-                    finding.get("rationale", "")
-                ),
-                cis_reference=finding.get("references", {}).get("cis", None)
-            ))
-
-        return mapped
-````
-
----
-
-### Référentiel M365 correspondant
-
-````yaml
-framework:
-  name: "Audit Microsoft 365"
-  version: "1.0"
-  description: "Référentiel d'audit M365 - basé sur CIS Benchmark et Monkey365"
-  engine: "monkey365"  # ◄── Indique le moteur d'évaluation
-  
-  engine_config:
-    provider: "Microsoft365"
-    rulesets:
-      - "cis_m365_benchmark"
-    auth_methods:
-      - "client_credentials"
-      - "certificate"
-      - "interactive"
-    required_permissions:
-      - "Directory.Read.All"
-      - "Policy.Read.All"
-      - "SecurityEvents.Read.All"
-      - "Exchange.ManageAsApp"
-
-  categories:
-    - name: "Entra ID - Authentification"
-      controls:
-        - id: M365-AAD-001
-          title: "MFA activé pour tous les utilisateurs"
-          description: "L'authentification multifacteur est obligatoire pour tous les comptes"
-          severity: critical
-          check_type: automatic
-          monkey365_rule: "monkey365_aad_mfa_status"
-          cis_reference: "CIS M365 1.1.1"
-          remediation: |
-            1. Aller dans Entra ID > Sécurité > Accès conditionnel
-            2. Créer une politique exigeant le MFA pour tous les utilisateurs
-            3. Exclure uniquement les comptes de service avec justification
-
-        - id: M365-AAD-002
-          title: "Méthodes d'authentification Legacy bloquées"
-          description: "Les protocoles d'authentification legacy (POP, IMAP, SMTP Auth) sont bloqués"
-          severity: critical
-          check_type: automatic
-          monkey365_rule: "monkey365_aad_legacy_auth"
-          cis_reference: "CIS M365 1.1.3"
-
-    - name: "Entra ID - Accès Conditionnel"
-      controls:
-        - id: M365-AAD-010
-          title: "Politiques d'accès conditionnel configurées"
-          description: "Des politiques CA couvrent les scénarios critiques"
-          severity: high
-          check_type: automatic
-          monkey365_rule: "monkey365_aad_conditional_access"
-          sub_checks:
-            - "CA bloquant les pays non autorisés"
-            - "CA exigeant appareil conforme"
-            - "CA bloquant legacy auth"
-            - "CA exigeant MFA pour admins"
-
-        - id: M365-AAD-011
-          title: "Politique de risque Sign-in configurée"
-          description: "Une politique détectant les connexions risquées est active"
-          severity: high
-          check_type: automatic
-          monkey365_rule: "monkey365_aad_signin_risk"
-
-    - name: "Entra ID - Identités Externes"
-      controls:
-        - id: M365-AAD-020
-          title: "Politique d'invitation des invités restrictive"
-          description: "Seuls les admins peuvent inviter des utilisateurs externes"
-          severity: high
-          check_type: automatic
-          monkey365_rule: "monkey365_aad_guest_policy"
-
-    - name: "Entra ID - Rôles & Privilèges"
-      controls:
-        - id: M365-AAD-030
-          title: "Nombre de Global Admins limité (2-4)"
-          description: "Le nombre de Global Administrators est entre 2 et 4"
-          severity: critical
-          check_type: automatic
-          monkey365_rule: "monkey365_aad_global_admins_count"
-
-        - id: M365-AAD-031
-          title: "PIM activé pour les rôles privilégiés"
-          description: "Privileged Identity Management est utilisé pour les rôles sensibles"
-          severity: high
-          check_type: automatic
-          monkey365_rule: "monkey365_aad_pim_enabled"
-
-    - name: "Exchange Online - Sécurité"
-      controls:
-        - id: M365-EXO-001
-          title: "Journalisation d'audit activée"
-          description: "L'audit unifié est activé dans Exchange Online"
-          severity: critical
-          check_type: automatic
-          monkey365_rule: "monkey365_eo_audit_enabled"
-          cis_reference: "CIS M365 3.1.1"
-
-        - id: M365-EXO-020
-          title: "DKIM configuré et actif"
-          description: "DKIM est configuré pour tous les domaines"
-          severity: high
-          check_type: automatic
-          monkey365_rule: "monkey365_eo_dkim_enabled"
-
-        - id: M365-EXO-021
-          title: "DMARC configuré avec policy reject/quarantine"
-          description: "Un enregistrement DMARC avec politique enforce existe"
-          severity: high
-          check_type: automatic
-          monkey365_rule: "monkey365_eo_dmarc_policy"
-
-        - id: M365-EXO-022
-          title: "SPF configuré correctement"
-          description: "L'enregistrement SPF est présent et correctement configuré"
-          severity: high
-          check_type: automatic
-          monkey365_rule: "monkey365_eo_spf_record"
-
-    - name: "SharePoint Online - Partage"
-      controls:
-        - id: M365-SPO-001
-          title: "Partage externe limité"
-          description: "Le partage externe est limité aux invités existants ou désactivé"
-          severity: high
-          check_type: automatic
-          monkey365_rule: "monkey365_spo_external_sharing"
-
-        - id: M365-SPO-002
-          title: "Liens anonymes désactivés"
-          description: "Les liens 'Anyone' ne sont pas autorisés"
-          severity: critical
-          check_type: automatic
-          monkey365_rule: "monkey365_spo_anonymous_links"
-
-    - name: "Teams - Configuration"
-      controls:
-        - id: M365-TEAMS-001
-          title: "Accès externe contrôlé"
-          description: "La fédération Teams est limitée aux domaines autorisés"
-          severity: medium
-          check_type: automatic
-          monkey365_rule: "monkey365_teams_external_access"
-
-        - id: M365-TEAMS-002
-          title: "Accès invité contrôlé"
-          description: "L'accès invité dans Teams est configuré selon la politique"
-          severity: medium
-          check_type: automatic
-          monkey365_rule: "monkey365_teams_guest_access"
-
-    - name: "Conformité & Protection des données"
-      controls:
-        - id: M365-COMP-001
-          title: "Politiques DLP configurées"
-          description: "Des politiques de prévention de fuite de données sont actives"
-          severity: high
-          check_type: semi-automatic
-          monkey365_rule: "monkey365_purview_dlp"
-
-        - id: M365-COMP-002
-          title: "Rétention des logs d'audit"
-          description: "Les logs d'audit sont conservés au minimum 90 jours"
-          severity: high
-          check_type: automatic
-          monkey365_rule: "monkey365_purview_audit_retention"
-````
-
----
-
-## 🔄 Workflow d'un audit M365 dans AssistantAudit
+### Workflow d'audit M365
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
 │ 1. CRÉATION CAMPAGNE                                         │
-│    Auditeur sélectionne le référentiel "Audit M365"          │
-│    Configure le tenant (tenant_id, auth method)              │
+│    Sélection du référentiel "Audit M365"                     │
+│    Configuration du tenant (tenant_id, auth method)          │
 └──────────────────┬───────────────────────────────────────────┘
                    ▼
 ┌──────────────────────────────────────────────────────────────┐
 │ 2. SCAN AUTOMATIQUE                                          │
-│    AssistantAudit lance Monkey365 via le bridge Python        │
-│    ┌─────────────────────────────────────────────┐           │
-│    │  pwsh → Invoke-Monkey365 → JSON output      │           │
-│    └─────────────────────────────────────────────┘           │
+│    Lancement Monkey365 via bridge Python → PowerShell        │
 │    Progression affichée en temps réel                        │
 └──────────────────┬───────────────────────────────────────────┘
                    ▼
@@ -972,7 +602,7 @@ framework:
 ┌──────────────────────────────────────────────────────────────┐
 │ 4. REVUE MANUELLE                                            │
 │    L'auditeur valide/ajuste les résultats auto               │
-│    Complete les contrôles manuels                            │
+│    Complète les contrôles manuels                            │
 │    Ajoute ses observations                                   │
 └──────────────────┬───────────────────────────────────────────┘
                    ▼
@@ -983,38 +613,83 @@ framework:
 └──────────────────────────────────────────────────────────────┘
 ```
 
----
+### Installation de Monkey365
 
-## 📦 Installation de Monkey365
-
-````powershell
-# Installation de Monkey365 comme sous-module
-
+```powershell
 # Option 1: Git submodule
 git submodule add https://github.com/silverhack/monkey365.git integrations/monkey365
 
 # Option 2: PowerShell Gallery
 Install-Module -Name monkey365 -Scope CurrentUser -Force
-
-# Vérification
-Import-Module ./integrations/monkey365 -Force
-Get-Command Invoke-Monkey365
-````
+```
 
 ---
 
-## 📋 Plan mis à jour
+## 📖 Exemple de référentiel YAML
 
-| Phase | Contenu | Moteur |
-| ------- | --------- | -------- |
-| Phase 1 | Fondations & Modèle de données | - |
-| Phase 2 | Référentiels (Infra **+ M365**) | - |
-| Phase 3 | Interface Utilisateur | - |
-| Phase 4a | Outils intégrés infra | nmap, parsers, SSH/WinRM |
-| **Phase 4b** | **Outils intégrés M365/Azure** | **Monkey365** |
-| Phase 5 | Rapports & Remédiation | - |
-| Phase 6 | Fonctionnalités avancées | - |
+### Référentiel infrastructure classique
 
-L'avantage majeur : Monkey365 évolue avec les changements de Microsoft, vous n'avez qu'à maintenir le **mapping** entre leurs règles et vos contrôles.
+```yaml
+framework:
+  name: "Audit Firewall"
+  version: "1.0"
+  ref_id: "firewall-audit"
+  description: "Référentiel d'audit pour les pare-feu"
+  categories:
+    - name: "Configuration Générale"
+      controls:
+        - id: FW-001
+          title: "Firmware à jour"
+          description: "Le firmware est à la dernière version stable"
+          severity: high
+          check_type: manual
+          evidence_required: true
+          remediation: "Mettre à jour vers la dernière version stable"
 
-Voulez-vous que je commence à initialiser la structure du projet, ou que je développe un autre référentiel spécifique ?
+        - id: FW-002
+          title: "Accès administration sécurisé"
+          description: "L'accès admin est limité à HTTPS/SSH uniquement"
+          severity: high
+          check_type: automatic
+          auto_check: "check_admin_protocols"
+
+    - name: "Règles de filtrage"
+      controls:
+        - id: FW-010
+          title: "Règle deny-all par défaut"
+          severity: critical
+          check_type: semi-automatic
+
+        - id: FW-011
+          title: "Pas de règle any-any"
+          severity: critical
+          check_type: automatic
+          auto_check: "check_any_any_rules"
+```
+
+### Référentiel M365 (motorisé par Monkey365)
+
+```yaml
+framework:
+  name: "Audit Microsoft 365"
+  version: "1.0"
+  ref_id: "m365-audit"
+  engine: "monkey365"
+  engine_config:
+    provider: "Microsoft365"
+    rulesets: ["cis_m365_benchmark"]
+    auth_methods: ["client_credentials", "certificate", "interactive"]
+  categories:
+    - name: "Entra ID - Authentification"
+      controls:
+        - id: M365-AAD-001
+          title: "MFA activé pour tous les utilisateurs"
+          severity: critical
+          check_type: automatic
+          engine_rule_id: "monkey365_aad_mfa_status"
+          cis_reference: "CIS M365 1.1.1"
+```
+
+---
+
+> **Rappel** : Ce document est mis à jour à chaque session de développement pour garder le fil du projet. Il sert de référence pour comprendre où on en est, quelles décisions ont été prises, et ce qu'il reste à faire.

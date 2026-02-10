@@ -1,6 +1,11 @@
 """
 Service Framework : chargement, import/export de référentiels YAML, versioning.
+
+100% dynamique : les fichiers YAML du dossier frameworks/ sont la source de vérité.
+Au démarrage du serveur, les référentiels sont automatiquement synchronisés en base.
+Un nouveau fichier YAML est détecté et importé sans modification de code.
 """
+import hashlib
 import logging
 from pathlib import Path
 from typing import Optional
@@ -14,6 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class FrameworkService:
+
+    # ------------------------------------------------------------------ #
+    #  Listing / get
+    # ------------------------------------------------------------------ #
 
     @staticmethod
     def list_frameworks(
@@ -37,6 +46,15 @@ class FrameworkService:
         """Récupère un référentiel par son ref_id"""
         return db.query(Framework).filter(Framework.ref_id == ref_id).first()
 
+    # ------------------------------------------------------------------ #
+    #  Import (YAML → BDD)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _file_hash(path: Path) -> str:
+        """Calcule un hash SHA-256 du contenu d'un fichier YAML."""
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
     @staticmethod
     def import_from_yaml(db: Session, yaml_path: str | Path) -> Framework:
         """
@@ -55,11 +73,21 @@ class FrameworkService:
         ref_id = fw_data.get("ref_id", yaml_path.stem)
         name = fw_data["name"]
         version = fw_data.get("version", "1.0")
+        file_hash = FrameworkService._file_hash(yaml_path)
 
-        # Vérifier si le framework existe déjà
-        existing = db.query(Framework).filter(Framework.ref_id == ref_id).first()
+        # Vérifier si le framework existe déjà (même ref_id + version)
+        existing = (
+            db.query(Framework)
+            .filter(Framework.ref_id == ref_id, Framework.version == version)
+            .first()
+        )
         if existing:
-            logger.info(f"Mise à jour du framework '{ref_id}' depuis {yaml_path.name}")
+            # Si le fichier n'a pas changé, skip
+            if existing.source_hash == file_hash:
+                logger.debug(f"Framework '{ref_id}' v{version} inchangé, skip")
+                return existing
+
+            logger.info(f"Mise à jour du framework '{ref_id}' v{version} depuis {yaml_path.name}")
             # Supprimer les anciennes catégories (cascade supprimera les contrôles)
             for cat in existing.categories:
                 db.delete(cat)
@@ -71,8 +99,9 @@ class FrameworkService:
             framework.engine = fw_data.get("engine")
             framework.engine_config = fw_data.get("engine_config")
             framework.source_file = str(yaml_path)
+            framework.source_hash = file_hash
         else:
-            logger.info(f"Import du nouveau framework '{ref_id}' depuis {yaml_path.name}")
+            logger.info(f"Import du nouveau framework '{ref_id}' v{version} depuis {yaml_path.name}")
             framework = Framework(
                 ref_id=ref_id,
                 name=name,
@@ -81,6 +110,7 @@ class FrameworkService:
                 engine=fw_data.get("engine"),
                 engine_config=fw_data.get("engine_config"),
                 source_file=str(yaml_path),
+                source_hash=file_hash,
             )
             db.add(framework)
             db.flush()
@@ -141,6 +171,69 @@ class FrameworkService:
 
         logger.info(f"{len(frameworks)} frameworks importés depuis {directory}")
         return frameworks
+
+    # ------------------------------------------------------------------ #
+    #  Sync automatique (détection fichiers nouveaux/modifiés)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def sync_from_directory(db: Session, directory: str | Path) -> dict:
+        """
+        Synchronise les frameworks YAML ↔ BDD.
+        - Importe les nouveaux fichiers YAML
+        - Met à jour les frameworks dont le fichier a changé (hash différent)
+        - Skipe les fichiers inchangés
+        
+        Retourne un résumé : {imported, updated, unchanged, errors}
+        """
+        directory = Path(directory)
+        if not directory.exists():
+            logger.warning(f"Répertoire de frameworks inexistant : {directory}")
+            return {"imported": 0, "updated": 0, "unchanged": 0, "errors": []}
+
+        result = {"imported": 0, "updated": 0, "unchanged": 0, "errors": []}
+
+        for yaml_file in sorted(directory.glob("*.yaml")):
+            try:
+                file_hash = FrameworkService._file_hash(yaml_file)
+
+                # Lire le ref_id et version du fichier
+                with open(yaml_file, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                fw_data = data.get("framework", data)
+                ref_id = fw_data.get("ref_id", yaml_file.stem)
+                version = fw_data.get("version", "1.0")
+
+                # Chercher en base
+                existing = (
+                    db.query(Framework)
+                    .filter(Framework.ref_id == ref_id, Framework.version == version)
+                    .first()
+                )
+
+                if existing and existing.source_hash == file_hash:
+                    result["unchanged"] += 1
+                    continue
+
+                # Import (crée ou met à jour)
+                FrameworkService.import_from_yaml(db, yaml_file)
+                if existing:
+                    result["updated"] += 1
+                else:
+                    result["imported"] += 1
+
+            except Exception as e:
+                logger.error(f"Erreur sync de {yaml_file.name}: {e}")
+                result["errors"].append(f"{yaml_file.name}: {str(e)}")
+                continue
+
+        total = result["imported"] + result["updated"] + result["unchanged"]
+        logger.info(
+            f"Sync frameworks : {total} fichiers traités "
+            f"({result['imported']} nouveaux, {result['updated']} mis à jour, "
+            f"{result['unchanged']} inchangés)"
+        )
+        return result
 
     @staticmethod
     def export_to_yaml(db: Session, framework_id: int, output_path: str | Path) -> Path:

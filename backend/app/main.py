@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import get_settings
-from .core.database import create_all_tables
+from .core.database import create_all_tables, SessionLocal
 
 settings = get_settings()
 
@@ -45,6 +45,23 @@ async def lifespan(app: FastAPI):
 
     # Créer le dossier frameworks
     Path(settings.FRAMEWORKS_DIR).mkdir(parents=True, exist_ok=True)
+
+    # Auto-sync des référentiels YAML → BDD au démarrage
+    from .services.framework_service import FrameworkService
+    db = SessionLocal()
+    try:
+        sync_result = FrameworkService.sync_from_directory(db, settings.FRAMEWORKS_DIR)
+        total = sync_result['imported'] + sync_result['updated'] + sync_result['unchanged']
+        logger.info(
+            f"Sync référentiels : {total} frameworks "
+            f"({sync_result['imported']} nouveaux, {sync_result['updated']} mis à jour, "
+            f"{sync_result['unchanged']} inchangés)"
+        )
+        if sync_result['errors']:
+            for err in sync_result['errors']:
+                logger.error(f"  Erreur sync : {err}")
+    finally:
+        db.close()
 
     logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} démarré ({settings.ENV})")
     yield

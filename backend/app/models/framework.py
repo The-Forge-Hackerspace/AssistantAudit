@@ -53,6 +53,7 @@ class Framework(Base):
     engine_config: Mapped[dict | None] = mapped_column(JSON)  # config moteur (auth, plugins...)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     source_file: Mapped[str | None] = mapped_column(String(500))  # chemin YAML source
+    source_hash: Mapped[str | None] = mapped_column(String(64))  # SHA-256 du fichier YAML
 
     # Versioning
     parent_version_id: Mapped[int | None] = mapped_column(
