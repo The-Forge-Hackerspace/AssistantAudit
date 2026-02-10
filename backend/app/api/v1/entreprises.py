@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, PaginationParams
+from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
 from ...models.entreprise import Entreprise, Contact
 from ...models.user import User
 from ...schemas.entreprise import (
@@ -46,7 +46,7 @@ async def list_entreprises(
 async def create_entreprise(
     body: EntrepriseCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_auditeur),
 ):
     """Crée une entreprise avec ses contacts"""
     existing = db.query(Entreprise).filter(Entreprise.nom == body.nom).first()
@@ -98,7 +98,7 @@ async def update_entreprise(
     entreprise_id: int,
     body: EntrepriseUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_auditeur),
 ):
     """Met à jour une entreprise"""
     entreprise = db.get(Entreprise, entreprise_id)
@@ -118,7 +118,7 @@ async def update_entreprise(
 async def delete_entreprise(
     entreprise_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_admin),
 ):
     """Supprime une entreprise"""
     entreprise = db.get(Entreprise, entreprise_id)

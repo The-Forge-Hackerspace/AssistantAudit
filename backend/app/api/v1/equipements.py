@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, PaginationParams
+from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
 from ...models.equipement import (
     Equipement,
     EquipementReseau,
@@ -105,7 +105,7 @@ async def list_equipements(
 async def create_equipement(
     body: EquipementCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_auditeur),
 ):
     """Crée un nouvel équipement dans un site"""
     # Vérifier que le site existe
@@ -169,7 +169,7 @@ async def update_equipement(
     equipement_id: int,
     body: EquipementUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_auditeur),
 ):
     """Modifie un équipement"""
     equipement = db.get(Equipement, equipement_id)
@@ -203,7 +203,7 @@ async def update_equipement(
 async def delete_equipement(
     equipement_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_admin),
 ):
     """Supprime un équipement et ses assessments associés"""
     equipement = db.get(Equipement, equipement_id)

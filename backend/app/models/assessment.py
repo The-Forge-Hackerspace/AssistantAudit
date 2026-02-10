@@ -184,7 +184,7 @@ class ControlResult(Base):
 
     # Relations
     assessment: Mapped["Assessment"] = relationship(back_populates="results")
-    control: Mapped["Control"] = relationship()  # type: ignore[name-defined]
+    control: Mapped["Control"] = relationship(lazy="selectin")  # type: ignore[name-defined]
 
     def __repr__(self) -> str:
         return f"<ControlResult(id={self.id}, control_id={self.control_id}, status={self.status.value})>"

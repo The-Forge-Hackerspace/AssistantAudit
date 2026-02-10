@@ -10,23 +10,25 @@
 
 L'API utilise des **tokens JWT Bearer**. Tous les endpoints (sauf `/health` et `/auth/login`) nécessitent un header :
 
-```
+```text
 Authorization: Bearer <access_token>
 ```
 
 ### Obtenir un token
 
 | Méthode | Endpoint | Content-Type |
-|---------|----------|-------------|
+| --------- | ---------- | ------------- |
 | `POST` | `/auth/login` | `application/x-www-form-urlencoded` (OAuth2) |
 | `POST` | `/auth/login/json` | `application/json` |
 
 **Formulaire OAuth2** (utilisé par Swagger Authorize) :
-```
+
+```text
 username=admin&password=Admin@2026!
 ```
 
 **JSON** :
+
 ```json
 {
   "username": "admin",
@@ -35,6 +37,7 @@ username=admin&password=Admin@2026!
 ```
 
 **Réponse** (`TokenResponse`) :
+
 ```json
 {
   "access_token": "eyJhbG...",
@@ -48,7 +51,7 @@ Les tokens expirent après **60 minutes** (configurable via `JWT_ACCESS_TOKEN_EX
 ### Rôles
 
 | Rôle | Description |
-|------|------------|
+| -------- | ------------ |
 | `admin` | Accès complet, gestion des utilisateurs, import des référentiels |
 | `auditeur` | Opérations d'audit, évaluations, scans |
 | `lecteur` | Consultation uniquement |
@@ -70,7 +73,7 @@ Les endpoints de liste retournent une réponse paginée :
 ```
 
 | Paramètre | Type | Défaut | Min | Max |
-|-----------|------|--------|-----|-----|
+| --------- | ------ | -------- | ----- | ----- |
 | `page` | `int` | `1` | `1` | — |
 | `page_size` | `int` | `20` | `1` | `100` |
 
@@ -81,10 +84,11 @@ Les endpoints de liste retournent une réponse paginée :
 ### Health
 
 | Méthode | Endpoint | Auth | Description |
-|---------|----------|------|-------------|
+| --------- | ---------- | ------ | ------------- |
 | `GET` | `/health` | Non | Vérifie que l'API est opérationnelle |
 
 **Réponse** :
+
 ```json
 {
   "status": "healthy",
@@ -98,7 +102,7 @@ Les endpoints de liste retournent une réponse paginée :
 ### Authentification (`/auth`)
 
 | Méthode | Endpoint | Auth | Description | Status |
-|---------|----------|------|-------------|--------|
+| --------- | ---------- | ------ | ------------- | -------- |
 | `POST` | `/auth/login` | Non | Login OAuth2 form → JWT | 200 |
 | `POST` | `/auth/login/json` | Non | Login JSON body → JWT | 200 |
 | `POST` | `/auth/register` | Admin | Créer un utilisateur | 201 |
@@ -146,7 +150,7 @@ Les endpoints de liste retournent une réponse paginée :
 ### Entreprises (`/entreprises`)
 
 | Méthode | Endpoint | Auth | Description | Status |
-|---------|----------|------|-------------|--------|
+| --------- | ---------- | ------ | ------------- | -------- |
 | `GET` | `/entreprises` | Oui | Lister (paginé) | 200 |
 | `POST` | `/entreprises` | Oui | Créer avec contacts | 201 |
 | `GET` | `/entreprises/{id}` | Oui | Détail | 200 |
@@ -193,7 +197,7 @@ Tous les champs sont optionnels (mise à jour partielle) :
 ### Audits (`/audits`)
 
 | Méthode | Endpoint | Auth | Description | Status |
-|---------|----------|------|-------------|--------|
+| --------- | ---------- | ------ | ------------- | -------- |
 | `GET` | `/audits` | Oui | Lister (paginé, filtrable) | 200 |
 | `POST` | `/audits` | Oui | Créer un projet d'audit | 201 |
 | `GET` | `/audits/{id}` | Oui | Détail | 200 |
@@ -231,7 +235,7 @@ Tous les champs sont optionnels (mise à jour partielle) :
 ### Sites (`/sites`)
 
 | Méthode | Endpoint | Auth | Description | Status |
-|---------|----------|------|-------------|--------|
+| --------- | ---------- | ------ | ------------- | -------- |
 | `GET` | `/sites` | Oui | Lister (paginé, filtrable) | 200 |
 | `POST` | `/sites` | Oui | Créer un site | 201 |
 | `GET` | `/sites/{id}` | Oui | Détail | 200 |
@@ -269,7 +273,7 @@ Tous les champs sont optionnels (mise à jour partielle) :
 ### Équipements (`/equipements`)
 
 | Méthode | Endpoint | Auth | Description | Status |
-|---------|----------|------|-------------|--------|
+| --------- | ---------- | ------ | ------------- | -------- |
 | `GET` | `/equipements` | Oui | Lister (paginé, filtrable) | 200 |
 | `POST` | `/equipements` | Oui | Créer un équipement | 201 |
 | `GET` | `/equipements/{id}` | Oui | Détail complet | 200 |
@@ -336,7 +340,7 @@ Tous les champs sont optionnels (mise à jour partielle) :
 **Champs spécifiques par type** :
 
 | Type | Champs supplémentaires |
-|------|----------------------|
+| ------ | ---------------------- |
 | `reseau` | `vlan_config`, `ports_status`, `firmware_version` |
 | `serveur` | `os_version_detail`, `modele_materiel`, `role_list`, `cpu_ram_info` |
 | `firewall` | `license_status`, `vpn_users_count`, `rules_count` |
@@ -350,9 +354,12 @@ Tous les champs sont optionnels (mise à jour partielle) :
 ### Référentiels (`/frameworks`)
 
 | Méthode | Endpoint | Auth | Description | Status |
-|---------|----------|------|-------------|--------|
+| --------- | ---------- | ------ | ------------- | -------- |
 | `GET` | `/frameworks` | Oui | Lister les référentiels (paginé) | 200 |
 | `GET` | `/frameworks/{id}` | Oui | Détail avec catégories et contrôles | 200 |
+| `GET` | `/frameworks/{id}/versions` | Oui | Lister toutes les versions d'un référentiel | 200 |
+| `POST` | `/frameworks/{id}/clone` | Admin | Cloner en nouvelle version | 201 |
+| `GET` | `/frameworks/{id}/export` | Oui | Exporter en fichier YAML | 200 |
 | `POST` | `/frameworks/import` | Admin | Importer tous les YAML | 200 |
 | `POST` | `/frameworks/import/{filename}` | Admin | Importer un YAML spécifique | 200 |
 
@@ -369,11 +376,13 @@ Tous les champs sont optionnels (mise à jour partielle) :
       "name": "Audit Firewall",
       "version": "1.0",
       "engine": null,
+      "engine_config": null,
       "is_active": true,
-      "total_controls": 20
+      "total_controls": 20,
+      "parent_version_id": null
     }
   ],
-  "total": 7,
+  "total": 12,
   "page": 1,
   "page_size": 20,
   "pages": 1
@@ -412,7 +421,7 @@ Retourne le référentiel complet avec ses catégories et contrôles imbriqués 
 #### Référentiels disponibles
 
 | Fichier YAML | Nom | Contrôles | Engine |
-|-------------|-----|-----------|--------|
+| ------------- | ----- | ----------- | -------- |
 | `firewall_audit.yaml` | Audit Firewall | 20 | — |
 | `switch_audit.yaml` | Audit Switch / Infrastructure Réseau | 18 | — |
 | `server_windows_audit.yaml` | Audit Serveur Windows | 15 | — |
@@ -420,6 +429,34 @@ Retourne le référentiel complet avec ses catégories et contrôles imbriqués 
 | `active_directory_audit.yaml` | Audit Active Directory | 17 | — |
 | `m365_audit.yaml` | Audit Microsoft 365 | 18 | `monkey365` |
 | `wifi_audit.yaml` | Audit Wi-Fi | 10 | — |
+| `sauvegarde_audit.yaml` | Audit Sauvegarde | 18 | — |
+| `vpn_audit.yaml` | Audit VPN | 15 | — |
+| `dns_dhcp_audit.yaml` | Audit DNS & DHCP | 18 | — |
+| `messagerie_audit.yaml` | Audit Messagerie | 17 | — |
+| `peripheriques_audit.yaml` | Audit Périphériques | 15 | — |
+
+#### Versioning
+
+Les référentiels supportent le versioning. Cloner un référentiel crée une nouvelle version tout en désactivant l'ancienne.
+
+#### `POST /frameworks/{id}/clone` (Admin)
+
+```json
+{
+  "new_version": "1.1",
+  "new_name": "Audit Firewall (personnalisé)"
+}
+```
+
+**Réponse** : `FrameworkRead` (201) avec `parent_version_id` pointant vers l'original.
+
+#### `GET /frameworks/{id}/versions`
+
+Retourne la liste de toutes les versions du même `ref_id` (actives et inactives).
+
+#### `GET /frameworks/{id}/export`
+
+Retourne un fichier YAML téléchargeable (`Content-Type: application/x-yaml`).
 
 ---
 
@@ -428,7 +465,7 @@ Retourne le référentiel complet avec ses catégories et contrôles imbriqués 
 #### Campagnes
 
 | Méthode | Endpoint | Auth | Description | Status |
-|---------|----------|------|-------------|--------|
+| --------- | ---------- | ------ | ------------- | -------- |
 | `GET` | `/assessments/campaigns` | Oui | Lister les campagnes (paginé) | 200 |
 | `POST` | `/assessments/campaigns` | Oui | Créer une campagne | 201 |
 | `GET` | `/assessments/campaigns/{id}` | Oui | Détail avec assessments | 200 |
@@ -452,9 +489,13 @@ Retourne le référentiel complet avec ses catégories et contrôles imbriqués 
 #### Assessments
 
 | Méthode | Endpoint | Auth | Description | Status |
-|---------|----------|------|-------------|--------|
+| --------- | ---------- | ------ | ------------- | -------- |
 | `POST` | `/assessments?campaign_id=1` | Oui | Créer un assessment | 201 |
 | `GET` | `/assessments/{id}` | Oui | Détail avec résultats | 200 |
+| `GET` | `/assessments/{id}/score` | Oui | Score de conformité | 200 |
+| `GET` | `/assessments/campaigns/{id}/score` | Oui | Score agrégé d'une campagne | 200 |
+| `POST` | `/assessments/{id}/scan/m365` | Auditeur | Lancer un scan Monkey365 | 200 |
+| `POST` | `/assessments/{id}/scan/simulate` | Auditeur | Simuler un scan M365 (dev/test) | 200 |
 
 #### `POST /assessments?campaign_id=1`
 
@@ -471,7 +512,7 @@ Crée un assessment et génère automatiquement un `ControlResult` par contrôle
 #### Résultats de contrôle
 
 | Méthode | Endpoint | Auth | Description | Status |
-|---------|----------|------|-------------|--------|
+| --------- | ---------- | ------ | ------------- | -------- |
 | `PUT` | `/assessments/results/{id}` | Oui | Mettre à jour un résultat | 200 |
 
 #### `PUT /assessments/results/{id}`
@@ -486,13 +527,93 @@ Crée un assessment et génère automatiquement un `ControlResult` par contrôle
 ```
 
 **Statuts de conformité** :
+
 | Valeur | Description |
-|--------|------------|
+| -------- | ------------ |
 | `not_assessed` | Non évalué (défaut) |
 | `compliant` | Conforme |
 | `non_compliant` | Non conforme |
 | `partially_compliant` | Partiellement conforme |
 | `not_applicable` | Non applicable |
+
+#### Scoring
+
+##### `GET /assessments/{id}/score`
+
+Retourne le score de conformité d'un assessment :
+
+```json
+{
+  "assessment_id": 1,
+  "total_controls": 20,
+  "assessed_controls": 4,
+  "compliant": 2,
+  "non_compliant": 1,
+  "partially_compliant": 1,
+  "not_applicable": 0,
+  "not_assessed": 16,
+  "compliance_score": 62.5
+}
+```
+
+Le score exclut les contrôles `not_assessed` et `not_applicable` du calcul.
+Le `partially_compliant` compte pour 0.5 dans le score.
+
+##### `GET /assessments/campaigns/{id}/score`
+
+Score agrégé de tous les assessments d'une campagne.
+
+#### Scan M365 (Monkey365)
+
+##### `POST /assessments/{id}/scan/m365` (Auditeur)
+
+Lance un scan Monkey365 réel sur un tenant Microsoft 365. L'assessment doit être associé à un framework ayant `engine=monkey365`.
+
+```json
+{
+  "tenant_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "client_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "client_secret": "secret_value",
+  "auth_method": "client_credentials",
+  "provider": "Microsoft365",
+  "plugins": ["sharepoint", "exchange", "teams"]
+}
+```
+
+**Réponse** (`M365ScanResponse`) :
+
+```json
+{
+  "scan_id": "uuid",
+  "status": "completed",
+  "findings_count": 18,
+  "mapped_count": 15,
+  "unmapped_count": 3,
+  "mapping_details": [
+    {
+      "rule_id": "monkey365-xxx",
+      "control_ref": "M365-ID-01",
+      "status": "compliant"
+    }
+  ],
+  "manual_controls": ["M365-GOV-01"]
+}
+```
+
+##### `POST /assessments/{id}/scan/simulate` (Auditeur)
+
+Injecte des résultats fictifs pour tester le mapping sans tenant réel :
+
+```json
+{
+  "findings": [
+    {
+      "rule_id": "monkey365-aad-mfa",
+      "status": "Fail",
+      "description": "MFA non activée"
+    }
+  ]
+}
 
 ---
 
@@ -520,13 +641,13 @@ Format d'erreur :
 ## Résumé
 
 | Module | Endpoints | Auth requise |
-|--------|-----------|-------------|
+| -------- | ----------- | ------------- |
 | Health | 1 | Non |
 | Authentification | 5 | Mixte |
 | Entreprises | 5 | Utilisateur |
 | Audits | 5 | Utilisateur |
 | Sites | 5 | Utilisateur |
 | Équipements | 5 | Utilisateur |
-| Référentiels | 4 | Utilisateur / Admin (import) |
-| Évaluations | 8 | Utilisateur |
-| **Total** | **38** | |
+| Référentiels | 7 | Utilisateur / Admin (clone, import) |
+| Évaluations | 12 | Utilisateur / Auditeur (scans) |
+| **Total** | **45** | |

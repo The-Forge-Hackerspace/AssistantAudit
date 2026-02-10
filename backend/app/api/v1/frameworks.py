@@ -1,16 +1,17 @@
 """
-Routes Frameworks (Référentiels) : CRUD, import/export YAML.
+Routes Frameworks (Référentiels) : CRUD, import/export YAML, versioning.
 """
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ...core.config import get_settings
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_admin, PaginationParams
+from ...core.deps import get_current_user, get_current_admin, get_current_auditeur, PaginationParams
 from ...models.user import User
-from ...schemas.framework import FrameworkRead, FrameworkSummary
+from ...schemas.framework import FrameworkRead, FrameworkSummary, FrameworkCloneRequest
 from ...schemas.common import PaginatedResponse, MessageResponse
 from ...services.framework_service import FrameworkService
 
@@ -49,6 +50,64 @@ async def get_framework(
     if not framework:
         raise HTTPException(status_code=404, detail="Référentiel introuvable")
     return framework
+
+
+@router.get("/{framework_id}/versions", response_model=list[FrameworkSummary])
+async def list_framework_versions(
+    framework_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Liste toutes les versions d'un référentiel"""
+    framework = FrameworkService.get_framework(db, framework_id)
+    if not framework:
+        raise HTTPException(status_code=404, detail="Référentiel introuvable")
+    versions = FrameworkService.list_versions(db, framework.ref_id)
+    return versions
+
+
+@router.post("/{framework_id}/clone", response_model=FrameworkRead, status_code=status.HTTP_201_CREATED)
+async def clone_framework(
+    framework_id: int,
+    body: FrameworkCloneRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Clone un référentiel en nouvelle version (désactive l'ancienne)"""
+    try:
+        clone = FrameworkService.clone_as_new_version(
+            db, framework_id, new_version=body.new_version, new_name=body.new_name
+        )
+        return clone
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{framework_id}/export")
+async def export_framework(
+    framework_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Exporte un référentiel en fichier YAML"""
+    framework = FrameworkService.get_framework(db, framework_id)
+    if not framework:
+        raise HTTPException(status_code=404, detail="Référentiel introuvable")
+
+    output_dir = Path(settings.UPLOAD_DIR) / "exports"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{framework.ref_id}_v{framework.version}.yaml"
+    output_path = output_dir / filename
+
+    try:
+        FrameworkService.export_to_yaml(db, framework_id, output_path)
+        return FileResponse(
+            path=str(output_path),
+            filename=filename,
+            media_type="application/x-yaml",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/import", response_model=MessageResponse)

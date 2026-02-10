@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, PaginationParams
+from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
 from ...models.audit import Audit, AuditStatus
 from ...models.user import User
 from ...schemas.audit import AuditCreate, AuditRead, AuditDetail, AuditUpdate
@@ -40,7 +40,7 @@ async def list_audits(
 async def create_audit(
     body: AuditCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_auditeur),
 ):
     """Crée un nouveau projet d'audit"""
     audit = Audit(
@@ -89,7 +89,7 @@ async def update_audit(
     audit_id: int,
     body: AuditUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_auditeur),
 ):
     audit = db.get(Audit, audit_id)
     if not audit:
@@ -110,7 +110,7 @@ async def update_audit(
 async def delete_audit(
     audit_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_admin),
 ):
     audit = db.get(Audit, audit_id)
     if not audit:

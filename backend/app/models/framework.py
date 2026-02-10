@@ -7,7 +7,7 @@ Les frameworks sont chargés depuis des fichiers YAML et persistés en base pour
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, Boolean
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, Boolean, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -40,15 +40,25 @@ class Framework(Base):
     possède son propre référentiel de contrôles.
     """
     __tablename__ = "frameworks"
+    __table_args__ = (
+        UniqueConstraint("ref_id", "version", name="uq_framework_ref_version"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    ref_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    ref_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     version: Mapped[str] = mapped_column(String(20), default="1.0", nullable=False)
     engine: Mapped[str | None] = mapped_column(String(50))  # nmap | monkey365 | ssh | winrm | manual
+    engine_config: Mapped[dict | None] = mapped_column(JSON)  # config moteur (auth, plugins...)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     source_file: Mapped[str | None] = mapped_column(String(500))  # chemin YAML source
+
+    # Versioning
+    parent_version_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("frameworks.id"), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
@@ -60,6 +70,9 @@ class Framework(Base):
     categories: Mapped[list["FrameworkCategory"]] = relationship(
         back_populates="framework", cascade="all, delete-orphan",
         lazy="selectin", order_by="FrameworkCategory.order"
+    )
+    parent_version: Mapped["Framework | None"] = relationship(
+        remote_side="Framework.id", foreign_keys=[parent_version_id],
     )
 
     def __repr__(self) -> str:

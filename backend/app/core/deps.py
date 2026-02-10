@@ -73,6 +73,16 @@ async def get_current_admin(current_user=Depends(get_current_user)):
     return current_user
 
 
+async def get_current_auditeur(current_user=Depends(get_current_user)):
+    """Dépendance : vérifie que l'utilisateur est au moins auditeur (admin ou auditeur)"""
+    if current_user.role not in ("admin", "auditeur"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Droits auditeur requis (rôle lecteur insuffisant)",
+        )
+    return current_user
+
+
 class PaginationParams:
     """Paramètres de pagination réutilisables"""
 
