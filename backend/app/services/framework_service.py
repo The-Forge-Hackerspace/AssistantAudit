@@ -1,5 +1,5 @@
 """
-Service Framework : chargement, import/export de référentiels YAML.
+Service Framework : chargement, import/export de référentiels YAML, versioning.
 """
 import logging
 from pathlib import Path
@@ -69,6 +69,7 @@ class FrameworkService:
             framework.version = version
             framework.description = fw_data.get("description")
             framework.engine = fw_data.get("engine")
+            framework.engine_config = fw_data.get("engine_config")
             framework.source_file = str(yaml_path)
         else:
             logger.info(f"Import du nouveau framework '{ref_id}' depuis {yaml_path.name}")
@@ -78,6 +79,7 @@ class FrameworkService:
                 description=fw_data.get("description"),
                 version=version,
                 engine=fw_data.get("engine"),
+                engine_config=fw_data.get("engine_config"),
                 source_file=str(yaml_path),
             )
             db.add(framework)
@@ -155,6 +157,7 @@ class FrameworkService:
                 "description": fw.description,
                 "version": fw.version,
                 "engine": fw.engine,
+                "engine_config": fw.engine_config,
                 "categories": [],
             }
         }
@@ -190,3 +193,78 @@ class FrameworkService:
 
         logger.info(f"Framework '{fw.ref_id}' exporté vers {output_path}")
         return output_path
+
+    @staticmethod
+    def clone_as_new_version(
+        db: Session, framework_id: int, new_version: str, new_name: str = None
+    ) -> Framework:
+        """
+        Clone un framework existant en tant que nouvelle version.
+        L'ancienne version est désactivée, la nouvelle hérite de tous
+        les catégories et contrôles.
+        """
+        original = db.get(Framework, framework_id)
+        if not original:
+            raise ValueError(f"Framework {framework_id} introuvable")
+
+        # Créer le clone
+        clone = Framework(
+            ref_id=original.ref_id,
+            name=new_name or original.name,
+            description=original.description,
+            version=new_version,
+            engine=original.engine,
+            engine_config=original.engine_config,
+            source_file=original.source_file,
+            parent_version_id=original.id,
+        )
+        db.add(clone)
+        db.flush()
+
+        # Cloner catégories + contrôles
+        for cat in original.categories:
+            new_cat = FrameworkCategory(
+                name=cat.name,
+                description=cat.description,
+                order=cat.order,
+                framework_id=clone.id,
+            )
+            db.add(new_cat)
+            db.flush()
+            for ctrl in cat.controls:
+                new_ctrl = Control(
+                    ref_id=ctrl.ref_id,
+                    title=ctrl.title,
+                    description=ctrl.description,
+                    severity=ctrl.severity,
+                    check_type=ctrl.check_type,
+                    order=ctrl.order,
+                    auto_check_function=ctrl.auto_check_function,
+                    engine_rule_id=ctrl.engine_rule_id,
+                    cis_reference=ctrl.cis_reference,
+                    remediation=ctrl.remediation,
+                    evidence_required=ctrl.evidence_required,
+                    category_id=new_cat.id,
+                )
+                db.add(new_ctrl)
+
+        # Désactiver l'ancienne version
+        original.is_active = False
+
+        db.commit()
+        db.refresh(clone)
+        logger.info(
+            f"Framework '{clone.ref_id}' cloné : v{original.version} -> v{new_version} "
+            f"({clone.total_controls} contrôles)"
+        )
+        return clone
+
+    @staticmethod
+    def list_versions(db: Session, ref_id: str) -> list[Framework]:
+        """Liste toutes les versions d'un framework par ref_id"""
+        return (
+            db.query(Framework)
+            .filter(Framework.ref_id == ref_id)
+            .order_by(Framework.id.desc())
+            .all()
+        )

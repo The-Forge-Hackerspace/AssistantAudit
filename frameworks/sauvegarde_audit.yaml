@@ -1,0 +1,147 @@
+framework:
+  ref_id: sauvegarde_audit
+  name: "Audit Sauvegarde & Restauration"
+  description: "Référentiel d'audit des systèmes de sauvegarde et plans de restauration"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "Politique de sauvegarde"
+      description: "Vérification de la politique et de la stratégie de sauvegarde"
+      controls:
+        - id: SAV-001
+          title: "Politique de sauvegarde formalisée"
+          description: "Une politique de sauvegarde documentée existe et couvre tous les systèmes critiques"
+          severity: critical
+          check_type: manual
+          evidence_required: true
+          remediation: "Rédiger et approuver une politique de sauvegarde couvrant les actifs critiques."
+
+        - id: SAV-002
+          title: "Classification des données sauvegardées"
+          description: "Les données sont classifiées et les fréquences de sauvegarde adaptées à leur criticité"
+          severity: high
+          check_type: manual
+          evidence_required: true
+          remediation: "Classifier les données et définir des RPO/RTO adaptés à chaque niveau de criticité."
+
+        - id: SAV-003
+          title: "Stratégie 3-2-1 appliquée"
+          description: "Au moins 3 copies des données, sur 2 supports différents, dont 1 hors site"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Mettre en place une stratégie 3-2-1 pour toutes les données critiques."
+
+    - name: "Configuration des sauvegardes"
+      description: "Paramétrage technique des solutions de sauvegarde"
+      controls:
+        - id: SAV-010
+          title: "Fréquence de sauvegarde conforme"
+          description: "Les sauvegardes sont exécutées selon la fréquence définie dans la politique"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Configurer les jobs de sauvegarde selon les fréquences définies (quotidien, hebdo, mensuel)."
+
+        - id: SAV-011
+          title: "Sauvegardes complètes régulières"
+          description: "Des sauvegardes complètes (full) sont réalisées au minimum hebdomadairement"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Planifier au moins une sauvegarde full par semaine."
+
+        - id: SAV-012
+          title: "Rétention conforme"
+          description: "Les durées de rétention sont conformes à la politique et aux obligations légales"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Configurer les durées de rétention conformément aux exigences légales et métier."
+
+        - id: SAV-013
+          title: "Chiffrement des sauvegardes"
+          description: "Les données sauvegardées sont chiffrées au repos et en transit"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Activer le chiffrement AES-256 pour les sauvegardes au repos et TLS pour le transit."
+
+        - id: SAV-014
+          title: "Déduplication et compression"
+          description: "Déduplication et/ou compression activées pour optimiser le stockage"
+          severity: low
+          check_type: semi-automatic
+          remediation: "Activer la déduplication et la compression si supporté par la solution."
+
+    - name: "Supervision & Alertes"
+      controls:
+        - id: SAV-020
+          title: "Monitoring des jobs de sauvegarde"
+          description: "Un système de supervision vérifie le succès/échec de chaque job de sauvegarde"
+          severity: critical
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Configurer des alertes automatiques en cas d'échec de sauvegarde."
+
+        - id: SAV-021
+          title: "Rapports de sauvegarde réguliers"
+          description: "Des rapports de sauvegarde sont générés et revus régulièrement"
+          severity: medium
+          check_type: manual
+          remediation: "Mettre en place des rapports hebdomadaires de l'état des sauvegardes."
+
+        - id: SAV-022
+          title: "Taux de succès des sauvegardes > 95%"
+          description: "Le taux de réussite des jobs de sauvegarde sur 30 jours est supérieur à 95%"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Analyser et corriger les causes d'échec récurrentes."
+
+    - name: "Tests de restauration"
+      controls:
+        - id: SAV-030
+          title: "Tests de restauration réguliers"
+          description: "Des tests de restauration sont réalisés au minimum trimestriellement"
+          severity: critical
+          check_type: manual
+          evidence_required: true
+          remediation: "Planifier et documenter des tests de restauration trimestriels."
+
+        - id: SAV-031
+          title: "PRA/PCA documenté et testé"
+          description: "Un plan de reprise/continuité d'activité existe et a été testé dans les 12 derniers mois"
+          severity: critical
+          check_type: manual
+          evidence_required: true
+          remediation: "Rédiger le PRA/PCA et planifier un test annuel complet."
+
+        - id: SAV-032
+          title: "RTO/RPO respectés lors des tests"
+          description: "Les objectifs de temps et de point de restauration sont atteints lors des tests"
+          severity: high
+          check_type: manual
+          evidence_required: true
+          remediation: "Optimiser les procédures de restauration pour atteindre les RTO/RPO définis."
+
+    - name: "Sécurité des sauvegardes"
+      controls:
+        - id: SAV-040
+          title: "Accès aux sauvegardes restreint"
+          description: "L'accès aux données de sauvegarde est limité aux comptes autorisés"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Restreindre l'accès aux sauvegardes via RBAC et comptes de service dédiés."
+
+        - id: SAV-041
+          title: "Protection contre les ransomwares"
+          description: "Les sauvegardes sont protégées contre la suppression malveillante (immutabilité, air-gap)"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Activer l'immutabilité des sauvegardes ou utiliser un stockage air-gapped."
+
+        - id: SAV-042
+          title: "Séparation des comptes de sauvegarde"
+          description: "Les comptes de sauvegarde sont séparés des comptes d'administration habituels"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Créer des comptes de service dédiés pour la solution de sauvegarde."

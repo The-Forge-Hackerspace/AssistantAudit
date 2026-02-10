@@ -111,3 +111,31 @@ class CampaignSummary(BaseModel):
     total_assessments: int = 0
 
     model_config = {"from_attributes": True}
+
+
+# --- M365 Scan ---
+class M365ScanRequest(BaseModel):
+    """Paramètres pour lancer un scan Monkey365 sur un assessment"""
+    tenant_id: str = Field(..., description="Azure tenant ID")
+    client_id: str = Field(..., description="App registration client ID")
+    client_secret: str = Field(..., description="App registration client secret")
+    auth_method: str = Field(default="client_credentials", pattern=r"^(client_credentials|certificate|interactive)$")
+    provider: str = Field(default="Microsoft365", pattern=r"^(Microsoft365|Azure|EntraID)$")
+    plugins: list[str] = Field(default_factory=list, description="Plugins spécifiques (vide = tous)")
+
+
+class M365ScanSimulateRequest(BaseModel):
+    """Injection manuelle de findings pour test/simulation"""
+    findings: list[dict] = Field(..., description="Liste de findings Monkey365 simulés")
+
+
+class M365ScanResponse(BaseModel):
+    """Résultat d'un scan M365"""
+    scan_id: str
+    status: str
+    findings_count: int = 0
+    mapped_count: int = 0
+    unmapped_count: int = 0
+    error: Optional[str] = None
+    mapping_details: list[dict] = []
+    manual_controls: list[dict] = []

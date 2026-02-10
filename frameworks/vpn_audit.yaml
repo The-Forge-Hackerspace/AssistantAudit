@@ -1,0 +1,134 @@
+framework:
+  ref_id: vpn_audit
+  name: "Audit VPN"
+  description: "Référentiel d'audit des infrastructures VPN (site-to-site et remote access)"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "Architecture VPN"
+      description: "Vérification de l'architecture et du déploiement VPN"
+      controls:
+        - id: VPN-001
+          title: "Topologie VPN documentée"
+          description: "La topologie VPN (site-to-site + remote access) est documentée et à jour"
+          severity: medium
+          check_type: manual
+          evidence_required: true
+          remediation: "Documenter la topologie VPN avec les flux, les peers et les sous-réseaux."
+
+        - id: VPN-002
+          title: "Équipements VPN redondés"
+          description: "Les concentrateurs/passerelles VPN sont en haute disponibilité"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Mettre en place une architecture HA pour les concentrateurs VPN."
+
+    - name: "Chiffrement & Protocoles"
+      description: "Sécurité des protocoles et algorithmes de chiffrement"
+      controls:
+        - id: VPN-010
+          title: "Protocole VPN sécurisé"
+          description: "Utilisation d'IKEv2/IPSec ou WireGuard — pas de PPTP ni L2TP sans IPSec"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Migrer vers IKEv2/IPSec ou WireGuard. Désactiver PPTP et L2TP sans IPSec."
+
+        - id: VPN-011
+          title: "Algorithmes de chiffrement robustes"
+          description: "Phase 1 : AES-256, SHA-256+, DH Group 14+. Pas de DES, 3DES, MD5, DH1/2"
+          severity: critical
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Configurer AES-256-GCM, SHA-384/SHA-512, DH Group 19/20 (ECDH)."
+
+        - id: VPN-012
+          title: "Perfect Forward Secrecy (PFS) activé"
+          description: "PFS est activé sur les tunnels IPSec pour la phase 2"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Activer PFS avec DH Group 14+ sur tous les tunnels IPSec."
+
+        - id: VPN-013
+          title: "Durée de vie des SA appropriée"
+          description: "IKE SA lifetime <= 24h, IPSec SA lifetime <= 8h"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Réduire le lifetime des SA : IKE 8-24h, IPSec 1-8h."
+
+    - name: "Authentification"
+      controls:
+        - id: VPN-020
+          title: "Authentification forte (certificats ou MFA)"
+          description: "L'authentification VPN utilise des certificats X.509 ou MFA, pas de PSK faibles"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Déployer une PKI pour l'authentification VPN ou intégrer le MFA."
+
+        - id: VPN-021
+          title: "Intégration avec l'annuaire (LDAP/RADIUS)"
+          description: "L'authentification VPN est liée à l'annuaire d'entreprise"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer l'authentification VPN via RADIUS/LDAP vers l'AD."
+
+        - id: VPN-022
+          title: "Politique de mot de passe VPN"
+          description: "Les mots de passe VPN respectent la politique de complexité de l'entreprise"
+          severity: high
+          check_type: manual
+          remediation: "Appliquer la politique de mots de passe AD aux comptes VPN."
+
+        - id: VPN-023
+          title: "Verrouillage après tentatives échouées"
+          description: "Le compte VPN est verrouillé après 5 tentatives échouées"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer le verrouillage de compte après 5 échecs d'authentification."
+
+    - name: "Contrôle d'accès"
+      controls:
+        - id: VPN-030
+          title: "Split tunneling désactivé ou contrôlé"
+          description: "Le split tunneling est désactivé ou limité aux ressources autorisées"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Désactiver le split tunneling ou n'autoriser que les flux vers les sous-réseaux internes."
+
+        - id: VPN-031
+          title: "Posture de conformité (NAC)"
+          description: "Les postes VPN sont vérifiés avant connexion (AV, patch, compliance)"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Mettre en place un NAC ou host-checker pour vérifier la conformité des postes."
+
+        - id: VPN-032
+          title: "Segmentation des accès VPN"
+          description: "Les utilisateurs VPN n'accèdent qu'aux ressources nécessaires (moindre privilège)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Créer des groupes VPN avec des ACL spécifiques par profil utilisateur."
+
+    - name: "Journalisation & Supervision"
+      controls:
+        - id: VPN-040
+          title: "Journalisation des connexions VPN"
+          description: "Toutes les connexions/déconnexions VPN sont journalisées"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Activer la journalisation complète des sessions VPN vers le SIEM."
+
+        - id: VPN-041
+          title: "Alertes sur connexions anormales"
+          description: "Des alertes sont déclenchées en cas de connexions depuis des localisations inhabituelles"
+          severity: medium
+          check_type: manual
+          remediation: "Configurer des règles de détection pour les connexions VPN géographiquement anormales."
+
+        - id: VPN-042
+          title: "Monitoring des tunnels site-to-site"
+          description: "Les tunnels site-to-site sont supervisés avec alertes en cas de coupure"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer la supervision SNMP/syslog pour les tunnels S2S avec alertes."

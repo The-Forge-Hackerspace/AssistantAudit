@@ -7,7 +7,7 @@
 
 ## Vue d'ensemble
 
-```
+```text
 AssistantAudit/
 ├── backend/              ← API FastAPI (Python 3.12+)
 │   ├── app/
@@ -31,7 +31,7 @@ AssistantAudit/
 ## Stack technique
 
 | Couche | Technologie | Rôle |
-|--------|-------------|------|
+| -------- | ------------- | ------ |
 | **API** | FastAPI 0.128+ | Framework web async, validation automatique, Swagger UI |
 | **ORM** | SQLAlchemy 2.0 | Accès base de données avec `mapped_column` |
 | **Validation** | Pydantic v2 | Sérialisation/désérialisation, validation des entrées |
@@ -46,7 +46,7 @@ AssistantAudit/
 
 Le backend suit le pattern **Service Layer** qui sépare clairement les responsabilités :
 
-```
+```text
 Requête HTTP
      │
      ▼
@@ -87,7 +87,7 @@ Requête HTTP
 ### `backend/app/core/` — Noyau
 
 | Fichier | Responsabilité |
-|---------|---------------|
+| --------- | --------------- |
 | `config.py` | Configuration centralisée via `pydantic-settings`. Charge `.env` automatiquement. Singleton avec `@lru_cache`. |
 | `database.py` | Engine SQLAlchemy, session factory (`SessionLocal`), `get_db()` pour l'injection de dépendances. Active les FK SQLite. |
 | `security.py` | Hashing bcrypt (sans passlib), création/décodage de tokens JWT (access + refresh). |
@@ -95,7 +95,7 @@ Requête HTTP
 
 ### `backend/app/models/` — Modèles de données
 
-```
+```text
 models/
 ├── user.py           ← Utilisateurs (admin, auditeur, lecteur)
 ├── entreprise.py     ← Entreprises et contacts
@@ -109,7 +109,7 @@ models/
 
 #### Diagramme relationnel simplifié
 
-```
+```text
 Entreprise ──1:N── Contact
      │
      ├──1:N── Audit ──1:N── AssessmentCampaign ──1:N── Assessment
@@ -130,7 +130,7 @@ Framework ──1:N── FrameworkCategory ──1:N── Control
 Les équipements utilisent l'héritage à table unique :
 
 | Classe | Type | Champs spécifiques |
-|--------|------|--------------------|
+| -------- | ------ | -------------------- |
 | `Equipement` | Base | ip_address, hostname, fabricant, os_detected, status_audit |
 | `EquipementReseau` | `reseau` | vlan_config, ports_status, firmware_version |
 | `EquipementServeur` | `serveur` | os_version_detail, modele_materiel, role_list, cpu_ram_info |
@@ -141,50 +141,67 @@ Les équipements utilisent l'héritage à table unique :
 Chaque domaine a ses schémas `Create`, `Update`, `Read` :
 
 | Fichier | Schémas principaux |
-|---------|-------------------|
+| --------- | ------------------- |
 | `common.py` | `PaginatedResponse[T]`, `MessageResponse` |
 | `user.py` | `LoginRequest`, `TokenResponse`, `UserCreate`, `UserRead`, `PasswordChange` |
 | `entreprise.py` | `EntrepriseCreate/Update/Read`, `ContactCreate/Read` |
 | `audit.py` | `AuditCreate/Update/Read/Detail` |
 | `site.py` | `SiteCreate/Update/Read` |
 | `equipement.py` | `EquipementCreate/Update/Read/Summary` |
-| `framework.py` | `FrameworkRead`, `FrameworkSummary`, `CategoryRead`, `ControlRead` |
-| `assessment.py` | `CampaignCreate/Update/Read/Summary`, `AssessmentCreate/Read`, `ControlResultUpdate/Read` |
+| `framework.py` | `FrameworkRead`, `FrameworkSummary`, `FrameworkCloneRequest`, `CategoryRead`, `ControlRead` |
+| `assessment.py` | `CampaignCreate/Update/Read/Summary`, `AssessmentCreate/Read`, `ControlResultUpdate/Read`, `M365ScanRequest`, `M365ScanSimulateRequest`, `M365ScanResponse` |
 
 Tous les schémas `Read` utilisent `model_config = {"from_attributes": True}` pour la conversion ORM → Pydantic.
 
 ### `backend/app/services/` — Logique métier
 
 | Service | Rôle |
-|---------|------|
+| --------- | ------ |
 | `AuthService` | Authentification, création de tokens, gestion utilisateurs, changement de mot de passe. |
-| `FrameworkService` | Import/export YAML ↔ BDD, listing et recherche de référentiels. Supporte la mise à jour (upsert par `ref_id`). |
-| `AssessmentService` | Création de campagnes, génération automatique des `ControlResult` à partir des contrôles d'un framework, mise à jour unitaire et en masse. |
+| `FrameworkService` | Import/export YAML ↔ BDD, versioning (clone), listing et recherche de référentiels. Supporte la mise à jour (upsert par `ref_id`). |
+| `AssessmentService` | Création de campagnes, génération automatique des `ControlResult` à partir des contrôles d'un framework, mise à jour unitaire et en masse, calcul du score de conformité. |
+| `Monkey365Service` | Orchestration des scans M365 : validation, exécution Monkey365, parsing des résultats, mapping automatique vers les `ControlResult`. Mode simulation pour test sans tenant réel. |
 
 ### `backend/app/api/v1/` — Routes API
 
 | Fichier | Préfixe | Endpoints |
-|---------|---------|-----------|
+| --------- | --------- | ----------- |
 | `health.py` | `/health` | 1 |
 | `auth.py` | `/auth` | 5 |
 | `entreprises.py` | `/entreprises` | 5 |
 | `audits.py` | `/audits` | 5 |
 | `sites.py` | `/sites` | 5 |
 | `equipements.py` | `/equipements` | 5 |
-| `frameworks.py` | `/frameworks` | 4 |
-| `assessments.py` | `/assessments` | 8 |
-| **Total** | | **38** |
+| `frameworks.py` | `/frameworks` | 7 |
+| `assessments.py` | `/assessments` | 12 |
+| **Total** | | **45** |
 
 Tous les sous-routers sont agrégés dans `router.py` sous le préfixe `/api/v1`.
 
 ### `backend/app/tools/` — Outils intégrés
 
 | Outil | Statut | Description |
-|-------|--------|-------------|
+| ------- | -------- | ------------- |
 | `nmap_scanner/` | Fonctionnel | Scanner réseau via subprocess nmap, parsing XML avec defusedxml. |
-| `monkey365_runner/` | Fonctionnel | Exécuteur Monkey365 (audit M365) via PowerShell, parsing JSON des résultats. |
+| `monkey365_runner/` | Fonctionnel | Exécuteur Monkey365 (audit M365) via PowerShell. Parser JSON + Mapper automatique (`engine_rule_id` → `ControlResult`). Mode simulation intégré. |
 | `config_parsers/` | Stub | Parseurs de configurations réseau (futur). |
 | `collectors/` | Stub | Collecteurs SSH/WinRM pour récupérer des configs (futur). |
+
+#### Bridge Monkey365
+
+```text
+Monkey365Service
+     │
+     ├── Executor ── PowerShell ── Monkey365 (tenant M365)
+     │                                  │
+     │                          résultats JSON
+     │                                  │
+     ├── Parser ── Monkey365Finding[] (normalisé)
+     │                                  │
+     └── Mapper ── engine_rule_id ──► ControlResult (status, evidence)
+```
+
+Le mapping automatique utilise le champ `engine_rule_id` des contrôles du framework M365 pour faire correspondre chaque finding Monkey365 à un ControlResult. Les findings non mappés sont signalés, et les contrôles restants en `manual` sont listés pour évaluation humaine.
 
 ---
 
@@ -219,7 +236,7 @@ categories:
 ### Référentiels livrés
 
 | Référentiel | Contrôles | Categories | Engine |
-|-------------|-----------|------------|--------|
+| ------------- | ----------- | ------------ | -------- |
 | Firewall | 20 | 6 | — |
 | Switch / Réseau | 18 | 5 | — |
 | Serveur Windows | 15 | 6 | — |
@@ -227,6 +244,13 @@ categories:
 | Active Directory | 17 | 6 | — |
 | Microsoft 365 | 18 | 8 | Monkey365 |
 | Wi-Fi | 10 | 4 | — |
+| Sauvegarde | 18 | 5 | — |
+| VPN | 15 | 5 | — |
+| DNS & DHCP | 18 | 4 | — |
+| Messagerie | 17 | 5 | — |
+| Périphériques | 15 | 5 | — |
+
+Les référentiels supportent le **versioning** : cloner un référentiel crée une nouvelle version (v1.0 → v1.1) avec `parent_version_id`, tout en désactivant l'ancienne version. La contrainte d'unicité porte sur `(ref_id, version)`.
 
 ---
 
@@ -234,7 +258,7 @@ categories:
 
 ### Flux JWT
 
-```
+```text
 Client                          API
   │                              │
   ├── POST /auth/login ────────► │
@@ -309,7 +333,7 @@ docker-compose up --build
 ### Variables d'environnement
 
 | Variable | Défaut | Description |
-|----------|--------|-------------|
+| ---------- | -------- | ------------- |
 | `DEBUG` | `True` | Mode debug (logs SQL, auto-create tables) |
 | `SECRET_KEY` | `dev-only-...` | Clé de signature JWT — **changer en prod** |
 | `DATABASE_URL` | `sqlite:///...` | URL de connexion BDD |
@@ -322,7 +346,7 @@ docker-compose up --build
 
 ## Flux d'audit typique
 
-```
+```text
 1. Créer une Entreprise
         │
 2. Créer un Audit (projet) lié à l'entreprise
@@ -348,12 +372,13 @@ docker-compose up --build
 
 ## Évolutions prévues
 
-| Phase | Composant | Description |
-|-------|-----------|-------------|
-| **Frontend** | React / Next.js | Interface web avec dashboards de conformité |
-| **Rapports** | Jinja2 + WeasyPrint | Génération PDF automatique |
-| **Scans** | Nmap intégré | Découverte réseau automatique → création d'équipements |
-| **M365** | Monkey365 | Exécution automatique des contrôles Microsoft 365 |
-| **Collecteurs** | SSH / WinRM | Récupération automatique de configurations |
-| **Référentiels** | YAML supplémentaires | Backup, DNS/DHCP, VPN, imprimantes |
-| **Multi-tenant** | Isolation par entreprise | Gestion multi-clients |
+| Phase | Composant | Description | Statut |
+| ------- | ----------- | ------------- | -------- |
+| **Frontend** | React / Next.js | Interface web avec dashboards de conformité | À faire |
+| **Rapports** | Jinja2 + WeasyPrint | Génération PDF automatique | À faire |
+| **Scans** | Nmap intégré | Découverte réseau automatique → création d'équipements | À faire |
+| **M365** | Monkey365 | Exécution automatique des contrôles Microsoft 365 | ✅ Fait |
+| **Collecteurs** | SSH / WinRM | Récupération automatique de configurations | À faire |
+| **Référentiels** | YAML supplémentaires | Backup, DNS/DHCP, VPN, messagerie, périphériques | ✅ Fait (12 total) |
+| **Versioning** | Framework cloning | Cloner / versionner les référentiels | ✅ Fait |
+| **Multi-tenant** | Isolation par entreprise | Gestion multi-clients | À faire |

@@ -2,6 +2,7 @@
 Service Assessment : campagnes d'évaluation, scoring, résultats.
 """
 import logging
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -193,3 +194,57 @@ class AssessmentService:
         db.commit()
         logger.info(f"Mise à jour en masse : {count} résultats")
         return count
+
+    @staticmethod
+    def compute_score(results: list[ControlResult]) -> dict:
+        """
+        Calcule un score de conformité détaillé à partir d'une liste de ControlResult.
+        Retourne un dict compatible avec ScoreResponse.
+        """
+        total = len(results)
+        counts = defaultdict(int)
+        by_severity = defaultdict(lambda: defaultdict(int))
+
+        for r in results:
+            counts[r.status.value] += 1
+            sev = r.control.severity.value if r.control else "unknown"
+            by_severity[sev]["total"] += 1
+            by_severity[sev][r.status.value] += 1
+
+        assessed = total - counts["not_assessed"] - counts["not_applicable"]
+        score = None
+        if assessed > 0:
+            score = round(
+                (counts["compliant"] + 0.5 * counts["partially_compliant"]) / assessed * 100, 1
+            )
+
+        return {
+            "score": score,
+            "total_controls": total,
+            "assessed": assessed,
+            "compliant": counts["compliant"],
+            "non_compliant": counts["non_compliant"],
+            "partially_compliant": counts["partially_compliant"],
+            "not_applicable": counts["not_applicable"],
+            "not_assessed": counts["not_assessed"],
+            "by_severity": dict(by_severity),
+        }
+
+    @staticmethod
+    def get_assessment_score(db: Session, assessment_id: int) -> dict | None:
+        """Calcule le score d'un assessment"""
+        assessment = db.get(Assessment, assessment_id)
+        if not assessment:
+            return None
+        return AssessmentService.compute_score(assessment.results)
+
+    @staticmethod
+    def get_campaign_score(db: Session, campaign_id: int) -> dict | None:
+        """Calcule le score d'une campagne (agrégé sur tous ses assessments)"""
+        campaign = db.get(AssessmentCampaign, campaign_id)
+        if not campaign:
+            return None
+        all_results = []
+        for assessment in campaign.assessments:
+            all_results.extend(assessment.results)
+        return AssessmentService.compute_score(all_results)

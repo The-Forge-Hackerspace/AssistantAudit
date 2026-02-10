@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, PaginationParams
+from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
 from ...models.entreprise import Entreprise
 from ...models.site import Site
 from ...models.user import User
@@ -54,7 +54,7 @@ async def list_sites(
 async def create_site(
     body: SiteCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_auditeur),
 ):
     """Crée un nouveau site pour une entreprise"""
     # Vérifier que l'entreprise existe
@@ -111,7 +111,7 @@ async def update_site(
     site_id: int,
     body: SiteUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_auditeur),
 ):
     """Modifie un site"""
     site = db.get(Site, site_id)
@@ -137,7 +137,7 @@ async def update_site(
 async def delete_site(
     site_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_admin),
 ):
     """Supprime un site et ses équipements"""
     site = db.get(Site, site_id)

@@ -8,14 +8,14 @@ Un outil d'audit d'infrastructure inspiré de CISO Assistant, mais centré sur l
 
 ## 📐 Architecture Conceptuelle
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │                  AssistantAudit                      │
 ├─────────────────────────────────────────────────────┤
 │  UI Layer (Frontend)                                │
 │  ┌─────────┐ ┌──────────┐ ┌───────────┐            │
-│  │Dashboard	 │ │Campagnee	   │ │Rapports   │            │
-│  │         	 │ │d'audit   │ │& Exports  │            │
+│  │Dashboard│ │Campagnee │ │Rapports   │            │
+│  │         │ │d'audit   │ │& Exports  │            │
 │  └─────────┘ └──────────┘ └───────────┘            │
 ├─────────────────────────────────────────────────────┤
 │  Core Engine                                        │
@@ -44,7 +44,7 @@ Un outil d'audit d'infrastructure inspiré de CISO Assistant, mais centré sur l
 **Objectif** : Poser l'architecture et le modèle de données central.
 
 | Tâche | Détail |
-|-------|--------|
+| ------- | -------- |
 | Stack technique | Python (backend), FastAPI ou Django, SQLite puis PostgreSQL |
 | Modèle de données | Définir les entités clés (voir ci-dessous) |
 | Structure projet | Monorepo avec séparation backend/frontend |
@@ -52,7 +52,7 @@ Un outil d'audit d'infrastructure inspiré de CISO Assistant, mais centré sur l
 
 **Modèle de données clé :**
 
-```
+```text
 Référentiel (Framework)
   └── Catégorie (Category)
        └── Point de contrôle (Control)
@@ -76,7 +76,7 @@ Campagne d'audit (Audit Campaign)
 **Objectif** : Vos mini-audits deviennent des référentiels structurés.
 
 | Tâche | Détail |
-|-------|--------|
+| ------- | -------- |
 | Format de référentiel | YAML/JSON pour définir chaque référentiel |
 | Import/Export | Charger des référentiels depuis des fichiers |
 | Référentiels initiaux | Convertir vos audits existants (Firewall, Switch, Serveur, AD, Wi-Fi...) |
@@ -151,7 +151,7 @@ framework:
 **Objectif** : Interface web pour gérer les audits.
 
 | Tâche | Détail |
-|-------|--------|
+| ------- | -------- |
 | Frontend | React, Vue.js, ou Svelte |
 | Dashboard | Vue d'ensemble des campagnes, scores globaux |
 | Gestion des campagnes | Créer, suivre, clôturer un audit |
@@ -160,7 +160,7 @@ framework:
 
 **Écrans principaux :**
 
-```
+```text
 📊 Dashboard
   ├── Campagnes en cours
   ├── Score global de conformité
@@ -192,7 +192,7 @@ framework:
 **Objectif** : Automatiser une partie de la collecte et de l'évaluation.
 
 | Outil | Fonction | Technologie |
-|-------|----------|-------------|
+| ------- | ---------- | ------------- |
 | **Scanner réseau** | Découverte d'assets, ports ouverts | Nmap (python-nmap) |
 | **Config Parser** | Analyser les configs exportées (Fortinet, Cisco...) | Parsers custom Python |
 | **Collecte WinRM/SSH** | Récupérer infos serveurs automatiquement | Paramiko, pywinrm |
@@ -271,7 +271,7 @@ class FortiGateConfigAnalyzer:
 ### **Phase 5 — Rapports & Remédiation** (Semaines 16-18)
 
 | Tâche | Détail |
-|-------|--------|
+| ------- | -------- |
 | Génération PDF | Rapport d'audit complet avec jinja2 + weasyprint |
 | Export Word | Template .docx personnalisable (python-docx) |
 | Plan de remédiation | Priorisation automatique par sévérité et effort |
@@ -283,7 +283,7 @@ class FortiGateConfigAnalyzer:
 ### **Phase 6 — Fonctionnalités Avancées** (Semaines 19+)
 
 | Tâche | Détail |
-|-------|--------|
+| ------- | -------- |
 | Multi-tenant | Gestion de plusieurs clients |
 | API REST | Intégration avec d'autres outils |
 | Scheduling | Planification d'audits récurrents |
@@ -296,7 +296,7 @@ class FortiGateConfigAnalyzer:
 ## 🛠️ Stack Technique Recommandée
 
 | Couche | Technologie | Justification |
-|--------|------------|---------------|
+| ------- | ---------- | ------------- |
 | Backend | **Python + FastAPI** | Rapide, async, bonne doc auto (Swagger) |
 | Frontend | **Vue.js 3 + Vuetify** ou **React + MUI** | Composants riches pour dashboards |
 | BDD | **SQLite** (dev) → **PostgreSQL** (prod) | Comme CISO Assistant |
@@ -310,7 +310,7 @@ class FortiGateConfigAnalyzer:
 
 ## 📁 Structure de Projet Suggérée
 
-```
+```text
 AssistantAudit/
 ├── backend/
 │   ├── app/
@@ -353,7 +353,7 @@ Voulez-vous que je commence par initialiser la structure du projet, créer le mo
 
 User: Alors il faut aussi pensé qu'on va faires Audit M365 pour ça je pensais me baser en backend sur Monkey 365 pour ça
 
-GitHub Copilot: 
+GitHub Copilot:
 
 # Intégration Monkey365 pour l'Audit M365
 
@@ -364,7 +364,7 @@ Excellente idée ! **Monkey365** est un outil PowerShell open-source mature qui 
 ## 🐒 Ce que Monkey365 couvre déjà
 
 | Domaine | Exemples de checks |
-|---------|-------------------|
+| --------- | ------------------- |
 | **Entra ID (Azure AD)** | MFA, Conditional Access, PIM, Guest policies, Password policies |
 | **Exchange Online** | Transport rules, DKIM/DMARC/SPF, Audit logging, Mailbox permissions |
 | **SharePoint Online** | Partage externe, accès anonyme, versioning |
@@ -377,7 +377,7 @@ Excellente idée ! **Monkey365** est un outil PowerShell open-source mature qui 
 
 ## 📐 Architecture d'intégration
 
-```
+```text
 AssistantAudit
 │
 ├── Core Engine
@@ -941,7 +941,7 @@ framework:
 
 ## 🔄 Workflow d'un audit M365 dans AssistantAudit
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────┐
 │ 1. CRÉATION CAMPAGNE                                         │
 │    Auditeur sélectionne le référentiel "Audit M365"          │
@@ -1006,7 +1006,7 @@ Get-Command Invoke-Monkey365
 ## 📋 Plan mis à jour
 
 | Phase | Contenu | Moteur |
-|-------|---------|--------|
+| ------- | --------- | -------- |
 | Phase 1 | Fondations & Modèle de données | - |
 | Phase 2 | Référentiels (Infra **+ M365**) | - |
 | Phase 3 | Interface Utilisateur | - |

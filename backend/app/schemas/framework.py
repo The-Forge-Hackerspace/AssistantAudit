@@ -59,6 +59,7 @@ class FrameworkBase(BaseModel):
     description: Optional[str] = None
     version: str = Field(default="1.0", max_length=20)
     engine: Optional[str] = None
+    engine_config: Optional[dict] = None
 
 
 class FrameworkCreate(FrameworkBase):
@@ -69,6 +70,7 @@ class FrameworkRead(FrameworkBase):
     id: int
     is_active: bool
     source_file: Optional[str] = None
+    parent_version_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     categories: list[CategoryRead] = []
@@ -85,6 +87,13 @@ class FrameworkSummary(BaseModel):
     version: str
     engine: Optional[str] = None
     is_active: bool
+    parent_version_id: Optional[int] = None
     total_controls: int = 0
 
     model_config = {"from_attributes": True}
+
+
+class FrameworkCloneRequest(BaseModel):
+    """Demande de clonage d'un framework en nouvelle version"""
+    new_version: str = Field(..., max_length=20, description="Numéro de la nouvelle version")
+    new_name: Optional[str] = Field(None, max_length=200, description="Nouveau nom (optionnel)")
