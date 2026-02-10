@@ -1,0 +1,105 @@
+"""
+Routes Audits : CRUD et gestion de statut.
+"""
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from ...core.database import get_db
+from ...core.deps import get_current_user, PaginationParams
+from ...models.audit import Audit, AuditStatus
+from ...models.user import User
+from ...schemas.audit import AuditCreate, AuditRead, AuditUpdate
+from ...schemas.common import PaginatedResponse, MessageResponse
+
+router = APIRouter()
+
+
+@router.get("", response_model=PaginatedResponse[AuditRead])
+async def list_audits(
+    pagination: PaginationParams = Depends(),
+    entreprise_id: int = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Liste les audits (paginé, filtrable par entreprise)"""
+    query = db.query(Audit)
+    if entreprise_id:
+        query = query.filter(Audit.entreprise_id == entreprise_id)
+    total = query.count()
+    items = query.order_by(Audit.date_debut.desc()).offset(pagination.offset).limit(pagination.page_size).all()
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=pagination.page,
+        page_size=pagination.page_size,
+        pages=(total + pagination.page_size - 1) // pagination.page_size,
+    )
+
+
+@router.post("", response_model=AuditRead, status_code=status.HTTP_201_CREATED)
+async def create_audit(
+    body: AuditCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Crée un nouveau projet d'audit"""
+    audit = Audit(
+        nom_projet=body.nom_projet,
+        entreprise_id=body.entreprise_id,
+        objectifs=body.objectifs,
+        limites=body.limites,
+        hypotheses=body.hypotheses,
+        risques_initiaux=body.risques_initiaux,
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(audit)
+    return audit
+
+
+@router.get("/{audit_id}", response_model=AuditRead)
+async def get_audit(
+    audit_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    audit = db.get(Audit, audit_id)
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit introuvable")
+    return audit
+
+
+@router.put("/{audit_id}", response_model=AuditRead)
+async def update_audit(
+    audit_id: int,
+    body: AuditUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    audit = db.get(Audit, audit_id)
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit introuvable")
+
+    update_data = body.model_dump(exclude_unset=True)
+    if "status" in update_data:
+        update_data["status"] = AuditStatus(update_data["status"])
+    for field, value in update_data.items():
+        setattr(audit, field, value)
+
+    db.commit()
+    db.refresh(audit)
+    return audit
+
+
+@router.delete("/{audit_id}", response_model=MessageResponse)
+async def delete_audit(
+    audit_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    audit = db.get(Audit, audit_id)
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit introuvable")
+    db.delete(audit)
+    db.commit()
+    return MessageResponse(message=f"Audit '{audit.nom_projet}' supprimé")

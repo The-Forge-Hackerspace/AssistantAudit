@@ -1,36 +1,62 @@
+# ==============================================================================
+# AssistantAudit — .gitignore
+# ==============================================================================
+
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-ENV/
 *.egg-info/
 dist/
 build/
+*.egg
 
-# Flask
-instance/
-.webassets-cache
-*.db
-
-# Logs
-logs/
-*.log
-
-# Uploads
-uploads/*
-!uploads/.gitkeep
+# Virtual environments
+venv/
+.venv/
+env/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Database
+instance/
+*.db
+*.sqlite3
+
+# Uploads & logs
+uploads/
+logs/
+*.log
+
+# Monkey365
+monkey365_output/
+integrations/monkey365/
+
+# Node (future frontend)
+node_modules/
+.next/
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Docker
+docker-compose.override.yml
+
+# Alembic
+backend/alembic/versions/*.py
+!backend/alembic/versions/.gitkeep
+
+# Tests
+.pytest_cache/
+htmlcov/
+.coverage

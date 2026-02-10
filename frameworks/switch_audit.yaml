@@ -1,0 +1,145 @@
+framework:
+  ref_id: switch_audit
+  name: "Audit Switch / Infrastructure Réseau"
+  description: "Référentiel d'audit pour les commutateurs et équipements réseau"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "Configuration Générale"
+      controls:
+        - id: SW-001
+          title: "Firmware à jour"
+          description: "Le firmware/IOS du switch est à la dernière version stable"
+          severity: high
+          check_type: manual
+          evidence_required: true
+          remediation: "Planifier la mise à jour du firmware vers la dernière version stable."
+
+        - id: SW-002
+          title: "Mot de passe par défaut changé"
+          description: "Les identifiants par défaut ont été modifiés"
+          severity: critical
+          check_type: manual
+          remediation: "Changer immédiatement tous les mots de passe par défaut."
+
+        - id: SW-003
+          title: "Accès administration restreint"
+          description: "L'accès SSH/HTTPS est restreint à un VLAN de management"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer un VLAN de management dédié et restreindre l'accès admin."
+
+        - id: SW-004
+          title: "Protocoles non sécurisés désactivés"
+          description: "Telnet et HTTP sont désactivés au profit de SSH et HTTPS"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Désactiver Telnet et HTTP. Configurer SSH v2 et HTTPS uniquement."
+
+        - id: SW-005
+          title: "NTP configuré"
+          description: "Synchronisation NTP avec au moins 2 sources fiables"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Configurer au moins 2 serveurs NTP."
+
+    - name: "VLAN & Segmentation"
+      controls:
+        - id: SW-010
+          title: "Segmentation VLAN en place"
+          description: "Le réseau est segmenté en VLANs selon les usages (serveurs, users, IoT, etc.)"
+          severity: high
+          check_type: manual
+          remediation: "Mettre en place une segmentation VLAN adaptée à l'architecture."
+
+        - id: SW-011
+          title: "VLAN 1 non utilisé"
+          description: "Le VLAN 1 par défaut n'est pas utilisé pour le trafic de production"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Migrer tout le trafic hors du VLAN 1 et le désactiver sur les ports non utilisés."
+
+        - id: SW-012
+          title: "Trunk sécurisé"
+          description: "Les ports trunk sont explicitement configurés (pas de DTP auto)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Désactiver DTP et configurer les trunks manuellement avec les VLANs autorisés."
+
+    - name: "Sécurité des Ports"
+      controls:
+        - id: SW-020
+          title: "Ports inutilisés désactivés"
+          description: "Les ports physiques non utilisés sont administrativement désactivés"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Désactiver (shutdown) tous les ports non utilisés."
+
+        - id: SW-021
+          title: "Port Security activé"
+          description: "La limitation MAC par port est configurée sur les ports d'accès"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Configurer le port-security avec une limite MAC sur les ports d'accès."
+
+        - id: SW-022
+          title: "DHCP Snooping activé"
+          description: "Le DHCP Snooping est activé pour prévenir les serveurs DHCP pirates"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Activer le DHCP Snooping et configurer les ports trusted appropriés."
+
+        - id: SW-023
+          title: "802.1X déployé (si applicable)"
+          description: "L'authentification 802.1X est déployée sur les ports d'accès"
+          severity: medium
+          check_type: manual
+          remediation: "Déployer 802.1X avec un serveur RADIUS pour l'authentification réseau."
+
+    - name: "Supervision & Logs"
+      controls:
+        - id: SW-030
+          title: "SNMP v3 configuré"
+          description: "SNMP v3 est utilisé (v1/v2c community strings par défaut supprimées)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Migrer vers SNMP v3 et supprimer les community strings v1/v2c."
+
+        - id: SW-031
+          title: "Syslog configuré"
+          description: "Les logs sont envoyés vers un serveur Syslog centralisé"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer l'envoi des logs vers le serveur Syslog/SIEM."
+
+        - id: SW-032
+          title: "Sauvegarde de configuration"
+          description: "Une sauvegarde récente de la configuration existe"
+          severity: high
+          check_type: manual
+          evidence_required: true
+          remediation: "Mettre en place une sauvegarde automatique régulière."
+
+    - name: "Spanning Tree & Résilience"
+      controls:
+        - id: SW-040
+          title: "STP activé et configuré"
+          description: "Spanning Tree Protocol est activé (RSTP/MSTP préféré)"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Configurer RSTP ou MSTP pour une convergence rapide."
+
+        - id: SW-041
+          title: "BPDU Guard activé"
+          description: "BPDU Guard est activé sur les ports d'accès"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Activer BPDU Guard sur tous les ports d'accès utilisateur."
+
+        - id: SW-042
+          title: "Stack/Agrégation configurée"
+          description: "Les liens critiques sont agrégés (LACP) pour la redondance"
+          severity: medium
+          check_type: manual
+          remediation: "Configurer l'agrégation de liens (LACP) sur les liaisons critiques."
