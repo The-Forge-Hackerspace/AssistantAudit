@@ -110,12 +110,41 @@ async def export_framework(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/sync", response_model=MessageResponse)
+async def sync_frameworks(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """
+    Synchronise les référentiels YAML → BDD.
+    Détecte automatiquement les fichiers nouveaux ou modifiés.
+    Les fichiers inchangés sont ignorés (comparaison par hash SHA-256).
+    Admin uniquement.
+    """
+    frameworks_dir = Path(settings.FRAMEWORKS_DIR)
+    if not frameworks_dir.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Dossier de frameworks introuvable : {frameworks_dir}",
+        )
+    result = FrameworkService.sync_from_directory(db, frameworks_dir)
+    total = result['imported'] + result['updated'] + result['unchanged']
+    return MessageResponse(
+        message=(
+            f"{total} référentiel(s) traité(s) : "
+            f"{result['imported']} nouveau(x), "
+            f"{result['updated']} mis à jour, "
+            f"{result['unchanged']} inchangé(s)"
+        ),
+    )
+
+
 @router.post("/import", response_model=MessageResponse)
 async def import_all_frameworks(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ):
-    """Importe tous les référentiels YAML depuis le dossier frameworks/"""
+    """Importe (force) tous les référentiels YAML depuis le dossier frameworks/"""
     frameworks_dir = Path(settings.FRAMEWORKS_DIR)
     if not frameworks_dir.exists():
         raise HTTPException(
@@ -125,7 +154,6 @@ async def import_all_frameworks(
     frameworks = FrameworkService.import_all_from_directory(db, frameworks_dir)
     return MessageResponse(
         message=f"{len(frameworks)} référentiel(s) importé(s)",
-        detail=", ".join(f.ref_id for f in frameworks),
     )
 
 
