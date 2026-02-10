@@ -8,7 +8,7 @@ from ...core.database import get_db
 from ...core.deps import get_current_user, PaginationParams
 from ...models.audit import Audit, AuditStatus
 from ...models.user import User
-from ...schemas.audit import AuditCreate, AuditRead, AuditUpdate
+from ...schemas.audit import AuditCreate, AuditRead, AuditDetail, AuditUpdate
 from ...schemas.common import PaginatedResponse, MessageResponse
 
 router = APIRouter()
@@ -57,7 +57,7 @@ async def create_audit(
     return audit
 
 
-@router.get("/{audit_id}", response_model=AuditRead)
+@router.get("/{audit_id}", response_model=AuditDetail)
 async def get_audit(
     audit_id: int,
     db: Session = Depends(get_db),
@@ -66,7 +66,22 @@ async def get_audit(
     audit = db.get(Audit, audit_id)
     if not audit:
         raise HTTPException(status_code=404, detail="Audit introuvable")
-    return audit
+    return AuditDetail(
+        id=audit.id,
+        nom_projet=audit.nom_projet,
+        entreprise_id=audit.entreprise_id,
+        status=audit.status.value,
+        date_debut=audit.date_debut,
+        objectifs=audit.objectifs,
+        limites=audit.limites,
+        hypotheses=audit.hypotheses,
+        risques_initiaux=audit.risques_initiaux,
+        lettre_mission_path=audit.lettre_mission_path,
+        contrat_path=audit.contrat_path,
+        planning_path=audit.planning_path,
+        total_campaigns=len(audit.campaigns) if audit.campaigns else 0,
+        entreprise_nom=audit.entreprise.nom if audit.entreprise else None,
+    )
 
 
 @router.put("/{audit_id}", response_model=AuditRead)

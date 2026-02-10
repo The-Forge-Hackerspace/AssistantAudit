@@ -39,5 +39,13 @@ class AuditRead(AuditBase):
     lettre_mission_path: Optional[str] = None
     contrat_path: Optional[str] = None
     planning_path: Optional[str] = None
+    total_campaigns: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class AuditDetail(AuditRead):
+    """Vue détaillée avec les campagnes résumées"""
+    entreprise_nom: Optional[str] = None
 
     model_config = {"from_attributes": True}

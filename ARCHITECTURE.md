@@ -112,17 +112,15 @@ models/
 ```
 Entreprise ──1:N── Contact
      │
-     └──1:N── Audit
-                │
-                ├──1:N── Site ──1:N── Equipement (STI)
-                │                        │
-                │                        └──1:N── Assessment
-                │                                    │
-                └──1:N── AssessmentCampaign          ├── framework_id → Framework
-                              │                      │
-                              └──1:N── Assessment    └──1:N── ControlResult
-                                                                  │
-                                                                  └── control_id → Control
+     ├──1:N── Audit ──1:N── AssessmentCampaign ──1:N── Assessment
+     │                                                     │
+     └──1:N── Site ──1:N── Equipement (STI) ───────────────┘
+                       │                           │
+                       └──1:N── ScanHost           ├── framework_id → Framework
+                                  ↑                │
+                       ScanReseau─┘                └──1:N── ControlResult
+                                                                │
+                                                                └── control_id → Control
 
 Framework ──1:N── FrameworkCategory ──1:N── Control
 ```
@@ -133,10 +131,10 @@ Les équipements utilisent l'héritage à table unique :
 
 | Classe | Type | Champs spécifiques |
 |--------|------|--------------------|
-| `Equipement` | Base | ip, hostname, os, statut |
-| `EquipementReseau` | `reseau` | nb_ports, supporte_poe, firmware |
-| `EquipementServeur` | `serveur` | cpu, ram_gb, stockage_gb, role_serveur |
-| `EquipementFirewall` | `firewall` | type_firewall, ha_enabled, nb_interfaces |
+| `Equipement` | Base | ip_address, hostname, fabricant, os_detected, status_audit |
+| `EquipementReseau` | `reseau` | vlan_config, ports_status, firmware_version |
+| `EquipementServeur` | `serveur` | os_version_detail, modele_materiel, role_list, cpu_ram_info |
+| `EquipementFirewall` | `firewall` | license_status, vpn_users_count, rules_count |
 
 ### `backend/app/schemas/` — Validation Pydantic
 
@@ -147,7 +145,9 @@ Chaque domaine a ses schémas `Create`, `Update`, `Read` :
 | `common.py` | `PaginatedResponse[T]`, `MessageResponse` |
 | `user.py` | `LoginRequest`, `TokenResponse`, `UserCreate`, `UserRead`, `PasswordChange` |
 | `entreprise.py` | `EntrepriseCreate/Update/Read`, `ContactCreate/Read` |
-| `audit.py` | `AuditCreate/Update/Read` |
+| `audit.py` | `AuditCreate/Update/Read/Detail` |
+| `site.py` | `SiteCreate/Update/Read` |
+| `equipement.py` | `EquipementCreate/Update/Read/Summary` |
 | `framework.py` | `FrameworkRead`, `FrameworkSummary`, `CategoryRead`, `ControlRead` |
 | `assessment.py` | `CampaignCreate/Update/Read/Summary`, `AssessmentCreate/Read`, `ControlResultUpdate/Read` |
 
@@ -169,8 +169,11 @@ Tous les schémas `Read` utilisent `model_config = {"from_attributes": True}` po
 | `auth.py` | `/auth` | 5 |
 | `entreprises.py` | `/entreprises` | 5 |
 | `audits.py` | `/audits` | 5 |
+| `sites.py` | `/sites` | 5 |
+| `equipements.py` | `/equipements` | 5 |
 | `frameworks.py` | `/frameworks` | 4 |
 | `assessments.py` | `/assessments` | 8 |
+| **Total** | | **38** |
 
 Tous les sous-routers sont agrégés dans `router.py` sous le préfixe `/api/v1`.
 
