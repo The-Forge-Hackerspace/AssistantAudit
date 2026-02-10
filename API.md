@@ -228,6 +228,125 @@ Tous les champs sont optionnels (mise à jour partielle) :
 
 ---
 
+### Sites (`/sites`)
+
+| Méthode | Endpoint | Auth | Description | Status |
+|---------|----------|------|-------------|--------|
+| `GET` | `/sites` | Oui | Lister (paginé, filtrable) | 200 |
+| `POST` | `/sites` | Oui | Créer un site | 201 |
+| `GET` | `/sites/{id}` | Oui | Détail | 200 |
+| `PUT` | `/sites/{id}` | Oui | Modifier | 200 |
+| `DELETE` | `/sites/{id}` | Oui | Supprimer (cascade équipements) | 200 |
+
+**Filtre** : `GET /sites?entreprise_id=1`
+
+#### `POST /sites`
+
+```json
+{
+  "nom": "Siège Paris",
+  "adresse": "1 rue de Rivoli, 75001 Paris",
+  "entreprise_id": 1
+}
+```
+
+#### `GET /sites/{id}` → `SiteRead`
+
+```json
+{
+  "id": 1,
+  "nom": "Siège Paris",
+  "adresse": "1 rue de Rivoli, 75001 Paris",
+  "entreprise_id": 1,
+  "equipement_count": 3
+}
+```
+
+**Erreurs** : `404` introuvable, `409` doublon (nom + entreprise).
+
+---
+
+### Équipements (`/equipements`)
+
+| Méthode | Endpoint | Auth | Description | Status |
+|---------|----------|------|-------------|--------|
+| `GET` | `/equipements` | Oui | Lister (paginé, filtrable) | 200 |
+| `POST` | `/equipements` | Oui | Créer un équipement | 201 |
+| `GET` | `/equipements/{id}` | Oui | Détail complet | 200 |
+| `PUT` | `/equipements/{id}` | Oui | Modifier | 200 |
+| `DELETE` | `/equipements/{id}` | Oui | Supprimer (cascade assessments) | 200 |
+
+**Filtres** : `GET /equipements?site_id=1&type_equipement=firewall&status_audit=A_AUDITER`
+
+**Types** : `reseau`, `serveur`, `firewall`, `equipement`
+
+#### `POST /equipements` (firewall)
+
+```json
+{
+  "site_id": 1,
+  "type_equipement": "firewall",
+  "ip_address": "10.0.0.1",
+  "hostname": "FW-PARIS-01",
+  "fabricant": "Fortinet",
+  "os_detected": "FortiOS 7.4.1",
+  "license_status": "active",
+  "rules_count": 245
+}
+```
+
+#### `POST /equipements` (serveur)
+
+```json
+{
+  "site_id": 1,
+  "type_equipement": "serveur",
+  "ip_address": "10.0.0.10",
+  "hostname": "SRV-DC01",
+  "fabricant": "Dell",
+  "os_detected": "Windows Server 2022",
+  "os_version_detail": "21H2 Build 20348.2527",
+  "role_list": {"roles": ["AD DS", "DNS", "DHCP"]}
+}
+```
+
+#### `POST /equipements` (réseau)
+
+```json
+{
+  "site_id": 1,
+  "type_equipement": "reseau",
+  "ip_address": "10.0.0.254",
+  "hostname": "SW-CORE-01",
+  "fabricant": "Cisco",
+  "firmware_version": "16.12.4"
+}
+```
+
+#### `PUT /equipements/{id}`
+
+```json
+{
+  "status_audit": "EN_COURS",
+  "notes_audit": "Audit en cours",
+  "hostname": "FW-PARIS-01-v2"
+}
+```
+
+**Champs spécifiques par type** :
+
+| Type | Champs supplémentaires |
+|------|----------------------|
+| `reseau` | `vlan_config`, `ports_status`, `firmware_version` |
+| `serveur` | `os_version_detail`, `modele_materiel`, `role_list`, `cpu_ram_info` |
+| `firewall` | `license_status`, `vpn_users_count`, `rules_count` |
+
+**Statuts d'audit** : `A_AUDITER` → `EN_COURS` → `CONFORME` / `NON_CONFORME`
+
+**Erreurs** : `404` site/équipement introuvable, `409` doublon IP sur le même site.
+
+---
+
 ### Référentiels (`/frameworks`)
 
 | Méthode | Endpoint | Auth | Description | Status |
@@ -406,6 +525,8 @@ Format d'erreur :
 | Authentification | 5 | Mixte |
 | Entreprises | 5 | Utilisateur |
 | Audits | 5 | Utilisateur |
+| Sites | 5 | Utilisateur |
+| Équipements | 5 | Utilisateur |
 | Référentiels | 4 | Utilisateur / Admin (import) |
 | Évaluations | 8 | Utilisateur |
-| **Total** | **28** | |
+| **Total** | **38** | |
