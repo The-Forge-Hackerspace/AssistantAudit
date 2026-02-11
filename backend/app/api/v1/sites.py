@@ -29,21 +29,8 @@ async def list_sites(
     total = query.count()
     items = query.order_by(Site.nom).offset(pagination.offset).limit(pagination.page_size).all()
 
-    # Enrichir avec le nombre d'équipements
-    result = []
-    for site in items:
-        site_data = SiteRead(
-            id=site.id,
-            nom=site.nom,
-            description=site.description,
-            adresse=site.adresse,
-            entreprise_id=site.entreprise_id,
-            equipement_count=len(site.equipements) if site.equipements else 0,
-        )
-        result.append(site_data)
-
     return PaginatedResponse(
-        items=result,
+        items=items,
         total=total,
         page=pagination.page,
         page_size=pagination.page_size,

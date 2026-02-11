@@ -17,7 +17,7 @@ class Site(Base):
 
     # FK
     entreprise_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("entreprises.id"), nullable=False
+        Integer, ForeignKey("entreprises.id"), nullable=False, index=True
     )
 
     # Relations
@@ -25,9 +25,18 @@ class Site(Base):
     equipements: Mapped[list["Equipement"]] = relationship(  # type: ignore[name-defined]
         back_populates="site", cascade="all, delete-orphan", lazy="selectin"
     )
+
+    @property
+    def equipement_count(self) -> int:
+        return len(self.equipements) if self.equipements else 0
+
     scans: Mapped[list["ScanReseau"]] = relationship(  # type: ignore[name-defined]
         back_populates="site", cascade="all, delete-orphan", lazy="selectin"
     )
+
+    @property
+    def equipement_count(self) -> int:
+        return len(self.equipements) if self.equipements else 0
 
     def __repr__(self) -> str:
         return f"<Site(id={self.id}, nom='{self.nom}')>"

@@ -37,7 +37,7 @@ class Audit(Base):
 
     # FK
     entreprise_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("entreprises.id"), nullable=False
+        Integer, ForeignKey("entreprises.id"), nullable=False, index=True
     )
 
     # Bloc Administratif
@@ -56,6 +56,10 @@ class Audit(Base):
     campaigns: Mapped[list["AssessmentCampaign"]] = relationship(  # type: ignore[name-defined]
         back_populates="audit", cascade="all, delete-orphan", lazy="selectin"
     )
+
+    @property
+    def total_campaigns(self) -> int:
+        return len(self.campaigns) if self.campaigns else 0
 
     def __repr__(self) -> str:
         return f"<Audit(id={self.id}, projet='{self.nom_projet}', status={self.status.value})>"

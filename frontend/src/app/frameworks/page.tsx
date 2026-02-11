@@ -12,16 +12,12 @@ import {
   RefreshCw,
   Copy,
   Shield,
-  ShieldAlert,
-  ShieldCheck,
   ChevronDown,
   ChevronUp,
   Eye,
   Settings,
   FileText,
   Layers,
-  AlertTriangle,
-  Info,
   CheckCircle,
   Plus,
   Pencil,
@@ -64,62 +60,16 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/auth-context";
 import { frameworksApi } from "@/services/api";
 import type { FrameworkSummary, Framework, FrameworkCategory, Control, FrameworkCreatePayload, CategoryCreate, ControlCreate } from "@/types";
-
-// ── Constants ──
-const SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"] as const;
-
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "bg-red-100 text-red-800 border-red-200",
-  high: "bg-orange-100 text-orange-800 border-orange-200",
-  medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  low: "bg-blue-100 text-blue-800 border-blue-200",
-  info: "bg-gray-100 text-gray-600 border-gray-200",
-};
-
-const SEVERITY_LABELS: Record<string, string> = {
-  critical: "Critique",
-  high: "Élevée",
-  medium: "Moyenne",
-  low: "Faible",
-  info: "Info",
-};
-
-const SEVERITY_ICONS: Record<string, typeof ShieldAlert> = {
-  critical: ShieldAlert,
-  high: AlertTriangle,
-  medium: Shield,
-  low: Info,
-  info: Info,
-};
-
-const ENGINE_LABELS: Record<string, string> = {
-  manual: "Manuel",
-  monkey365: "Monkey365",
-  nmap: "Nmap",
-  automatic: "Automatique",
-};
-
-const FRAMEWORK_ICONS: Record<string, string> = {
-  firewall: "🔥",
-  switch: "🔀",
-  server_windows: "🖥️",
-  server_linux: "🐧",
-  active_directory: "📁",
-  wifi: "📶",
-  sauvegarde: "💾",
-  peripheriques: "🖨️",
-  m365: "☁️",
-  messagerie: "📧",
-  vpn: "🔒",
-  dns_dhcp: "🌐",
-};
-
-function getFrameworkIcon(refId: string): string {
-  for (const [key, icon] of Object.entries(FRAMEWORK_ICONS)) {
-    if (refId.includes(key)) return icon;
-  }
-  return "📋";
-}
+import { toast } from "sonner";
+import {
+  SEVERITY_ORDER,
+  SEVERITY_COLORS,
+  SEVERITY_LABELS,
+  SEVERITY_ICONS,
+  ENGINE_LABELS,
+  CHECK_TYPE_LABELS,
+  getFrameworkIcon,
+} from "@/lib/constants";
 
 // ── Main Page ──
 export default function FrameworksPage() {
@@ -499,9 +449,10 @@ function FrameworkDetail({
     setDeleting(true);
     try {
       await frameworksApi.delete(framework.id);
+      toast.success("Référentiel supprimé");
       onDeleted();
     } catch {
-      /* ignore */
+      toast.error("Erreur lors de la suppression");
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -855,19 +806,6 @@ function ControlRow({
 }) {
   const [showDetails, setShowDetails] = useState(false);
 
-  const checkTypeLabel = (type: string | null) => {
-    switch (type) {
-      case "automatic":
-        return "Automatique";
-      case "semi-automatic":
-        return "Semi-auto";
-      case "manual":
-        return "Manuel";
-      default:
-        return type || "—";
-    }
-  };
-
   const checkTypeIcon = (type: string | null) => {
     switch (type) {
       case "automatic":
@@ -903,7 +841,7 @@ function ControlRow({
         <TableCell>
           <span className="flex items-center text-xs text-muted-foreground">
             {checkTypeIcon(ctrl.check_type)}
-            {checkTypeLabel(ctrl.check_type)}
+            {CHECK_TYPE_LABELS[ctrl.check_type || ""] || ctrl.check_type || "—"}
           </span>
         </TableCell>
         <TableCell className="text-center">
@@ -1224,13 +1162,16 @@ function FrameworkEditor({
     try {
       if (isEditMode) {
         await frameworksApi.update(framework.id, payload);
+        toast.success("Référentiel mis à jour");
       } else {
         await frameworksApi.create(payload);
+        toast.success("Référentiel créé");
       }
       onSaved();
     } catch (err: unknown) {
       const apiErr = err as { response?: { data?: { detail?: string } } };
       setError(apiErr.response?.data?.detail || "Erreur lors de l'enregistrement.");
+      toast.error("Erreur lors de l'enregistrement");
     } finally {
       setSaving(false);
     }

@@ -47,6 +47,8 @@ import {
 } from "@/components/ui/select";
 import { sitesApi, entreprisesApi } from "@/services/api";
 import type { Site, SiteCreate, Entreprise } from "@/types";
+import { toast } from "sonner";
+import { TableSkeleton } from "@/components/skeletons";
 
 export default function SitesPage() {
   return (
@@ -112,6 +114,7 @@ function SitesContent() {
         setEntrepriseMap(map);
       } catch (error) {
         console.error("Erreur chargement entreprises:", error);
+        toast.error("Impossible de charger les entreprises");
       }
     }
     loadEntreprises();
@@ -127,6 +130,7 @@ function SitesContent() {
       setPages(res.pages);
     } catch (error) {
       console.error("Erreur chargement sites:", error);
+      toast.error("Impossible de charger les sites");
     } finally {
       setLoading(false);
     }
@@ -201,9 +205,11 @@ function SitesContent() {
       setCreateOpen(false);
       resetForm();
       loadSites();
+      toast.success("Site créé avec succès");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la création");
+      toast.error("Erreur lors de la création");
     } finally {
       setSaving(false);
     }
@@ -225,9 +231,11 @@ function SitesContent() {
       setEditOpen(false);
       resetForm();
       loadSites();
+      toast.success("Site mis à jour");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la mise à jour");
+      toast.error("Erreur lors de la mise à jour");
     } finally {
       setSaving(false);
     }
@@ -242,9 +250,11 @@ function SitesContent() {
       setDeleteOpen(false);
       setSelected(null);
       loadSites();
+      toast.success("Site supprimé");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la suppression");
+      toast.error("Erreur lors de la suppression");
     } finally {
       setSaving(false);
     }
@@ -308,9 +318,7 @@ function SitesContent() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
+            <TableSkeleton rows={5} cols={4} />
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <MapPin className="h-12 w-12 mb-4 opacity-30" />

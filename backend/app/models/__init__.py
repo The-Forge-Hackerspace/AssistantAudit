@@ -28,6 +28,7 @@ from .assessment import (
     ComplianceStatus,
     CampaignStatus,
 )
+from .attachment import Attachment
 
 __all__ = [
     "User",

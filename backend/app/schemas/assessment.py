@@ -38,6 +38,11 @@ class ControlResultRead(ControlResultBase):
     control_ref_id: Optional[str] = None
     control_title: Optional[str] = None
     control_severity: Optional[str] = None
+    control_category_name: Optional[str] = None
+    control_category_id: Optional[int] = None
+    control_description: Optional[str] = None
+    control_remediation: Optional[str] = None
+    control_check_type: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

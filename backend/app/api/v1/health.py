@@ -3,14 +3,17 @@ Route Health : vérification de l'état de l'application.
 """
 from fastapi import APIRouter
 
+from ...core.config import get_settings
+
 router = APIRouter()
+settings = get_settings()
 
 
 @router.get("/health")
 async def health_check():
-    """Vérifie que l'API est opérationnelle"""
+    """État de l'API"""
     return {
         "status": "healthy",
-        "service": "AssistantAudit API",
-        "version": "2.0.0",
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
     }

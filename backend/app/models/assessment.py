@@ -198,6 +198,9 @@ class ControlResult(Base):
     # Relations
     assessment: Mapped["Assessment"] = relationship(back_populates="results")
     control: Mapped["Control"] = relationship(lazy="selectin")  # type: ignore[name-defined]
+    attachments: Mapped[list["Attachment"]] = relationship(  # type: ignore[name-defined]
+        back_populates="control_result", cascade="all, delete-orphan", lazy="selectin"
+    )
 
     # Propriétés dénormalisées pour Pydantic from_attributes
     @property
@@ -211,6 +214,26 @@ class ControlResult(Base):
     @property
     def control_severity(self) -> str | None:
         return self.control.severity.value if self.control else None
+
+    @property
+    def control_category_name(self) -> str | None:
+        return self.control.category.name if self.control and self.control.category else None
+
+    @property
+    def control_category_id(self) -> int | None:
+        return self.control.category_id if self.control else None
+
+    @property
+    def control_description(self) -> str | None:
+        return self.control.description if self.control else None
+
+    @property
+    def control_remediation(self) -> str | None:
+        return self.control.remediation if self.control else None
+
+    @property
+    def control_check_type(self) -> str | None:
+        return self.control.check_type.value if self.control else None
 
     def __repr__(self) -> str:
         return f"<ControlResult(id={self.id}, control_id={self.control_id}, status={self.status.value})>"

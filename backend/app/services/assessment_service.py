@@ -96,6 +96,16 @@ class AssessmentService:
         db.refresh(campaign)
         return campaign
 
+    @staticmethod
+    def delete_campaign(db: Session, campaign_id: int) -> None:
+        """Supprime une campagne et tous ses assessments/résultats associés."""
+        campaign = db.get(AssessmentCampaign, campaign_id)
+        if not campaign:
+            raise ValueError(f"Campagne {campaign_id} introuvable")
+        db.delete(campaign)
+        db.commit()
+        logger.info(f"Campagne supprimée : id={campaign_id} '{campaign.name}'")
+
     # --- Assessments (évaluation d'un équipement) ---
 
     @staticmethod
@@ -122,6 +132,18 @@ class AssessmentService:
         framework = db.get(Framework, framework_id)
         if not framework:
             raise ValueError(f"Framework {framework_id} introuvable")
+
+        # Vérifier qu'il n'existe pas déjà un assessment pour cette combinaison
+        existing = db.query(Assessment).filter_by(
+            campaign_id=campaign_id,
+            equipement_id=equipement_id,
+            framework_id=framework_id,
+        ).first()
+        if existing:
+            raise ValueError(
+                f"Un assessment existe déjà pour cette combinaison "
+                f"(campagne={campaign_id}, équipement={equipement_id}, framework={framework_id})"
+            )
 
         # Créer l'assessment
         assessment = Assessment(
@@ -157,6 +179,16 @@ class AssessmentService:
     def get_assessment(db: Session, assessment_id: int) -> Optional[Assessment]:
         return db.get(Assessment, assessment_id)
 
+    @staticmethod
+    def delete_assessment(db: Session, assessment_id: int) -> None:
+        """Supprime un assessment et tous ses résultats de contrôle / pièces jointes."""
+        assessment = db.get(Assessment, assessment_id)
+        if not assessment:
+            raise ValueError(f"Assessment {assessment_id} introuvable")
+        db.delete(assessment)
+        db.commit()
+        logger.info(f"Assessment supprimé : id={assessment_id}")
+
     # --- Résultats de contrôle ---
 
     @staticmethod
@@ -175,9 +207,12 @@ class AssessmentService:
             raise ValueError(f"ControlResult {result_id} introuvable")
 
         result.status = ComplianceStatus(status)
-        result.evidence = evidence
-        result.comment = comment
-        result.remediation_note = remediation_note
+        if evidence is not None:
+            result.evidence = evidence
+        if comment is not None:
+            result.comment = comment
+        if remediation_note is not None:
+            result.remediation_note = remediation_note
         result.assessed_by = assessed_by
         result.assessed_at = datetime.now(timezone.utc)
 

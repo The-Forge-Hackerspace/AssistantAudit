@@ -12,9 +12,6 @@ import {
   Search,
   Loader2,
   Server,
-  Shield,
-  Wifi,
-  Monitor,
   MapPin,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,35 +45,14 @@ import {
 } from "@/components/ui/select";
 import { equipementsApi, sitesApi } from "@/services/api";
 import type { Equipement, EquipementCreate, Site, TypeEquipement, StatusAudit } from "@/types";
-
-// ── Constants ──
-const TYPE_LABELS: Record<TypeEquipement, string> = {
-  serveur: "Serveur",
-  firewall: "Firewall",
-  reseau: "Réseau",
-  equipement: "Autre",
-};
-
-const TYPE_ICONS: Record<TypeEquipement, typeof Server> = {
-  serveur: Monitor,
-  firewall: Shield,
-  reseau: Wifi,
-  equipement: Server,
-};
-
-const STATUS_LABELS: Record<StatusAudit, string> = {
-  A_AUDITER: "À auditer",
-  EN_COURS: "En cours",
-  CONFORME: "Conforme",
-  NON_CONFORME: "Non conforme",
-};
-
-const STATUS_VARIANTS: Record<StatusAudit, "default" | "secondary" | "destructive" | "outline"> = {
-  A_AUDITER: "outline",
-  EN_COURS: "secondary",
-  CONFORME: "default",
-  NON_CONFORME: "destructive",
-};
+import { toast } from "sonner";
+import { TableSkeleton } from "@/components/skeletons";
+import {
+  EQUIPEMENT_TYPE_LABELS as TYPE_LABELS,
+  EQUIPEMENT_TYPE_ICONS as TYPE_ICONS,
+  EQUIPEMENT_STATUS_LABELS as STATUS_LABELS,
+  EQUIPEMENT_STATUS_VARIANTS as STATUS_VARIANTS,
+} from "@/lib/constants";
 
 // ── Default create form ──
 const EMPTY_FORM: EquipementCreate = {
@@ -257,9 +233,11 @@ function EquipementsContent() {
       setCreateOpen(false);
       resetForm();
       loadEquipements();
+      toast.success("Équipement créé avec succès");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la création");
+      toast.error("Erreur lors de la création");
     } finally {
       setSaving(false);
     }
@@ -295,9 +273,11 @@ function EquipementsContent() {
       setEditOpen(false);
       resetForm();
       loadEquipements();
+      toast.success("Équipement mis à jour");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la mise à jour");
+      toast.error("Erreur lors de la mise à jour");
     } finally {
       setSaving(false);
     }
@@ -311,9 +291,11 @@ function EquipementsContent() {
       await equipementsApi.delete(selected.id);
       setDeleteOpen(false);
       loadEquipements();
+      toast.success("Équipement supprimé");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la suppression");
+      toast.error("Erreur lors de la suppression");
     } finally {
       setSaving(false);
     }
@@ -397,9 +379,7 @@ function EquipementsContent() {
       {/* ── Table ── */}
       <Card>
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
+          <TableSkeleton rows={5} cols={5} />
         ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Server className="h-12 w-12 mx-auto mb-4 opacity-50" />

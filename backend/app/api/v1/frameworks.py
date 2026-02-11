@@ -191,7 +191,7 @@ async def update_framework(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.delete("/{framework_id}")
+@router.delete("/{framework_id}", response_model=MessageResponse)
 async def delete_framework(
     framework_id: int,
     db: Session = Depends(get_db),
@@ -230,7 +230,11 @@ async def import_single_framework(
     _: User = Depends(get_current_admin),
 ):
     """Importe un référentiel YAML spécifique"""
-    yaml_path = Path(settings.FRAMEWORKS_DIR) / filename
+    frameworks_dir = Path(settings.FRAMEWORKS_DIR).resolve()
+    yaml_path = (frameworks_dir / filename).resolve()
+    # Protection path traversal
+    if not yaml_path.is_relative_to(frameworks_dir):
+        raise HTTPException(status_code=400, detail="Nom de fichier invalide")
     if not yaml_path.exists():
         raise HTTPException(status_code=404, detail=f"Fichier '{filename}' introuvable")
     try:

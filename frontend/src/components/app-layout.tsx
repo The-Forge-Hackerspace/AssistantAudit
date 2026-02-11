@@ -160,9 +160,11 @@ function AppSidebar() {
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" className="w-56">
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  Mon profil
+                <DropdownMenuItem asChild>
+                  <Link href="/profile">
+                    <User className="mr-2 h-4 w-4" />
+                    Mon profil
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="text-destructive">
@@ -178,6 +180,8 @@ function AppSidebar() {
   );
 }
 
+import { ThemeToggle } from "@/components/theme-toggle";
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
@@ -189,6 +193,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-6" />
           <div className="flex-1" />
+          <ThemeToggle />
           <span className="text-sm text-muted-foreground">
             {user?.full_name}
           </span>
