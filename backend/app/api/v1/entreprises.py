@@ -53,13 +53,22 @@ async def create_entreprise(
     if existing:
         raise HTTPException(status_code=409, detail=f"L'entreprise '{body.nom}' existe déjà")
 
+    # Convertir les chaînes vides en None pour éviter les conflits UNIQUE
+    siret = body.siret.strip() if body.siret else None
+    siret = siret or None  # "" -> None
+
+    if siret:
+        dup = db.query(Entreprise).filter(Entreprise.siret == siret).first()
+        if dup:
+            raise HTTPException(status_code=409, detail=f"Une entreprise avec le SIRET '{siret}' existe déjà")
+
     entreprise = Entreprise(
         nom=body.nom,
-        adresse=body.adresse,
-        secteur_activite=body.secteur_activite,
-        siret=body.siret,
-        presentation_desc=body.presentation_desc,
-        contraintes_reglementaires=body.contraintes_reglementaires,
+        adresse=body.adresse or None,
+        secteur_activite=body.secteur_activite or None,
+        siret=siret,
+        presentation_desc=body.presentation_desc or None,
+        contraintes_reglementaires=body.contraintes_reglementaires or None,
     )
     db.add(entreprise)
     db.flush()

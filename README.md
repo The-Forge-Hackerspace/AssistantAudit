@@ -1,63 +1,204 @@
 # AssistantAudit
 
-Outil d'audit d'infrastructure IT — évaluation de conformité des équipements réseau, serveurs et services cloud.
+Plateforme d'audit d'infrastructure IT — évaluation de conformité des équipements réseau, serveurs, services cloud et périphériques. Interface web complète avec outils intégrés (Nmap, analyse SSL/TLS, parseurs de configuration).
+
+---
+
+## Fonctionnalités
+
+- **Gestion multi-entreprises / multi-sites** — suivi des entreprises, sites et équipements audités
+- **14 référentiels d'audit YAML** (200 contrôles) — firewall, switch, serveurs Windows/Linux, Active Directory, Microsoft 365, Wi-Fi, VPN, DNS/DHCP, messagerie, sauvegarde, périphériques, OPNsense
+- **Évaluation de conformité** — scoring par contrôle (conforme / partiel / non-conforme / N/A), commentaires, pièces jointes
+- **Scanner réseau Nmap** — découverte d'hôtes, scan de ports, détection d'OS, mode personnalisé (commande nmap libre), import automatique des équipements
+- **Analyse SSL/TLS** — vérification des certificats, protocoles, suites de chiffrement
+- **Parseur de configuration** — analyse des configs Fortinet FortiGate et OPNsense (interfaces, règles, VPN, NAT)
+- **Intégration Monkey365** — audit Microsoft 365 / Azure AD automatisé
+- **Authentification JWT** — rôles admin, auditeur, lecteur
+- **Export YAML** — export des référentiels personnalisés
+- **Versioning** — historique des modifications sur les référentiels
+
+## Stack technique
+
+| Composant | Technologies |
+|-----------|-------------|
+| **Backend** | Python 3.13 · FastAPI · SQLAlchemy 2.0 · Pydantic v2 · Alembic |
+| **Frontend** | Next.js 16 · React 19 · TypeScript · Tailwind CSS v4 · shadcn/ui · Recharts |
+| **Auth** | JWT (python-jose + bcrypt) |
+| **BDD** | SQLite (dev) / PostgreSQL (prod) |
+| **Outils** | Nmap · OpenSSL · Monkey365 |
+| **Infra** | Docker · Docker Compose |
 
 ## Démarrage rapide
 
+### Prérequis
+
+- **Python 3.12+**
+- **Node.js 20+** et npm
+- **Nmap** (optionnel, pour le scanner réseau)
+
+### Installation automatique
+
 ```bash
-# Installer les dépendances
-cd backend
-pip install -r requirements.txt
+# Cloner le projet
+git clone <url> && cd AssistantAudit
 
-# Initialiser la base de données + admin + référentiels
-python init_db.py
+# Lancer tout (backend + frontend)
+# Linux / macOS :
+chmod +x start.sh && ./start.sh
 
-# Lancer le serveur
-python -m uvicorn app.main:app --reload --port 8000
+# Windows (PowerShell) :
+.\start.ps1
 ```
 
-**Swagger UI** : <http://localhost:8000/docs>
-**Identifiants** : `admin` / `Admin@2026!`
+### Installation manuelle
+
+```bash
+# 1. Backend
+cd backend
+python -m venv ../venv
+# Linux: source ../venv/bin/activate
+# Windows: ..\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# 2. Initialiser la BDD + admin + référentiels
+python init_db.py
+
+# 3. Lancer le backend
+cd ..
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# 4. Frontend (dans un autre terminal)
+cd frontend
+npm install
+npm run dev
+```
+
+### Accès
+
+| Service | URL |
+|---------|-----|
+| **Frontend** | http://localhost:3000 |
+| **API** | http://localhost:8000 |
+| **Swagger UI** | http://localhost:8000/docs |
+| **ReDoc** | http://localhost:8000/redoc |
+
+**Identifiants par défaut** : `admin` / `Admin@2026!`
+
+### Docker
+
+```bash
+docker-compose up --build
+```
 
 ## Structure du projet
 
-```text
+```
 AssistantAudit/
-├── backend/            API FastAPI (Python)
+├── backend/                    API FastAPI (Python)
 │   ├── app/
-│   │   ├── api/v1/     Routes (28 endpoints)
-│   │   ├── core/       Config, auth JWT, BDD
-│   │   ├── models/     Modèles SQLAlchemy
-│   │   ├── schemas/    Schémas Pydantic
-│   │   ├── services/   Logique métier
-│   │   └── tools/      Nmap, Monkey365
-│   ├── alembic/        Migrations
-│   ├── tests/          Tests pytest
-│   └── init_db.py      Initialisation
-├── frameworks/         7 référentiels YAML (114 contrôles)
-├── API.md              Documentation API
-├── ARCHITECTURE.md     Architecture détaillée
+│   │   ├── api/v1/             75 endpoints REST
+│   │   │   ├── auth.py         Authentification (login, register, refresh, password)
+│   │   │   ├── entreprises.py  CRUD entreprises
+│   │   │   ├── sites.py        CRUD sites
+│   │   │   ├── equipements.py  CRUD équipements
+│   │   │   ├── audits.py       CRUD audits
+│   │   │   ├── frameworks.py   Référentiels (CRUD, sync, import/export, clone)
+│   │   │   ├── assessments.py  Évaluations (scoring, résultats, statistiques)
+│   │   │   ├── attachments.py  Pièces jointes
+│   │   │   ├── scans.py        Scanner réseau (lancement, résultats, décisions)
+│   │   │   ├── tools.py        Outils (config parser, SSL checker)
+│   │   │   └── health.py       Healthcheck
+│   │   ├── core/               Config, auth JWT, BDD, dépendances
+│   │   ├── models/             10 modèles SQLAlchemy
+│   │   ├── schemas/            Schémas Pydantic (validation I/O)
+│   │   ├── services/           Logique métier
+│   │   └── tools/              Outils intégrés
+│   │       ├── nmap_scanner/   Scanner Nmap (discovery, ports, full, custom)
+│   │       ├── ssl_checker/    Vérificateur SSL/TLS
+│   │       ├── config_parsers/ Parseurs Fortinet + OPNsense
+│   │       ├── monkey365_runner/ Bridge Monkey365
+│   │       └── collectors/     Collecteurs de données
+│   ├── alembic/                Migrations de schéma
+│   ├── tests/                  Tests pytest
+│   ├── init_db.py              Initialisation BDD + admin
+│   └── requirements.txt
+├── frontend/                   Interface Next.js
+│   └── src/
+│       ├── app/                13 pages
+│       │   ├── login/          Connexion
+│       │   ├── entreprises/    Gestion des entreprises
+│       │   ├── sites/          Gestion des sites
+│       │   ├── equipements/    Inventaire des équipements
+│       │   ├── audits/         Audits et évaluation
+│       │   ├── frameworks/     Référentiels d'audit
+│       │   ├── outils/         Hub outils
+│       │   │   ├── scanner/    Scanner réseau Nmap
+│       │   │   ├── ssl-checker/Analyse SSL/TLS
+│       │   │   └── config-parser/ Parseur de configuration
+│       │   └── profile/        Profil utilisateur
+│       ├── components/         Composants UI (shadcn/ui)
+│       ├── services/           Client API Axios
+│       ├── contexts/           Auth context
+│       ├── hooks/              Hooks personnalisés
+│       └── types/              Types TypeScript
+├── frameworks/                 14 référentiels YAML (200 contrôles)
+├── data/                       Données d'audit (configs, exports)
+├── start.sh                    Script de démarrage (Linux/macOS)
+├── start.ps1                   Script de démarrage (Windows)
+├── docker-compose.yml
 ├── Dockerfile
-└── docker-compose.yml
+├── API.md                      Documentation API complète
+├── ARCHITECTURE.md             Architecture et choix techniques
+└── CONCEPT.md                  Concept et vision du projet
 ```
 
 ## Référentiels d'audit
 
-| Référentiel | Contrôles |
-| ------------- | ----------- |
-| Firewall | 20 |
-| Switch / Réseau | 18 |
-| Serveur Windows | 15 |
-| Serveur Linux | 16 |
-| Active Directory | 17 |
-| Microsoft 365 | 18 |
-| Wi-Fi | 10 |
+| Référentiel | Contrôles | Description |
+|-------------|:---------:|-------------|
+| Firewall | 20 | Règles, NAT, VPN, HA, logs |
+| Switch / Réseau | 18 | VLAN, STP, port security, ACL |
+| Messagerie | 18 | SPF, DKIM, DMARC, antispam, chiffrement |
+| Microsoft 365 | 18 | Azure AD, MFA, conditional access, DLP |
+| Active Directory | 17 | GPO, Kerberos, LDAPS, comptes à privilèges |
+| DNS / DHCP | 17 | DNSSEC, transferts de zone, baux, scope |
+| Sauvegarde | 17 | Politique 3-2-1, rétention, tests de restauration |
+| Périphériques | 16 | Imprimantes, IoT, firmwares, accès réseau |
+| Serveur Linux | 16 | SSH, firewall, mises à jour, partitionnement |
+| VPN | 16 | Protocoles, certificats, split tunneling, MFA |
+| Serveur Windows | 15 | GPO, BitLocker, pare-feu, RDP, antivirus |
+| Wi-Fi | 10 | WPA3, segmentation, portail captif, rogue AP |
+| OPNsense | 1 | Audit spécifique OPNsense |
+
+## Configuration
+
+Variables d'environnement (fichier `.env` à la racine) :
+
+```env
+# Sécurité (OBLIGATOIRE en production)
+SECRET_KEY=votre-cle-secrete-de-32-caracteres-minimum
+
+# Base de données
+DATABASE_URL=sqlite:///./instance/assistantaudit.db
+# DATABASE_URL=postgresql://user:password@localhost:5432/assistantaudit
+
+# Application
+ENV=development          # development | production
+DEBUG=true
+LOG_LEVEL=INFO
+
+# Outils
+NMAP_TIMEOUT=600         # Timeout Nmap en secondes
+MONKEY365_PATH=          # Chemin vers Invoke-Monkey365.ps1
+```
 
 ## Documentation
 
-- [API.md](API.md) — Référence complète des endpoints
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Architecture et choix techniques
+- [API.md](API.md) — Référence complète des 75 endpoints
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Architecture technique et choix de conception
+- [CONCEPT.md](CONCEPT.md) — Vision et concept du projet
+- [Swagger UI](http://localhost:8000/docs) — Documentation interactive des API
 
-## Stack
+## Licence
 
-FastAPI · SQLAlchemy 2.0 · Pydantic v2 · JWT · SQLite/PostgreSQL · Alembic
+Projet interne — tous droits réservés.

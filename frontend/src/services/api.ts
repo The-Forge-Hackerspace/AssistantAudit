@@ -24,6 +24,14 @@ import type {
   MessageResponse,
   RegisterRequest,
   Attachment,
+  Scan,
+  ScanCreate,
+  ScanSummary,
+  ScanHostDecision,
+  ConfigUploadResponse,
+  SSLCheckRequest,
+  SSLCheckResult,
+  VendorInfo,
 } from "@/types";
 
 // ── Auth ──
@@ -357,5 +365,98 @@ export const attachmentsApi = {
 
   previewUrl(attachmentId: number): string {
     return `/api/v1/attachments/${attachmentId}/preview`;
+  },
+};
+
+// ── Scans (Scanner réseau) ──
+export const scansApi = {
+  async launch(data: ScanCreate): Promise<Scan> {
+    const { data: result } = await api.post("/scans", data);
+    return result;
+  },
+
+  async list(params?: {
+    site_id?: number;
+    page?: number;
+    page_size?: number;
+  }): Promise<PaginatedResponse<ScanSummary>> {
+    const { data } = await api.get("/scans", { params });
+    return data;
+  },
+
+  async get(scanId: number): Promise<Scan> {
+    const { data } = await api.get(`/scans/${scanId}`);
+    return data;
+  },
+
+  async delete(scanId: number): Promise<void> {
+    await api.delete(`/scans/${scanId}`);
+  },
+
+  async updateHostDecision(
+    hostId: number,
+    decision: ScanHostDecision
+  ): Promise<Record<string, unknown>> {
+    const { data } = await api.put(`/scans/hosts/${hostId}/decision`, decision);
+    return data;
+  },
+
+  async linkHostToEquipement(
+    hostId: number,
+    equipementId: number
+  ): Promise<Record<string, unknown>> {
+    const { data } = await api.post(
+      `/scans/hosts/${hostId}/link/${equipementId}`
+    );
+    return data;
+  },
+
+  async importAllKept(scanId: number): Promise<Record<string, unknown>> {
+    const { data } = await api.post(`/scans/${scanId}/import-all`);
+    return data;
+  },
+
+  async previewCommand(params: {
+    scan_type: string;
+    target?: string;
+    custom_args?: string;
+  }): Promise<{ command: string }> {
+    const { data } = await api.get("/scans/preview-command", { params });
+    return data;
+  },
+};
+
+// ── Tools (Config Parser + SSL Checker) ──
+export const toolsApi = {
+  // Config Parser
+  async analyzeConfig(
+    file: File,
+    equipementId?: number
+  ): Promise<ConfigUploadResponse> {
+    const form = new FormData();
+    form.append("file", file);
+    if (equipementId) form.append("equipement_id", String(equipementId));
+    const { data } = await api.post("/tools/config-analysis", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  },
+
+  async listVendors(): Promise<{ vendors: VendorInfo[] }> {
+    const { data } = await api.get("/tools/config-analysis/vendors");
+    return data;
+  },
+
+  // SSL Checker
+  async sslCheck(request: SSLCheckRequest): Promise<SSLCheckResult> {
+    const { data } = await api.post("/tools/ssl-check", request);
+    return data;
+  },
+
+  async sslCheckBatch(
+    requests: SSLCheckRequest[]
+  ): Promise<SSLCheckResult[]> {
+    const { data } = await api.post("/tools/ssl-check/batch", requests);
+    return data;
   },
 };

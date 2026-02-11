@@ -39,6 +39,10 @@ import {
   LogOut,
   User,
   ChevronUp,
+  Wrench,
+  Radar,
+  FileCode,
+  Lock,
 } from "lucide-react";
 
 const navItems = [
@@ -61,6 +65,14 @@ const navItems = [
     items: [
       { title: "Projets d'audit", href: "/audits", icon: ClipboardCheck },
       { title: "Référentiels", href: "/frameworks", icon: BookOpen },
+    ],
+  },
+  {
+    label: "Outils",
+    items: [
+      { title: "Scanner réseau", href: "/outils/scanner", icon: Radar },
+      { title: "Config parser", href: "/outils/config-parser", icon: FileCode },
+      { title: "SSL/TLS", href: "/outils/ssl-checker", icon: Lock },
     ],
   },
 ];
