@@ -16,7 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { entreprisesApi, auditsApi, sitesApi, equipementsApi, frameworksApi, campaignsApi } from "@/services/api";
-import type { Audit, FrameworkSummary, Campaign, Score } from "@/types";
+import type { Audit, FrameworkSummary, CampaignSummary, Score } from "@/types";
 
 interface DashboardStats {
   entreprises: number;
@@ -31,7 +31,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentAudits, setRecentAudits] = useState<Audit[]>([]);
   const [frameworks, setFrameworks] = useState<FrameworkSummary[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignSummary[]>([]);
   const [campaignScores, setCampaignScores] = useState<Record<number, Score>>({});
   const [loading, setLoading] = useState(true);
 
@@ -191,7 +191,7 @@ export default function DashboardPage() {
                         {audit.nom_projet}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(audit.created_at).toLocaleDateString("fr-FR")}
+                        {new Date(audit.date_debut).toLocaleDateString("fr-FR")}
                       </p>
                     </div>
                     <Badge

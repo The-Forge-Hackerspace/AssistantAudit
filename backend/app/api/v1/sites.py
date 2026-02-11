@@ -35,6 +35,7 @@ async def list_sites(
         site_data = SiteRead(
             id=site.id,
             nom=site.nom,
+            description=site.description,
             adresse=site.adresse,
             entreprise_id=site.entreprise_id,
             equipement_count=len(site.equipements) if site.equipements else 0,
@@ -74,13 +75,14 @@ async def create_site(
             detail=f"Le site '{body.nom}' existe déjà pour cette entreprise",
         )
 
-    site = Site(nom=body.nom, adresse=body.adresse, entreprise_id=body.entreprise_id)
+    site = Site(nom=body.nom, description=body.description, adresse=body.adresse, entreprise_id=body.entreprise_id)
     db.add(site)
     db.commit()
     db.refresh(site)
     return SiteRead(
         id=site.id,
         nom=site.nom,
+        description=site.description,
         adresse=site.adresse,
         entreprise_id=site.entreprise_id,
         equipement_count=0,
@@ -100,6 +102,7 @@ async def get_site(
     return SiteRead(
         id=site.id,
         nom=site.nom,
+        description=site.description,
         adresse=site.adresse,
         entreprise_id=site.entreprise_id,
         equipement_count=len(site.equipements) if site.equipements else 0,
@@ -127,6 +130,7 @@ async def update_site(
     return SiteRead(
         id=site.id,
         nom=site.nom,
+        description=site.description,
         adresse=site.adresse,
         entreprise_id=site.entreprise_id,
         equipement_count=len(site.equipements) if site.equipements else 0,

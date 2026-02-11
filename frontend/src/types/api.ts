@@ -90,8 +90,12 @@ export interface Audit {
   hypotheses: string | null;
   risques_initiaux: string | null;
   status: AuditStatus;
-  created_at: string;
-  updated_at: string;
+  date_debut: string;
+  lettre_mission_path: string | null;
+  contrat_path: string | null;
+  planning_path: string | null;
+  total_campaigns: number;
+  entreprise_nom?: string | null;
 }
 
 export interface AuditCreate {
@@ -107,6 +111,7 @@ export interface AuditCreate {
 export interface Site {
   id: number;
   nom: string;
+  description: string | null;
   adresse: string | null;
   entreprise_id: number;
   equipement_count: number;
@@ -114,6 +119,7 @@ export interface Site {
 
 export interface SiteCreate {
   nom: string;
+  description?: string;
   adresse?: string;
   entreprise_id: number;
 }
@@ -169,6 +175,8 @@ export interface Control {
   check_type: string | null;
   remediation: string | null;
   engine_rule_id: string | null;
+  cis_reference: string | null;
+  evidence_required: boolean;
 }
 
 export interface FrameworkCategory {
@@ -195,8 +203,46 @@ export interface Framework extends FrameworkSummary {
   categories: FrameworkCategory[];
 }
 
+export interface ControlCreate {
+  ref_id: string;
+  title: string;
+  description?: string;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  check_type: string;
+  remediation?: string;
+  engine_rule_id?: string;
+  cis_reference?: string;
+  evidence_required?: boolean;
+}
+
+export interface CategoryCreate {
+  name: string;
+  description?: string;
+  controls: ControlCreate[];
+}
+
+export interface FrameworkCreatePayload {
+  ref_id: string;
+  name: string;
+  description?: string;
+  version: string;
+  engine?: string;
+  engine_config?: Record<string, unknown>;
+  categories: CategoryCreate[];
+}
+
 // ── Campaign ──
 export type CampaignStatus = "draft" | "in_progress" | "review" | "completed" | "archived";
+
+export interface CampaignSummary {
+  id: number;
+  name: string;
+  status: CampaignStatus;
+  audit_id: number;
+  created_at: string;
+  compliance_score: number | null;
+  total_assessments: number;
+}
 
 export interface Campaign {
   id: number;
@@ -205,8 +251,10 @@ export interface Campaign {
   audit_id: number;
   status: CampaignStatus;
   created_at: string;
-  updated_at: string;
-  assessments?: Assessment[];
+  started_at: string | null;
+  completed_at: string | null;
+  compliance_score: number | null;
+  assessments: Assessment[];
 }
 
 export interface CampaignCreate {
@@ -216,16 +264,25 @@ export interface CampaignCreate {
 }
 
 // ── Assessment ──
+export type ComplianceStatus = "not_assessed" | "compliant" | "non_compliant" | "partially_compliant" | "not_applicable";
+
 export interface ControlResult {
   id: number;
+  assessment_id: number;
   control_id: number;
-  status: "not_assessed" | "compliant" | "non_compliant" | "partially_compliant" | "not_applicable";
+  status: ComplianceStatus;
+  score: number | null;
   evidence: string | null;
+  evidence_file_path: string | null;
   comment: string | null;
   remediation_note: string | null;
   auto_result: string | null;
-  created_at: string;
-  updated_at: string;
+  is_auto_assessed: boolean;
+  assessed_at: string | null;
+  assessed_by: string | null;
+  control_ref_id: string | null;
+  control_title: string | null;
+  control_severity: string | null;
 }
 
 export interface Assessment {
@@ -233,10 +290,15 @@ export interface Assessment {
   campaign_id: number;
   equipement_id: number;
   framework_id: number;
+  score: number | null;
   notes: string | null;
-  results: ControlResult[];
   created_at: string;
-  updated_at: string;
+  assessed_by: string | null;
+  results: ControlResult[];
+  equipement_ip: string | null;
+  equipement_hostname: string | null;
+  framework_name: string | null;
+  compliance_score: number | null;
 }
 
 export interface AssessmentCreate {

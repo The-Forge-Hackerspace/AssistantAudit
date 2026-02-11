@@ -122,14 +122,27 @@ class Assessment(Base):
 
     # Relations
     campaign: Mapped["AssessmentCampaign"] = relationship(back_populates="assessments")
-    equipement: Mapped["Equipement"] = relationship(back_populates="assessments")  # type: ignore[name-defined]
-    framework: Mapped["Framework"] = relationship()  # type: ignore[name-defined]
+    equipement: Mapped["Equipement"] = relationship(back_populates="assessments", lazy="selectin")  # type: ignore[name-defined]
+    framework: Mapped["Framework"] = relationship(lazy="selectin")  # type: ignore[name-defined]
     results: Mapped[list["ControlResult"]] = relationship(
         back_populates="assessment", cascade="all, delete-orphan", lazy="selectin"
     )
 
     def __repr__(self) -> str:
         return f"<Assessment(id={self.id}, equipement_id={self.equipement_id}, framework_id={self.framework_id})>"
+
+    # Propriétés dénormalisées pour Pydantic from_attributes
+    @property
+    def equipement_ip(self) -> str | None:
+        return self.equipement.ip_address if self.equipement else None
+
+    @property
+    def equipement_hostname(self) -> str | None:
+        return self.equipement.hostname if self.equipement else None
+
+    @property
+    def framework_name(self) -> str | None:
+        return self.framework.name if self.framework else None
 
     @property
     def compliance_score(self) -> float | None:
@@ -185,6 +198,19 @@ class ControlResult(Base):
     # Relations
     assessment: Mapped["Assessment"] = relationship(back_populates="results")
     control: Mapped["Control"] = relationship(lazy="selectin")  # type: ignore[name-defined]
+
+    # Propriétés dénormalisées pour Pydantic from_attributes
+    @property
+    def control_ref_id(self) -> str | None:
+        return self.control.ref_id if self.control else None
+
+    @property
+    def control_title(self) -> str | None:
+        return self.control.title if self.control else None
+
+    @property
+    def control_severity(self) -> str | None:
+        return self.control.severity.value if self.control else None
 
     def __repr__(self) -> str:
         return f"<ControlResult(id={self.id}, control_id={self.control_id}, status={self.status.value})>"

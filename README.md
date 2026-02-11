@@ -16,12 +16,12 @@ python init_db.py
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-**Swagger UI** : http://localhost:8000/docs
+**Swagger UI** : <http://localhost:8000/docs>
 **Identifiants** : `admin` / `Admin@2026!`
 
 ## Structure du projet
 
-```
+```text
 AssistantAudit/
 ├── backend/            API FastAPI (Python)
 │   ├── app/
@@ -44,7 +44,7 @@ AssistantAudit/
 ## Référentiels d'audit
 
 | Référentiel | Contrôles |
-|-------------|-----------|
+| ------------- | ----------- |
 | Firewall | 20 |
 | Switch / Réseau | 18 |
 | Serveur Windows | 15 |

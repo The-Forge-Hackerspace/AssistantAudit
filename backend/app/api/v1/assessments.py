@@ -94,6 +94,29 @@ async def get_campaign(
     return campaign
 
 
+@router.put("/campaigns/{campaign_id}", response_model=CampaignSummary)
+async def update_campaign(
+    campaign_id: int,
+    body: CampaignUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_auditeur),
+):
+    """Met à jour une campagne (nom, description, statut)"""
+    try:
+        campaign = AssessmentService.update_campaign(db, campaign_id, body)
+        return CampaignSummary(
+            id=campaign.id,
+            name=campaign.name,
+            status=campaign.status.value,
+            audit_id=campaign.audit_id,
+            created_at=campaign.created_at,
+            compliance_score=campaign.compliance_score,
+            total_assessments=len(campaign.assessments),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.post("/campaigns/{campaign_id}/start", response_model=MessageResponse)
 async def start_campaign(
     campaign_id: int,

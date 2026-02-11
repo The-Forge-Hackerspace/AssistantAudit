@@ -25,9 +25,9 @@ class MessageResponse(BaseModel):
 
 class ScoreResponse(BaseModel):
     """Score de conformité détaillé"""
-    score: Optional[float] = None
+    compliance_score: Optional[float] = None
     total_controls: int = 0
-    assessed: int = 0
+    assessed_controls: int = 0
     compliant: int = 0
     non_compliant: int = 0
     partially_compliant: int = 0
