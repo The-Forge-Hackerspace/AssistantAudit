@@ -283,6 +283,11 @@ export interface ControlResult {
   control_ref_id: string | null;
   control_title: string | null;
   control_severity: string | null;
+  control_category_name: string | null;
+  control_category_id: number | null;
+  control_description: string | null;
+  control_remediation: string | null;
+  control_check_type: string | null;
 }
 
 export interface Assessment {
@@ -318,10 +323,27 @@ export interface Score {
   not_applicable: number;
   not_assessed: number;
   compliance_score: number;
+  by_severity?: Record<string, Record<string, number>>;
 }
 
 // ── Messages ──
 export interface MessageResponse {
   message: string;
   detail?: string | null;
+}
+
+// ── Attachments ──
+export interface Attachment {
+  id: number;
+  control_result_id: number;
+  original_filename: string;
+  stored_filename: string;
+  file_path: string;
+  mime_type: string;
+  file_size: number;
+  description: string | null;
+  uploaded_at: string;
+  uploaded_by: string | null;
+  download_url: string | null;
+  preview_url: string | null;
 }

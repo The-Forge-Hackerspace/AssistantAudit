@@ -43,6 +43,10 @@ async def lifespan(app: FastAPI):
     # Créer le dossier uploads
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
+    # Créer le dossier data (stockage des pièces jointes)
+    data_dir = Path(settings.FRAMEWORKS_DIR).parent / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
     # Créer le dossier frameworks
     Path(settings.FRAMEWORKS_DIR).mkdir(parents=True, exist_ok=True)
 

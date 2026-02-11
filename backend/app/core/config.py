@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     # --- Application ---
     APP_NAME: str = "AssistantAudit"
     APP_VERSION: str = "2.0.0"
-    DEBUG: bool = True
+    DEBUG: bool = False
     ENV: str = "development"  # development | testing | production
+    SQL_ECHO: bool = False
 
     # --- API ---
     API_V1_PREFIX: str = "/api/v1"
@@ -37,6 +38,14 @@ class Settings(BaseSettings):
     # --- Sécurité / JWT ---
     SECRET_KEY: str = "dev-only-insecure-key-change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
+
+    def validate_secret_key(self) -> None:
+        """Vérifie que la clé secrète n'est pas celle par défaut en production."""
+        if self.ENV == "production" and "dev-only" in self.SECRET_KEY:
+            raise ValueError(
+                "SECRET_KEY doit être défini en production ! "
+                "Ajoutez SECRET_KEY=<votre-clé> dans .env"
+            )
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
@@ -63,4 +72,6 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     """Retourne l'instance de settings (singleton via cache)"""
-    return Settings()
+    s = Settings()
+    s.validate_secret_key()
+    return s

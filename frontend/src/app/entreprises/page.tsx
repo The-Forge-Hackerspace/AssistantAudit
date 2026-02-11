@@ -41,6 +41,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { entreprisesApi } from "@/services/api";
 import type { Entreprise, EntrepriseCreate, Contact } from "@/types";
+import { toast } from "sonner";
+import { TableSkeleton } from "@/components/skeletons";
 
 // ── Contact form row ──
 interface ContactFormData {
@@ -49,6 +51,7 @@ interface ContactFormData {
   email: string;
   telephone: string;
   is_main_contact: boolean;
+  _key?: string;
 }
 
 const emptyContact: ContactFormData = {
@@ -58,6 +61,11 @@ const emptyContact: ContactFormData = {
   telephone: "",
   is_main_contact: false,
 };
+
+let contactKeyCounter = 0;
+function nextContactKey() {
+  return `contact-${++contactKeyCounter}`;
+}
 
 // ── Main page ──
 export default function EntreprisesPage() {
@@ -102,7 +110,7 @@ export default function EntreprisesPage() {
       setTotal(res.total);
       setPages(res.pages);
     } catch (error) {
-      console.error("Erreur chargement entreprises:", error);
+      toast.error("Impossible de charger les entreprises");
     } finally {
       setLoading(false);
     }
@@ -178,7 +186,7 @@ export default function EntreprisesPage() {
 
   // ── Contact management ──
   const addContact = () => {
-    setContacts([...contacts, { ...emptyContact }]);
+    setContacts([...contacts, { ...emptyContact, _key: nextContactKey() }]);
   };
 
   const updateContact = (index: number, field: keyof ContactFormData, value: string | boolean) => {
@@ -206,9 +214,11 @@ export default function EntreprisesPage() {
       setCreateOpen(false);
       resetForm();
       loadEntreprises();
+      toast.success("Entreprise créée avec succès");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la création");
+      toast.error("Erreur lors de la création");
     } finally {
       setSaving(false);
     }
@@ -229,13 +239,16 @@ export default function EntreprisesPage() {
         siret: form.siret || undefined,
         presentation_desc: form.presentation_desc || undefined,
         contraintes_reglementaires: form.contraintes_reglementaires || undefined,
+        contacts: contacts.filter((c) => c.nom.trim()),
       });
       setEditOpen(false);
       resetForm();
       loadEntreprises();
+      toast.success("Entreprise mise à jour");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la mise à jour");
+      toast.error("Erreur lors de la mise à jour");
     } finally {
       setSaving(false);
     }
@@ -249,9 +262,11 @@ export default function EntreprisesPage() {
       setDeleteOpen(false);
       setSelected(null);
       loadEntreprises();
+      toast.success("Entreprise supprimée");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la suppression");
+      toast.error("Erreur lors de la suppression");
     } finally {
       setSaving(false);
     }
@@ -297,9 +312,7 @@ export default function EntreprisesPage() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
+            <TableSkeleton rows={5} cols={4} />
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Building2 className="h-12 w-12 mb-4 opacity-30" />
@@ -633,7 +646,7 @@ export default function EntreprisesPage() {
                 </Button>
               </div>
               {contacts.map((contact, index) => (
-                <div key={index} className="rounded-md border p-3 space-y-3 relative">
+                <div key={contact._key || index} className="rounded-md border p-3 space-y-3 relative">
                   <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => removeContact(index)}>
                     <X className="h-3 w-3" />
                   </Button>

@@ -39,8 +39,9 @@ api.interceptors.response.use(
 
 // ── Helpers Auth ──
 export function setTokens(accessToken: string, refreshToken: string) {
-  Cookies.set(TOKEN_KEY, accessToken, { expires: 1, sameSite: "strict" });
-  Cookies.set(REFRESH_KEY, refreshToken, { expires: 7, sameSite: "strict" });
+  const isSecure = typeof window !== "undefined" && window.location.protocol === "https:";
+  Cookies.set(TOKEN_KEY, accessToken, { expires: 1, sameSite: "strict", secure: isSecure });
+  Cookies.set(REFRESH_KEY, refreshToken, { expires: 7, sameSite: "strict", secure: isSecure });
 }
 
 export function clearTokens() {

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
 from ...models.audit import Audit, AuditStatus
+from ...models.entreprise import Entreprise
 from ...models.user import User
 from ...schemas.audit import AuditCreate, AuditRead, AuditDetail, AuditUpdate
 from ...schemas.common import PaginatedResponse, MessageResponse
@@ -43,6 +44,10 @@ async def create_audit(
     _: User = Depends(get_current_auditeur),
 ):
     """Crée un nouveau projet d'audit"""
+    # Vérifier que l'entreprise existe
+    entreprise = db.get(Entreprise, body.entreprise_id)
+    if not entreprise:
+        raise HTTPException(status_code=404, detail="Entreprise introuvable")
     audit = Audit(
         nom_projet=body.nom_projet,
         entreprise_id=body.entreprise_id,

@@ -277,28 +277,36 @@ Endpoint POST /api/v1/frameworks/sync :
 | Initialisation Next.js | Projet créé, shadcn/ui configuré | ✅ |
 | Système d'auth | AuthContext, login page, AuthGuard, JWT cookies | ✅ |
 | Layout principal | Sidebar avec navigation groupée, avatar utilisateur | ✅ |
-| Dashboard | 6 stat cards, audits récents, campagnes avec scores, grille référentiels | ✅ |
-| Page Entreprises | Liste, création, modification, suppression | 🔜 |
-| Page Sites | CRUD avec lien vers entreprise parente | 🔜 |
-| Page Équipements | CRUD avec lien vers site parent | 🔜 |
-| Page Audits | Liste des campagnes, création, suivi | 🔜 |
-| Page Référentiels | Détail des frameworks, catégories, contrôles | 🔜 |
-| Page Évaluation | Interface contrôle par contrôle avec preuves | 🔜 |
-| Visualisation | Graphiques radar, jauges de conformité | 🔜 |
+| Dashboard | 6 stat cards cliquables, graphiques recharts, filtre entreprise | ✅ |
+| Page Entreprises | Liste, création, modification, suppression | ✅ |
+| Page Sites | CRUD avec lien vers entreprise parente | ✅ |
+| Page Équipements | CRUD avec lien vers site parent, filtres type/statut | ✅ |
+| Page Audits | Campagnes, assessments, évaluation, DELETE endpoints | ✅ |
+| Page Référentiels | Liste, détail, éditeur/créateur YAML, versioning | ✅ |
+| Page Évaluation | Interface contrôle par contrôle avec preuves & pièces jointes | ✅ |
+| Visualisation | Graphiques radar, camembert, barres (recharts) | ✅ |
+| Page Profil | Infos utilisateur, changement de mot de passe | ✅ |
+| Dark mode | Toggle clair/sombre/système (next-themes) | ✅ |
+| Toasts | Notifications sonner sur toutes les actions CRUD | ✅ |
+| Skeletons | Chargement squelette sur toutes les pages listes | ✅ |
 
 **Ce qui est déjà fonctionnel :**
 
 ```text
 📊 Dashboard (page d'accueil après login)
-  ├── 6 cartes statistiques (Entreprises, Audits, Sites, Équipements, Référentiels, Campagnes)
+  ├── 6 cartes statistiques cliquables (navigation vers page correspondante)
+  ├── Filtre par entreprise pour les visualisations
+  ├── Graphique camembert (statuts des audits)
+  ├── Graphique barres (conformité par campagne)
+  ├── Graphique radar (contrôles par sévérité)
   ├── Liste des audits récents avec statut et date
-  ├── Campagnes en cours avec barre de progression et score de conformité
-  └── Grille des référentiels disponibles avec nombre de catégories/contrôles
+  ├── Campagnes en cours avec barre de progression et score
+  └── Grille des référentiels disponibles
 
 🔐 Authentification
   ├── Page de login avec formulaire username/password
   ├── Stockage JWT dans cookies (access_token + refresh_token)
-  ├── Intercepteur Axios : injection automatique du token dans les requêtes
+  ├── Intercepteur Axios : injection automatique du token
   ├── Redirect automatique vers /login si token expiré (401)
   └── AuthGuard : protection de toutes les routes
 
@@ -307,43 +315,25 @@ Endpoint POST /api/v1/frameworks/sync :
   ├── Gestion → Entreprises, Sites, Équipements
   ├── Audit → Projets d'audit, Référentiels
   └── Footer → Avatar utilisateur, rôle, menu (profil, déconnexion)
-```
 
-**Écrans restants à développer :**
+📋 Pages CRUD (toutes avec recherche, pagination, toast notifications)
+  ├── Entreprises — Tableau + dialog création/modification/suppression
+  ├── Sites — Filtrage par entreprise, CRUD complet
+  ├── Équipements — Filtrage par site/type/statut, CRUD complet
+  ├── Audits — Campagnes, assessments, suivi progression
+  ├── Référentiels — Liste, détail, éditeur YAML complet, versioning
+  └── Évaluation — Contrôle par contrôle, statut, preuves, pièces jointes
 
-```text
-📋 Page Entreprises
-  ├── Tableau avec recherche et pagination
-  ├── Dialog de création/modification
-  └── Actions (voir sites, supprimer)
+👤 Profil utilisateur
+  ├── Informations du compte (nom, email, rôle, date création)
+  └── Changement de mot de passe
 
-🏢 Page Sites
-  ├── Filtrage par entreprise
-  ├── CRUD complet
-  └── Lien vers équipements du site
-
-🖥️ Page Équipements
-  ├── Filtrage par site / type
-  ├── CRUD complet
-  └── Historique des audits
-
-📋 Page Audit (Campagne)
-  ├── Infos client / périmètre
-  ├── Équipements à auditer
-  ├── Référentiels appliqués
-  └── Progression globale
-
-✅ Page Évaluation
-  ├── Liste des contrôles (par catégorie)
-  ├── Statut par contrôle (dropdown)
-  ├── Zone de preuve (screenshot, texte, fichier)
-  └── Zone de recommandation
-
-📈 Rapports (Phase 5)
-  ├── Synthèse exécutive
-  ├── Détail par équipement
-  ├── Plan de remédiation priorisé
-  └── Export PDF/Word/Excel
+🎨 Qualité UX
+  ├── Dark mode (toggle clair/sombre/système)
+  ├── Toast notifications (sonner) sur toutes les actions
+  ├── Skeleton loading sur les pages listes
+  ├── AlertDialog pour suppression (pas confirm())
+  └── Constantes centralisées (labels, couleurs, icônes)
 ```
 
 ---
@@ -465,8 +455,10 @@ Le bridge Monkey365 est déjà implémenté en Phase 2 :
 | Tests automatisés | 55 (tous ✅) |
 | Modèles SQLAlchemy | 8 |
 | Référentiels YAML | 12 |
-| Composants shadcn/ui | 20 |
-| Migrations Alembic | 2 |
+| Composants shadcn/ui | 25+ |
+| Migrations Alembic | 3 |
+| Pages frontend | 10 |
+| Hooks SWR | 7 |
 
 ---
 
@@ -537,15 +529,32 @@ npm run dev
 - Dashboard avec stats live depuis l'API
 - Bug fix : gestion des scores null (`toFixed` sur undefined)
 
+### Session 5 — Phase 3 : Pages CRUD complètes
+
+- Pages CRUD : Entreprises, Sites, Équipements (tableaux + formulaires + pagination)
+- Page Audits : gestion campagnes, assessments, navigation audit-détail
+- Page Référentiels : liste, détail, éditeur/créateur YAML complet avec versioning
+- Page Évaluation : interface contrôle par contrôle, statuts, preuves, pièces jointes
+- Upload & gestion de pièces jointes (drag-drop, preview image/texte, téléchargement)
+- Visualisation : graphiques radar, camembert, barres avec recharts
+
+### Session 6 — Corrections & Améliorations UX (P0→P3)
+
+- **Sécurité (P0)** : Correction path traversal dans attachments, upload streaming 8KB chunks
+- **Fonctionnel (P1)** : DELETE endpoints campagnes/assessments, toast notifications (sonner), AlertDialog pour suppressions
+- **Qualité (P2)** : Centralisation constantes UI, page profil + changement mot de passe, lien profil dans sidebar, suppression passlib
+- **UX (P3)** : Dark mode (next-themes), skeleton loading, hooks SWR pour cache client, extraction composants (AttachmentSection)
+- Dashboard : cartes statistiques cliquables, filtre par entreprise, graphiques recharts
+
 ---
 
-## 🗺️ Prochaines Étapes (Phase 3 suite)
+## 🗺️ Prochaines Étapes (Phase 4)
 
-1. **Pages CRUD** : Entreprises, Sites, Équipements (tableaux + formulaires)
-2. **Page Audits** : Création de campagne, sélection framework + équipements
-3. **Page Évaluation** : Interface contrôle par contrôle avec statut + preuve
-4. **Page Référentiels** : Vue détaillée des frameworks avec catégories et contrôles
-5. **Visualisation** : Graphiques de conformité (radar, jauges, tendances)
+1. **Scanner réseau** : Intégration Nmap pour découverte d'assets
+2. **Config Parser** : Analyse des configurations exportées (Fortinet, Cisco...)
+3. **Monkey365** : Lancement réel des scans M365/Azure via le bridge existant
+4. **Intégration WinRM/SSH** : Collecte automatique d'infos serveurs
+5. **Rapports** : Génération PDF/Word avec synthèse et plan de remédiation
 
 ---
 

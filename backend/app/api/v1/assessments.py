@@ -145,6 +145,19 @@ async def complete_campaign(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.delete("/campaigns/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_auditeur),
+):
+    """Supprime une campagne et toutes ses évaluations"""
+    try:
+        AssessmentService.delete_campaign(db, campaign_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 # --- Assessments ---
 
 @router.post("", response_model=AssessmentRead, status_code=status.HTTP_201_CREATED)
@@ -181,6 +194,19 @@ async def get_assessment(
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment introuvable")
     return assessment
+
+
+@router.delete("/{assessment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_assessment(
+    assessment_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_auditeur),
+):
+    """Supprime un assessment et tous ses résultats"""
+    try:
+        AssessmentService.delete_assessment(db, assessment_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 # --- Résultats de contrôle ---

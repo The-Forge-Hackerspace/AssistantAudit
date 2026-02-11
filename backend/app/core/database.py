@@ -28,11 +28,15 @@ def _get_engine():
     if db_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
 
+    pool_kwargs = {}
+    if not db_url.startswith("sqlite"):
+        pool_kwargs["pool_pre_ping"] = True
+
     engine = create_engine(
         db_url,
         connect_args=connect_args,
-        echo=settings.DEBUG,
-        pool_pre_ping=True,
+        echo=settings.SQL_ECHO,
+        **pool_kwargs,
     )
 
     # Activer les clés étrangères pour SQLite

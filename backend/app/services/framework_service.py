@@ -70,11 +70,18 @@ class FrameworkService:
             data = yaml.safe_load(f)
 
         fw_data = data.get("framework", data)
+        file_hash = FrameworkService._file_hash(yaml_path)
+        return FrameworkService._import_from_data(db, fw_data, yaml_path, file_hash)
 
+    @staticmethod
+    def _import_from_data(db: Session, fw_data: dict, yaml_path: Path, file_hash: str) -> Framework:
+        """
+        Importe un framework à partir de données YAML déjà parsées.
+        Évite le double parsing quand les données sont déjà lues.
+        """
         ref_id = fw_data.get("ref_id", yaml_path.stem)
         name = fw_data["name"]
         version = fw_data.get("version", "1.0")
-        file_hash = FrameworkService._file_hash(yaml_path)
 
         # Vérifier si le framework existe déjà (même ref_id + version)
         existing = (
@@ -200,8 +207,8 @@ class FrameworkService:
 
                 # Lire le ref_id et version du fichier
                 with open(yaml_file, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
-                fw_data = data.get("framework", data)
+                    fw_data_raw = yaml.safe_load(f)
+                fw_data = fw_data_raw.get("framework", fw_data_raw)
                 ref_id = fw_data.get("ref_id", yaml_file.stem)
                 version = fw_data.get("version", "1.0")
 
@@ -216,8 +223,8 @@ class FrameworkService:
                     result["unchanged"] += 1
                     continue
 
-                # Import (crée ou met à jour)
-                FrameworkService.import_from_yaml(db, yaml_file)
+                # Import (crée ou met à jour) en passant les données déjà lues
+                FrameworkService._import_from_data(db, fw_data, yaml_file, file_hash)
                 if existing:
                     result["updated"] += 1
                 else:

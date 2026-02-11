@@ -23,6 +23,7 @@ import type {
   ControlResult,
   MessageResponse,
   RegisterRequest,
+  Attachment,
 } from "@/types";
 
 // ── Auth ──
@@ -277,6 +278,10 @@ export const campaignsApi = {
     const { data } = await api.get(`/assessments/campaigns/${id}/score`);
     return data;
   },
+
+  async delete(id: number): Promise<void> {
+    await api.delete(`/assessments/campaigns/${id}`);
+  },
 };
 
 // ── Assessments ──
@@ -298,6 +303,10 @@ export const assessmentsApi = {
     return data;
   },
 
+  async delete(id: number): Promise<void> {
+    await api.delete(`/assessments/${id}`);
+  },
+
   async updateResult(
     resultId: number,
     payload: Partial<Pick<ControlResult, "status" | "evidence" | "comment" | "remediation_note">>
@@ -312,5 +321,41 @@ export const healthApi = {
   async check(): Promise<{ status: string; service: string; version: string }> {
     const { data } = await api.get("/health");
     return data;
+  },
+};
+
+// ── Attachments (Pièces jointes) ──
+export const attachmentsApi = {
+  async list(controlResultId: number): Promise<Attachment[]> {
+    const { data } = await api.get(`/attachments/control-result/${controlResultId}`);
+    return data;
+  },
+
+  async upload(
+    controlResultId: number,
+    file: File,
+    description?: string
+  ): Promise<Attachment> {
+    const form = new FormData();
+    form.append("file", file);
+    if (description) form.append("description", description);
+    const { data } = await api.post(
+      `/attachments/control-result/${controlResultId}/upload`,
+      form,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+    return data;
+  },
+
+  async delete(attachmentId: number): Promise<void> {
+    await api.delete(`/attachments/${attachmentId}`);
+  },
+
+  downloadUrl(attachmentId: number): string {
+    return `/api/v1/attachments/${attachmentId}/download`;
+  },
+
+  previewUrl(attachmentId: number): string {
+    return `/api/v1/attachments/${attachmentId}/preview`;
   },
 };

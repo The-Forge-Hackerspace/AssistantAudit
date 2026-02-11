@@ -10,6 +10,7 @@ from .sites import router as sites_router
 from .equipements import router as equipements_router
 from .frameworks import router as frameworks_router
 from .assessments import router as assessments_router
+from .attachments import router as attachments_router
 from .health import router as health_router
 
 api_router = APIRouter()
@@ -22,3 +23,4 @@ api_router.include_router(sites_router, prefix="/sites", tags=["Sites"])
 api_router.include_router(equipements_router, prefix="/equipements", tags=["Équipements"])
 api_router.include_router(frameworks_router, prefix="/frameworks", tags=["Référentiels"])
 api_router.include_router(assessments_router, prefix="/assessments", tags=["Évaluations"])
+api_router.include_router(attachments_router, prefix="/attachments", tags=["Pièces jointes"])

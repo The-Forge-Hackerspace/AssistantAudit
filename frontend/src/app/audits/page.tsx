@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Plus,
   Pencil,
@@ -15,9 +15,7 @@ import {
   Building2,
   Calendar,
   BarChart3,
-  Play,
   CheckCircle,
-  Archive,
   FileText,
   ArrowLeft,
   Target,
@@ -71,6 +69,7 @@ import {
   sitesApi,
   equipementsApi,
 } from "@/services/api";
+import { toast } from "sonner";
 import type {
   Audit,
   AuditCreate,
@@ -86,60 +85,15 @@ import type {
   Score,
   ComplianceStatus,
 } from "@/types";
-
-// ── Constants ──
-const STATUS_LABELS: Record<AuditStatus, string> = {
-  NOUVEAU: "Nouveau",
-  EN_COURS: "En cours",
-  TERMINE: "Terminé",
-  ARCHIVE: "Archivé",
-};
-
-const STATUS_VARIANTS: Record<AuditStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  NOUVEAU: "outline",
-  EN_COURS: "secondary",
-  TERMINE: "default",
-  ARCHIVE: "destructive",
-};
-
-const STATUS_ICONS: Record<AuditStatus, typeof FileText> = {
-  NOUVEAU: FileText,
-  EN_COURS: Play,
-  TERMINE: CheckCircle,
-  ARCHIVE: Archive,
-};
-
-const CAMPAIGN_LABELS: Record<CampaignStatus, string> = {
-  draft: "Brouillon",
-  in_progress: "En cours",
-  review: "Revue",
-  completed: "Terminée",
-  archived: "Archivée",
-};
-
-const COMPLIANCE_LABELS: Record<ComplianceStatus, string> = {
-  not_assessed: "Non évalué",
-  compliant: "Conforme",
-  non_compliant: "Non conforme",
-  partially_compliant: "Partiellement",
-  not_applicable: "N/A",
-};
-
-const COMPLIANCE_CLASSES: Record<ComplianceStatus, string> = {
-  not_assessed: "bg-gray-100 text-gray-500 border-gray-200",
-  compliant: "bg-green-50 text-green-700 border-green-200",
-  non_compliant: "bg-red-50 text-red-700 border-red-200",
-  partially_compliant: "bg-orange-50 text-orange-700 border-orange-200",
-  not_applicable: "bg-gray-900 text-white border-gray-900",
-};
-
-const SEVERITY_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  critical: "destructive",
-  high: "destructive",
-  medium: "secondary",
-  low: "outline",
-  info: "outline",
-};
+import {
+  AUDIT_STATUS_LABELS as STATUS_LABELS,
+  AUDIT_STATUS_VARIANTS as STATUS_VARIANTS,
+  AUDIT_STATUS_ICONS as STATUS_ICONS,
+  CAMPAIGN_STATUS_LABELS as CAMPAIGN_LABELS,
+  COMPLIANCE_LABELS_SHORT as COMPLIANCE_LABELS,
+  COMPLIANCE_COLORS as COMPLIANCE_CLASSES,
+  SEVERITY_VARIANTS,
+} from "@/lib/constants";
 
 export default function AuditsPage() {
   return (
@@ -333,9 +287,11 @@ function AuditListView({
       void status;
       await auditsApi.create(createPayload);
       setCreateOpen(false); resetForm(); loadAudits();
+      toast.success("Projet d'audit créé avec succès");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la création");
+      toast.error("Erreur lors de la création");
     } finally { setSaving(false); }
   };
 
@@ -352,9 +308,11 @@ function AuditListView({
         status: form.status,
       });
       setEditOpen(false); resetForm(); loadAudits();
+      toast.success("Projet d'audit mis à jour");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la mise à jour");
+      toast.error("Erreur lors de la mise à jour");
     } finally { setSaving(false); }
   };
 
@@ -364,9 +322,11 @@ function AuditListView({
     try {
       await auditsApi.delete(selected.id);
       setDeleteOpen(false); loadAudits();
+      toast.success("Projet d'audit supprimé");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       setFormError(err.response?.data?.detail || "Erreur lors de la suppression");
+      toast.error("Erreur lors de la suppression");
     } finally { setSaving(false); }
   };
 
@@ -969,6 +929,7 @@ function CampaignDetail({
   entrepriseId: number;
   onAssessmentChanged: () => void;
 }) {
+  const router = useRouter();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [score, setScore] = useState<Score | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1159,6 +1120,18 @@ function CampaignDetail({
                   <Badge variant="outline" className="text-xs">
                     {assessment.results.length} contrôles
                   </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/audits/evaluation?assessmentId=${assessment.id}`);
+                    }}
+                  >
+                    <ClipboardCheck className="h-3 w-3 mr-1" />
+                    Évaluer
+                  </Button>
                   {expandedAssessmentId === assessment.id ? (
                     <ChevronUp className="h-4 w-4 text-muted-foreground" />
                   ) : (
