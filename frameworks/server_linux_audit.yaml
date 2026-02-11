@@ -1,0 +1,131 @@
+framework:
+  ref_id: server_linux_audit
+  name: "Audit Serveur Linux"
+  description: "Référentiel d'audit pour les serveurs Linux (Debian, Ubuntu, RHEL, etc.)"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "Système & Mises à jour"
+      controls:
+        - id: LSRV-001
+          title: "Distribution supportée"
+          description: "La distribution et sa version sont encore supportées (LTS)"
+          severity: critical
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Migrer vers une version LTS supportée."
+
+        - id: LSRV-002
+          title: "Mises à jour de sécurité installées"
+          description: "Les patchs de sécurité sont à jour"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Appliquer les mises à jour de sécurité (apt upgrade / yum update)."
+
+        - id: LSRV-003
+          title: "Mises à jour automatiques (unattended-upgrades)"
+          description: "Les mises à jour de sécurité automatiques sont configurées"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Configurer unattended-upgrades ou dnf-automatic pour les patchs de sécurité."
+
+    - name: "Comptes & Authentification"
+      controls:
+        - id: LSRV-010
+          title: "Connexion root directe désactivée"
+          description: "La connexion root directe via SSH est désactivée"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Configurer PermitRootLogin no dans /etc/ssh/sshd_config."
+
+        - id: LSRV-011
+          title: "Authentification SSH par clés"
+          description: "L'authentification SSH par mot de passe est désactivée au profit des clés"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer PasswordAuthentication no dans sshd_config et déployer les clés SSH."
+
+        - id: LSRV-012
+          title: "Sudo configuré correctement"
+          description: "L'accès sudo est restreint et les commandes sont limitées"
+          severity: high
+          check_type: manual
+          remediation: "Configurer sudoers avec le principe du moindre privilège."
+
+        - id: LSRV-013
+          title: "Politique de mot de passe (PAM)"
+          description: "PAM est configuré pour imposer la complexité des mots de passe"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Configurer pam_pwquality avec des exigences de complexité."
+
+    - name: "Réseau & Services"
+      controls:
+        - id: LSRV-020
+          title: "Firewall activé (iptables/nftables/ufw)"
+          description: "Un pare-feu local est configuré et actif"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer et activer ufw/iptables/nftables avec politique deny par défaut."
+
+        - id: LSRV-021
+          title: "Services inutiles désactivés"
+          description: "Les services réseau non nécessaires sont désactivés"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Désactiver les services non utilisés avec systemctl disable."
+
+        - id: LSRV-022
+          title: "SSH durci"
+          description: "SSH est configuré avec des paramètres de sécurité renforcés"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Durcir SSH : protocole 2 uniquement, ciphers forts, MaxAuthTries 3, etc."
+
+    - name: "Journalisation"
+      controls:
+        - id: LSRV-030
+          title: "Rsyslog/journald configuré"
+          description: "La journalisation système est configurée et fonctionnelle"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Vérifier la configuration de rsyslog/journald."
+
+        - id: LSRV-031
+          title: "Logs centralisés"
+          description: "Les logs sont envoyés vers un serveur central (SIEM/Syslog)"
+          severity: high
+          check_type: manual
+          remediation: "Configurer l'envoi des logs vers le SIEM."
+
+        - id: LSRV-032
+          title: "Auditd configuré"
+          description: "Le framework auditd est installé et configuré pour tracer les actions sensibles"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Installer et configurer auditd avec des règles pour les fichiers sensibles."
+
+    - name: "Sauvegarde & Sécurité"
+      controls:
+        - id: LSRV-040
+          title: "Sauvegarde configurée"
+          description: "Le serveur est sauvegardé régulièrement"
+          severity: critical
+          check_type: manual
+          evidence_required: true
+          remediation: "Mettre en place une sauvegarde régulière."
+
+        - id: LSRV-041
+          title: "Antivirus/EDR installé"
+          description: "Une solution de sécurité endpoint est installée"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Installer un agent EDR ou ClamAV selon les besoins."
+
+        - id: LSRV-042
+          title: "Permissions fichiers sensibles"
+          description: "Les fichiers sensibles (/etc/shadow, /etc/passwd) ont les permissions correctes"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Corriger les permissions : /etc/shadow 600, /etc/passwd 644."
