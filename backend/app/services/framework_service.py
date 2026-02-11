@@ -14,6 +14,7 @@ import yaml
 from sqlalchemy.orm import Session
 
 from ..models.framework import Framework, FrameworkCategory, Control, ControlSeverity, CheckType
+from ..core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -361,3 +362,169 @@ class FrameworkService:
             .order_by(Framework.id.desc())
             .all()
         )
+
+    # ------------------------------------------------------------------ #
+    #  CRUD manuel (éditeur de référentiels)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def create_framework(
+        db: Session,
+        ref_id: str,
+        name: str,
+        version: str = "1.0",
+        description: str | None = None,
+        engine: str | None = None,
+        engine_config: dict | None = None,
+        categories: list[dict] | None = None,
+    ) -> Framework:
+        """Crée un nouveau framework depuis l'éditeur (pas YAML)."""
+        existing = (
+            db.query(Framework)
+            .filter(Framework.ref_id == ref_id, Framework.version == version)
+            .first()
+        )
+        if existing:
+            raise ValueError(f"Un référentiel '{ref_id}' v{version} existe déjà")
+
+        framework = Framework(
+            ref_id=ref_id,
+            name=name,
+            description=description,
+            version=version,
+            engine=engine,
+            engine_config=engine_config,
+        )
+        db.add(framework)
+        db.flush()
+
+        for cat_order, cat_data in enumerate(categories or [], start=1):
+            category = FrameworkCategory(
+                name=cat_data["name"],
+                description=cat_data.get("description"),
+                order=cat_order,
+                framework_id=framework.id,
+            )
+            db.add(category)
+            db.flush()
+            for ctrl_order, ctrl_data in enumerate(cat_data.get("controls", []), start=1):
+                control = Control(
+                    ref_id=ctrl_data["ref_id"],
+                    title=ctrl_data["title"],
+                    description=ctrl_data.get("description"),
+                    severity=ControlSeverity(ctrl_data.get("severity", "medium")),
+                    check_type=CheckType(ctrl_data.get("check_type", "manual")),
+                    order=ctrl_order,
+                    auto_check_function=ctrl_data.get("auto_check_function"),
+                    engine_rule_id=ctrl_data.get("engine_rule_id"),
+                    cis_reference=ctrl_data.get("cis_reference"),
+                    remediation=ctrl_data.get("remediation"),
+                    evidence_required=ctrl_data.get("evidence_required", False),
+                    category_id=category.id,
+                )
+                db.add(control)
+
+        db.commit()
+        db.refresh(framework)
+        logger.info(
+            f"Framework '{framework.ref_id}' v{framework.version} créé : "
+            f"{len(framework.categories)} catégories, {framework.total_controls} contrôles"
+        )
+
+        # Auto-export YAML vers le dossier frameworks/
+        try:
+            yaml_path = Path(get_settings().FRAMEWORKS_DIR) / f"{framework.ref_id}_v{framework.version}.yaml"
+            FrameworkService.export_to_yaml(db, framework.id, yaml_path)
+            framework.source_file = str(yaml_path.name)
+            db.commit()
+        except Exception as e:
+            logger.warning(f"Export YAML automatique échoué : {e}")
+
+        return framework
+
+    @staticmethod
+    def update_framework(
+        db: Session,
+        framework_id: int,
+        data: dict,
+    ) -> Framework:
+        """
+        Met à jour un framework existant.
+        Si 'categories' est fourni, remplace intégralement les catégories/contrôles.
+        """
+        framework = db.get(Framework, framework_id)
+        if not framework:
+            raise ValueError(f"Framework {framework_id} introuvable")
+
+        # Champs simples
+        for field in ("name", "description", "engine", "engine_config"):
+            if field in data:
+                setattr(framework, field, data[field])
+
+        # Remplacement des catégories/contrôles
+        if "categories" in data:
+            for cat in framework.categories:
+                db.delete(cat)
+            db.flush()
+
+            for cat_order, cat_data in enumerate(data["categories"], start=1):
+                category = FrameworkCategory(
+                    name=cat_data["name"],
+                    description=cat_data.get("description"),
+                    order=cat_order,
+                    framework_id=framework.id,
+                )
+                db.add(category)
+                db.flush()
+                for ctrl_order, ctrl_data in enumerate(cat_data.get("controls", []), start=1):
+                    control = Control(
+                        ref_id=ctrl_data["ref_id"],
+                        title=ctrl_data["title"],
+                        description=ctrl_data.get("description"),
+                        severity=ControlSeverity(ctrl_data.get("severity", "medium")),
+                        check_type=CheckType(ctrl_data.get("check_type", "manual")),
+                        order=ctrl_order,
+                        auto_check_function=ctrl_data.get("auto_check_function"),
+                        engine_rule_id=ctrl_data.get("engine_rule_id"),
+                        cis_reference=ctrl_data.get("cis_reference"),
+                        remediation=ctrl_data.get("remediation"),
+                        evidence_required=ctrl_data.get("evidence_required", False),
+                        category_id=category.id,
+                    )
+                    db.add(control)
+
+        db.commit()
+        db.refresh(framework)
+        logger.info(f"Framework '{framework.ref_id}' v{framework.version} mis à jour")
+
+        # Auto-export YAML vers le dossier frameworks/
+        try:
+            yaml_name = framework.source_file or f"{framework.ref_id}_v{framework.version}.yaml"
+            yaml_path = Path(get_settings().FRAMEWORKS_DIR) / yaml_name
+            FrameworkService.export_to_yaml(db, framework.id, yaml_path)
+        except Exception as e:
+            logger.warning(f"Export YAML automatique échoué : {e}")
+
+        return framework
+
+    @staticmethod
+    def delete_framework(db: Session, framework_id: int) -> None:
+        """Supprime un framework et toutes ses catégories/contrôles en cascade."""
+        framework = db.get(Framework, framework_id)
+        if not framework:
+            raise ValueError(f"Framework {framework_id} introuvable")
+        ref = f"{framework.ref_id} v{framework.version}"
+        source_file = framework.source_file
+        db.delete(framework)
+        db.commit()
+        logger.info(f"Framework '{ref}' supprimé")
+
+        # Supprimer le fichier YAML associé
+        if source_file:
+            try:
+                yaml_path = Path(get_settings().FRAMEWORKS_DIR) / source_file
+                if yaml_path.exists():
+                    yaml_path.unlink()
+                    logger.info(f"Fichier YAML '{source_file}' supprimé")
+            except Exception as e:
+                logger.warning(f"Suppression du fichier YAML échouée : {e}")

@@ -58,6 +58,21 @@ class AssessmentService:
         return campaigns, total
 
     @staticmethod
+    def update_campaign(db: Session, campaign_id: int, data) -> AssessmentCampaign:
+        """Met à jour une campagne (nom, description, statut)"""
+        campaign = db.get(AssessmentCampaign, campaign_id)
+        if not campaign:
+            raise ValueError(f"Campagne {campaign_id} introuvable")
+        update_data = data.model_dump(exclude_unset=True)
+        if "status" in update_data:
+            update_data["status"] = CampaignStatus(update_data["status"])
+        for field, value in update_data.items():
+            setattr(campaign, field, value)
+        db.commit()
+        db.refresh(campaign)
+        return campaign
+
+    @staticmethod
     def start_campaign(db: Session, campaign_id: int) -> AssessmentCampaign:
         """Démarre une campagne"""
         campaign = db.get(AssessmentCampaign, campaign_id)
@@ -219,9 +234,9 @@ class AssessmentService:
             )
 
         return {
-            "score": score,
+            "compliance_score": score,
             "total_controls": total,
-            "assessed": assessed,
+            "assessed_controls": assessed,
             "compliant": counts["compliant"],
             "non_compliant": counts["non_compliant"],
             "partially_compliant": counts["partially_compliant"],

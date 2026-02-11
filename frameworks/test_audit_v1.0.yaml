@@ -1,0 +1,18 @@
+framework:
+  ref_id: test_audit
+  name: Audit Test
+  description: null
+  version: '1.0'
+  engine: manual
+  engine_config: null
+  categories:
+  - name: test
+    description: null
+    controls:
+    - id: TEST-01
+      title: test
+      description: null
+      severity: medium
+      check_type: manual
+      remediation: null
+      evidence_required: false

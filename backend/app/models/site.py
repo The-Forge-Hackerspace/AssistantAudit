@@ -12,6 +12,7 @@ class Site(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nom: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(1000))
     adresse: Mapped[str | None] = mapped_column(String(500))
 
     # FK

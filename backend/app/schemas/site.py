@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 class SiteBase(BaseModel):
     nom: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = None
     adresse: Optional[str] = None
 
 
@@ -17,6 +18,7 @@ class SiteCreate(SiteBase):
 
 class SiteUpdate(BaseModel):
     nom: Optional[str] = Field(default=None, max_length=200)
+    description: Optional[str] = None
     adresse: Optional[str] = None
 
 

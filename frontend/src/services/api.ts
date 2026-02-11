@@ -13,6 +13,8 @@ import type {
   EquipementCreate,
   FrameworkSummary,
   Framework,
+  FrameworkCreatePayload,
+  CampaignSummary,
   Campaign,
   CampaignCreate,
   Assessment,
@@ -221,11 +223,25 @@ export const frameworksApi = {
     const { data } = await api.post("/frameworks/sync");
     return data;
   },
+
+  async create(payload: FrameworkCreatePayload): Promise<Framework> {
+    const { data } = await api.post("/frameworks", payload);
+    return data;
+  },
+
+  async update(id: number, payload: FrameworkCreatePayload): Promise<Framework> {
+    const { data } = await api.put(`/frameworks/${id}`, payload);
+    return data;
+  },
+
+  async delete(id: number): Promise<void> {
+    await api.delete(`/frameworks/${id}`);
+  },
 };
 
 // ── Campaigns ──
 export const campaignsApi = {
-  async list(page = 1, pageSize = 20, auditId?: number): Promise<PaginatedResponse<Campaign>> {
+  async list(page = 1, pageSize = 20, auditId?: number): Promise<PaginatedResponse<CampaignSummary>> {
     const { data } = await api.get("/assessments/campaigns", {
       params: { page, page_size: pageSize, audit_id: auditId },
     });
@@ -237,17 +253,22 @@ export const campaignsApi = {
     return data;
   },
 
-  async create(payload: CampaignCreate): Promise<Campaign> {
+  async create(payload: CampaignCreate): Promise<CampaignSummary> {
     const { data } = await api.post("/assessments/campaigns", payload);
     return data;
   },
 
-  async start(id: number): Promise<Campaign> {
+  async update(id: number, payload: { name?: string; description?: string; status?: string }): Promise<CampaignSummary> {
+    const { data } = await api.put(`/assessments/campaigns/${id}`, payload);
+    return data;
+  },
+
+  async start(id: number): Promise<MessageResponse> {
     const { data } = await api.post(`/assessments/campaigns/${id}/start`);
     return data;
   },
 
-  async complete(id: number): Promise<Campaign> {
+  async complete(id: number): Promise<MessageResponse> {
     const { data } = await api.post(`/assessments/campaigns/${id}/complete`);
     return data;
   },

@@ -11,7 +11,7 @@ from ...core.config import get_settings
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_admin, get_current_auditeur, PaginationParams
 from ...models.user import User
-from ...schemas.framework import FrameworkRead, FrameworkSummary, FrameworkCloneRequest
+from ...schemas.framework import FrameworkRead, FrameworkSummary, FrameworkCloneRequest, FrameworkCreate
 from ...schemas.common import PaginatedResponse, MessageResponse
 from ...services.framework_service import FrameworkService
 
@@ -137,6 +137,72 @@ async def sync_frameworks(
             f"{result['unchanged']} inchangé(s)"
         ),
     )
+
+
+@router.post("", response_model=FrameworkRead, status_code=status.HTTP_201_CREATED)
+async def create_framework(
+    body: FrameworkCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Crée un nouveau référentiel depuis l'éditeur (admin uniquement)"""
+    categories_data = []
+    for cat in body.categories:
+        cat_dict = {"name": cat.name, "description": cat.description, "controls": []}
+        for ctrl in cat.controls:
+            cat_dict["controls"].append(ctrl.model_dump())
+        categories_data.append(cat_dict)
+    try:
+        framework = FrameworkService.create_framework(
+            db,
+            ref_id=body.ref_id,
+            name=body.name,
+            version=body.version,
+            description=body.description,
+            engine=body.engine,
+            engine_config=body.engine_config,
+            categories=categories_data,
+        )
+        return framework
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.put("/{framework_id}", response_model=FrameworkRead)
+async def update_framework(
+    framework_id: int,
+    body: FrameworkCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Met à jour un référentiel existant (admin uniquement)"""
+    data = body.model_dump()
+    categories_data = []
+    for cat in body.categories:
+        cat_dict = {"name": cat.name, "description": cat.description, "controls": []}
+        for ctrl in cat.controls:
+            cat_dict["controls"].append(ctrl.model_dump())
+        categories_data.append(cat_dict)
+    data["categories"] = categories_data
+    try:
+        framework = FrameworkService.update_framework(db, framework_id, data)
+        return framework
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/{framework_id}")
+async def delete_framework(
+    framework_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Supprime un référentiel (admin uniquement)"""
+    try:
+        FrameworkService.delete_framework(db, framework_id)
+        return {"message": "Référentiel supprimé"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/import", response_model=MessageResponse)
