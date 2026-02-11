@@ -1,0 +1,139 @@
+framework:
+  ref_id: active_directory_audit
+  name: "Audit Active Directory"
+  description: "Référentiel d'audit pour Active Directory / Entra ID (on-premise)"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "Architecture & Design"
+      controls:
+        - id: AD-001
+          title: "Niveau fonctionnel forêt/domaine"
+          description: "Le niveau fonctionnel de la forêt et du domaine est à jour"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Élever le niveau fonctionnel après avoir vérifié la compatibilité de tous les DC."
+
+        - id: AD-002
+          title: "Nombre de contrôleurs de domaine"
+          description: "Au moins 2 DC sont déployés pour la redondance"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Déployer un second DC pour assurer la haute disponibilité."
+
+        - id: AD-003
+          title: "Rôles FSMO documentés"
+          description: "L'emplacement des rôles FSMO est documenté et cohérent"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Documenter les rôles FSMO et les distribuer de manière cohérente."
+
+    - name: "Comptes Privilégiés"
+      controls:
+        - id: AD-010
+          title: "Nombre de Domain Admins"
+          description: "Le groupe Domain Admins contient un nombre limité de comptes ( ≤ 5)"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Réduire les Domain Admins au strict nécessaire et utiliser des comptes dédiés."
+
+        - id: AD-011
+          title: "Comptes admin dédiés"
+          description: "Les administrateurs utilisent des comptes séparés pour l'administration"
+          severity: high
+          check_type: manual
+          remediation: "Créer des comptes d'administration dédiés (préfixe adm- par exemple)."
+
+        - id: AD-012
+          title: "Compte Administrateur intégré protégé"
+          description: "Le compte Administrator intégré est désactivé ou protégé et son mot de passe changé régulièrement"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Désactiver le compte Administrator intégré ou le protéger avec un mot de passe fort."
+
+        - id: AD-013
+          title: "LAPS déployé"
+          description: "LAPS (Local Administrator Password Solution) est déployé pour les postes/serveurs"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Déployer LAPS via GPO pour la gestion automatique des mots de passe locaux."
+
+    - name: "Politique de Mots de Passe"
+      controls:
+        - id: AD-020
+          title: "Politique de mot de passe domaine"
+          description: "La politique impose au moins 12 caractères et la complexité"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer la PSO ou la Default Domain Policy pour imposer 12 caractères minimum."
+
+        - id: AD-021
+          title: "Fine-Grained Password Policies"
+          description: "Des PSO spécifiques existent pour les comptes privilégiés (plus restrictives)"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Créer des PSO avec des exigences renforcées pour les comptes administrateurs."
+
+        - id: AD-022
+          title: "Pas de mots de passe qui n'expirent jamais"
+          description: "Aucun compte utilisateur n'a le flag 'password never expires' sans justification"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Identifier et corriger les comptes avec des mots de passe qui n'expirent jamais."
+
+    - name: "GPO & Configuration"
+      controls:
+        - id: AD-030
+          title: "GPO documentées"
+          description: "Les GPO sont documentées et leur finalité est claire"
+          severity: medium
+          check_type: manual
+          remediation: "Documenter chaque GPO avec son objectif et son périmètre d'application."
+
+        - id: AD-031
+          title: "GPO de sécurité déployées"
+          description: "Des GPO de durcissement sont en place (verrouillage écran, USB, etc.)"
+          severity: high
+          check_type: manual
+          remediation: "Déployer des GPO de durcissement basées sur les CIS Benchmarks."
+
+    - name: "Réplication & Santé"
+      controls:
+        - id: AD-040
+          title: "Réplication fonctionnelle"
+          description: "La réplication AD fonctionne sans erreur entre tous les DC"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Diagnostiquer et corriger les erreurs de réplication (repadmin /showrepl)."
+
+        - id: AD-041
+          title: "DNS intégré fonctionnel"
+          description: "Le DNS intégré à AD fonctionne correctement"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Vérifier la configuration DNS et la résolution sur tous les DC."
+
+        - id: AD-042
+          title: "Sauvegarde System State"
+          description: "Le System State des DC est sauvegardé régulièrement"
+          severity: critical
+          check_type: manual
+          evidence_required: true
+          remediation: "Configurer la sauvegarde du System State sur au moins un DC toutes les 24h."
+
+    - name: "Audit & Journalisation"
+      controls:
+        - id: AD-050
+          title: "Audit des événements AD"
+          description: "L'audit avancé est configuré (logon, changes, etc.)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer la stratégie d'audit avancée via GPO sur les DC."
+
+        - id: AD-051
+          title: "Surveillance des groupes privilégiés"
+          description: "Les modifications des groupes sensibles (DA, EA, Schema Admins) sont surveillées"
+          severity: critical
+          check_type: manual
+          remediation: "Mettre en place des alertes sur les modifications des groupes privilégiés."

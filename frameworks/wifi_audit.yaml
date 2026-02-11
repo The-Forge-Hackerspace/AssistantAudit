@@ -1,0 +1,86 @@
+framework:
+  ref_id: wifi_audit
+  name: "Audit Wi-Fi"
+  description: "Référentiel d'audit pour l'infrastructure sans fil"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "Architecture & Configuration"
+      controls:
+        - id: WIFI-001
+          title: "Chiffrement WPA3 ou WPA2-Enterprise"
+          description: "Tous les SSID utilisent WPA3 ou WPA2-Enterprise (802.1X)"
+          severity: critical
+          check_type: manual
+          remediation: "Migrer vers WPA3 ou WPA2-Enterprise avec RADIUS."
+
+        - id: WIFI-002
+          title: "SSID Entreprise séparé du Guest"
+          description: "Le réseau Wi-Fi invité est séparé du réseau entreprise"
+          severity: high
+          check_type: manual
+          remediation: "Créer un SSID Guest isolé dans un VLAN dédié."
+
+        - id: WIFI-003
+          title: "SSID caché (si applicable)"
+          description: "Le broadcast SSID est évalué selon la politique"
+          severity: low
+          check_type: manual
+          remediation: "Évaluer l'opportunité de masquer le SSID principal."
+
+        - id: WIFI-004
+          title: "Isolement des clients Guest"
+          description: "Les clients du réseau invité ne peuvent pas communiquer entre eux"
+          severity: medium
+          check_type: manual
+          remediation: "Activer l'isolation des clients sur le SSID invité."
+
+    - name: "Authentification"
+      controls:
+        - id: WIFI-010
+          title: "RADIUS pour le réseau entreprise"
+          description: "L'authentification 802.1X/RADIUS est utilisée pour le réseau entreprise"
+          severity: high
+          check_type: manual
+          remediation: "Déployer l'authentification RADIUS avec certificats."
+
+        - id: WIFI-011
+          title: "Portail captif pour le Guest"
+          description: "Un portail captif avec conditions d'utilisation existe pour le réseau invité"
+          severity: medium
+          check_type: manual
+          remediation: "Déployer un portail captif avec CGU pour le réseau Guest."
+
+    - name: "Contrôleur & Bornes"
+      controls:
+        - id: WIFI-020
+          title: "Firmware des bornes à jour"
+          description: "Le firmware des points d'accès est à jour"
+          severity: high
+          check_type: manual
+          evidence_required: true
+          remediation: "Mettre à jour le firmware des AP vers la dernière version stable."
+
+        - id: WIFI-021
+          title: "Accès admin des bornes sécurisé"
+          description: "L'accès d'administration aux bornes est restreint"
+          severity: high
+          check_type: manual
+          remediation: "Restreindre l'accès admin aux bornes via VLAN de management."
+
+    - name: "Supervision"
+      controls:
+        - id: WIFI-030
+          title: "Détection de Rogue AP"
+          description: "Le système détecte les points d'accès non autorisés"
+          severity: medium
+          check_type: manual
+          remediation: "Activer la détection de Rogue AP sur le contrôleur Wi-Fi."
+
+        - id: WIFI-031
+          title: "Logs Wi-Fi centralisés"
+          description: "Les événements Wi-Fi sont envoyés vers le SIEM"
+          severity: medium
+          check_type: manual
+          remediation: "Configurer l'envoi des logs Wi-Fi vers le SIEM/Syslog."

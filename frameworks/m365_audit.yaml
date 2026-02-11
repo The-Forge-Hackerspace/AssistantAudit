@@ -1,0 +1,173 @@
+framework:
+  ref_id: m365_audit
+  name: "Audit Microsoft 365"
+  description: "Référentiel d'audit M365 — basé sur CIS Benchmark, moteur Monkey365"
+  version: "1.0"
+  engine: monkey365
+
+  categories:
+    - name: "Entra ID — Authentification"
+      description: "Vérifications MFA, méthodes d'authentification, legacy auth"
+      controls:
+        - id: M365-AAD-001
+          title: "MFA activé pour tous les utilisateurs"
+          description: "L'authentification multifacteur est obligatoire pour tous les comptes"
+          severity: critical
+          check_type: automatic
+          monkey365_rule: "monkey365_aad_mfa_status"
+          cis_reference: "CIS M365 1.1.1"
+          remediation: |
+            1. Aller dans Entra ID > Sécurité > Accès conditionnel
+            2. Créer une politique exigeant le MFA pour tous les utilisateurs
+            3. Exclure uniquement les comptes de service avec justification
+
+        - id: M365-AAD-002
+          title: "Protocoles d'authentification legacy bloqués"
+          description: "Les protocoles legacy (POP, IMAP, SMTP Auth) sont bloqués par accès conditionnel"
+          severity: critical
+          check_type: automatic
+          monkey365_rule: "monkey365_aad_legacy_auth"
+          cis_reference: "CIS M365 1.1.3"
+          remediation: "Créer une politique d'accès conditionnel bloquant l'authentification legacy."
+
+        - id: M365-AAD-003
+          title: "Politique de risque Sign-in"
+          description: "Une politique détectant les connexions risquées est active"
+          severity: high
+          check_type: automatic
+          monkey365_rule: "monkey365_aad_signin_risk"
+          remediation: "Configurer Identity Protection pour détecter les connexions risquées."
+
+    - name: "Entra ID — Accès Conditionnel"
+      controls:
+        - id: M365-AAD-010
+          title: "Politiques d'accès conditionnel configurées"
+          description: "Des politiques CA couvrent les scénarios critiques"
+          severity: high
+          check_type: automatic
+          monkey365_rule: "monkey365_aad_conditional_access"
+          remediation: "Configurer les politiques CA couvrant : MFA admins, blocage legacy, localisation, conformité appareil."
+
+        - id: M365-AAD-011
+          title: "Blocage des pays non autorisés"
+          description: "L'accès depuis les pays non autorisés est bloqué par CA"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Créer une politique CA bloquant les pays non autorisés via Named Locations."
+
+    - name: "Entra ID — Rôles & Privilèges"
+      controls:
+        - id: M365-AAD-020
+          title: "Nombre de Global Admins limité (2-4)"
+          description: "Le nombre de Global Administrators est entre 2 et 4"
+          severity: critical
+          check_type: automatic
+          monkey365_rule: "monkey365_aad_global_admins_count"
+          remediation: "Réduire le nombre de Global Admins et utiliser des rôles plus spécifiques."
+
+        - id: M365-AAD-021
+          title: "PIM activé pour les rôles privilégiés"
+          description: "Privileged Identity Management est utilisé pour les rôles sensibles"
+          severity: high
+          check_type: automatic
+          monkey365_rule: "monkey365_aad_pim_enabled"
+          remediation: "Activer PIM pour tous les rôles d'administration."
+
+    - name: "Entra ID — Identités Externes"
+      controls:
+        - id: M365-AAD-030
+          title: "Politique d'invitation des invités restrictive"
+          description: "Seuls les admins peuvent inviter des utilisateurs externes"
+          severity: high
+          check_type: automatic
+          monkey365_rule: "monkey365_aad_guest_policy"
+          remediation: "Restreindre les invitations d'invités aux administrateurs uniquement."
+
+    - name: "Exchange Online — Sécurité"
+      controls:
+        - id: M365-EXO-001
+          title: "Journalisation d'audit activée"
+          description: "L'audit unifié est activé dans Exchange Online"
+          severity: critical
+          check_type: automatic
+          monkey365_rule: "monkey365_eo_audit_enabled"
+          cis_reference: "CIS M365 3.1.1"
+          remediation: "Activer le Unified Audit Log dans le Security & Compliance Center."
+
+        - id: M365-EXO-010
+          title: "DKIM configuré et actif"
+          description: "DKIM est configuré pour tous les domaines"
+          severity: high
+          check_type: automatic
+          monkey365_rule: "monkey365_eo_dkim_enabled"
+          remediation: "Configurer DKIM pour chaque domaine dans Exchange Online."
+
+        - id: M365-EXO-011
+          title: "DMARC configuré avec policy enforce"
+          description: "Un enregistrement DMARC avec politique reject ou quarantine existe"
+          severity: high
+          check_type: automatic
+          monkey365_rule: "monkey365_eo_dmarc_policy"
+          remediation: "Configurer DMARC avec p=quarantine ou p=reject pour chaque domaine."
+
+        - id: M365-EXO-012
+          title: "SPF configuré correctement"
+          description: "L'enregistrement SPF est présent et correctement configuré"
+          severity: high
+          check_type: automatic
+          monkey365_rule: "monkey365_eo_spf_record"
+          remediation: "Configurer l'enregistrement SPF avec les serveurs autorisés et terminer par -all."
+
+    - name: "SharePoint Online — Partage"
+      controls:
+        - id: M365-SPO-001
+          title: "Partage externe limité"
+          description: "Le partage externe est limité aux invités existants ou désactivé"
+          severity: high
+          check_type: automatic
+          monkey365_rule: "monkey365_spo_external_sharing"
+          remediation: "Restreindre le partage externe aux invités existants dans l'annuaire."
+
+        - id: M365-SPO-002
+          title: "Liens anonymes (Anyone) désactivés"
+          description: "Les liens 'Anyone' ne sont pas autorisés"
+          severity: critical
+          check_type: automatic
+          monkey365_rule: "monkey365_spo_anonymous_links"
+          remediation: "Désactiver les liens anonymes dans les paramètres de partage SharePoint."
+
+    - name: "Teams — Configuration"
+      controls:
+        - id: M365-TEAMS-001
+          title: "Accès externe contrôlé"
+          description: "La fédération Teams est limitée aux domaines autorisés"
+          severity: medium
+          check_type: automatic
+          monkey365_rule: "monkey365_teams_external_access"
+          remediation: "Limiter la fédération Teams aux domaines de confiance uniquement."
+
+        - id: M365-TEAMS-002
+          title: "Accès invité contrôlé dans Teams"
+          description: "L'accès invité dans Teams est configuré selon la politique"
+          severity: medium
+          check_type: automatic
+          monkey365_rule: "monkey365_teams_guest_access"
+          remediation: "Configurer la politique d'accès invité Teams selon les besoins métier."
+
+    - name: "Conformité & Protection des données"
+      controls:
+        - id: M365-COMP-001
+          title: "Politiques DLP configurées"
+          description: "Des politiques de prévention de fuite de données sont actives"
+          severity: high
+          check_type: semi-automatic
+          monkey365_rule: "monkey365_purview_dlp"
+          remediation: "Configurer des politiques DLP pour les données sensibles (CB, SSN, etc.)."
+
+        - id: M365-COMP-002
+          title: "Rétention des logs d'audit (90j minimum)"
+          description: "Les logs d'audit sont conservés au minimum 90 jours"
+          severity: high
+          check_type: automatic
+          monkey365_rule: "monkey365_purview_audit_retention"
+          remediation: "Configurer la rétention des logs d'audit à au moins 90 jours (licence E5 ou add-on)."

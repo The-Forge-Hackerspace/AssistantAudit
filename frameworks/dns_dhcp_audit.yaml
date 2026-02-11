@@ -1,0 +1,141 @@
+framework:
+  ref_id: dns_dhcp_audit
+  name: "Audit DNS / DHCP"
+  description: "Référentiel d'audit des services DNS et DHCP de l'infrastructure"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "DNS — Configuration générale"
+      description: "Sécurité et configuration des serveurs DNS"
+      controls:
+        - id: DNS-001
+          title: "Serveurs DNS redondés"
+          description: "Au moins deux serveurs DNS sont configurés pour la haute disponibilité"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Déployer au minimum deux serveurs DNS avec réplication de zone."
+
+        - id: DNS-002
+          title: "DNS intégrés à Active Directory"
+          description: "Les zones DNS internes sont intégrées à AD (si environnement Windows)"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Intégrer les zones DNS à Active Directory pour bénéficier de la réplication sécurisée."
+
+        - id: DNS-003
+          title: "Transferts de zone restreints"
+          description: "Les transferts de zone (AXFR) sont limités aux serveurs secondaires autorisés"
+          severity: critical
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Restreindre les transferts de zone aux adresses IP des serveurs DNS secondaires."
+
+        - id: DNS-004
+          title: "Récursion DNS contrôlée"
+          description: "La récursion DNS est désactivée sur les serveurs exposés à Internet"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Désactiver la récursion sur les serveurs DNS publics. Limiter la récursion aux réseaux internes."
+
+        - id: DNS-005
+          title: "DNSSEC activé"
+          description: "DNSSEC est configuré pour les zones critiques"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Activer DNSSEC pour les zones DNS publiques et internes critiques."
+
+    - name: "DNS — Sécurité"
+      controls:
+        - id: DNS-010
+          title: "Protection contre le cache poisoning"
+          description: "Le serveur DNS est protégé contre les attaques de cache poisoning (port source aléatoire)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Vérifier que la randomisation des ports source est activée."
+
+        - id: DNS-011
+          title: "Filtrage DNS (RPZ/sinkhole)"
+          description: "Un filtrage DNS est en place pour bloquer les domaines malveillants"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Mettre en place des RPZ ou un service DNS filtrant pour bloquer les domaines malveillants."
+
+        - id: DNS-012
+          title: "Journalisation des requêtes DNS"
+          description: "Les requêtes DNS sont journalisées pour analyse et détection d'anomalies"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Activer le DNS query logging et centraliser les logs dans le SIEM."
+
+        - id: DNS-013
+          title: "DNS over HTTPS/TLS interne"
+          description: "Les résolutions DNS internes sont chiffrées (DoH/DoT) si supporté"
+          severity: low
+          check_type: manual
+          remediation: "Évaluer le déploiement de DoH/DoT pour les résolutions DNS internes."
+
+    - name: "DHCP — Configuration"
+      description: "Sécurité et configuration des serveurs DHCP"
+      controls:
+        - id: DHCP-001
+          title: "Serveurs DHCP redondés"
+          description: "Le service DHCP est en haute disponibilité (failover ou split-scope)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer un failover DHCP ou un split-scope 80/20."
+
+        - id: DHCP-002
+          title: "Scopes DHCP cohérents"
+          description: "Les scopes DHCP correspondent aux VLANs et sous-réseaux documentés"
+          severity: medium
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Vérifier la correspondance entre les scopes DHCP et le plan d'adressage."
+
+        - id: DHCP-003
+          title: "Durée de bail DHCP adaptée"
+          description: "La durée de bail est adaptée au type de réseau (8h bureaux, 1h WiFi invités)"
+          severity: low
+          check_type: semi-automatic
+          remediation: "Ajuster les durées de bail selon l'usage : 8h fixe, 1h WiFi, 4h VDI."
+
+        - id: DHCP-004
+          title: "Réservations pour les équipements critiques"
+          description: "Les équipements critiques (serveurs, imprimantes, AP) ont des réservations DHCP ou IP fixes"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Créer des réservations DHCP pour tous les équipements d'infrastructure."
+
+    - name: "DHCP — Sécurité"
+      controls:
+        - id: DHCP-010
+          title: "DHCP Snooping activé"
+          description: "DHCP Snooping est activé sur les switches pour prévenir les DHCP rogue"
+          severity: critical
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Activer DHCP Snooping sur tous les ports access des switches."
+
+        - id: DHCP-011
+          title: "Autorisation DHCP dans AD"
+          description: "Seuls les serveurs DHCP autorisés dans AD peuvent distribuer des baux"
+          severity: high
+          check_type: semi-automatic
+          remediation: "S'assurer que seuls les serveurs DHCP légitimes sont autorisés dans Active Directory."
+
+        - id: DHCP-012
+          title: "Journalisation DHCP active"
+          description: "Les attributions de baux DHCP sont journalisées"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Activer la journalisation DHCP et centraliser les logs."
+
+        - id: DHCP-013
+          title: "Filtrage MAC (802.1X ou MAB)"
+          description: "NAC ou filtrage MAC complémente le DHCP pour le contrôle d'accès réseau"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Déployer 802.1X ou MAB en complément du DHCP pour le contrôle d'accès."

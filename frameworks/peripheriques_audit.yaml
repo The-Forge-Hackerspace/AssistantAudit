@@ -1,0 +1,135 @@
+framework:
+  ref_id: peripheriques_audit
+  name: "Audit Imprimantes & Périphériques"
+  description: "Référentiel d'audit des imprimantes réseau, MFP et périphériques connectés"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "Configuration réseau"
+      description: "Sécurité réseau des imprimantes et périphériques"
+      controls:
+        - id: PER-001
+          title: "Imprimantes sur VLAN dédié"
+          description: "Les imprimantes sont isolées dans un VLAN dédié, séparé des utilisateurs"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Créer un VLAN dédié pour les imprimantes et configurer les ACLs inter-VLAN."
+
+        - id: PER-002
+          title: "Ports et services inutiles désactivés"
+          description: "Les services non utilisés sont désactivés (FTP, Telnet, SNMP v1/v2, IPP non sécurisé)"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Désactiver FTP, Telnet, SNMP v1/v2, et tout service non nécessaire sur les MFP."
+
+        - id: PER-003
+          title: "Accès administration sécurisé"
+          description: "L'interface d'administration web est en HTTPS avec certificat valide"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Activer HTTPS sur l'interface web et désactiver HTTP."
+
+        - id: PER-004
+          title: "SNMP v3 configuré"
+          description: "Si SNMP est utilisé, la version 3 avec authentification et chiffrement est configurée"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Migrer vers SNMP v3 avec authentification SHA et chiffrement AES."
+
+    - name: "Authentification & Accès"
+      controls:
+        - id: PER-010
+          title: "Mot de passe admin par défaut changé"
+          description: "Le mot de passe administrateur par défaut a été modifié sur tous les périphériques"
+          severity: critical
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Changer le mot de passe admin par défaut sur toutes les imprimantes et MFP."
+
+        - id: PER-011
+          title: "Authentification utilisateur pour l'impression"
+          description: "L'impression nécessite une authentification (badge, PIN, ou login réseau)"
+          severity: medium
+          check_type: manual
+          remediation: "Déployer l'impression sécurisée (pull printing) avec authentification par badge ou PIN."
+
+        - id: PER-012
+          title: "Accès aux fonctions restreint"
+          description: "L'accès aux fonctions scan/copie/fax est contrôlé par profil utilisateur"
+          severity: low
+          check_type: manual
+          remediation: "Configurer des profils utilisateur limitant l'accès aux fonctions selon le besoin."
+
+    - name: "Protection des données"
+      controls:
+        - id: PER-020
+          title: "Chiffrement du disque dur interne"
+          description: "Le disque dur des MFP est chiffré pour protéger les données en cache"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Activer le chiffrement du disque dur sur les MFP qui le supportent."
+
+        - id: PER-021
+          title: "Effacement automatique des données"
+          description: "Les données temporaires sont effacées automatiquement après chaque travail"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Activer l'effacement automatique des données après chaque impression/scan."
+
+        - id: PER-022
+          title: "Scan vers email sécurisé"
+          description: "Les scans envoyés par email utilisent TLS et un compte de service authentifié"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Configurer le scan-to-email via SMTP authentifié avec TLS."
+
+        - id: PER-023
+          title: "Pas de stockage de documents sur fax"
+          description: "La mémoire fax est purgée régulièrement ou le fax est désactivé"
+          severity: low
+          check_type: manual
+          remediation: "Désactiver le fax s'il n'est pas utilisé, ou configurer la purge automatique."
+
+    - name: "Firmware & Maintenance"
+      controls:
+        - id: PER-030
+          title: "Firmware à jour"
+          description: "Le firmware des imprimantes et MFP est à la dernière version stable"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Mettre à jour le firmware vers la dernière version stable du fabricant."
+
+        - id: PER-031
+          title: "Inventaire des périphériques à jour"
+          description: "Un inventaire complet des imprimantes et périphériques réseau est maintenu"
+          severity: medium
+          check_type: manual
+          evidence_required: true
+          remediation: "Maintenir un inventaire à jour avec modèle, firmware, IP, localisation."
+
+        - id: PER-032
+          title: "Supervision des périphériques"
+          description: "Les imprimantes sont supervisées (état, consommables, erreurs)"
+          severity: low
+          check_type: semi-automatic
+          remediation: "Intégrer les imprimantes dans la supervision (SNMP traps, alertes consommables)."
+
+    - name: "Journalisation"
+      controls:
+        - id: PER-040
+          title: "Journalisation des impressions"
+          description: "Les travaux d'impression sont journalisés (utilisateur, document, horodatage)"
+          severity: medium
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Activer la journalisation des travaux d'impression via le serveur d'impression."
+
+        - id: PER-041
+          title: "Logs d'administration centralisés"
+          description: "Les logs d'administration des périphériques sont centralisés (syslog)"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Configurer l'envoi des logs d'administration vers le serveur syslog/SIEM."

@@ -1,0 +1,154 @@
+framework:
+  ref_id: messagerie_audit
+  name: "Audit Messagerie"
+  description: "Référentiel d'audit de la messagerie d'entreprise (on-premise ou hybride)"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "Architecture & Disponibilité"
+      description: "Architecture de messagerie et haute disponibilité"
+      controls:
+        - id: MSG-001
+          title: "Architecture de messagerie documentée"
+          description: "L'architecture de messagerie est documentée (flux, serveurs, MX, relais)"
+          severity: medium
+          check_type: manual
+          evidence_required: true
+          remediation: "Documenter l'architecture complète de la messagerie avec les flux entrants/sortants."
+
+        - id: MSG-002
+          title: "Haute disponibilité de la messagerie"
+          description: "Le service de messagerie est en haute disponibilité (DAG, cluster, ou SaaS)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Mettre en place un DAG Exchange ou vérifier la redondance du service cloud."
+
+        - id: MSG-003
+          title: "Enregistrements MX corrects"
+          description: "Les enregistrements MX pointent vers les serveurs de messagerie actuels"
+          severity: high
+          check_type: automatic
+          remediation: "Vérifier et corriger les enregistrements MX dans le DNS public."
+
+    - name: "Authentification Email"
+      description: "SPF, DKIM, DMARC — protection contre l'usurpation"
+      controls:
+        - id: MSG-010
+          title: "SPF configuré"
+          description: "Un enregistrement SPF valide est publié pour chaque domaine d'envoi"
+          severity: high
+          check_type: automatic
+          evidence_required: true
+          remediation: "Publier un enregistrement SPF incluant les serveurs d'envoi autorisés, terminé par -all."
+
+        - id: MSG-011
+          title: "DKIM activé"
+          description: "DKIM est configuré et les signatures sont valides pour les domaines d'envoi"
+          severity: high
+          check_type: automatic
+          evidence_required: true
+          remediation: "Configurer DKIM avec des clés RSA 2048 bits pour chaque domaine."
+
+        - id: MSG-012
+          title: "DMARC configuré (quarantine/reject)"
+          description: "Un enregistrement DMARC avec p=quarantine ou p=reject est publié"
+          severity: high
+          check_type: automatic
+          evidence_required: true
+          remediation: "Publier un DMARC p=quarantine, puis passer à p=reject après validation des rapports."
+
+        - id: MSG-013
+          title: "BIMI configuré (optionnel)"
+          description: "BIMI est déployé pour renforcer la confiance visuelle dans les emails"
+          severity: info
+          check_type: manual
+          remediation: "Configurer BIMI après validation de DMARC p=reject."
+
+    - name: "Sécurité des transports"
+      controls:
+        - id: MSG-020
+          title: "TLS imposé pour les connexions"
+          description: "Les connexions SMTP utilisent TLS 1.2+ — TLS opportuniste au minimum"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer TLS 1.2 minimum sur les connecteurs SMTP entrants et sortants."
+
+        - id: MSG-021
+          title: "Certificats valides sur les serveurs"
+          description: "Les certificats SSL/TLS des serveurs de messagerie sont valides et non expirés"
+          severity: high
+          check_type: automatic
+          evidence_required: true
+          remediation: "Renouveler les certificats expirés et configurer le renouvellement automatique."
+
+        - id: MSG-022
+          title: "MTA-STS configuré"
+          description: "MTA-STS est configuré pour imposer le chiffrement SMTP en transit"
+          severity: medium
+          check_type: automatic
+          remediation: "Déployer MTA-STS pour forcer le TLS sur les connexions SMTP entrantes."
+
+    - name: "Anti-spam & Anti-malware"
+      controls:
+        - id: MSG-030
+          title: "Filtrage anti-spam actif"
+          description: "Un système anti-spam filtre les messages entrants et sortants"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Déployer une solution anti-spam avec filtrage entrant et sortant."
+
+        - id: MSG-031
+          title: "Anti-malware email actif"
+          description: "Les pièces jointes sont analysées par un moteur anti-malware"
+          severity: critical
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Activer l'analyse anti-malware des pièces jointes et des liens."
+
+        - id: MSG-032
+          title: "Protection anti-phishing"
+          description: "Une protection contre le phishing est déployée (analyse d'URL, sandboxing)"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Déployer une solution de protection anti-phishing avec analyse d'URL en temps réel."
+
+        - id: MSG-033
+          title: "Blocage des extensions dangereuses"
+          description: "Les pièces jointes avec extensions dangereuses (.exe, .vbs, .ps1, etc.) sont bloquées"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Configurer le blocage des extensions exécutables dans les règles de transport."
+
+    - name: "Contrôle d'accès & Audit"
+      controls:
+        - id: MSG-040
+          title: "Accès aux boîtes aux lettres journalisé"
+          description: "L'accès aux boîtes aux lettres (notamment les accès délégués) est audité"
+          severity: high
+          check_type: semi-automatic
+          evidence_required: true
+          remediation: "Activer l'audit des accès aux boîtes aux lettres."
+
+        - id: MSG-041
+          title: "Règles de transfert externe bloquées"
+          description: "Les règles de transfert automatique vers des domaines externes sont bloquées"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "Créer une règle de transport bloquant le forwarding automatique vers l'extérieur."
+
+        - id: MSG-042
+          title: "DLP sur la messagerie"
+          description: "Des politiques DLP sont appliquées pour détecter les fuites de données sensibles"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer des politiques DLP détectant les données sensibles (CB, IBAN, etc.)."
+
+        - id: MSG-043
+          title: "Rétention des emails configurée"
+          description: "Une politique de rétention des emails est définie et appliquée"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Configurer des politiques de rétention conformes aux exigences légales."

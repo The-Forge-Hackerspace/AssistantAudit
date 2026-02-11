@@ -1,0 +1,169 @@
+framework:
+  ref_id: firewall_audit
+  name: "Audit Firewall"
+  description: "Référentiel d'audit pour les pare-feu (FortiGate, Palo Alto, pfSense, etc.)"
+  version: "1.0"
+  engine: manual
+
+  categories:
+    - name: "Configuration Générale"
+      description: "Vérifications de la configuration de base du pare-feu"
+      controls:
+        - id: FW-001
+          title: "Firmware à jour"
+          description: "Le firmware du pare-feu est à la dernière version stable recommandée par le constructeur"
+          severity: high
+          check_type: manual
+          evidence_required: true
+          remediation: "Mettre à jour vers la dernière version stable du firmware. Planifier une fenêtre de maintenance."
+
+        - id: FW-002
+          title: "Accès administration sécurisé"
+          description: "L'accès à l'interface d'administration est limité à HTTPS et/ou SSH uniquement"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Désactiver HTTP et Telnet. Forcer HTTPS avec un certificat valide et SSH avec clés."
+
+        - id: FW-003
+          title: "Mot de passe admin modifié"
+          description: "Le mot de passe par défaut du compte administrateur a été changé"
+          severity: critical
+          check_type: manual
+          remediation: "Changer immédiatement le mot de passe par défaut avec un mot de passe complexe."
+
+        - id: FW-004
+          title: "Bannière d'avertissement configurée"
+          description: "Un message d'avertissement (login banner) est affiché avant l'authentification"
+          severity: low
+          check_type: manual
+          remediation: "Configurer une bannière légale sur les interfaces de connexion."
+
+        - id: FW-005
+          title: "NTP configuré"
+          description: "Le pare-feu est synchronisé avec au moins 2 serveurs NTP fiables"
+          severity: medium
+          check_type: semi-automatic
+          remediation: "Configurer la synchronisation NTP vers des serveurs de temps fiables."
+
+    - name: "Règles de Filtrage"
+      description: "Vérification de la politique de filtrage"
+      controls:
+        - id: FW-010
+          title: "Règle deny-all par défaut"
+          description: "Une règle deny all est présente en fin de politique (implicit deny)"
+          severity: critical
+          check_type: semi-automatic
+          remediation: "S'assurer qu'une règle deny all est en dernière position de la politique."
+
+        - id: FW-011
+          title: "Absence de règle any-any"
+          description: "Aucune règle n'autorise tout le trafic (source any, destination any, service any)"
+          severity: critical
+          check_type: automatic
+          auto_check: "check_any_any_rules"
+          remediation: "Supprimer ou restreindre toute règle trop permissive (any-any)."
+
+        - id: FW-012
+          title: "Règles documentées"
+          description: "Chaque règle de filtrage a un commentaire/description explicatif"
+          severity: medium
+          check_type: manual
+          remediation: "Ajouter un commentaire descriptif à chaque règle de filtrage."
+
+        - id: FW-013
+          title: "Règles désactivées nettoyées"
+          description: "Les règles désactivées inutiles ont été supprimées"
+          severity: low
+          check_type: semi-automatic
+          remediation: "Supprimer les règles désactivées qui ne sont plus nécessaires après validation."
+
+        - id: FW-014
+          title: "Pas de règle avec source/destination large inutile"
+          description: "Les règles sont le plus spécifiques possible (principe du moindre privilège)"
+          severity: high
+          check_type: manual
+          remediation: "Restreindre les règles larges en spécifiant les IPs/réseaux/services nécessaires uniquement."
+
+    - name: "Journalisation & Supervision"
+      description: "Vérification des logs et de la supervision"
+      controls:
+        - id: FW-020
+          title: "Logging activé"
+          description: "La journalisation est activée pour les règles de filtrage (au minimum les deny)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Activer le logging sur toutes les règles, ou au minimum sur les deny."
+
+        - id: FW-021
+          title: "Envoi des logs vers un SIEM/Syslog"
+          description: "Les logs sont envoyés vers un serveur Syslog centralisé ou un SIEM"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Configurer l'envoi des logs vers le SIEM/serveur Syslog."
+
+        - id: FW-022
+          title: "Alertes configurées"
+          description: "Des alertes sont configurées pour les événements critiques (failover, login admin, etc.)"
+          severity: medium
+          check_type: manual
+          remediation: "Configurer des alertes email/SNMP pour les événements critiques."
+
+        - id: FW-023
+          title: "Rétention des logs"
+          description: "Les logs sont conservés au minimum 90 jours"
+          severity: medium
+          check_type: manual
+          remediation: "Configurer une rétention d'au minimum 90 jours sur le SIEM/Syslog."
+
+    - name: "Haute Disponibilité & Sauvegarde"
+      description: "Vérification de la résilience"
+      controls:
+        - id: FW-030
+          title: "Sauvegarde de configuration"
+          description: "Une sauvegarde récente de la configuration existe (< 30 jours)"
+          severity: high
+          check_type: manual
+          evidence_required: true
+          remediation: "Mettre en place une sauvegarde automatique régulière de la configuration."
+
+        - id: FW-031
+          title: "HA configuré (si applicable)"
+          description: "La haute disponibilité est configurée si l'équipement est critique"
+          severity: medium
+          check_type: manual
+          remediation: "Configurer le clustering HA (actif/passif ou actif/actif)."
+
+    - name: "VPN"
+      description: "Vérification de la configuration VPN"
+      controls:
+        - id: FW-040
+          title: "Protocoles VPN sécurisés"
+          description: "Les VPN utilisent des protocoles sécurisés (IKEv2, IPSec avec AES-256)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Migrer vers IKEv2/IPSec avec chiffrement AES-256 et DH group 14+."
+
+        - id: FW-041
+          title: "Authentification VPN forte"
+          description: "L'authentification VPN utilise le MFA ou des certificats"
+          severity: high
+          check_type: manual
+          remediation: "Mettre en place le MFA ou l'authentification par certificat pour les VPN."
+
+    - name: "Licences & Mises à jour"
+      description: "Vérification des licences et services de sécurité"
+      controls:
+        - id: FW-050
+          title: "Licences actives"
+          description: "Toutes les licences de sécurité sont actives (AV, IPS, Web Filter, etc.)"
+          severity: high
+          check_type: manual
+          evidence_required: true
+          remediation: "Renouveler les licences expirées ou en fin de vie."
+
+        - id: FW-051
+          title: "Bases de signatures à jour"
+          description: "Les bases de signatures (AV, IPS) sont à jour (< 24h)"
+          severity: high
+          check_type: semi-automatic
+          remediation: "Vérifier la mise à jour automatique des signatures et corriger si nécessaire."
