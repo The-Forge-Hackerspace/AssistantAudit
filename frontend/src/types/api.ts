@@ -347,3 +347,176 @@ export interface Attachment {
   download_url: string | null;
   preview_url: string | null;
 }
+
+// ── Scanner Réseau ──
+export interface ScanCreate {
+  nom?: string;
+  site_id: number;
+  target: string;
+  scan_type?: "discovery" | "port_scan" | "full" | "custom";
+  custom_args?: string;
+  notes?: string;
+  timeout?: number;
+}
+
+export interface ScanPort {
+  id: number;
+  port_number: number;
+  protocol: string | null;
+  state: string | null;
+  service_name: string | null;
+  product: string | null;
+  version: string | null;
+}
+
+export type HostDecision = "pending" | "kept" | "ignored";
+
+export interface ScanHost {
+  id: number;
+  ip_address: string;
+  hostname: string | null;
+  mac_address: string | null;
+  vendor: string | null;
+  os_guess: string | null;
+  status: string | null;
+  ports_open_count: number;
+  decision: HostDecision;
+  chosen_type: TypeEquipement | null;
+  equipement_id: number | null;
+  date_decouverte: string;
+  ports: ScanPort[];
+}
+
+export interface Scan {
+  id: number;
+  site_id: number;
+  nom: string | null;
+  date_scan: string;
+  type_scan: string | null;
+  nmap_command: string | null;
+  nombre_hosts_trouves: number;
+  nombre_ports_ouverts: number;
+  duree_scan_secondes: number | null;
+  notes: string | null;
+  hosts: ScanHost[];
+}
+
+export interface ScanSummary {
+  id: number;
+  site_id: number;
+  nom: string | null;
+  date_scan: string;
+  type_scan: string | null;
+  nmap_command: string | null;
+  nombre_hosts_trouves: number;
+  nombre_ports_ouverts: number;
+  duree_scan_secondes: number | null;
+  notes: string | null;
+}
+
+export interface ScanHostDecision {
+  decision: HostDecision;
+  chosen_type?: TypeEquipement;
+  hostname_override?: string;
+  create_equipement?: boolean;
+}
+
+// ── Config Parser ──
+export interface InterfaceInfo {
+  name: string;
+  ip_address: string | null;
+  netmask: string | null;
+  vlan: number | null;
+  status: string;
+  allowed_access: string[];
+  description: string | null;
+}
+
+export interface FirewallRuleInfo {
+  rule_id: string;
+  name: string | null;
+  source_interface: string | null;
+  dest_interface: string | null;
+  source_address: string | null;
+  dest_address: string | null;
+  service: string | null;
+  action: string;
+  schedule: string | null;
+  enabled: boolean;
+  log_traffic: boolean;
+}
+
+export type Severity = "critical" | "high" | "medium" | "low" | "info";
+
+export interface SecurityFinding {
+  severity: Severity;
+  category: string;
+  title: string;
+  description: string;
+  remediation: string | null;
+  reference: string | null;
+}
+
+export interface ConfigAnalysisResult {
+  vendor: string;
+  device_type: string;
+  hostname: string | null;
+  firmware_version: string | null;
+  serial_number: string | null;
+  interfaces: InterfaceInfo[];
+  firewall_rules: FirewallRuleInfo[];
+  findings: SecurityFinding[];
+  summary: Record<string, unknown>;
+}
+
+export interface ConfigUploadResponse {
+  filename: string;
+  vendor: string;
+  equipement_id: number | null;
+  analysis: ConfigAnalysisResult;
+}
+
+export interface VendorInfo {
+  id: string;
+  name: string;
+  format: string;
+  description: string;
+}
+
+// ── SSL/TLS Checker ──
+export interface SSLCheckRequest {
+  host: string;
+  port?: number;
+  timeout?: number;
+}
+
+export interface CertificateInfo {
+  subject: string;
+  issuer: string;
+  organization: string;
+  not_before: string | null;
+  not_after: string | null;
+  days_remaining: number;
+  is_expired: boolean;
+  self_signed: boolean;
+  is_trusted: boolean;
+  san: string[];
+  serial_number: string;
+  version: number;
+  signature_algorithm: string;
+  error: string | null;
+}
+
+export interface ProtocolInfo {
+  name: string;
+  supported: boolean;
+  is_secure: boolean;
+}
+
+export interface SSLCheckResult {
+  host: string;
+  port: number;
+  certificate: CertificateInfo | null;
+  protocols: ProtocolInfo[];
+  findings: SecurityFinding[];
+}

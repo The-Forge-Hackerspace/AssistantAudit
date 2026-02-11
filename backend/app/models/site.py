@@ -34,9 +34,5 @@ class Site(Base):
         back_populates="site", cascade="all, delete-orphan", lazy="selectin"
     )
 
-    @property
-    def equipement_count(self) -> int:
-        return len(self.equipements) if self.equipements else 0
-
     def __repr__(self) -> str:
         return f"<Site(id={self.id}, nom='{self.nom}')>"

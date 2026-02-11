@@ -17,11 +17,13 @@ class ScanReseau(Base):
     __tablename__ = "scans_reseau"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nom: Mapped[str | None] = mapped_column(String(200))
     site_id: Mapped[int] = mapped_column(Integer, ForeignKey("sites.id"), nullable=False, index=True)
     date_scan: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False, index=True
     )
     raw_xml_output: Mapped[str | None] = mapped_column(Text)
+    nmap_command: Mapped[str | None] = mapped_column(String(1000))
     type_scan: Mapped[str | None] = mapped_column(String(50))
     nombre_hosts_trouves: Mapped[int] = mapped_column(Integer, default=0)
     nombre_ports_ouverts: Mapped[int] = mapped_column(Integer, default=0)

@@ -100,6 +100,7 @@ class NmapScanner:
             "discovery": ["-sn"],  # Ping scan uniquement
             "port_scan": ["-sV", "--top-ports", "1000"],
             "full": ["-sV", "-sC", "-O", "-p-"],
+            "custom": [],  # Pas d'args par défaut, tout vient de extra_args
         }
         base.extend(type_args.get(scan_type, ["-sn"]))
 
