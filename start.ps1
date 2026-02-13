@@ -107,6 +107,15 @@ $backendJob = Start-Job -ScriptBlock {
         --host 0.0.0.0 `
         --port $port `
         --reload `
+        --reload-exclude "*.db" `
+        --reload-exclude "*.log" `
+        --reload-exclude "*.sqlite" `
+        --reload-exclude "*.sqlite3" `
+        --reload-exclude "instance/*" `
+        --reload-exclude "logs/*" `
+        --reload-exclude "uploads/*" `
+        --reload-exclude "__pycache__/*" `
+        --reload-exclude "data/*" `
         --log-level info
 } -ArgumentList $RootDir, $VenvDir, $BackendPort
 
@@ -145,7 +154,7 @@ Write-Host ""
 Write-Host "  ╔══════════════════════════════════════════════╗" -ForegroundColor Green
 Write-Host "  ║           Tout est pret !                    ║" -ForegroundColor Green
 Write-Host "  ╠══════════════════════════════════════════════╣" -ForegroundColor Green
-Write-Host "  ║  Frontend  : http://localhost:$FrontendPort          ║" -ForegroundColor Green
+Write-Host "  ║  Frontend  : http://localhost:$FrontendPort           ║" -ForegroundColor Green
 Write-Host "  ║  API       : http://localhost:$BackendPort           ║" -ForegroundColor Green
 Write-Host "  ║  Swagger   : http://localhost:$BackendPort/docs      ║" -ForegroundColor Green
 Write-Host "  ║  Login     : admin / Admin@2026!             ║" -ForegroundColor Green

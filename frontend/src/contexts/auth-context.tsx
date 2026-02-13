@@ -28,7 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const me = await authApi.me();
       setUser(me);
-    } catch {
+    } catch (err) {
+      console.error("[AuthContext] refresh() failed:", err);
       setUser(null);
       authApi.logout();
     } finally {

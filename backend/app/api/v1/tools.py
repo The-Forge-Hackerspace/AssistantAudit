@@ -9,7 +9,7 @@ Routes API pour les outils d'infrastructure.
 - POST /ssl-check               : Vérification SSL/TLS d'un hôte
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
@@ -70,7 +70,16 @@ async def analyze_config(
     if not file.filename:
         raise HTTPException(400, "Nom de fichier manquant")
 
-    raw = await file.read()
+    # ── Limite de taille du fichier ──────────────────────────────────────
+    from ...core.config import get_settings
+    _settings = get_settings()
+    max_bytes = _settings.MAX_CONFIG_UPLOAD_SIZE_MB * 1024 * 1024
+    raw = await file.read(max_bytes + 1)  # lire 1 octet de plus pour détecter
+    if len(raw) > max_bytes:
+        raise HTTPException(
+            413,
+            f"Fichier trop volumineux (max {_settings.MAX_CONFIG_UPLOAD_SIZE_MB} Mo).",
+        )
 
     # Try UTF-8, then latin-1
     try:
@@ -142,7 +151,7 @@ async def analyze_config_raw(
         return parser.parse(content)
     except Exception as exc:
         logger.exception("Erreur lors du parsing")
-        raise HTTPException(500, f"Erreur d'analyse : {exc}") from exc
+        raise HTTPException(500, "Erreur interne lors de l'analyse de la configuration.") from exc
 
 
 @router.get("/config-analysis/vendors")
@@ -175,6 +184,8 @@ async def list_vendors(
 @router.get("/config-analyses", response_model=list[ConfigAnalysisSummary])
 async def list_analyses(
     equipement_id: int | None = None,
+    page: int = Query(1, ge=1, description="Numéro de page"),
+    page_size: int = Query(20, ge=1, le=100, description="Éléments par page"),
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_user),
 ):
@@ -184,7 +195,12 @@ async def list_analyses(
     query = db.query(CA)
     if equipement_id:
         query = query.filter(CA.equipement_id == equipement_id)
-    analyses = query.order_by(CA.created_at.desc()).all()
+    analyses = (
+        query.order_by(CA.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
 
     # Convertir en summary avec findings_count calculé
     results = []
@@ -245,7 +261,7 @@ async def prefill_audit(
         raise HTTPException(404, str(ve)) from ve
     except Exception as exc:
         logger.exception("Erreur lors du pré-remplissage")
-        raise HTTPException(500, f"Erreur de pré-remplissage : {exc}") from exc
+        raise HTTPException(500, "Erreur interne lors du pré-remplissage.") from exc
     return PrefillResult(**result)
 
 
@@ -297,7 +313,7 @@ async def ssl_check(
         )
     except Exception as exc:
         logger.exception("Erreur SSL check pour %s:%d", request.host, request.port)
-        raise HTTPException(500, f"Erreur lors de la vérification SSL : {exc}") from exc
+        raise HTTPException(500, "Erreur interne lors de la vérification SSL.") from exc
 
     return result
 
@@ -389,11 +405,18 @@ async def launch_collect(
 @router.get("/collects", response_model=list[CollectResultSummary])
 async def list_collects(
     equipement_id: int | None = None,
+    page: int = Query(1, ge=1, description="Numéro de page"),
+    page_size: int = Query(20, ge=1, le=100, description="Éléments par page"),
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
 ):
     """Liste les collectes, optionnellement filtrées par équipement."""
-    return list_collect_results(db, equipement_id=equipement_id)
+    return list_collect_results(
+        db,
+        equipement_id=equipement_id,
+        skip=(page - 1) * page_size,
+        limit=page_size,
+    )
 
 
 @router.get("/collects/{collect_id}", response_model=CollectResultRead)

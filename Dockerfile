@@ -16,10 +16,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 COPY frameworks/ ./frameworks/
 
-# Répertoires de données
-RUN mkdir -p backend/instance backend/uploads backend/logs
+# Créer un utilisateur non-root
+RUN groupadd -r appuser && useradd -r -g appuser -s /sbin/nologin appuser
+
+# Répertoires de données (accessibles par appuser)
+RUN mkdir -p backend/instance backend/uploads backend/logs \
+    && chown -R appuser:appuser backend/instance backend/uploads backend/logs
 
 WORKDIR /app/backend
+
+# Basculer sur l'utilisateur non-root
+USER appuser
 
 # Port
 EXPOSE 8000

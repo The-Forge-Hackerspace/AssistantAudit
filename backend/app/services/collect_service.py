@@ -655,12 +655,14 @@ def execute_collect_background(
 def list_collect_results(
     db: Session,
     equipement_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 20,
 ) -> list[CollectResult]:
-    """Liste les collectes, optionnellement filtrées par équipement."""
+    """Liste les collectes, optionnellement filtrées par équipement, avec pagination."""
     q = db.query(CollectResult)
     if equipement_id:
         q = q.filter(CollectResult.equipement_id == equipement_id)
-    return q.order_by(CollectResult.created_at.desc()).all()
+    return q.order_by(CollectResult.created_at.desc()).offset(skip).limit(limit).all()
 
 
 def get_collect_result(db: Session, collect_id: int) -> Optional[CollectResult]:

@@ -41,7 +41,7 @@ def auth_headers(client):
     """Obtient un token JWT pour les tests authentifiés"""
     response = client.post(
         "/api/v1/auth/login",
-        json={"username": "testadmin", "password": "TestPass@2026"},
+        data={"username": "testadmin", "password": "TestPass@2026"},
     )
     assert response.status_code == 200
     token = response.json()["access_token"]
@@ -61,7 +61,7 @@ def test_health(client):
 def test_login_success(client):
     response = client.post(
         "/api/v1/auth/login",
-        json={"username": "testadmin", "password": "TestPass@2026"},
+        data={"username": "testadmin", "password": "TestPass@2026"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -72,7 +72,7 @@ def test_login_success(client):
 def test_login_fail(client):
     response = client.post(
         "/api/v1/auth/login",
-        json={"username": "testadmin", "password": "wrongpassword"},
+        data={"username": "testadmin", "password": "wrongpassword"},
     )
     assert response.status_code == 401
 

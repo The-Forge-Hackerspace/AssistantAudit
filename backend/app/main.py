@@ -5,8 +5,9 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .core.config import get_settings
 from .core.database import create_all_tables, SessionLocal
@@ -86,13 +87,45 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS
+    # ── Security Headers Middleware ────────────────────────────────────────
+    class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+        """Ajoute les en-têtes de sécurité HTTP à chaque réponse."""
+
+        async def dispatch(self, request: Request, call_next):
+            response: Response = await call_next(request)
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["X-XSS-Protection"] = "1; mode=block"
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            response.headers["Permissions-Policy"] = (
+                "camera=(), microphone=(), geolocation=(), payment=()"
+            )
+            # CSP : restrictif mais compatible avec Swagger UI
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "img-src 'self' data:; "
+                "font-src 'self' https://cdn.jsdelivr.net; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none'"
+            )
+            # HSTS uniquement si HTTPS détecté
+            if request.url.scheme == "https":
+                response.headers["Strict-Transport-Security"] = (
+                    "max-age=31536000; includeSubDomains"
+                )
+            return response
+
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    # ── CORS (restreint aux méthodes et en-têtes nécessaires) ────────────
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=settings.CORS_ALLOW_METHODS,
+        allow_headers=settings.CORS_ALLOW_HEADERS,
     )
 
     # Enregistrement du router API v1

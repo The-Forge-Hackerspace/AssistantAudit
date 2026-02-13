@@ -93,7 +93,7 @@ async def launch_scan(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Erreur lors de la création du scan")
-        raise HTTPException(status_code=500, detail=f"Erreur interne : {e}")
+        raise HTTPException(status_code=500, detail="Erreur interne lors de la création du scan.")
 
 
 @router.get(

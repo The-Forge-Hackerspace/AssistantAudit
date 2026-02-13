@@ -140,7 +140,16 @@ def collect_via_ssh(
     """
     result = SSHCollectResult()
     client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    # Sécurité : charger les host keys connues du système.
+    # En mode audit, on accepte les clés inconnues avec un warning
+    # plutôt que de rejeter silencieusement (AutoAddPolicy aveugle).
+    try:
+        client.load_system_host_keys()
+    except Exception:
+        pass  # Pas de fichier known_hosts système
+
+    client.set_missing_host_key_policy(paramiko.WarningPolicy())
 
     try:
         # Préparer les paramètres de connexion

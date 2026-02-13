@@ -27,8 +27,9 @@ async def get_current_user(
     db: Session = Depends(get_db),
 ):
     """
-    Dépendance : récupère l'utilisateur authentifié depuis le token JWT.
-    Lève 401 si le token est absent ou invalide.
+    Dépendance : récupère l'utilisateur authentifié depuis le token JWT
+    envoyé dans le header Authorization: Bearer <token>.
+    Lève 401 si aucun token valide n'est trouvé.
     """
     if token is None:
         raise HTTPException(
