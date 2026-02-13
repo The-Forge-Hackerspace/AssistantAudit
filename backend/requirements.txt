@@ -26,6 +26,11 @@ PyYAML>=6.0.0
 # --- Sécurité XML (scan Nmap) ---
 defusedxml>=0.7.1
 
+# --- Collecte SSH / WinRM ---
+paramiko>=3.4.0
+pywinrm>=0.4.3
+python-dateutil>=2.9.0
+
 # --- Logging & Config ---
 python-dotenv>=1.0.0
 

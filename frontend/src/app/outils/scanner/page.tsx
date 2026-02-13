@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback, useMemo } from "react";
+import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   Radar,
   Play,
@@ -18,6 +18,7 @@ import {
   Server,
   Globe,
   Terminal,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { scansApi, sitesApi } from "@/services/api";
 import type { Scan, ScanSummary, ScanHost, Site, TypeEquipement } from "@/types";
 import { toast } from "sonner";
@@ -112,9 +119,9 @@ function ScannerContent() {
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedScan, setSelectedScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scanning, setScanning] = useState(false);
   const [showLaunch, setShowLaunch] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Launch form
   const [nom, setNom] = useState("");
@@ -134,6 +141,12 @@ function ScannerContent() {
     const scanDef = SCAN_TYPES.find((s) => s.value === scanType);
     return `nmap ${scanDef?.args || "-sn"} ${t}`;
   }, [target, scanType, customArgs]);
+
+  // ── Has running scans? ──
+  const hasRunningScans = useMemo(
+    () => scans.some((s) => s.statut === "running"),
+    [scans]
+  );
 
   // ── Fetch ──
   const fetchScans = useCallback(async () => {
@@ -161,7 +174,27 @@ function ScannerContent() {
     fetchSites();
   }, [fetchScans, fetchSites]);
 
-  // ── Launch scan ──
+  // ── Polling: refresh every 3s while scans are running ──
+  useEffect(() => {
+    if (hasRunningScans) {
+      pollingRef.current = setInterval(() => {
+        fetchScans();
+      }, 3000);
+    } else {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    }
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [hasRunningScans, fetchScans]);
+
+  // ── Launch scan (async — returns immediately) ──
   const handleLaunch = async () => {
     if (!siteId || !target) {
       toast.error("Veuillez sélectionner un site et saisir une cible");
@@ -171,9 +204,10 @@ function ScannerContent() {
       toast.error("Veuillez saisir les arguments Nmap personnalisés");
       return;
     }
-    setScanning(true);
+    // Close dialog immediately
+    setShowLaunch(false);
     try {
-      const scan = await scansApi.launch({
+      await scansApi.launch({
         nom: nom.trim() || undefined,
         site_id: siteId,
         target,
@@ -181,20 +215,15 @@ function ScannerContent() {
         custom_args: scanType === "custom" ? customArgs.trim() : undefined,
         notes: notes || undefined,
       });
-      toast.success(
-        `Scan terminé — ${scan.nombre_hosts_trouves} hôte(s) découvert(s)`
-      );
-      setShowLaunch(false);
+      toast.success("Scan lancé — il s'exécute en arrière-plan");
       resetForm();
       fetchScans();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } };
       const msg =
         axiosErr?.response?.data?.detail ||
-        (err instanceof Error ? err.message : "Erreur lors du scan");
+        (err instanceof Error ? err.message : "Erreur lors du lancement du scan");
       toast.error(msg);
-    } finally {
-      setScanning(false);
     }
   };
 
@@ -296,7 +325,15 @@ function ScannerContent() {
       {/* Scan list */}
       <Card>
         <CardHeader>
-          <CardTitle>Historique des scans</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Historique des scans
+            {hasRunningScans && (
+              <Badge className="gap-1 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400 text-xs">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {scans.filter((s) => s.statut === "running").length} en cours
+              </Badge>
+            )}
+          </CardTitle>
           <CardDescription>
             {scans.length} scan(s) enregistré(s)
           </CardDescription>
@@ -317,6 +354,7 @@ function ScannerContent() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nom</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Site</TableHead>
                   <TableHead>Type</TableHead>
@@ -329,11 +367,14 @@ function ScannerContent() {
               </TableHeader>
               <TableBody>
                 {scans.map((scan) => (
-                  <TableRow key={scan.id}>
+                  <TableRow key={scan.id} className={scan.statut === "running" ? "bg-primary/5" : ""}>
                     <TableCell className="font-medium max-w-[160px] truncate">
                       {scan.nom || (
                         <span className="text-muted-foreground italic">—</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <ScanStatusBadge statut={scan.statut} errorMessage={scan.error_message} />
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       {new Date(scan.date_scan).toLocaleDateString("fr-FR", {
@@ -377,6 +418,7 @@ function ScannerContent() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleViewScan(scan.id)}
+                          disabled={scan.statut === "running"}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -384,6 +426,7 @@ function ScannerContent() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(scan.id)}
+                          disabled={scan.statut === "running"}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -399,7 +442,7 @@ function ScannerContent() {
 
       {/* Launch dialog */}
       <Dialog open={showLaunch} onOpenChange={setShowLaunch}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Lancer un scan réseau</DialogTitle>
             <DialogDescription>
@@ -518,18 +561,9 @@ function ScannerContent() {
             <Button variant="outline" onClick={() => setShowLaunch(false)}>
               Annuler
             </Button>
-            <Button onClick={handleLaunch} disabled={scanning}>
-              {scanning ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Scan en cours…
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  Lancer
-                </>
-              )}
+            <Button onClick={handleLaunch}>
+              <Play className="h-4 w-4 mr-2" />
+              Lancer
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -537,7 +571,7 @@ function ScannerContent() {
 
       {/* Detail dialog */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
-        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-[50vw] w-full max-h-[90vh] overflow-y-auto">
           {selectedScan && (
             <>
               <DialogHeader>
@@ -600,6 +634,52 @@ function ScannerContent() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ── Scan Status Badge component ──
+function ScanStatusBadge({
+  statut,
+  errorMessage,
+}: {
+  statut: string;
+  errorMessage: string | null;
+}) {
+  if (statut === "running") {
+    return (
+      <div className="space-y-1.5 min-w-[100px]">
+        <Badge className="gap-1.5 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          En cours
+        </Badge>
+        <div className="h-1.5 w-full bg-blue-100 dark:bg-blue-900/30 rounded-full overflow-hidden">
+          <div className="h-full w-1/3 bg-blue-500 rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]" />
+        </div>
+      </div>
+    );
+  }
+  if (statut === "failed") {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant="destructive" className="gap-1 cursor-help">
+              <AlertCircle className="h-3 w-3" />
+              Échoué
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p className="text-sm">{errorMessage || "Erreur inconnue"}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  return (
+    <Badge variant="outline" className="gap-1 text-green-600 border-green-200 dark:border-green-800 dark:text-green-400">
+      <Check className="h-3 w-3" />
+      Terminé
+    </Badge>
   );
 }
 

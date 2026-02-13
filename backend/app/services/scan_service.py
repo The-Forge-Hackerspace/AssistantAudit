@@ -11,6 +11,7 @@ from ..models.scan import ScanReseau, ScanHost, ScanPort
 from ..models.site import Site
 from ..models.equipement import Equipement
 from ..tools.nmap_scanner.scanner import NmapScanner, NmapScanResult
+from ..core.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def get_nmap_command_preview(target: str, scan_type: str, custom_args: Optional[
     return _build_display_command(target or "<cible>", scan_type, custom_args)
 
 
-def run_scan(
+def create_pending_scan(
     db: Session,
     site_id: int,
     target: str,
@@ -46,118 +47,146 @@ def run_scan(
     nom: Optional[str] = None,
     notes: Optional[str] = None,
     custom_args: Optional[str] = None,
-    timeout: int = 600,
 ) -> ScanReseau:
     """
-    Exécute un scan Nmap et persiste les résultats en base.
-
-    Args:
-        db: Session SQLAlchemy
-        site_id: ID du site auquel rattacher le scan
-        target: IP, CIDR ou hostname
-        scan_type: discovery | port_scan | full | custom
-        nom: Nom du scan (ex: "VLAN 10 - MGT")
-        notes: Notes optionnelles
-        custom_args: Arguments Nmap personnalisés (mode custom)
-        timeout: Timeout Nmap en secondes
+    Crée un scan en statut 'running' et le persiste immédiatement.
+    Le scan réel sera exécuté en arrière-plan via execute_scan_background().
 
     Returns:
-        ScanReseau avec les hosts et ports découverts
+        ScanReseau avec statut='running'
     """
     # Vérifier que le site existe
     site = db.get(Site, site_id)
     if not site:
         raise ValueError(f"Site {site_id} introuvable")
 
-    # Lancer le scan
-    scanner = NmapScanner(timeout=timeout)
-
-    extra_args: Optional[list[str]] = None
     effective_scan_type = scan_type
-
-    if scan_type == "custom" and custom_args:
-        # En mode custom, on utilise 'discovery' comme base et on passe tout dans extra_args
-        # On parse les arguments custom pour nmap
-        extra_args = custom_args.strip().split()
-        effective_scan_type = "custom"
-        # Utiliser un scan_type neutre pour la commande interne
-        result: NmapScanResult = scanner.scan(target, "custom", extra_args)
-    else:
-        result = scanner.scan(target, scan_type)
-
-    if not result.success:
-        raise RuntimeError(f"Échec du scan : {result.error}")
-
-    # Construire la commande nmap affichée
     nmap_command = _build_display_command(target, scan_type, custom_args)
 
-    # Persister en base
     scan = ScanReseau(
         nom=nom,
         site_id=site_id,
         type_scan=effective_scan_type,
         nmap_command=nmap_command,
-        raw_xml_output=result.raw_xml,
-        nombre_hosts_trouves=len(result.hosts),
-        nombre_ports_ouverts=sum(
-            len([p for p in h.ports if p.state == "open"])
-            for h in result.hosts
-        ),
-        duree_scan_secondes=result.duration_seconds,
+        statut="running",
         notes=notes,
     )
     db.add(scan)
-    db.flush()  # Obtenir l'ID
-
-    for discovered_host in result.hosts:
-        host = ScanHost(
-            scan_id=scan.id,
-            ip_address=discovered_host.ip_address,
-            hostname=discovered_host.hostname or None,
-            mac_address=discovered_host.mac_address or None,
-            vendor=discovered_host.vendor or None,
-            os_guess=discovered_host.os_guess or None,
-            status=discovered_host.status,
-            ports_open_count=len([p for p in discovered_host.ports if p.state == "open"]),
-            decision="pending",
-        )
-        # Vérifier si un équipement existe déjà avec cette IP sur ce site
-        existing = (
-            db.query(Equipement)
-            .filter(
-                Equipement.site_id == site_id,
-                Equipement.ip_address == discovered_host.ip_address,
-            )
-            .first()
-        )
-        if existing:
-            host.equipement_id = existing.id
-            host.decision = "kept"
-            host.chosen_type = existing.type_equipement
-
-        db.add(host)
-        db.flush()
-
-        for discovered_port in discovered_host.ports:
-            port = ScanPort(
-                host_id=host.id,
-                port_number=discovered_port.port_number,
-                protocol=discovered_port.protocol,
-                state=discovered_port.state,
-                service_name=discovered_port.service_name or None,
-                product=discovered_port.product or None,
-                version=discovered_port.version or None,
-            )
-            db.add(port)
-
     db.commit()
     db.refresh(scan)
 
-    logger.info(
-        f"Scan terminé: {len(result.hosts)} hosts, "
-        f"{scan.nombre_ports_ouverts} ports ouverts ({result.duration_seconds}s)"
-    )
+    logger.info(f"Scan #{scan.id} créé en statut 'running' pour {target}")
     return scan
+
+
+def execute_scan_background(
+    scan_id: int,
+    site_id: int,
+    target: str,
+    scan_type: str = "discovery",
+    custom_args: Optional[str] = None,
+    timeout: int = 600,
+) -> None:
+    """
+    Exécute le scan Nmap en arrière-plan et met à jour l'enregistrement.
+    Utilise sa propre session DB (les background tasks sont hors requête).
+    """
+    db = SessionLocal()
+    try:
+        scan = db.get(ScanReseau, scan_id)
+        if not scan:
+            logger.error(f"Scan #{scan_id} introuvable pour exécution background")
+            return
+
+        # Lancer le scan
+        scanner = NmapScanner(timeout=timeout)
+        extra_args: Optional[list[str]] = None
+
+        if scan_type == "custom" and custom_args:
+            extra_args = custom_args.strip().split()
+            result: NmapScanResult = scanner.scan(target, "custom", extra_args)
+        else:
+            result = scanner.scan(target, scan_type)
+
+        if not result.success:
+            scan.statut = "failed"
+            scan.error_message = result.error or "Échec du scan"
+            db.commit()
+            logger.warning(f"Scan #{scan_id} échoué: {result.error}")
+            return
+
+        # Mettre à jour le scan avec les résultats
+        scan.raw_xml_output = result.raw_xml
+        scan.nombre_hosts_trouves = len(result.hosts)
+        scan.nombre_ports_ouverts = sum(
+            len([p for p in h.ports if p.state == "open"])
+            for h in result.hosts
+        )
+        scan.duree_scan_secondes = result.duration_seconds
+        scan.statut = "completed"
+        db.flush()
+
+        # Persister les hosts et ports
+        for discovered_host in result.hosts:
+            host = ScanHost(
+                scan_id=scan.id,
+                ip_address=discovered_host.ip_address,
+                hostname=discovered_host.hostname or None,
+                mac_address=discovered_host.mac_address or None,
+                vendor=discovered_host.vendor or None,
+                os_guess=discovered_host.os_guess or None,
+                status=discovered_host.status,
+                ports_open_count=len([p for p in discovered_host.ports if p.state == "open"]),
+                decision="pending",
+            )
+            # Vérifier si un équipement existe déjà avec cette IP sur ce site
+            existing = (
+                db.query(Equipement)
+                .filter(
+                    Equipement.site_id == site_id,
+                    Equipement.ip_address == discovered_host.ip_address,
+                )
+                .first()
+            )
+            if existing:
+                host.equipement_id = existing.id
+                host.decision = "kept"
+                host.chosen_type = existing.type_equipement
+
+            db.add(host)
+            db.flush()
+
+            for discovered_port in discovered_host.ports:
+                port = ScanPort(
+                    host_id=host.id,
+                    port_number=discovered_port.port_number,
+                    protocol=discovered_port.protocol,
+                    state=discovered_port.state,
+                    service_name=discovered_port.service_name or None,
+                    product=discovered_port.product or None,
+                    version=discovered_port.version or None,
+                )
+                db.add(port)
+
+        db.commit()
+
+        logger.info(
+            f"Scan #{scan_id} terminé: {len(result.hosts)} hosts, "
+            f"{scan.nombre_ports_ouverts} ports ouverts ({result.duration_seconds}s)"
+        )
+
+    except Exception as e:
+        logger.exception(f"Erreur inattendue lors du scan background #{scan_id}")
+        try:
+            scan = db.get(ScanReseau, scan_id)
+            if scan:
+                scan.statut = "failed"
+                scan.error_message = str(e)
+                db.commit()
+        except Exception:
+            logger.exception("Impossible de mettre à jour le statut du scan")
+    finally:
+        db.close()
 
 
 def update_host_decision(

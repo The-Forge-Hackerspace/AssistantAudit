@@ -27,24 +27,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ── Statut des scans en cours (in-memory) ──
-_running_scans: dict[int, dict] = {}  # site_id -> {"status": ..., "scan_id": ...}
-
-
 @router.post(
     "",
     response_model=ScanRead,
-    status_code=status.HTTP_201_CREATED,
-    summary="Lancer un scan réseau",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Lancer un scan réseau (asynchrone)",
 )
 async def launch_scan(
     payload: ScanCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),
 ):
     """
-    Lance un scan Nmap sur la cible spécifiée et persiste les résultats.
-    Types de scan : discovery (ping), port_scan (top 1000), full (tous ports + OS), custom (commande libre).
+    Lance un scan Nmap de manière asynchrone.
+    Crée immédiatement un enregistrement en statut 'running' et retourne la réponse.
+    Le scan s'exécute en arrière-plan. Utilisez GET /scans pour suivre le statut.
+    Plusieurs scans peuvent tourner en parallèle.
     """
     # Vérifier que le site existe
     site = db.get(Site, payload.site_id)
@@ -67,7 +66,8 @@ async def launch_scan(
         )
 
     try:
-        scan = scan_service.run_scan(
+        # Créer le scan en statut 'running' (retour immédiat)
+        scan = scan_service.create_pending_scan(
             db=db,
             site_id=payload.site_id,
             target=payload.target,
@@ -76,13 +76,23 @@ async def launch_scan(
             notes=payload.notes,
             custom_args=payload.custom_args,
         )
+
+        # Lancer l'exécution en arrière-plan
+        background_tasks.add_task(
+            scan_service.execute_scan_background,
+            scan_id=scan.id,
+            site_id=payload.site_id,
+            target=payload.target,
+            scan_type=payload.scan_type,
+            custom_args=payload.custom_args,
+        )
+
         return scan
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        logger.exception("Erreur inattendue lors du scan")
+        logger.exception("Erreur lors de la création du scan")
         raise HTTPException(status_code=500, detail=f"Erreur interne : {e}")
 
 

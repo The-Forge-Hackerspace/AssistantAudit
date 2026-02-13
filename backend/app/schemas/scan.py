@@ -58,6 +58,8 @@ class ScanRead(BaseModel):
     date_scan: datetime
     type_scan: Optional[str] = None
     nmap_command: Optional[str] = None
+    statut: str = "running"
+    error_message: Optional[str] = None
     nombre_hosts_trouves: int = 0
     nombre_ports_ouverts: int = 0
     duree_scan_secondes: Optional[int] = None
@@ -75,6 +77,8 @@ class ScanSummary(BaseModel):
     date_scan: datetime
     type_scan: Optional[str] = None
     nmap_command: Optional[str] = None
+    statut: str = "running"
+    error_message: Optional[str] = None
     nombre_hosts_trouves: int = 0
     nombre_ports_ouverts: int = 0
     duree_scan_secondes: Optional[int] = None
@@ -147,6 +151,7 @@ class ConfigUploadResponse(BaseModel):
     filename: str
     vendor: str
     equipement_id: Optional[int] = None
+    config_analysis_id: Optional[int] = None
     analysis: ConfigAnalysisResult
 
 
@@ -191,3 +196,110 @@ class SSLCheckResult(BaseModel):
     certificate: Optional[CertificateInfo] = None
     protocols: list[ProtocolInfo] = []
     findings: list[SecurityFinding] = []
+
+
+# ─── Config Analysis (liée à un équipement) ──────────────────
+
+class ConfigAnalysisRead(BaseModel):
+    """Analyse de configuration persistée et liée à un équipement."""
+    id: int
+    equipement_id: int
+    filename: str
+    vendor: str
+    device_type: str = "firewall"
+    hostname: Optional[str] = None
+    firmware_version: Optional[str] = None
+    serial_number: Optional[str] = None
+    interfaces: list[InterfaceInfo] = []
+    firewall_rules: list[FirewallRuleInfo] = []
+    findings: list[SecurityFinding] = []
+    summary: dict = {}
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ConfigAnalysisSummary(BaseModel):
+    """Résumé d'une analyse de configuration."""
+    id: int
+    equipement_id: int
+    filename: str
+    vendor: str
+    hostname: Optional[str] = None
+    firmware_version: Optional[str] = None
+    findings_count: int = 0
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PrefillResult(BaseModel):
+    """Résultat du pré-remplissage d'audit depuis une analyse de config."""
+    controls_prefilled: int
+    controls_compliant: int
+    controls_non_compliant: int
+    controls_partial: int
+    details: list[dict] = []
+
+
+# ─── Collecte SSH / WinRM ─────────────────────────────────────
+
+class CollectCreate(BaseModel):
+    """Paramètres pour lancer une collecte SSH ou WinRM."""
+    equipement_id: int
+    method: str = Field(..., description="ssh ou winrm")
+    target_host: str = Field(..., description="IP ou hostname du serveur")
+    target_port: int = Field(22, description="Port SSH (22) ou WinRM (5985/5986)")
+    username: str = Field(..., description="Utilisateur de connexion")
+    password: Optional[str] = Field(None, description="Mot de passe")
+    private_key: Optional[str] = Field(None, description="Clé privée SSH (PEM)")
+    passphrase: Optional[str] = Field(None, description="Passphrase de la clé privée")
+    use_ssl: bool = Field(False, description="WinRM: utiliser HTTPS (port 5986)")
+    transport: str = Field("ntlm", description="WinRM: méthode d'auth (ntlm, kerberos, basic)")
+
+
+class CollectResultSummary(BaseModel):
+    """Résumé d'une collecte pour la liste."""
+    id: int
+    equipement_id: int
+    method: str
+    status: str
+    target_host: str
+    target_port: int
+    username: str
+    hostname_collected: Optional[str] = None
+    summary: Optional[dict] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
+class CollectResultRead(BaseModel):
+    """Détail complet d'une collecte."""
+    id: int
+    equipement_id: int
+    method: str
+    status: str
+    target_host: str
+    target_port: int
+    username: str
+    hostname_collected: Optional[str] = None
+    error_message: Optional[str] = None
+    os_info: Optional[dict] = None
+    network: Optional[dict] = None
+    users: Optional[dict] = None
+    services: Optional[dict] = None
+    security: Optional[dict] = None
+    storage: Optional[dict] = None
+    updates: Optional[dict] = None
+    findings: Optional[list] = None
+    summary: Optional[dict] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+

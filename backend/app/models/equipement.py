@@ -64,6 +64,12 @@ class Equipement(Base):
     assessments: Mapped[list["Assessment"]] = relationship(  # type: ignore[name-defined]
         back_populates="equipement", cascade="all, delete-orphan", lazy="selectin"
     )
+    config_analyses: Mapped[list["ConfigAnalysis"]] = relationship(  # type: ignore[name-defined]
+        back_populates="equipement", cascade="all, delete-orphan", lazy="selectin"
+    )
+    collect_results: Mapped[list["CollectResult"]] = relationship(  # type: ignore[name-defined]
+        back_populates="equipement", cascade="all, delete-orphan", lazy="selectin"
+    )
 
     __table_args__ = (
         UniqueConstraint("site_id", "ip_address", name="uq_site_ip"),

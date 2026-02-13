@@ -394,6 +394,8 @@ export interface Scan {
   date_scan: string;
   type_scan: string | null;
   nmap_command: string | null;
+  statut: "running" | "completed" | "failed";
+  error_message: string | null;
   nombre_hosts_trouves: number;
   nombre_ports_ouverts: number;
   duree_scan_secondes: number | null;
@@ -408,6 +410,8 @@ export interface ScanSummary {
   date_scan: string;
   type_scan: string | null;
   nmap_command: string | null;
+  statut: "running" | "completed" | "failed";
+  error_message: string | null;
   nombre_hosts_trouves: number;
   nombre_ports_ouverts: number;
   duree_scan_secondes: number | null;
@@ -473,7 +477,51 @@ export interface ConfigUploadResponse {
   filename: string;
   vendor: string;
   equipement_id: number | null;
+  config_analysis_id: number | null;
   analysis: ConfigAnalysisResult;
+}
+
+// ── Config Analysis (persistée) ──
+export interface ConfigAnalysisRead {
+  id: number;
+  equipement_id: number;
+  filename: string;
+  vendor: string;
+  device_type: string;
+  hostname: string | null;
+  firmware_version: string | null;
+  serial_number: string | null;
+  interfaces: InterfaceInfo[];
+  firewall_rules: FirewallRuleInfo[];
+  findings: SecurityFinding[];
+  summary: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ConfigAnalysisSummary {
+  id: number;
+  equipement_id: number;
+  filename: string;
+  vendor: string;
+  hostname: string | null;
+  firmware_version: string | null;
+  findings_count: number;
+  created_at: string;
+}
+
+export interface PrefillDetail {
+  control_ref: string;
+  control_title: string;
+  status: string;
+  findings_count: number;
+}
+
+export interface PrefillResult {
+  controls_prefilled: number;
+  controls_compliant: number;
+  controls_non_compliant: number;
+  controls_partial: number;
+  details: PrefillDetail[];
 }
 
 export interface VendorInfo {
@@ -519,4 +567,68 @@ export interface SSLCheckResult {
   certificate: CertificateInfo | null;
   protocols: ProtocolInfo[];
   findings: SecurityFinding[];
+}
+
+// ── Collecte SSH / WinRM ──
+export interface CollectCreate {
+  equipement_id: number;
+  method: "ssh" | "winrm";
+  target_host: string;
+  target_port: number;
+  username: string;
+  password?: string;
+  private_key?: string;
+  passphrase?: string;
+  use_ssl?: boolean;
+  transport?: string;
+}
+
+export type CollectStatus = "running" | "success" | "failed";
+
+export interface CollectResultSummary {
+  id: number;
+  equipement_id: number;
+  method: string;
+  status: CollectStatus;
+  target_host: string;
+  target_port: number;
+  username: string;
+  hostname_collected: string | null;
+  summary: CollectSummary | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+  duration_seconds: number | null;
+}
+
+export interface CollectSummary {
+  os_type: string;
+  os_name: string;
+  os_version: string;
+  hostname: string;
+  total_checks: number;
+  compliant: number;
+  non_compliant: number;
+  compliance_score: number;
+}
+
+export interface CollectResultRead extends CollectResultSummary {
+  os_info: Record<string, unknown> | null;
+  network: Record<string, unknown> | null;
+  users: Record<string, unknown> | null;
+  services: Record<string, unknown> | null;
+  security: Record<string, unknown> | null;
+  storage: Record<string, unknown> | null;
+  updates: Record<string, unknown> | null;
+  findings: CollectFinding[] | null;
+}
+
+export interface CollectFinding {
+  control_ref: string;
+  title: string;
+  description: string;
+  severity: string;
+  category: string;
+  remediation: string;
+  status: string;
 }
