@@ -1,6 +1,7 @@
 """
 Routes d'authentification : login, register, refresh, profile.
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -20,6 +21,8 @@ from ...services.auth_service import AuthService
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
+
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
@@ -31,6 +34,7 @@ async def login(
     Accepte le format OAuth2 form (utilisé par Swagger Authorize)
     et le format JSON classique.
     """
+    logger.info(f"[LOGIN] Tentative login user='{form_data.username}' (len_pwd={len(form_data.password)})")
     user = AuthService.authenticate(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(

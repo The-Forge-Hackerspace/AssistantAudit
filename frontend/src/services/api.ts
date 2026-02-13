@@ -29,9 +29,15 @@ import type {
   ScanSummary,
   ScanHostDecision,
   ConfigUploadResponse,
+  ConfigAnalysisRead,
+  ConfigAnalysisSummary,
+  PrefillResult,
   SSLCheckRequest,
   SSLCheckResult,
   VendorInfo,
+  CollectCreate,
+  CollectResultSummary,
+  CollectResultRead,
 } from "@/types";
 
 // ── Auth ──
@@ -447,6 +453,36 @@ export const toolsApi = {
     return data;
   },
 
+  // Config Analyses (persistées)
+  async listConfigAnalyses(equipementId?: number): Promise<ConfigAnalysisSummary[]> {
+    const params = equipementId ? { equipement_id: equipementId } : {};
+    const { data } = await api.get("/tools/config-analyses", { params });
+    return data;
+  },
+
+  async getConfigAnalysis(configId: number): Promise<ConfigAnalysisRead> {
+    const { data } = await api.get(`/tools/config-analyses/${configId}`);
+    return data;
+  },
+
+  async deleteConfigAnalysis(configId: number): Promise<void> {
+    await api.delete(`/tools/config-analyses/${configId}`);
+  },
+
+  async prefillAudit(configId: number, assessmentId: number): Promise<PrefillResult> {
+    const { data } = await api.post(
+      `/tools/config-analyses/${configId}/prefill/${assessmentId}`
+    );
+    return data;
+  },
+
+  async listAssessmentsForEquipment(equipementId: number): Promise<
+    { id: number; campaign_id: number; framework_id: number; framework_name: string; created_at: string }[]
+  > {
+    const { data } = await api.get(`/tools/assessments-for-equipment/${equipementId}`);
+    return data;
+  },
+
   // SSL Checker
   async sslCheck(request: SSLCheckRequest): Promise<SSLCheckResult> {
     const { data } = await api.post("/tools/ssl-check", request);
@@ -457,6 +493,34 @@ export const toolsApi = {
     requests: SSLCheckRequest[]
   ): Promise<SSLCheckResult[]> {
     const { data } = await api.post("/tools/ssl-check/batch", requests);
+    return data;
+  },
+
+  // Collecte SSH / WinRM
+  async launchCollect(params: CollectCreate): Promise<CollectResultSummary> {
+    const { data } = await api.post("/tools/collect", params);
+    return data;
+  },
+
+  async listCollects(equipementId?: number): Promise<CollectResultSummary[]> {
+    const params = equipementId ? { equipement_id: equipementId } : {};
+    const { data } = await api.get("/tools/collects", { params });
+    return data;
+  },
+
+  async getCollect(collectId: number): Promise<CollectResultRead> {
+    const { data } = await api.get(`/tools/collects/${collectId}`);
+    return data;
+  },
+
+  async deleteCollect(collectId: number): Promise<void> {
+    await api.delete(`/tools/collects/${collectId}`);
+  },
+
+  async prefillFromCollect(collectId: number, assessmentId: number): Promise<PrefillResult> {
+    const { data } = await api.post(
+      `/tools/collects/${collectId}/prefill/${assessmentId}`
+    );
     return data;
   },
 };

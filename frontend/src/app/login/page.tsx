@@ -25,8 +25,17 @@ export default function LoginPage() {
     try {
       await login(username, password);
       router.push("/");
-    } catch {
-      setError("Identifiants incorrects");
+    } catch (err: unknown) {
+      console.error("Login error:", err);
+      if (err && typeof err === "object" && "response" in err) {
+        const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } };
+        const detail = axiosErr.response?.data?.detail;
+        setError(detail || `Erreur ${axiosErr.response?.status || "inconnue"}`);
+      } else if (err instanceof Error) {
+        setError(err.message || "Erreur de connexion");
+      } else {
+        setError("Identifiants incorrects");
+      }
     } finally {
       setLoading(false);
     }

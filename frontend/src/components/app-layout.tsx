@@ -43,6 +43,7 @@ import {
   Radar,
   FileCode,
   Lock,
+  Terminal,
 } from "lucide-react";
 
 const navItems = [
@@ -72,6 +73,7 @@ const navItems = [
     items: [
       { title: "Scanner réseau", href: "/outils/scanner", icon: Radar },
       { title: "Config parser", href: "/outils/config-parser", icon: FileCode },
+      { title: "Collecte SSH/WinRM", href: "/outils/collecte", icon: Terminal },
       { title: "SSL/TLS", href: "/outils/ssl-checker", icon: Lock },
     ],
   },

@@ -5,6 +5,7 @@ import {
   Radar,
   FileCode,
   Lock,
+  Terminal,
   Wrench,
   ArrowRight,
 } from "lucide-react";
@@ -29,6 +30,15 @@ const tools = [
     href: "/outils/config-parser",
     color: "text-orange-500",
     bgColor: "bg-orange-500/10",
+  },
+  {
+    title: "Collecte SSH / WinRM",
+    description:
+      "Collecte automatique d'informations système sur les serveurs via SSH (Linux) ou WinRM (Windows). Analyse de conformité et pré-remplissage d'audit.",
+    icon: Terminal,
+    href: "/outils/collecte",
+    color: "text-purple-500",
+    bgColor: "bg-purple-500/10",
   },
   {
     title: "Vérificateur SSL/TLS",

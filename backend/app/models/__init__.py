@@ -29,6 +29,8 @@ from .assessment import (
     CampaignStatus,
 )
 from .attachment import Attachment
+from .config_analysis import ConfigAnalysis
+from .collect_result import CollectResult, CollectMethod, CollectStatus
 
 __all__ = [
     "User",
@@ -55,4 +57,8 @@ __all__ = [
     "ControlResult",
     "ComplianceStatus",
     "CampaignStatus",
+    "ConfigAnalysis",
+    "CollectResult",
+    "CollectMethod",
+    "CollectStatus",
 ]

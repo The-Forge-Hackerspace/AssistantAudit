@@ -25,6 +25,8 @@ class ScanReseau(Base):
     raw_xml_output: Mapped[str | None] = mapped_column(Text)
     nmap_command: Mapped[str | None] = mapped_column(String(1000))
     type_scan: Mapped[str | None] = mapped_column(String(50))
+    statut: Mapped[str] = mapped_column(String(20), default="running", nullable=False, index=True)
+    error_message: Mapped[str | None] = mapped_column(Text)
     nombre_hosts_trouves: Mapped[int] = mapped_column(Integer, default=0)
     nombre_ports_ouverts: Mapped[int] = mapped_column(Integer, default=0)
     duree_scan_secondes: Mapped[int | None] = mapped_column(Integer)
