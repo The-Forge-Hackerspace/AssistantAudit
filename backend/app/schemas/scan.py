@@ -13,7 +13,12 @@ class ScanCreate(BaseModel):
     """Paramètres pour lancer un scan Nmap."""
     nom: Optional[str] = Field(None, description="Nom du scan (ex: VLAN 10 - MGT)")
     site_id: int
-    target: str = Field(..., description="IP, CIDR ou hostname à scanner")
+    target: str = Field(
+        ...,
+        description="IP, CIDR ou hostname à scanner",
+        pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._:/\-]{0,254}$",
+        examples=["192.168.1.0/24", "10.0.0.1", "server.local"],
+    )
     scan_type: str = Field("discovery", description="discovery | port_scan | full | custom")
     custom_args: Optional[str] = Field(None, description="Arguments Nmap personnalisés (mode custom)")
     notes: Optional[str] = None

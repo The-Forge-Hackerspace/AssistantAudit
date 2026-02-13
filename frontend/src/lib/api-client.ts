@@ -27,6 +27,7 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
+      // Nettoyer les cookies JS
       Cookies.remove(TOKEN_KEY);
       Cookies.remove(REFRESH_KEY);
       if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {

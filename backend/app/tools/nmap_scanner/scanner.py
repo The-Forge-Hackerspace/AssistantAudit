@@ -2,6 +2,7 @@
 Scanner Nmap — outil de découverte réseau intégré.
 """
 import logging
+import re
 import subprocess
 from dataclasses import dataclass, field
 from typing import Optional
@@ -9,6 +10,116 @@ from typing import Optional
 import defusedxml.ElementTree as ET
 
 logger = logging.getLogger(__name__)
+
+# ── Whitelist des flags Nmap autorisés ───────────────────────────────────────
+# Seuls ces flags (et leurs variantes) sont acceptés en extra_args.
+# Les flags dangereux (--script avec chemin arbitraire, -oN/-oG, --interactive,
+# --exec, etc.) sont bloqués par défaut.
+ALLOWED_NMAP_FLAGS = {
+    # Scan types
+    "-sS", "-sT", "-sU", "-sA", "-sW", "-sM", "-sN", "-sF", "-sX",
+    "-sV", "-sC", "-sn", "-sP", "-sL", "-sO",
+    # Port specification
+    "-p", "--top-ports", "-F",
+    # Timing
+    "-T0", "-T1", "-T2", "-T3", "-T4", "-T5",
+    "--min-rate", "--max-rate", "--min-parallelism", "--max-parallelism",
+    "--host-timeout", "--scan-delay", "--max-scan-delay",
+    # Detection
+    "-O", "-A", "--osscan-guess", "--version-intensity",
+    "--version-light", "--version-all",
+    # Output control (safe ones only — XML stdout already handled)
+    "-v", "-vv", "-d", "--reason", "--open",
+    # Host discovery
+    "-Pn", "-PS", "-PA", "-PU", "-PY", "-PE", "-PP", "-PM",
+    "-PR", "--disable-arp-ping", "--traceroute",
+    # DNS
+    "-n", "-R", "--dns-servers",
+    # Misc safe
+    "--max-retries", "--min-rtt-timeout", "--max-rtt-timeout",
+    "--initial-rtt-timeout", "--defeat-rst-ratelimit",
+    "-6", "-e",
+}
+
+# Regex : un flag Nmap valide commence par "-" et contient [a-zA-Z0-9-]
+_FLAG_PATTERN = re.compile(r"^-{1,2}[a-zA-Z][a-zA-Z0-9\-]*$")
+
+# Regex : une valeur d'argument Nmap (numéro, IP, plage de ports, etc.)
+_VALUE_PATTERN = re.compile(r"^[a-zA-Z0-9_.:/\-,]+$")
+
+# Flags explicitement interdits (même s'ils matchent le pattern)
+BLOCKED_NMAP_FLAGS = {
+    "--script", "--script-args", "--script-args-file", "--script-trace",
+    "--script-updatedb", "--script-help",
+    "-oN", "-oG", "-oX", "-oA", "-oS",           # output vers fichiers
+    "--stylesheet",                                 # XSLT injection
+    "--interactive", "--exec",                      # exécution arbitraire
+    "--datadir", "--servicedb", "--versiondb",      # chemins arbitraires
+    "--resume",                                      # reprise depuis fichier
+    "--iflist",
+    "--send-eth", "--send-ip",
+    "--privileged", "--unprivileged",
+}
+
+
+def sanitize_nmap_args(extra_args: Optional[list[str]]) -> list[str]:
+    """
+    Valide et filtre les arguments Nmap fournis par l'utilisateur.
+
+    Retourne une liste nettoyée. Lève ValueError si un argument est dangereux.
+    """
+    if not extra_args:
+        return []
+
+    sanitized = []
+    for arg in extra_args:
+        arg = arg.strip()
+        if not arg:
+            continue
+
+        # Vérifier si c'est un flag
+        if arg.startswith("-"):
+            # Extraire le flag de base (sans valeur collée, ex: -p80 → -p)
+            flag_base = arg
+            # Gérer les flags avec valeur collée comme -p80, -T4, -PS80
+            for known in sorted(ALLOWED_NMAP_FLAGS, key=len, reverse=True):
+                if arg.startswith(known) and len(arg) > len(known):
+                    flag_base = known
+                    value_part = arg[len(known):]
+                    if not _VALUE_PATTERN.match(value_part):
+                        raise ValueError(
+                            f"Valeur invalide dans l'argument Nmap : '{arg}'"
+                        )
+                    break
+
+            # Vérifier flags bloqués
+            if flag_base in BLOCKED_NMAP_FLAGS:
+                raise ValueError(
+                    f"Argument Nmap interdit pour raison de sécurité : '{flag_base}'"
+                )
+
+            # Vérifier whitelist
+            if flag_base in ALLOWED_NMAP_FLAGS:
+                sanitized.append(arg)
+            elif _FLAG_PATTERN.match(arg):
+                # Flag inconnu mais syntaxe valide → bloquer par sécurité
+                raise ValueError(
+                    f"Argument Nmap non autorisé : '{arg}'. "
+                    f"Contactez un administrateur pour l'ajouter à la whitelist."
+                )
+            else:
+                raise ValueError(
+                    f"Argument Nmap invalide : '{arg}'"
+                )
+        else:
+            # C'est une valeur (port range, nombre, etc.) — valider le format
+            if not _VALUE_PATTERN.match(arg):
+                raise ValueError(
+                    f"Valeur d'argument Nmap invalide : '{arg}'"
+                )
+            sanitized.append(arg)
+
+    return sanitized
 
 
 @dataclass
@@ -81,6 +192,11 @@ class NmapScanner:
             result = self._parse_xml(process.stdout, target)
             return result
 
+        except ValueError as e:
+            logger.warning(f"Arguments Nmap rejetés : {e}")
+            return NmapScanResult(
+                success=False, target=target, error=str(e)
+            )
         except subprocess.TimeoutExpired:
             return NmapScanResult(
                 success=False, target=target, error=f"Timeout après {self.timeout}s"
@@ -93,7 +209,7 @@ class NmapScanner:
     def _build_args(
         self, target: str, scan_type: str, extra_args: Optional[list[str]]
     ) -> list[str]:
-        """Construit la ligne de commande Nmap"""
+        """Construit la ligne de commande Nmap avec validation des arguments."""
         base = ["nmap", "-oX", "-"]  # sortie XML sur stdout
 
         type_args = {
@@ -104,8 +220,14 @@ class NmapScanner:
         }
         base.extend(type_args.get(scan_type, ["-sn"]))
 
+        # Sanitize extra_args : whitelist + validation
         if extra_args:
-            base.extend(extra_args)
+            safe_args = sanitize_nmap_args(extra_args)
+            base.extend(safe_args)
+
+        # Valider le target (IP, CIDR, hostname)
+        if not re.match(r"^[a-zA-Z0-9._:/\-]+$", target):
+            raise ValueError(f"Target Nmap invalide : '{target}'")
 
         base.append(target)
         return base

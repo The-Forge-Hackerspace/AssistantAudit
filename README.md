@@ -20,7 +20,7 @@ Plateforme d'audit d'infrastructure IT — évaluation de conformité des équip
 ## Stack technique
 
 | Composant | Technologies |
-|-----------|-------------|
+| ----------- | ------------- |
 | **Backend** | Python 3.13 · FastAPI · SQLAlchemy 2.0 · Pydantic v2 · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript · Tailwind CSS v4 · shadcn/ui · Recharts |
 | **Auth** | JWT (python-jose + bcrypt) |
@@ -76,11 +76,11 @@ npm run dev
 ### Accès
 
 | Service | URL |
-|---------|-----|
-| **Frontend** | http://localhost:3000 |
-| **API** | http://localhost:8000 |
-| **Swagger UI** | http://localhost:8000/docs |
-| **ReDoc** | http://localhost:8000/redoc |
+| ----------- | ----- |
+| **Frontend** | <http://localhost:3000> |
+| **API** | <http://localhost:8000> |
+| **Swagger UI** | <http://localhost:8000/docs> |
+| **ReDoc** | <http://localhost:8000/redoc> |
 
 **Identifiants par défaut** : `admin` / `Admin@2026!`
 
@@ -92,7 +92,7 @@ docker-compose up --build
 
 ## Structure du projet
 
-```
+```text
 AssistantAudit/
 ├── backend/                    API FastAPI (Python)
 │   ├── app/
@@ -155,7 +155,7 @@ AssistantAudit/
 ## Référentiels d'audit
 
 | Référentiel | Contrôles | Description |
-|-------------|:---------:|-------------|
+| ------------- | --------- | ------------- |
 | Firewall | 20 | Règles, NAT, VPN, HA, logs |
 | Switch / Réseau | 18 | VLAN, STP, port security, ACL |
 | Messagerie | 18 | SPF, DKIM, DMARC, antispam, chiffrement |

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ShieldCheck, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const { login } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +22,8 @@ export default function LoginPage() {
 
     try {
       await login(username, password);
-      router.push("/");
+      // La redirection vers "/" est gérée par AuthGuard
+      // une fois que le state `user` est mis à jour.
     } catch (err: unknown) {
       console.error("Login error:", err);
       if (err && typeof err === "object" && "response" in err) {

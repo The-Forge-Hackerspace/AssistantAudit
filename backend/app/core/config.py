@@ -46,12 +46,32 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
 
     def validate_secret_key(self) -> None:
-        """Vérifie que la clé secrète n'est pas celle par défaut en production."""
-        if self.ENV == "production" and "dev-only" in self.SECRET_KEY:
-            raise ValueError(
-                "SECRET_KEY doit être défini en production ! "
-                "Ajoutez SECRET_KEY=<votre-clé> dans .env"
-            )
+        """Vérifie que la clé secrète est sûre en production / preprod."""
+        insecure_defaults = ("dev-only", "change-me", "secret", "insecure")
+        is_safe_env = self.ENV in ("production", "preprod", "staging")
+
+        if is_safe_env:
+            if any(tok in self.SECRET_KEY.lower() for tok in insecure_defaults):
+                raise ValueError(
+                    "SECRET_KEY doit être défini en production ! "
+                    "Ajoutez SECRET_KEY=<votre-clé> dans .env"
+                )
+            if len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "SECRET_KEY trop courte (min 32 caractères en production). "
+                    "Générez-en une avec : python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+                )
+
+    # --- CORS ---
+    CORS_ALLOW_METHODS: list[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    CORS_ALLOW_HEADERS: list[str] = [
+        "Authorization", "Content-Type", "Accept",
+        "Origin", "X-Requested-With",
+    ]
+
+    # --- Upload ---
+    MAX_CONFIG_UPLOAD_SIZE_MB: int = 5  # taille max fichier config analysis
+
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 

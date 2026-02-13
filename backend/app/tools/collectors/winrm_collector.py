@@ -191,11 +191,23 @@ def collect_via_winrm(
 
     try:
         logger.info(f"Connexion WinRM vers {endpoint} en tant que {username}...")
+
+        cert_validation = "validate"
+        if use_ssl:
+            # En mode SSL, la validation est désactivée car les serveurs
+            # internes utilisent souvent des certificats auto-signés.
+            # TODO (production) : configurer un CA bundle + validation stricte
+            logger.warning(
+                f"[SECURITE] WinRM SSL vers {host} : validation du certificat "
+                f"désactivée. Risque MITM sur réseaux non sûrs."
+            )
+            cert_validation = "ignore"
+
         session = winrm.Session(
             endpoint,
             auth=(username, password),
             transport=transport,
-            server_cert_validation="ignore" if use_ssl else "validate",
+            server_cert_validation=cert_validation,
             operation_timeout_sec=WINRM_TIMEOUT,
             read_timeout_sec=WINRM_TIMEOUT + 10,
         )
