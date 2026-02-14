@@ -16,7 +16,7 @@ from ..models.assessment import (
     ComplianceStatus,
 )
 from ..models.framework import Framework
-from ..models.equipement import Equipement
+from ..models.equipement import Equipement, EquipementAuditStatus
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +64,16 @@ class AssessmentService:
         if not campaign:
             raise ValueError(f"Campagne {campaign_id} introuvable")
         update_data = data.model_dump(exclude_unset=True)
+
+        # Si le statut change vers in_progress ou completed, déléguer aux méthodes dédiées
         if "status" in update_data:
-            update_data["status"] = CampaignStatus(update_data["status"])
+            new_status = CampaignStatus(update_data["status"])
+            if new_status == CampaignStatus.IN_PROGRESS and campaign.status != CampaignStatus.IN_PROGRESS:
+                return AssessmentService.start_campaign(db, campaign_id)
+            if new_status == CampaignStatus.COMPLETED and campaign.status != CampaignStatus.COMPLETED:
+                return AssessmentService.complete_campaign(db, campaign_id)
+            update_data["status"] = new_status
+
         for field, value in update_data.items():
             setattr(campaign, field, value)
         db.commit()
@@ -74,24 +82,48 @@ class AssessmentService:
 
     @staticmethod
     def start_campaign(db: Session, campaign_id: int) -> AssessmentCampaign:
-        """Démarre une campagne"""
+        """Démarre une campagne et passe les équipements associés en EN_COURS."""
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
             raise ValueError(f"Campagne {campaign_id} introuvable")
         campaign.status = CampaignStatus.IN_PROGRESS
         campaign.started_at = datetime.now(timezone.utc)
+
+        # Passer tous les équipements liés à cette campagne en EN_COURS
+        for assessment in campaign.assessments:
+            eq = db.get(Equipement, assessment.equipement_id)
+            if eq and eq.status_audit == EquipementAuditStatus.A_AUDITER:
+                eq.status_audit = EquipementAuditStatus.EN_COURS
+                logger.info(f"Équipement #{eq.id} '{eq.hostname}' → EN_COURS (campagne démarrée)")
+
         db.commit()
         db.refresh(campaign)
         return campaign
 
     @staticmethod
     def complete_campaign(db: Session, campaign_id: int) -> AssessmentCampaign:
-        """Termine une campagne"""
+        """Termine une campagne et met à jour le statut des équipements."""
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
             raise ValueError(f"Campagne {campaign_id} introuvable")
         campaign.status = CampaignStatus.COMPLETED
         campaign.completed_at = datetime.now(timezone.utc)
+
+        # Mettre à jour le statut de chaque équipement selon ses résultats
+        for assessment in campaign.assessments:
+            eq = db.get(Equipement, assessment.equipement_id)
+            if not eq:
+                continue
+            score = AssessmentService.compute_score(assessment.results)
+            if score["non_compliant"] > 0:
+                eq.status_audit = EquipementAuditStatus.NON_CONFORME
+            elif score["assessed_controls"] > 0 and score["non_compliant"] == 0:
+                eq.status_audit = EquipementAuditStatus.CONFORME
+            logger.info(
+                f"Équipement #{eq.id} '{eq.hostname}' → {eq.status_audit.value} "
+                f"(campagne terminée, score={score['compliance_score']}%)"
+            )
+
         db.commit()
         db.refresh(campaign)
         return campaign
@@ -166,6 +198,12 @@ class AssessmentService:
                 )
                 db.add(result)
                 control_count += 1
+
+        # Si la campagne est déjà en cours, passer l'équipement en EN_COURS
+        if campaign.status == CampaignStatus.IN_PROGRESS:
+            if equipement.status_audit == EquipementAuditStatus.A_AUDITER:
+                equipement.status_audit = EquipementAuditStatus.EN_COURS
+                logger.info(f"Équipement #{equipement_id} '{equipement.hostname}' → EN_COURS (assessment créé)")
 
         db.commit()
         db.refresh(assessment)

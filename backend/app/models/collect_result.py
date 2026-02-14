@@ -50,6 +50,7 @@ class CollectResult(Base):
     target_host: Mapped[str] = mapped_column(String(255), nullable=False)
     target_port: Mapped[int] = mapped_column(Integer, nullable=False)
     username: Mapped[str] = mapped_column(String(255), nullable=False)
+    device_profile: Mapped[str | None] = mapped_column(String(50), default="linux_server")
 
     # Données collectées (JSON)
     hostname_collected: Mapped[str | None] = mapped_column(String(255))

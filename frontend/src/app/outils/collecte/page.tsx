@@ -94,6 +94,13 @@ const METHOD_LABELS: Record<string, string> = {
   winrm: "WinRM (Windows)",
 };
 
+const PROFILE_OPTIONS: { value: string; label: string; description: string }[] = [
+  { value: "linux_server", label: "Serveur Linux", description: "OS, kernel, SSH, firewall, utilisateurs, services, stockage" },
+  { value: "opnsense", label: "OPNsense", description: "pf rules, Suricata IDS, CARP HA, VPN, packages, interfaces" },
+  { value: "stormshield", label: "Stormshield (SNS)", description: "Filter rules, VPN IPsec/SSL, HA, auth, supervision, logs" },
+  { value: "fortigate", label: "FortiGate (FortiOS)", description: "Firewall policies, VPN, admin users, FortiGuard, HA, logs" },
+];
+
 // ══════════════════════════════════════════════════════════════
 // Page principale
 // ══════════════════════════════════════════════════════════════
@@ -108,6 +115,7 @@ export default function CollectePage() {
 
   // Form
   const [method, setMethod] = useState<"ssh" | "winrm">("ssh");
+  const [deviceProfile, setDeviceProfile] = useState("linux_server");
   const [selectedEquipementId, setSelectedEquipementId] = useState<string>("");
   const [targetHost, setTargetHost] = useState("");
   const [targetPort, setTargetPort] = useState("22");
@@ -180,6 +188,7 @@ export default function CollectePage() {
   // Adjust default port when method changes
   useEffect(() => {
     setTargetPort(method === "ssh" ? "22" : "5985");
+    if (method === "winrm") setDeviceProfile("linux_server");
   }, [method]);
 
   // ── Actions ──
@@ -194,6 +203,7 @@ export default function CollectePage() {
       const params: CollectCreate = {
         equipement_id: Number(selectedEquipementId),
         method,
+        device_profile: method === "ssh" ? deviceProfile : undefined,
         target_host: targetHost,
         target_port: Number(targetPort),
         username,
@@ -322,8 +332,8 @@ export default function CollectePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Row 1: Method + Equipment */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Row 1: Method + Profile + Equipment */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Méthode de connexion</Label>
               <Select value={method} onValueChange={(v) => setMethod(v as "ssh" | "winrm")}>
@@ -333,7 +343,7 @@ export default function CollectePage() {
                 <SelectContent>
                   <SelectItem value="ssh">
                     <span className="flex items-center gap-2">
-                      <Server className="h-4 w-4" /> SSH — Serveur Linux
+                      <Server className="h-4 w-4" /> SSH — Linux / Firewall
                     </span>
                   </SelectItem>
                   <SelectItem value="winrm">
@@ -344,6 +354,31 @@ export default function CollectePage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {method === "ssh" && (
+              <div className="space-y-2">
+                <Label>Profil de collecte</Label>
+                <Select value={deviceProfile} onValueChange={setDeviceProfile}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROFILE_OPTIONS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        <span className="flex items-center gap-2">
+                          {p.value === "linux_server" ? (
+                            <Server className="h-4 w-4" />
+                          ) : (
+                            <Shield className="h-4 w-4" />
+                          )}
+                          {p.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Équipement cible</Label>
@@ -495,9 +530,10 @@ export default function CollectePage() {
               <Info className="h-4 w-4" /> Informations collectées
             </p>
             <p className="text-blue-600 dark:text-blue-500">
-              {method === "ssh"
-                ? "OS, kernel, mises à jour, SSH config, firewall (ufw/iptables), utilisateurs, services, rsyslog, auditd, PAM, antivirus/EDR, stockage"
-                : "OS, mises à jour Windows, WSUS, comptes (admin renommé, politique MdP), pare-feu Windows, RDP/NLA, audit policy, journaux d'événements, Defender, stockage"}
+              {method === "winrm"
+                ? "OS, mises à jour Windows, WSUS, comptes (admin renommé, politique MdP), pare-feu Windows, RDP/NLA, audit policy, journaux d'événements, Defender, stockage"
+                : PROFILE_OPTIONS.find((p) => p.value === deviceProfile)?.description
+                  ?? "OS, kernel, mises à jour, SSH config, firewall (ufw/iptables), utilisateurs, services, rsyslog, auditd, PAM, antivirus/EDR, stockage"}
             </p>
           </div>
 
@@ -564,11 +600,17 @@ export default function CollectePage() {
                       <TableCell>
                         <Badge variant="outline" className="gap-1">
                           {c.method === "ssh" ? (
-                            <Server className="h-3 w-3" />
+                            c.device_profile && c.device_profile !== "linux_server" ? (
+                              <Shield className="h-3 w-3" />
+                            ) : (
+                              <Server className="h-3 w-3" />
+                            )
                           ) : (
                             <Monitor className="h-3 w-3" />
                           )}
-                          {METHOD_LABELS[c.method] || c.method}
+                          {c.method === "ssh"
+                            ? (PROFILE_OPTIONS.find((p) => p.value === c.device_profile)?.label ?? "SSH (Linux)")
+                            : (METHOD_LABELS[c.method] || c.method)}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-sm">
@@ -601,15 +643,23 @@ export default function CollectePage() {
                       </TableCell>
                       <TableCell>
                         {c.summary ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-sm font-medium">
-                              {c.summary.compliance_score}%
+                          c.summary.compliance_score != null ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm font-medium">
+                                {c.summary.compliance_score}%
+                              </span>
+                              <Progress
+                                value={c.summary.compliance_score}
+                                className="w-16 h-2"
+                              />
+                            </div>
+                          ) : c.summary.firewall_rules_count != null ? (
+                            <span className="text-sm text-muted-foreground">
+                              {c.summary.firewall_rules_count} règles
                             </span>
-                            <Progress
-                              value={c.summary.compliance_score}
-                              className="w-16 h-2"
-                            />
-                          </div>
+                          ) : (
+                            "—"
+                          )
                         ) : (
                           "—"
                         )}
@@ -851,6 +901,8 @@ export default function CollectePage() {
 function CollectDetailView({ collect }: { collect: CollectResultRead }) {
   const summary = collect.summary;
   const isWindows = collect.method === "winrm";
+  const isOPNsense = summary?.device_profile === "opnsense" || collect.device_profile === "opnsense";
+  const isFirewall = isOPNsense || summary?.device_profile === "stormshield" || summary?.device_profile === "fortigate";
 
   return (
     <div className="space-y-6">
@@ -859,7 +911,11 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card>
             <CardContent className="pt-3 text-center">
-              <Cpu className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+              {isFirewall ? (
+                <Shield className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+              ) : (
+                <Cpu className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+              )}
               <p className="text-sm font-medium">{summary.os_name}</p>
               <p className="text-xs text-muted-foreground">{summary.os_version}</p>
             </CardContent>
@@ -867,8 +923,22 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
           <Card>
             <CardContent className="pt-3 text-center">
               <Shield className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-2xl font-bold">{summary.compliance_score}%</p>
-              <p className="text-xs text-muted-foreground">Conformité</p>
+              {summary.compliance_score != null ? (
+                <>
+                  <p className="text-2xl font-bold">{summary.compliance_score}%</p>
+                  <p className="text-xs text-muted-foreground">Conformité</p>
+                </>
+              ) : summary.firewall_rules_count != null ? (
+                <>
+                  <p className="text-2xl font-bold">{summary.firewall_rules_count}</p>
+                  <p className="text-xs text-muted-foreground">Règles pare-feu</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">—</p>
+                  <p className="text-xs text-muted-foreground">Conformité</p>
+                </>
+              )}
             </CardContent>
           </Card>
           <Card className="border-green-200">
@@ -952,7 +1022,16 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
               <div className="rounded-lg border p-4">
                 <h3 className="font-semibold mb-2">Informations système</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  {isWindows ? (
+                  {isOPNsense ? (
+                    <>
+                      <InfoRow label="Distribution" value={collect.os_info.distro as string} />
+                      <InfoRow label="Version" value={collect.os_info.version as string} />
+                      <InfoRow label="Version complète" value={collect.os_info.version_full as string} />
+                      <InfoRow label="Kernel" value={collect.os_info.kernel as string} />
+                      <InfoRow label="Architecture" value={collect.os_info.arch as string} />
+                      <InfoRow label="Uptime" value={collect.os_info.uptime as string} />
+                    </>
+                  ) : isWindows ? (
                     <>
                       <InfoRow label="OS" value={collect.os_info.caption as string} />
                       <InfoRow label="Version" value={collect.os_info.version as string} />
@@ -980,7 +1059,14 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
               <div className="rounded-lg border p-4">
                 <h3 className="font-semibold mb-2">Mises à jour</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  {isWindows ? (
+                  {isOPNsense ? (
+                    <>
+                      <InfoRow
+                        label="Mises à jour disponibles"
+                        value={collect.updates.updates_available ? "Oui" : "Non"}
+                      />
+                    </>
+                  ) : isWindows ? (
                     <>
                       <InfoRow label="Dernière MàJ" value={collect.updates.last_update_date as string} />
                       <InfoRow
@@ -1008,17 +1094,44 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                     </>
                   )}
                 </div>
+                {isOPNsense && collect.updates.pkg_audit && (
+                  <div className="mt-3">
+                    <h4 className="text-sm font-medium mb-1">Audit des packages (pkg audit)</h4>
+                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
+                      {collect.updates.pkg_audit as string}
+                    </pre>
+                  </div>
+                )}
               </div>
             )}
 
             {collect.services && (
               <div className="rounded-lg border p-4">
-                <h3 className="font-semibold mb-2">Services</h3>
-                <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
-                  {isWindows
-                    ? (collect.services.services_running as string || "N/A")
-                    : (collect.services.running as string || "N/A")}
-                </pre>
+                <h3 className="font-semibold mb-2">{isOPNsense ? "Services & VPN" : "Services"}</h3>
+                {isOPNsense ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <InfoRow label="OpenVPN" value={collect.services.openvpn_status as string || "Non configuré"} />
+                      <InfoRow label="IPsec" value={collect.services.ipsec_status as string || "Non configuré"} />
+                      <InfoRow label="WireGuard" value={collect.services.wireguard_status as string || "Non configuré"} />
+                      <InfoRow label="CARP (HA)" value={collect.services.carp_status as string || "Non configuré"} />
+                    </div>
+                    {collect.services.services_list && (
+                      <div className="mt-2">
+                        <h4 className="text-sm font-medium mb-1">Liste des services</h4>
+                        <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
+                          {collect.services.services_list as string}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
+                    {isWindows
+                      ? (collect.services.services_running as string || "N/A")
+                      : (collect.services.running as string || "N/A")}
+                  </pre>
+                )}
               </div>
             )}
           </div>
@@ -1029,9 +1142,43 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
           <div className="space-y-4">
             {collect.security && (
               <>
+                {/* Pare-feu */}
                 <div className="rounded-lg border p-4">
                   <h3 className="font-semibold mb-2">Pare-feu</h3>
-                  {isWindows ? (
+                  {isOPNsense ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <InfoRow label="Moteur" value={collect.security.firewall_engine as string || "pf"} />
+                        <InfoRow label="Activé" value={(collect.security.firewall_enabled as boolean) ? "Oui" : "Non"} />
+                        <InfoRow label="Nombre de règles" value={String(collect.security.firewall_rules_count ?? 0)} />
+                        <InfoRow label="États actifs" value={collect.security.states_count as string || "N/A"} />
+                      </div>
+                      {collect.security.firewall_rules && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-1">Règles pf</h4>
+                          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
+                            {collect.security.firewall_rules as string}
+                          </pre>
+                        </div>
+                      )}
+                      {collect.security.nat_rules && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-1">Règles NAT</h4>
+                          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
+                            {collect.security.nat_rules as string}
+                          </pre>
+                        </div>
+                      )}
+                      {collect.security.aliases && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-1">Aliases</h4>
+                          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
+                            {collect.security.aliases as string}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ) : isWindows ? (
                     <div className="space-y-2">
                       <InfoRow
                         label="Tous profils activés"
@@ -1051,57 +1198,88 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                   )}
                 </div>
 
-                {isWindows ? (
-                  <div className="rounded-lg border p-4">
-                    <h3 className="font-semibold mb-2">RDP</h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <InfoRow
-                        label="RDP activé"
-                        value={(collect.security.rdp_enabled as boolean) ? "Oui" : "Non"}
-                      />
-                      <InfoRow
-                        label="NLA activé"
-                        value={(collect.security.rdp_nla_enabled as boolean) ? "Oui" : "Non"}
-                      />
+                {/* SSH / RDP / IDS */}
+                {isOPNsense ? (
+                  <>
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold mb-2">SSH</h3>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <InfoRow label="PermitRootLogin" value={collect.security.ssh_permit_root_login as string} />
+                      </div>
+                      {collect.security.ssh_config_raw && (
+                        <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto mt-2">
+                          {collect.security.ssh_config_raw as string}
+                        </pre>
+                      )}
                     </div>
-                  </div>
+
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold mb-2">IDS / IPS (Suricata)</h3>
+                      <InfoRow label="Statut" value={collect.security.suricata_status as string || "Non actif"} />
+                    </div>
+
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold mb-2">Journalisation</h3>
+                      <InfoRow label="Syslog distant" value={collect.security.syslog_remote as string || "Non configuré"} />
+                    </div>
+                  </>
+                ) : isWindows ? (
+                  <>
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold mb-2">RDP</h3>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <InfoRow
+                          label="RDP activé"
+                          value={(collect.security.rdp_enabled as boolean) ? "Oui" : "Non"}
+                        />
+                        <InfoRow
+                          label="NLA activé"
+                          value={(collect.security.rdp_nla_enabled as boolean) ? "Oui" : "Non"}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold mb-2">Antivirus / EDR</h3>
+                      <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+                        {collect.security.defender_raw as string || "N/A"}
+                      </pre>
+                    </div>
+
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold mb-2">Journalisation</h3>
+                      <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
+                        {collect.security.audit_policy as string || "N/A"}
+                      </pre>
+                    </div>
+                  </>
                 ) : (
-                  <div className="rounded-lg border p-4">
-                    <h3 className="font-semibold mb-2">SSH</h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <InfoRow label="PermitRootLogin" value={collect.security.ssh_permit_root_login as string} />
-                      <InfoRow label="PasswordAuth" value={collect.security.ssh_password_authentication as string} />
+                  <>
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold mb-2">SSH</h3>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <InfoRow label="PermitRootLogin" value={collect.security.ssh_permit_root_login as string} />
+                        <InfoRow label="PasswordAuth" value={collect.security.ssh_password_authentication as string} />
+                      </div>
+                      <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto mt-2">
+                        {collect.security.sshd_config_raw as string || "N/A"}
+                      </pre>
                     </div>
-                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto mt-2">
-                      {collect.security.sshd_config_raw as string || "N/A"}
-                    </pre>
-                  </div>
+
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold mb-2">Antivirus / EDR</h3>
+                      <InfoRow label="Agent détecté" value={collect.security.antivirus_edr as string || "Aucun"} />
+                    </div>
+
+                    <div className="rounded-lg border p-4">
+                      <h3 className="font-semibold mb-2">Journalisation</h3>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <InfoRow label="rsyslog" value={collect.security.rsyslog_active as string} />
+                        <InfoRow label="auditd" value={collect.security.auditd_active as string} />
+                      </div>
+                    </div>
+                  </>
                 )}
-
-                <div className="rounded-lg border p-4">
-                  <h3 className="font-semibold mb-2">Antivirus / EDR</h3>
-                  {isWindows ? (
-                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-                      {collect.security.defender_raw as string || "N/A"}
-                    </pre>
-                  ) : (
-                    <InfoRow label="Agent détecté" value={collect.security.antivirus_edr as string || "Aucun"} />
-                  )}
-                </div>
-
-                <div className="rounded-lg border p-4">
-                  <h3 className="font-semibold mb-2">Journalisation</h3>
-                  {isWindows ? (
-                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
-                      {collect.security.audit_policy as string || "N/A"}
-                    </pre>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <InfoRow label="rsyslog" value={collect.security.rsyslog_active as string} />
-                      <InfoRow label="auditd" value={collect.security.auditd_active as string} />
-                    </div>
-                  )}
-                </div>
               </>
             )}
           </div>
@@ -1112,12 +1290,21 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
           {collect.network && (
             <div className="space-y-4">
               <div className="rounded-lg border p-4">
-                <h3 className="font-semibold mb-2">Configuration IP</h3>
+                <h3 className="font-semibold mb-2">{isOPNsense ? "Interfaces" : "Configuration IP"}</h3>
                 <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
-                  {collect.network.ip_config as string ||
+                  {collect.network.interfaces as string ||
+                   collect.network.ip_config as string ||
                    collect.network.ip_addresses as string || "N/A"}
                 </pre>
               </div>
+              {isOPNsense && collect.network.routes && (
+                <div className="rounded-lg border p-4">
+                  <h3 className="font-semibold mb-2">Routes</h3>
+                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
+                    {collect.network.routes as string}
+                  </pre>
+                </div>
+              )}
               <div className="rounded-lg border p-4">
                 <h3 className="font-semibold mb-2">Ports en écoute</h3>
                 <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
@@ -1139,7 +1326,14 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
         <TabsContent value="users">
           {collect.users && (
             <div className="space-y-4">
-              {isWindows ? (
+              {isOPNsense ? (
+                <div className="rounded-lg border p-4">
+                  <h3 className="font-semibold mb-2">Comptes système avec shell</h3>
+                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
+                    {collect.users.users_with_shell as string || "N/A"}
+                  </pre>
+                </div>
+              ) : isWindows ? (
                 <>
                   <div className="rounded-lg border p-4">
                     <h3 className="font-semibold mb-2">Compte Administrateur</h3>
@@ -1222,11 +1416,23 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
         {/* Storage tab */}
         <TabsContent value="storage">
           {collect.storage && (
-            <div className="rounded-lg border p-4">
-              <h3 className="font-semibold mb-2">Utilisation disque</h3>
-              <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-                {collect.storage.disk_usage as string || "N/A"}
-              </pre>
+            <div className="space-y-4">
+              {isOPNsense ? (
+                <div className="rounded-lg border p-4">
+                  <h3 className="font-semibold mb-2">Configuration OPNsense</h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <InfoRow label="Taille config.xml" value={collect.storage.config_xml_size as string || "N/A"} />
+                    <InfoRow label="Sauvegardes" value={`${collect.storage.config_backup_count ?? 0} fichier(s)`} />
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border p-4">
+                  <h3 className="font-semibold mb-2">Utilisation disque</h3>
+                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+                    {collect.storage.disk_usage as string || "N/A"}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
         </TabsContent>

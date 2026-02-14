@@ -38,6 +38,9 @@ import type {
   CollectCreate,
   CollectResultSummary,
   CollectResultRead,
+  ADAuditCreate,
+  ADAuditResultSummary,
+  ADAuditResultRead,
 } from "@/types";
 
 // ── Auth ──
@@ -171,7 +174,7 @@ export const equipementsApi = {
   async list(
     page = 1,
     pageSize = 20,
-    filters?: { site_id?: number; type_equipement?: string; status_audit?: string }
+    filters?: { site_id?: number; entreprise_id?: number; type_equipement?: string; status_audit?: string }
   ): Promise<PaginatedResponse<Equipement>> {
     const { data } = await api.get("/equipements", {
       params: { page, page_size: pageSize, ...filters },
@@ -520,6 +523,34 @@ export const toolsApi = {
   async prefillFromCollect(collectId: number, assessmentId: number): Promise<PrefillResult> {
     const { data } = await api.post(
       `/tools/collects/${collectId}/prefill/${assessmentId}`
+    );
+    return data;
+  },
+
+  // Audit Active Directory
+  async launchADAudit(params: ADAuditCreate): Promise<ADAuditResultSummary> {
+    const { data } = await api.post("/tools/ad-audit", params);
+    return data;
+  },
+
+  async listADAudits(equipementId?: number): Promise<ADAuditResultSummary[]> {
+    const params = equipementId ? { equipement_id: equipementId } : {};
+    const { data } = await api.get("/tools/ad-audits", { params });
+    return data;
+  },
+
+  async getADAudit(auditId: number): Promise<ADAuditResultRead> {
+    const { data } = await api.get(`/tools/ad-audits/${auditId}`);
+    return data;
+  },
+
+  async deleteADAudit(auditId: number): Promise<void> {
+    await api.delete(`/tools/ad-audits/${auditId}`);
+  },
+
+  async prefillFromADAudit(auditId: number, assessmentId: number): Promise<PrefillResult> {
+    const { data } = await api.post(
+      `/tools/ad-audits/${auditId}/prefill/${assessmentId}`
     );
     return data;
   },

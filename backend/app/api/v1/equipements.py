@@ -70,16 +70,19 @@ def _equipement_to_read(eq: Equipement) -> EquipementRead:
 @router.get("", response_model=PaginatedResponse[EquipementSummary])
 async def list_equipements(
     site_id: int = None,
+    entreprise_id: int = None,
     type_equipement: str = Query(default=None, pattern=r"^(reseau|serveur|firewall|equipement)$"),
     status_audit: str = Query(default=None, pattern=r"^(A_AUDITER|EN_COURS|CONFORME|NON_CONFORME)$"),
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Liste les équipements (filtrable par site, type, statut)"""
+    """Liste les équipements (filtrable par site, entreprise, type, statut)"""
     query = db.query(Equipement)
     if site_id:
         query = query.filter(Equipement.site_id == site_id)
+    if entreprise_id:
+        query = query.join(Site, Equipement.site_id == Site.id).filter(Site.entreprise_id == entreprise_id)
     if type_equipement:
         query = query.filter(Equipement.type_equipement == type_equipement)
     if status_audit:

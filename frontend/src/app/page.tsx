@@ -70,27 +70,47 @@ export default function DashboardPage() {
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [selectedEntreprise, setSelectedEntreprise] = useState<string>("all");
 
-  // Load entreprises on mount
-  useEffect(() => {
-    entreprisesApi.list(1, 200).then((res) => setEntreprises(res.items)).catch(() => {});
-  }, []);
-
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
       const entFilter = selectedEntreprise !== "all" ? Number(selectedEntreprise) : undefined;
 
-      const [entRes, audRes, sitRes, eqRes, fwRes, campRes] = await Promise.all([
-        entreprisesApi.list(1, 1),
-        auditsApi.list(1, 5, entFilter),
-        sitesApi.list(1, 1, entFilter),
-        equipementsApi.list(1, 1),
-        frameworksApi.list(1, 100),
-        campaignsApi.list(1, 100),
+      const results = await Promise.allSettled([
+        entreprisesApi.list(1, 100),                                    // 0: entListRes (for dropdown)
+        auditsApi.list(1, 5, entFilter),                                // 1: audRes
+        sitesApi.list(1, 1, entFilter),                                 // 2: sitRes
+        equipementsApi.list(1, 1, entFilter ? { entreprise_id: entFilter } : undefined),  // 3: eqRes
+        frameworksApi.list(1, 100),                                     // 4: fwRes
+        campaignsApi.list(1, 100),                                      // 5: campRes
       ]);
 
+      // Helper to extract fulfilled value or fallback
+      const val = <T,>(r: PromiseSettledResult<T>, fallback: T): T =>
+        r.status === "fulfilled" ? r.value : fallback;
+
+      const emptyPage = { items: [] as never[], total: 0, page: 1, page_size: 1, pages: 0 };
+
+      const entListRes = val(results[0], emptyPage);
+      const audRes = val(results[1], emptyPage);
+      const sitRes = val(results[2], emptyPage);
+      const eqRes = val(results[3], emptyPage);
+      const fwRes = val(results[4], emptyPage);
+      const campRes = val(results[5], emptyPage);
+
+      // Log any failures for debugging
+      results.forEach((r, i) => {
+        if (r.status === "rejected") {
+          console.error(`Dashboard API call #${i} failed:`, r.reason);
+        }
+      });
+
+      // Populate entreprises dropdown
+      if (entListRes.items.length > 0) {
+        setEntreprises(entListRes.items);
+      }
+
       setStats({
-        entreprises: entRes.total,
+        entreprises: entListRes.total,
         audits: audRes.total,
         sites: sitRes.total,
         equipements: eqRes.total,
@@ -104,12 +124,18 @@ export default function DashboardPage() {
       // Filter campaigns by entreprise if needed
       let filteredCampaigns = campRes.items;
       if (entFilter) {
-        // Get all audit IDs for this entreprise
-        const allAudits = await auditsApi.list(1, 200, entFilter);
-        const auditIds = new Set(allAudits.items.map((a) => a.id));
-        filteredCampaigns = campRes.items.filter((c) => auditIds.has(c.audit_id));
+        try {
+          const allAudits = await auditsApi.list(1, 100, entFilter);
+          const auditIds = new Set(allAudits.items.map((a) => a.id));
+          filteredCampaigns = campRes.items.filter((c) => auditIds.has(c.audit_id));
+        } catch { /* keep unfiltered */ }
       }
       setCampaigns(filteredCampaigns);
+
+      // Update campaign count in stats to reflect filtered count
+      if (entFilter) {
+        setStats((prev) => prev ? { ...prev, campaigns: filteredCampaigns.length } : prev);
+      }
 
       // Load scores for relevant campaigns (parallel)
       const scores: Record<number, Score> = {};
@@ -127,7 +153,8 @@ export default function DashboardPage() {
         }
       }
       setCampaignScores(scores);
-    } catch {
+    } catch (err: unknown) {
+      console.error("Dashboard load error:", err);
       toast.error("Impossible de charger le tableau de bord");
     } finally {
       setLoading(false);

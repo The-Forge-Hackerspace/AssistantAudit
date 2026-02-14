@@ -1,0 +1,351 @@
+framework:
+  ref_id: opnsense_audit
+  name: "Audit OPNsense (CIS-Inspired)"
+  description: >
+    Référentiel d'audit pour pare-feu OPNsense, basé sur les recommandations
+    CIS FreeBSD Benchmark v1.1.0, CIS Controls v8 et NIST SP 800-41.
+    Il n'existe pas de CIS Benchmark spécifique OPNsense ; ce référentiel
+    adapte les contrôles CIS FreeBSD et les bonnes pratiques pare-feu
+    au contexte OPNsense (FreeBSD/HardenedBSD + pf + Suricata + Unbound).
+  version: "1.0"
+  engine: collect_ssh
+  engine_config:
+    device_profile: opnsense
+    auto_evaluate: true
+    references:
+      - "CIS FreeBSD Benchmark v1.1.0"
+      - "CIS Controls v8"
+      - "NIST SP 800-41 Rev 1 - Guidelines on Firewalls and Firewall Policy"
+
+  categories:
+    # ── 1. Système & Mises à jour ────────────────────────────
+    - name: "Système & Mises à jour"
+      description: "Vérification du firmware, des packages et de la surface d'attaque système"
+      controls:
+        - id: OPNS-001
+          title: "Firmware OPNsense à jour"
+          description: "Le firmware OPNsense est à la dernière version stable disponible (aucune mise à jour en attente)"
+          severity: high
+          check_type: automatic
+          auto_check: "firmware_up_to_date"
+          evidence_required: true
+          cis_reference: "CIS Controls v8 — 7.3 Perform Automated Operating System Patch Management"
+          remediation: "Appliquer les mises à jour via System > Firmware > Updates ou 'opnsense-update'."
+
+        - id: OPNS-002
+          title: "Pas de vulnérabilités dans les packages"
+          description: "Aucun package installé ne présente de vulnérabilité connue (résultat de pkg audit)"
+          severity: high
+          check_type: automatic
+          auto_check: "no_pkg_vulnerabilities"
+          evidence_required: true
+          cis_reference: "CIS Controls v8 — 7.4 Perform Automated Application Patch Management"
+          remediation: "Mettre à jour les packages vulnérables via pkg upgrade ou l'interface web."
+
+        - id: OPNS-003
+          title: "Services inutiles désactivés"
+          description: "Seuls les services nécessaires sont activés (pas de services legacy ou de démo)"
+          severity: medium
+          check_type: manual
+          cis_reference: "CIS FreeBSD 2.1 — Ensure inetd is not enabled"
+          remediation: "Désactiver les services non nécessaires via Services > vérifier l'état de chaque service."
+
+    # ── 2. Accès Administration ──────────────────────────────
+    - name: "Accès Administration"
+      description: "Durcissement de l'accès à l'interface d'administration et SSH (CIS FreeBSD 5.2.x)"
+      controls:
+        - id: OPNS-010
+          title: "WebGUI en HTTPS uniquement"
+          description: "L'interface d'administration Web est accessible uniquement en HTTPS (pas de HTTP)"
+          severity: high
+          check_type: automatic
+          auto_check: "webgui_https"
+          cis_reference: "CIS Controls v8 — 3.10 Encrypt Sensitive Data in Transit"
+          remediation: "System > Settings > Administration > Protocol = HTTPS. Désactiver la redirection HTTP."
+
+        - id: OPNS-011
+          title: "Accès WebGUI restreint par IP"
+          description: "L'accès à l'interface d'administration est limité à des IP/réseaux spécifiques"
+          severity: high
+          check_type: manual
+          cis_reference: "CIS Controls v8 — 6.3 Require MFA for Externally-Exposed Applications"
+          remediation: "Firewall > Rules > créer une règle limitant l'accès au port 443 d'admin aux IP autorisées."
+
+        - id: OPNS-020
+          title: "Connexion root SSH désactivée"
+          description: "La connexion root directe via SSH est désactivée (PermitRootLogin no)"
+          severity: critical
+          check_type: automatic
+          auto_check: "ssh_root_disabled"
+          cis_reference: "CIS FreeBSD 5.2.8 — Ensure SSH root login is disabled"
+          remediation: "System > Settings > Administration > SSH > décocher 'Permit root user login'. Ou PermitRootLogin no dans sshd_config."
+
+        - id: OPNS-021
+          title: "Authentification SSH par mot de passe désactivée"
+          description: "L'authentification SSH par mot de passe est désactivée au profit des clés publiques"
+          severity: high
+          check_type: automatic
+          auto_check: "ssh_password_disabled"
+          cis_reference: "CIS FreeBSD 5.2.5 — Ensure SSH PasswordAuthentication is disabled"
+          remediation: "Configurer PasswordAuthentication no et déployer des clés SSH autorisées."
+
+        - id: OPNS-022
+          title: "Protocole SSH version 2 uniquement"
+          description: "Seul le protocole SSH v2 est autorisé (pas de SSHv1 vulnérable)"
+          severity: high
+          check_type: semi-automatic
+          cis_reference: "CIS FreeBSD 5.2.2 — Ensure SSH Protocol is set to 2"
+          remediation: "Protocol 2 dans sshd_config (défaut sur OPNsense moderne)."
+
+        - id: OPNS-023
+          title: "Timeout de session WebGUI configuré"
+          description: "Un timeout d'inactivité est configuré pour les sessions d'administration (≤ 15 min recommandé)"
+          severity: medium
+          check_type: manual
+          cis_reference: "CIS Controls v8 — 6.2 Establish an Access Revoking Process"
+          remediation: "System > Settings > Administration > Session Timeout."
+
+        - id: OPNS-024
+          title: "Bannière d'avertissement configurée"
+          description: "Un message d'avertissement (login banner) est affiché avant l'authentification SSH et WebGUI"
+          severity: low
+          check_type: manual
+          cis_reference: "CIS FreeBSD 1.7 — Ensure message of the day is configured properly"
+          remediation: "System > Settings > Administration > Login Banner. Configurer aussi /etc/motd."
+
+        - id: OPNS-025
+          title: "Nombre de comptes shell limité"
+          description: "Le nombre de comptes avec un shell interactif est limité (≤ 3 recommandé)"
+          severity: medium
+          check_type: automatic
+          auto_check: "limited_shell_accounts"
+          cis_reference: "CIS FreeBSD 6.2.8 — Ensure no users have .forward files"
+          remediation: "Supprimer les comptes inutiles ou changer leur shell vers /usr/sbin/nologin."
+
+    # ── 3. Filtrage Réseau (pf) ──────────────────────────────
+    - name: "Filtrage Réseau (pf)"
+      description: "Vérification du moteur Packet Filter — politique de filtrage (NIST SP 800-41)"
+      controls:
+        - id: OPNS-030
+          title: "Packet Filter (pf) actif"
+          description: "Le moteur de filtrage pf est actif et filtre le trafic réseau"
+          severity: critical
+          check_type: automatic
+          auto_check: "pf_enabled"
+          cis_reference: "CIS Controls v8 — 4.4 Implement and Manage a Firewall on Servers"
+          remediation: "Vérifier que pf n'est pas désactivé : Firewall > Settings > Advanced."
+
+        - id: OPNS-031
+          title: "Règles de filtrage définies"
+          description: "Des règles de filtrage pf sont définies (nombre de règles > 0)"
+          severity: high
+          check_type: automatic
+          auto_check: "pf_rules_defined"
+          cis_reference: "NIST SP 800-41 — 4.1 Firewall Policy"
+          remediation: "Configurer les règles de filtrage via Firewall > Rules."
+
+        - id: OPNS-032
+          title: "Politique deny-all par défaut"
+          description: "La politique par défaut est de bloquer tout le trafic sauf ce qui est explicitement autorisé"
+          severity: critical
+          check_type: manual
+          evidence_required: true
+          cis_reference: "NIST SP 800-41 — 4.1.1 Default-Deny Policy"
+          remediation: "S'assurer que la dernière règle de chaque interface est un block all implicite ou explicite."
+
+        - id: OPNS-033
+          title: "Absence de règle any-any permissive"
+          description: "Aucune règle n'autorise tout le trafic (source any, destination any, service any)"
+          severity: critical
+          check_type: automatic
+          auto_check: "no_any_any_rules"
+          evidence_required: true
+          cis_reference: "CIS Controls v8 — 4.5 Implement and Manage a Firewall on End-User Devices"
+          remediation: "Examiner toutes les règles et supprimer/restreindre celles qui sont trop permissives."
+
+        - id: OPNS-034
+          title: "Anti-spoofing activé"
+          description: "La protection anti-spoofing (BPF/antispoof) est activée sur les interfaces externes"
+          severity: high
+          check_type: manual
+          cis_reference: "NIST SP 800-41 — 4.2.2 IP Spoofing"
+          remediation: "Firewall > Settings > Advanced > activer 'Block bogon networks' et 'Block private networks' sur WAN."
+
+        - id: OPNS-035
+          title: "Règles documentées"
+          description: "Chaque règle de filtrage possède une description explicative"
+          severity: low
+          check_type: automatic
+          auto_check: "rules_documented"
+          cis_reference: "CIS Controls v8 — 4.1 Establish and Maintain a Secure Configuration Process"
+          remediation: "Ajouter une description à chaque règle dans Firewall > Rules."
+
+    # ── 4. Détection d'intrusion (IDS/IPS) ───────────────────
+    - name: "Détection d'intrusion (IDS/IPS)"
+      description: "Moteur Suricata et détection des menaces"
+      controls:
+        - id: OPNS-040
+          title: "Suricata IDS/IPS actif"
+          description: "Le moteur de détection d'intrusion Suricata est actif et opérationnel"
+          severity: high
+          check_type: automatic
+          auto_check: "suricata_active"
+          cis_reference: "CIS Controls v8 — 13.3 Deploy a Network Intrusion Detection Solution"
+          remediation: "Activer Suricata via Services > Intrusion Detection > Administration."
+
+        - id: OPNS-041
+          title: "Rulesets IDS à jour"
+          description: "Les rulesets Suricata (ET Open, Abuse.ch, etc.) sont à jour (< 24h)"
+          severity: high
+          check_type: manual
+          cis_reference: "CIS Controls v8 — 13.8 Perform Traffic Filtering Between Network Segments"
+          remediation: "Services > Intrusion Detection > Administration > vérifier la date de mise à jour des rulesets."
+
+        - id: OPNS-042
+          title: "Mode IPS activé (si applicable)"
+          description: "Suricata fonctionne en mode IPS (inline/blocking) et non pas seulement IDS (alerte)"
+          severity: medium
+          check_type: automatic
+          auto_check: "ids_ips_mode"
+          cis_reference: "CIS Controls v8 — 13.4 Perform Traffic Filtering Between Network Segments"
+          remediation: "Services > Intrusion Detection > Administration > cocher 'IPS mode'."
+
+    # ── 5. Journalisation & Audit ────────────────────────────
+    - name: "Journalisation & Audit"
+      description: "Centralisation des logs et traçabilité (CIS FreeBSD 4.x)"
+      controls:
+        - id: OPNS-050
+          title: "Syslog distant configuré"
+          description: "Les logs sont envoyés vers un serveur syslog distant (SIEM/collecteur centralisé)"
+          severity: high
+          check_type: automatic
+          auto_check: "syslog_remote_configured"
+          cis_reference: "CIS FreeBSD 4.2.1 — Ensure rsyslog is configured to send logs to a remote log host"
+          remediation: "System > Settings > Logging > Remote > configurer un serveur syslog."
+
+        - id: OPNS-051
+          title: "Logging des règles firewall activé"
+          description: "La journalisation est activée pour les règles de filtrage (au minimum les deny)"
+          severity: high
+          check_type: automatic
+          auto_check: "firewall_logging"
+          cis_reference: "CIS Controls v8 — 8.2 Collect Audit Logs"
+          remediation: "Cocher 'Log packets that are handled by this rule' sur les règles critiques."
+
+        - id: OPNS-052
+          title: "Rétention des logs ≥ 90 jours"
+          description: "Les logs sont conservés au minimum 90 jours (sur le SIEM distant)"
+          severity: medium
+          check_type: manual
+          cis_reference: "CIS Controls v8 — 8.10 Retain Audit Logs"
+          remediation: "Configurer la rétention sur le SIEM/syslog distant. OPNsense local est limité en espace."
+
+        - id: OPNS-053
+          title: "NTP synchronisé"
+          description: "L'horloge est synchronisée via NTP avec au moins 2 serveurs de temps fiables"
+          severity: medium
+          check_type: automatic
+          auto_check: "ntp_configured"
+          cis_reference: "CIS FreeBSD 2.2.1 — Ensure NTP is configured"
+          remediation: "Services > Network Time > configurer au moins 2 serveurs NTP (ex: pool.ntp.org)."
+
+    # ── 6. VPN & Cryptographie ───────────────────────────────
+    - name: "VPN & Cryptographie"
+      description: "Tunnels VPN et standards cryptographiques"
+      controls:
+        - id: OPNS-060
+          title: "VPN configuré"
+          description: "Au moins un tunnel VPN est configuré (OpenVPN, IPsec ou WireGuard)"
+          severity: low
+          check_type: automatic
+          auto_check: "vpn_configured"
+          cis_reference: "CIS Controls v8 — 3.10 Encrypt Sensitive Data in Transit"
+          remediation: "Configurer un VPN via VPN > OpenVPN / IPsec / WireGuard selon le besoin."
+
+        - id: OPNS-061
+          title: "Chiffrement VPN fort (AES-256 / ChaCha20)"
+          description: "Les tunnels VPN utilisent un chiffrement fort : AES-256-GCM, ChaCha20-Poly1305 ou équivalent"
+          severity: high
+          check_type: manual
+          evidence_required: true
+          cis_reference: "CIS Controls v8 — 3.10 Encrypt Sensitive Data in Transit"
+          remediation: "Configurer AES-256-GCM pour IPsec/OpenVPN. Éviter DES, 3DES, AES-128-CBC."
+
+        - id: OPNS-062
+          title: "PFS activé sur les tunnels IPsec"
+          description: "Perfect Forward Secrecy est activé (DH Group ≥ 14) sur les phases IPsec"
+          severity: high
+          check_type: manual
+          cis_reference: "CIS Controls v8 — 3.10"
+          remediation: "VPN > IPsec > Phase 2 > PFS Key Group ≥ 14 (2048-bit MODP)."
+
+    # ── 7. Haute Disponibilité & Sauvegarde ──────────────────
+    - name: "Haute Disponibilité & Sauvegarde"
+      description: "Résilience et sauvegardes de configuration"
+      controls:
+        - id: OPNS-070
+          title: "Haute disponibilité CARP configurée"
+          description: "La haute disponibilité CARP est configurée (si architecture redondante requise)"
+          severity: low
+          check_type: automatic
+          auto_check: "carp_ha_configured"
+          cis_reference: "CIS Controls v8 — 11.1 Establish and Maintain a Data Recovery Practice"
+          remediation: "Interfaces > Virtual IPs > CARP et System > High Availability."
+
+        - id: OPNS-071
+          title: "Sauvegardes de configuration existantes"
+          description: "Des sauvegardes de la configuration (config.xml) existent sur l'appliance"
+          severity: high
+          check_type: automatic
+          auto_check: "config_backups_exist"
+          evidence_required: true
+          cis_reference: "CIS Controls v8 — 11.2 Perform Automated Backups"
+          remediation: "System > Configuration > Backups. Configurer aussi une sauvegarde externe (Google Drive, Nextcloud)."
+
+        - id: OPNS-072
+          title: "Sauvegarde automatique vers stockage externe"
+          description: "Une sauvegarde automatique de la configuration est envoyée vers un stockage externe"
+          severity: medium
+          check_type: manual
+          cis_reference: "CIS Controls v8 — 11.3 Protect Recovery Data with Secure, Remote Storage"
+          remediation: "System > Configuration > Backups > configurer Google Drive ou Nextcloud backup."
+
+        - id: OPNS-073
+          title: "Test de restauration documenté"
+          description: "Un test de restauration de la configuration a été effectué et documenté (< 12 mois)"
+          severity: medium
+          check_type: manual
+          evidence_required: true
+          cis_reference: "CIS Controls v8 — 11.5 Test Data Recovery"
+          remediation: "Effectuer un test de restauration sur un environnement de test et documenter le résultat."
+
+    # ── 8. Réseau & Durcissement ─────────────────────────────
+    - name: "Réseau & Durcissement"
+      description: "Configuration réseau sécurisée et réduction de la surface d'attaque (CIS FreeBSD 3.x)"
+      controls:
+        - id: OPNS-080
+          title: "DNS sécurisé (Unbound avec DNSSEC)"
+          description: "Le résolveur DNS Unbound est configuré avec la validation DNSSEC activée"
+          severity: medium
+          check_type: automatic
+          auto_check: "dnssec_enabled"
+          cis_reference: "CIS Controls v8 — 9.2 Use DNS Filtering Services"
+          remediation: "Services > Unbound DNS > General > cocher 'DNSSEC'. Désactiver le DNS Forwarder (dnsmasq)."
+
+        - id: OPNS-081
+          title: "Interfaces non utilisées désactivées"
+          description: "Les interfaces réseau non utilisées sont désactivées"
+          severity: medium
+          check_type: automatic
+          auto_check: "no_unused_interfaces"
+          cis_reference: "CIS FreeBSD 3.4 — Ensure wireless interfaces are disabled"
+          remediation: "Interfaces > désactiver les interfaces inutilisées."
+
+        - id: OPNS-082
+          title: "Bogon et réseaux privés bloqués sur WAN"
+          description: "Le blocage des réseaux bogon et RFC1918 est activé sur l'interface WAN"
+          severity: high
+          check_type: automatic
+          auto_check: "wan_bogon_blocked"
+          cis_reference: "NIST SP 800-41 — 4.2.2 IP Address Spoofing"
+          remediation: "Interfaces > WAN > cocher 'Block private networks' et 'Block bogon networks'."

@@ -777,8 +777,18 @@ function CampaignsTab({ auditId, entrepriseId }: { auditId: number; entrepriseId
     } finally { setSaving(false); }
   };
 
-  const handleStatusChange = async (id: number, status: CampaignStatus) => {
-    try { await campaignsApi.update(id, { status }); loadCampaigns(); } catch { /* ignore */ }
+  const handleStatusChange = async (id: number, newStatus: CampaignStatus) => {
+    try {
+      // Utiliser les endpoints dédiés qui gèrent aussi le statut des équipements
+      if (newStatus === "in_progress") {
+        await campaignsApi.start(id);
+      } else if (newStatus === "completed") {
+        await campaignsApi.complete(id);
+      } else {
+        await campaignsApi.update(id, { status: newStatus });
+      }
+      loadCampaigns();
+    } catch { /* ignore */ }
   };
 
   const formatDate = (d: string) => {
