@@ -573,6 +573,7 @@ export interface SSLCheckResult {
 export interface CollectCreate {
   equipement_id: number;
   method: "ssh" | "winrm";
+  device_profile?: string;
   target_host: string;
   target_port: number;
   username: string;
@@ -589,6 +590,7 @@ export interface CollectResultSummary {
   id: number;
   equipement_id: number;
   method: string;
+  device_profile: string | null;
   status: CollectStatus;
   target_host: string;
   target_port: number;
@@ -606,10 +608,12 @@ export interface CollectSummary {
   os_name: string;
   os_version: string;
   hostname: string;
+  device_profile?: string;
   total_checks: number;
   compliant: number;
   non_compliant: number;
-  compliance_score: number;
+  compliance_score: number | null;
+  firewall_rules_count?: number;
 }
 
 export interface CollectResultRead extends CollectResultSummary {
@@ -631,4 +635,76 @@ export interface CollectFinding {
   category: string;
   remediation: string;
   status: string;
+}
+
+// ── Audit Active Directory ──
+export interface ADAuditCreate {
+  target_host: string;
+  target_port?: number;
+  use_ssl?: boolean;
+  username: string;
+  password: string;
+  domain: string;
+  auth_method?: "ntlm" | "simple";
+  equipement_id?: number;
+}
+
+export type ADAuditStatus = "running" | "success" | "failed";
+
+export interface ADAuditSummary {
+  total_controls: number;
+  compliant: number;
+  non_compliant: number;
+  partial: number;
+  info: number;
+  compliance_score: number;
+}
+
+export interface ADAuditFinding {
+  control_ref: string;
+  title: string;
+  description: string;
+  severity: string;
+  category: string;
+  status: string;
+  evidence: string;
+  remediation: string;
+  details: Record<string, unknown> | null;
+}
+
+export interface ADAuditResultSummary {
+  id: number;
+  equipement_id: number | null;
+  status: ADAuditStatus;
+  target_host: string;
+  target_port: number;
+  domain: string | null;
+  domain_name: string | null;
+  summary: ADAuditSummary | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+  duration_seconds: number | null;
+}
+
+export interface ADAuditResultRead extends ADAuditResultSummary {
+  username: string | null;
+  domain_functional_level: string | null;
+  forest_functional_level: string | null;
+  total_users: number | null;
+  enabled_users: number | null;
+  disabled_users: number | null;
+  dc_list: Record<string, unknown>[] | null;
+  domain_admins: Record<string, unknown>[] | null;
+  enterprise_admins: Record<string, unknown>[] | null;
+  schema_admins: Record<string, unknown>[] | null;
+  inactive_users: Record<string, unknown>[] | null;
+  never_expire_password: Record<string, unknown>[] | null;
+  never_logged_in: Record<string, unknown>[] | null;
+  admin_account_status: Record<string, unknown> | null;
+  password_policy: Record<string, unknown> | null;
+  fine_grained_policies: Record<string, unknown>[] | null;
+  gpo_list: Record<string, unknown>[] | null;
+  laps_deployed: boolean | null;
+  findings: ADAuditFinding[] | null;
 }

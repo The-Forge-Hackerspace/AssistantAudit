@@ -1,0 +1,1053 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import {
+  ShieldCheck,
+  Play,
+  Loader2,
+  Trash2,
+  Eye,
+  X,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Clock,
+  Users,
+  Shield,
+  Key,
+  Server,
+  RefreshCw,
+  ClipboardCheck,
+  ArrowLeft,
+  Info,
+  Lock,
+  FileText,
+} from "lucide-react";
+import Link from "next/link";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+
+import { equipementsApi, toolsApi } from "@/services/api";
+import type {
+  Equipement,
+  ADAuditResultSummary,
+  ADAuditResultRead,
+  ADAuditCreate,
+  ADAuditFinding,
+  PrefillResult,
+} from "@/types";
+
+// ── Constants ───────────────────────────────────────────────
+const STATUS_LABELS: Record<string, string> = {
+  running: "En cours",
+  success: "Succès",
+  failed: "Échec",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  running: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  success: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  failed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+};
+
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  high: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+  medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+  low: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  info: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+};
+
+const FINDING_STATUS_ICONS: Record<string, React.ReactNode> = {
+  compliant: <CheckCircle2 className="h-4 w-4 text-green-500" />,
+  non_compliant: <XCircle className="h-4 w-4 text-red-500" />,
+  partial: <AlertTriangle className="h-4 w-4 text-yellow-500" />,
+  info: <Info className="h-4 w-4 text-blue-500" />,
+};
+
+// ══════════════════════════════════════════════════════════════
+// Page principale
+// ══════════════════════════════════════════════════════════════
+export default function ADAuditorPage() {
+  // ── State ──
+  const [equipements, setEquipements] = useState<Equipement[]>([]);
+  const [loadingEquipements, setLoadingEquipements] = useState(true);
+  const [audits, setAudits] = useState<ADAuditResultSummary[]>([]);
+  const [loadingAudits, setLoadingAudits] = useState(false);
+  const [selectedAudit, setSelectedAudit] = useState<ADAuditResultRead | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  // Form state
+  const [selectedEquipementId, setSelectedEquipementId] = useState<string>("");
+  const [targetHost, setTargetHost] = useState("");
+  const [targetPort, setTargetPort] = useState("389");
+  const [useSsl, setUseSsl] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [domain, setDomain] = useState("");
+  const [authMethod, setAuthMethod] = useState<"ntlm" | "simple">("ntlm");
+  const [launching, setLaunching] = useState(false);
+
+  // Prefill state
+  const [prefillDialogOpen, setPrefillDialogOpen] = useState(false);
+  const [prefillAuditId, setPrefillAuditId] = useState<number | null>(null);
+  const [assessments, setAssessments] = useState<
+    { id: number; campaign_id: number; framework_id: number; framework_name: string; created_at: string }[]
+  >([]);
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState<string>("");
+  const [prefilling, setPrefilling] = useState(false);
+  const [prefillResult, setPrefillResult] = useState<PrefillResult | null>(null);
+
+  // ── Loading ──
+  const loadEquipements = useCallback(async () => {
+    setLoadingEquipements(true);
+    try {
+      const res = await equipementsApi.list(1, 100);
+      setEquipements(res.items);
+    } catch (err) {
+      console.error("Erreur chargement équipements:", err);
+    } finally {
+      setLoadingEquipements(false);
+    }
+  }, []);
+
+  const loadAudits = useCallback(async () => {
+    setLoadingAudits(true);
+    try {
+      const data = await toolsApi.listADAudits();
+      setAudits(data);
+    } catch (err) {
+      console.error("Erreur chargement audits AD:", err);
+    } finally {
+      setLoadingAudits(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadEquipements();
+    loadAudits();
+  }, [loadEquipements, loadAudits]);
+
+  // Polling
+  useEffect(() => {
+    const hasRunning = audits.some((a) => a.status === "running");
+    if (!hasRunning) return;
+    const interval = setInterval(loadAudits, 3000);
+    return () => clearInterval(interval);
+  }, [audits, loadAudits]);
+
+  // Auto-fill host when equipment selected
+  useEffect(() => {
+    if (selectedEquipementId) {
+      const eq = equipements.find((e) => e.id === Number(selectedEquipementId));
+      if (eq) {
+        setTargetHost(eq.ip_address.split("/")[0]);
+      }
+    }
+  }, [selectedEquipementId, equipements]);
+
+  // Auto-adjust port for SSL
+  useEffect(() => {
+    setTargetPort(useSsl ? "636" : "389");
+  }, [useSsl]);
+
+  // ── Actions ──
+  const handleLaunch = async () => {
+    if (!targetHost || !username || !password || !domain) {
+      toast.error("Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+
+    setLaunching(true);
+    try {
+      const params: ADAuditCreate = {
+        target_host: targetHost,
+        target_port: Number(targetPort),
+        use_ssl: useSsl,
+        username,
+        password,
+        domain,
+        auth_method: authMethod,
+        equipement_id: selectedEquipementId ? Number(selectedEquipementId) : undefined,
+      };
+      await toolsApi.launchADAudit(params);
+      toast.success("Audit AD lancé en arrière-plan");
+      loadAudits();
+      // Reset form password for security
+      setPassword("");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Erreur lors du lancement";
+      toast.error(msg);
+    } finally {
+      setLaunching(false);
+    }
+  };
+
+  const handleViewDetail = async (auditId: number) => {
+    try {
+      const detail = await toolsApi.getADAudit(auditId);
+      setSelectedAudit(detail);
+      setDetailOpen(true);
+    } catch {
+      toast.error("Erreur lors du chargement du détail");
+    }
+  };
+
+  const handleDelete = async (auditId: number) => {
+    try {
+      await toolsApi.deleteADAudit(auditId);
+      toast.success("Audit supprimé");
+      loadAudits();
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    }
+  };
+
+  const handleOpenPrefill = async (auditId: number, equipementId: number | null) => {
+    if (!equipementId) {
+      toast.error("Cet audit n'est pas lié à un équipement");
+      return;
+    }
+    setPrefillAuditId(auditId);
+    setPrefillResult(null);
+    setSelectedAssessmentId("");
+    try {
+      const data = await toolsApi.listAssessmentsForEquipment(equipementId);
+      setAssessments(data);
+      setPrefillDialogOpen(true);
+    } catch {
+      toast.error("Erreur lors du chargement des assessments");
+    }
+  };
+
+  const handlePrefill = async () => {
+    if (!prefillAuditId || !selectedAssessmentId) return;
+    setPrefilling(true);
+    try {
+      const result = await toolsApi.prefillFromADAudit(
+        prefillAuditId,
+        Number(selectedAssessmentId)
+      );
+      setPrefillResult(result);
+      toast.success(`${result.controls_prefilled} contrôles pré-remplis`);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Erreur lors du pré-remplissage";
+      toast.error(msg);
+    } finally {
+      setPrefilling(false);
+    }
+  };
+
+  // ── Render ──
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Link href="/outils">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-1" /> Outils
+              </Button>
+            </Link>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <ShieldCheck className="h-6 w-6 text-cyan-500" />
+            Audit Active Directory
+          </h1>
+          <p className="text-muted-foreground">
+            Audit automatisé d&apos;un domaine AD via LDAP : comptes privilégiés, politique de mots de passe, GPO, LAPS
+          </p>
+        </div>
+      </div>
+
+      {/* Connection Form */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Connexion LDAP</CardTitle>
+          <CardDescription>
+            Configurez la connexion au contrôleur de domaine Active Directory
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {/* Equipment select */}
+            <div className="space-y-2">
+              <Label>Équipement (optionnel)</Label>
+              {loadingEquipements ? (
+                <Skeleton className="h-10 w-full" />
+              ) : (
+                <Select value={selectedEquipementId} onValueChange={setSelectedEquipementId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="— Aucun —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {equipements.map((eq) => (
+                      <SelectItem key={eq.id} value={String(eq.id)}>
+                        {eq.hostname || eq.type_equipement} ({eq.ip_address})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Target host */}
+            <div className="space-y-2">
+              <Label>Hôte DC *</Label>
+              <Input
+                placeholder="dc01.domain.local"
+                value={targetHost}
+                onChange={(e) => setTargetHost(e.target.value)}
+              />
+            </div>
+
+            {/* Port */}
+            <div className="space-y-2">
+              <Label>Port LDAP</Label>
+              <Input
+                type="number"
+                value={targetPort}
+                onChange={(e) => setTargetPort(e.target.value)}
+              />
+            </div>
+
+            {/* Domain */}
+            <div className="space-y-2">
+              <Label>Domaine *</Label>
+              <Input
+                placeholder="DOMAIN.LOCAL"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+              />
+            </div>
+
+            {/* Username */}
+            <div className="space-y-2">
+              <Label>Utilisateur *</Label>
+              <Input
+                placeholder="admin ou DOMAIN\\admin"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <Label>Mot de passe *</Label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            {/* Auth method */}
+            <div className="space-y-2">
+              <Label>Méthode d&apos;authentification</Label>
+              <Select value={authMethod} onValueChange={(v) => setAuthMethod(v as "ntlm" | "simple")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ntlm">NTLM</SelectItem>
+                  <SelectItem value="simple">Simple</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* SSL */}
+            <div className="space-y-2 flex items-end gap-2">
+              <div className="flex items-center space-x-2 pb-2">
+                <input
+                  type="checkbox"
+                  id="use-ssl"
+                  checked={useSsl}
+                  onChange={(e) => setUseSsl(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="use-ssl" className="cursor-pointer">
+                  Utiliser LDAPS (SSL)
+                </Label>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <Button onClick={handleLaunch} disabled={launching}>
+              {launching ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Lancement...
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Lancer l&apos;audit AD
+                </>
+              )}
+            </Button>
+            <Button variant="outline" onClick={loadAudits}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Rafraîchir
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Audit History Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Historique des audits</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingAudits ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : audits.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              Aucun audit AD effectué pour le moment.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Cible</TableHead>
+                  <TableHead>Domaine</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Score</TableHead>
+                  <TableHead>Durée</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {audits.map((audit) => (
+                  <TableRow key={audit.id}>
+                    <TableCell className="font-mono text-sm">#{audit.id}</TableCell>
+                    <TableCell>{audit.target_host}:{audit.target_port}</TableCell>
+                    <TableCell>{audit.domain_name || audit.domain || "—"}</TableCell>
+                    <TableCell>
+                      <Badge className={STATUS_COLORS[audit.status] || ""}>
+                        {audit.status === "running" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                        {STATUS_LABELS[audit.status] || audit.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {audit.summary ? (
+                        <div className="flex items-center gap-2">
+                          <Progress value={audit.summary.compliance_score} className="h-2 w-16" />
+                          <span className="text-sm font-medium">
+                            {Math.round(audit.summary.compliance_score)}%
+                          </span>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {audit.duration_seconds ? `${audit.duration_seconds}s` : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {new Date(audit.created_at).toLocaleString("fr-FR")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={audit.status === "running"}
+                          onClick={() => handleViewDetail(audit.id)}
+                          title="Voir le détail"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {audit.status === "success" && audit.equipement_id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenPrefill(audit.id, audit.equipement_id)}
+                            title="Pré-remplir un assessment"
+                          >
+                            <ClipboardCheck className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" title="Supprimer">
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Supprimer cet audit ?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Cette action est irréversible.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(audit.id)}>
+                                Supprimer
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Detail Dialog ── */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+          {selectedAudit && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-cyan-500" />
+                  Audit AD #{selectedAudit.id} — {selectedAudit.domain_name || selectedAudit.domain}
+                </DialogTitle>
+                <DialogDescription>
+                  {selectedAudit.target_host}:{selectedAudit.target_port} ·
+                  Durée : {selectedAudit.duration_seconds}s ·
+                  {selectedAudit.domain_functional_level && ` Niveau fonctionnel : ${selectedAudit.domain_functional_level}`}
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Summary */}
+              {selectedAudit.summary && (
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-5 mb-4">
+                  <SummaryCard
+                    label="Contrôles"
+                    value={selectedAudit.summary.total_controls}
+                    icon={<Shield className="h-4 w-4" />}
+                  />
+                  <SummaryCard
+                    label="Conformes"
+                    value={selectedAudit.summary.compliant}
+                    icon={<CheckCircle2 className="h-4 w-4 text-green-500" />}
+                    color="text-green-600"
+                  />
+                  <SummaryCard
+                    label="Non conformes"
+                    value={selectedAudit.summary.non_compliant}
+                    icon={<XCircle className="h-4 w-4 text-red-500" />}
+                    color="text-red-600"
+                  />
+                  <SummaryCard
+                    label="Partiels"
+                    value={selectedAudit.summary.partial}
+                    icon={<AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                    color="text-yellow-600"
+                  />
+                  <SummaryCard
+                    label="Score"
+                    value={`${Math.round(selectedAudit.summary.compliance_score)}%`}
+                    icon={<Shield className="h-4 w-4 text-cyan-500" />}
+                    color="text-cyan-600"
+                  />
+                </div>
+              )}
+
+              {/* Tabs */}
+              <Tabs defaultValue="findings" className="w-full">
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="findings">Findings</TabsTrigger>
+                  <TabsTrigger value="domain">Domaine</TabsTrigger>
+                  <TabsTrigger value="users">Utilisateurs</TabsTrigger>
+                  <TabsTrigger value="groups">Groupes</TabsTrigger>
+                  <TabsTrigger value="policy">Politiques</TabsTrigger>
+                </TabsList>
+
+                {/* Findings Tab */}
+                <TabsContent value="findings" className="space-y-3">
+                  {selectedAudit.findings && selectedAudit.findings.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[40px]"></TableHead>
+                          <TableHead>Ref</TableHead>
+                          <TableHead>Contrôle</TableHead>
+                          <TableHead>Sévérité</TableHead>
+                          <TableHead>Statut</TableHead>
+                          <TableHead>Preuve</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedAudit.findings.map((f: ADAuditFinding, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell>{FINDING_STATUS_ICONS[f.status] || null}</TableCell>
+                            <TableCell className="font-mono text-xs">{f.control_ref}</TableCell>
+                            <TableCell className="font-medium">{f.title}</TableCell>
+                            <TableCell>
+                              <Badge className={SEVERITY_COLORS[f.severity] || ""}>
+                                {f.severity}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{f.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm max-w-xs truncate" title={f.evidence}>
+                              {f.evidence || "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-muted-foreground text-center py-4">
+                      Aucun finding disponible.
+                    </p>
+                  )}
+                </TabsContent>
+
+                {/* Domain Tab */}
+                <TabsContent value="domain" className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <InfoBlock label="Nom du domaine" value={selectedAudit.domain_name} />
+                    <InfoBlock label="Niveau fonctionnel" value={selectedAudit.domain_functional_level} />
+                    <InfoBlock label="Forêt" value={selectedAudit.forest_functional_level} />
+                    <InfoBlock label="LAPS déployé" value={selectedAudit.laps_deployed ? "Oui" : "Non"} />
+                  </div>
+
+                  {/* DC list */}
+                  {selectedAudit.dc_list && selectedAudit.dc_list.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-1">
+                        <Server className="h-4 w-4" /> Contrôleurs de domaine ({selectedAudit.dc_list.length})
+                      </h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nom</TableHead>
+                            <TableHead>DN</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedAudit.dc_list.map((dc: Record<string, unknown>, i: number) => (
+                            <TableRow key={i}>
+                              <TableCell className="font-mono text-sm">
+                                {String(dc.name || dc.cn || "—")}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {String(dc.dn || "—")}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {/* GPO list */}
+                  {selectedAudit.gpo_list && selectedAudit.gpo_list.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-1">
+                        <FileText className="h-4 w-4" /> GPOs ({selectedAudit.gpo_list.length})
+                      </h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nom</TableHead>
+                            <TableHead>DN</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedAudit.gpo_list.map((gpo: Record<string, unknown>, i: number) => (
+                            <TableRow key={i}>
+                              <TableCell className="font-medium">
+                                {String(gpo.name || gpo.displayName || "—")}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {String(gpo.dn || "—")}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Users Tab */}
+                <TabsContent value="users" className="space-y-4">
+                  <div className="grid gap-4 grid-cols-3">
+                    <SummaryCard
+                      label="Total"
+                      value={selectedAudit.total_users ?? "—"}
+                      icon={<Users className="h-4 w-4" />}
+                    />
+                    <SummaryCard
+                      label="Actifs"
+                      value={selectedAudit.enabled_users ?? "—"}
+                      icon={<CheckCircle2 className="h-4 w-4 text-green-500" />}
+                      color="text-green-600"
+                    />
+                    <SummaryCard
+                      label="Désactivés"
+                      value={selectedAudit.disabled_users ?? "—"}
+                      icon={<XCircle className="h-4 w-4 text-red-500" />}
+                      color="text-red-600"
+                    />
+                  </div>
+
+                  {/* Never expire password */}
+                  {selectedAudit.never_expire_password && selectedAudit.never_expire_password.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-1 text-orange-600">
+                        <AlertTriangle className="h-4 w-4" /> Mot de passe n&apos;expire jamais ({selectedAudit.never_expire_password.length})
+                      </h4>
+                      <UserTable users={selectedAudit.never_expire_password} />
+                    </div>
+                  )}
+
+                  {/* Inactive users */}
+                  {selectedAudit.inactive_users && selectedAudit.inactive_users.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-1 text-yellow-600">
+                        <Clock className="h-4 w-4" /> Utilisateurs inactifs ({selectedAudit.inactive_users.length})
+                      </h4>
+                      <UserTable users={selectedAudit.inactive_users} />
+                    </div>
+                  )}
+
+                  {/* Never logged in */}
+                  {selectedAudit.never_logged_in && selectedAudit.never_logged_in.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-1 text-gray-600">
+                        <Info className="h-4 w-4" /> Jamais connectés ({selectedAudit.never_logged_in.length})
+                      </h4>
+                      <UserTable users={selectedAudit.never_logged_in} />
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Groups Tab */}
+                <TabsContent value="groups" className="space-y-4">
+                  <GroupSection
+                    title="Domain Admins"
+                    members={selectedAudit.domain_admins}
+                    color="text-red-600"
+                  />
+                  <GroupSection
+                    title="Enterprise Admins"
+                    members={selectedAudit.enterprise_admins}
+                    color="text-orange-600"
+                  />
+                  <GroupSection
+                    title="Schema Admins"
+                    members={selectedAudit.schema_admins}
+                    color="text-yellow-600"
+                  />
+
+                  {selectedAudit.admin_account_status && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-1">
+                        <Key className="h-4 w-4" /> Compte Administrateur Builtin
+                      </h4>
+                      <div className="grid gap-2 md:grid-cols-3">
+                        <InfoBlock
+                          label="Nom"
+                          value={String(selectedAudit.admin_account_status.name || "Administrator")}
+                        />
+                        <InfoBlock
+                          label="Activé"
+                          value={selectedAudit.admin_account_status.enabled ? "Oui" : "Non"}
+                        />
+                        <InfoBlock
+                          label="Renommé"
+                          value={selectedAudit.admin_account_status.renamed ? "Oui" : "Non"}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Policy Tab */}
+                <TabsContent value="policy" className="space-y-4">
+                  {selectedAudit.password_policy && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-1">
+                        <Lock className="h-4 w-4" /> Politique de mots de passe par défaut
+                      </h4>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {Object.entries(selectedAudit.password_policy).map(([k, v]) => (
+                          <InfoBlock key={k} label={k} value={String(v ?? "—")} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedAudit.fine_grained_policies && selectedAudit.fine_grained_policies.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-1">
+                        <Shield className="h-4 w-4" /> Fine-Grained Password Policies ({selectedAudit.fine_grained_policies.length})
+                      </h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nom</TableHead>
+                            <TableHead>DN</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedAudit.fine_grained_policies.map((p: Record<string, unknown>, i: number) => (
+                            <TableRow key={i}>
+                              <TableCell className="font-medium">
+                                {String(p.name || p.cn || "—")}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {String(p.dn || "—")}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Prefill Dialog ── */}
+      <Dialog open={prefillDialogOpen} onOpenChange={setPrefillDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pré-remplir un assessment</DialogTitle>
+            <DialogDescription>
+              Sélectionnez l&apos;assessment à pré-remplir avec les résultats de l&apos;audit AD.
+            </DialogDescription>
+          </DialogHeader>
+
+          {prefillResult ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 grid-cols-2">
+                <SummaryCard label="Pré-remplis" value={prefillResult.controls_prefilled} icon={<ClipboardCheck className="h-4 w-4" />} />
+                <SummaryCard label="Conformes" value={prefillResult.controls_compliant} icon={<CheckCircle2 className="h-4 w-4 text-green-500" />} color="text-green-600" />
+                <SummaryCard label="Non conformes" value={prefillResult.controls_non_compliant} icon={<XCircle className="h-4 w-4 text-red-500" />} color="text-red-600" />
+                <SummaryCard label="Partiels" value={prefillResult.controls_partial} icon={<AlertTriangle className="h-4 w-4 text-yellow-500" />} color="text-yellow-600" />
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setPrefillDialogOpen(false)}>Fermer</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <>
+              {assessments.length === 0 ? (
+                <p className="text-muted-foreground py-4">
+                  Aucun assessment trouvé pour cet équipement. Créez d&apos;abord un assessment avec le framework AD.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Assessment</Label>
+                    <Select value={selectedAssessmentId} onValueChange={setSelectedAssessmentId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un assessment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {assessments.map((a) => (
+                          <SelectItem key={a.id} value={String(a.id)}>
+                            #{a.id} — {a.framework_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setPrefillDialogOpen(false)}>
+                      Annuler
+                    </Button>
+                    <Button onClick={handlePrefill} disabled={!selectedAssessmentId || prefilling}>
+                      {prefilling ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Pré-remplissage...
+                        </>
+                      ) : (
+                        <>
+                          <ClipboardCheck className="mr-2 h-4 w-4" />
+                          Pré-remplir
+                        </>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── Helper Components ──────────────────────────────────────────
+
+function SummaryCard({
+  label,
+  value,
+  icon,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  color?: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4 flex items-center gap-3">
+        {icon}
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className={`text-lg font-bold ${color || ""}`}>{value}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InfoBlock({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="bg-muted/50 rounded-lg p-3">
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      <p className="text-sm font-medium">{value || "—"}</p>
+    </div>
+  );
+}
+
+function UserTable({ users }: { users: Record<string, unknown>[] }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Nom</TableHead>
+          <TableHead>sAMAccountName</TableHead>
+          <TableHead>DN</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {users.slice(0, 20).map((u, i) => (
+          <TableRow key={i}>
+            <TableCell className="font-medium">
+              {String(u.name || u.cn || "—")}
+            </TableCell>
+            <TableCell className="font-mono text-sm">
+              {String(u.sAMAccountName || "—")}
+            </TableCell>
+            <TableCell className="text-sm text-muted-foreground truncate max-w-xs" title={String(u.dn || "")}>
+              {String(u.dn || "—")}
+            </TableCell>
+          </TableRow>
+        ))}
+        {users.length > 20 && (
+          <TableRow>
+            <TableCell colSpan={3} className="text-center text-muted-foreground">
+              ... et {users.length - 20} de plus
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  );
+}
+
+function GroupSection({
+  title,
+  members,
+  color,
+}: {
+  title: string;
+  members: Record<string, unknown>[] | null;
+  color?: string;
+}) {
+  if (!members) return null;
+  return (
+    <div>
+      <h4 className={`font-semibold mb-2 flex items-center gap-1 ${color || ""}`}>
+        <Users className="h-4 w-4" /> {title} ({members.length})
+      </h4>
+      {members.length === 0 ? (
+        <p className="text-muted-foreground text-sm">Aucun membre</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nom</TableHead>
+              <TableHead>DN</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {members.map((m, i) => (
+              <TableRow key={i}>
+                <TableCell className="font-medium">
+                  {String(m.name || m.cn || "—")}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {String(m.dn || "—")}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}

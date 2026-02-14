@@ -31,6 +31,9 @@ paramiko>=3.4.0
 pywinrm>=0.4.3
 python-dateutil>=2.9.0
 
+# --- Audit Active Directory (LDAP) ---
+ldap3>=2.9.0
+
 # --- Logging & Config ---
 python-dotenv>=1.0.0
 

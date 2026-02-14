@@ -261,6 +261,7 @@ class CollectCreate(BaseModel):
     passphrase: Optional[str] = Field(None, description="Passphrase de la clé privée")
     use_ssl: bool = Field(False, description="WinRM: utiliser HTTPS (port 5986)")
     transport: str = Field("ntlm", description="WinRM: méthode d'auth (ntlm, kerberos, basic)")
+    device_profile: str = Field("linux_server", description="Profil collecte SSH: linux_server, opnsense, stormshield, fortigate")
 
 
 class CollectResultSummary(BaseModel):
@@ -272,6 +273,7 @@ class CollectResultSummary(BaseModel):
     target_host: str
     target_port: int
     username: str
+    device_profile: Optional[str] = "linux_server"
     hostname_collected: Optional[str] = None
     summary: Optional[dict] = None
     error_message: Optional[str] = None
@@ -291,6 +293,7 @@ class CollectResultRead(BaseModel):
     target_host: str
     target_port: int
     username: str
+    device_profile: Optional[str] = "linux_server"
     hostname_collected: Optional[str] = None
     error_message: Optional[str] = None
     os_info: Optional[dict] = None
@@ -302,6 +305,91 @@ class CollectResultRead(BaseModel):
     updates: Optional[dict] = None
     findings: Optional[list] = None
     summary: Optional[dict] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Audit Active Directory (LDAP) ────────────────────────────
+
+class ADAuditCreate(BaseModel):
+    """Paramètres pour lancer un audit AD."""
+    equipement_id: Optional[int] = Field(None, description="Équipement (DC) associé")
+    target_host: str = Field(..., description="IP ou hostname du contrôleur de domaine")
+    target_port: int = Field(389, description="Port LDAP (389) ou LDAPS (636)")
+    use_ssl: bool = Field(False, description="Utiliser LDAPS (SSL)")
+    username: str = Field(..., description="Utilisateur pour la connexion LDAP")
+    password: str = Field(..., description="Mot de passe")
+    domain: str = Field(..., description="Nom du domaine AD (ex: corp.local)")
+    auth_method: str = Field("ntlm", description="Méthode d'auth : ntlm ou simple")
+
+
+class ADAuditFindingRead(BaseModel):
+    """Un constat d'audit AD."""
+    control_ref: str
+    title: str
+    description: str = ""
+    severity: str
+    category: str
+    status: str
+    evidence: str = ""
+    remediation: str = ""
+    details: dict = {}
+
+
+class ADAuditResultSummary(BaseModel):
+    """Résumé d'un audit AD pour la liste."""
+    id: int
+    equipement_id: Optional[int] = None
+    status: str
+    target_host: str
+    target_port: int
+    username: str
+    domain: str
+    domain_name: Optional[str] = None
+    domain_functional_level: Optional[str] = None
+    total_users: Optional[int] = None
+    summary: Optional[dict] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ADAuditResultRead(BaseModel):
+    """Détail complet d'un audit AD."""
+    id: int
+    equipement_id: Optional[int] = None
+    status: str
+    target_host: str
+    target_port: int
+    username: str
+    domain: str
+    domain_name: Optional[str] = None
+    domain_functional_level: Optional[str] = None
+    forest_functional_level: Optional[str] = None
+    total_users: Optional[int] = None
+    enabled_users: Optional[int] = None
+    disabled_users: Optional[int] = None
+    dc_list: Optional[list] = None
+    domain_admins: Optional[list] = None
+    enterprise_admins: Optional[list] = None
+    schema_admins: Optional[list] = None
+    inactive_users: Optional[list] = None
+    never_expire_password: Optional[list] = None
+    never_logged_in: Optional[list] = None
+    admin_account_status: Optional[dict] = None
+    password_policy: Optional[dict] = None
+    fine_grained_policies: Optional[list] = None
+    gpo_list: Optional[list] = None
+    laps_deployed: Optional[bool] = None
+    findings: Optional[list] = None
+    summary: Optional[dict] = None
+    error_message: Optional[str] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[int] = None

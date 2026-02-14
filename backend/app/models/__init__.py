@@ -31,6 +31,7 @@ from .assessment import (
 from .attachment import Attachment
 from .config_analysis import ConfigAnalysis
 from .collect_result import CollectResult, CollectMethod, CollectStatus
+from .ad_audit_result import ADAuditResultModel, ADAuditStatus
 
 __all__ = [
     "User",
@@ -61,4 +62,6 @@ __all__ = [
     "CollectResult",
     "CollectMethod",
     "CollectStatus",
+    "ADAuditResultModel",
+    "ADAuditStatus",
 ]

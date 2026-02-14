@@ -8,6 +8,7 @@ import {
   Terminal,
   Wrench,
   ArrowRight,
+  ShieldCheck,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,15 @@ const tools = [
     href: "/outils/ssl-checker",
     color: "text-green-500",
     bgColor: "bg-green-500/10",
+  },
+  {
+    title: "Audit Active Directory",
+    description:
+      "Audit automatisé d'un domaine AD via LDAP : comptes privilégiés, politique de mots de passe, GPO, LAPS, niveau fonctionnel et conformité CIS.",
+    icon: ShieldCheck,
+    href: "/outils/ad-auditor",
+    color: "text-cyan-500",
+    bgColor: "bg-cyan-500/10",
   },
 ];
 
