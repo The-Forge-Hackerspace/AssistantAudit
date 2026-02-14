@@ -26,6 +26,9 @@ env/
 .env.local
 .env.production
 
+# Wiki
+wiki/
+
 # Database
 instance/
 *.db
