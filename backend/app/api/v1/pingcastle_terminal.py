@@ -154,8 +154,8 @@ async def pingcastle_terminal(
             try:
                 while True:
                     data = await websocket.receive_text()
-                    # Convertir CR en LF pour le process Windows
-                    data = data.replace("\r", "\n")
+                    # Envoyer tel quel au process - pas de conversion de line endings
+                    # Le process Windows gère nativement CRLF et LF
                     process.stdin.write(data.encode("utf-8"))
                     await process.stdin.drain()
             except (WebSocketDisconnect, ConnectionError):

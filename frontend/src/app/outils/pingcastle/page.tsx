@@ -84,6 +84,12 @@ function scoreBadge(score: number | null) {
   return <Badge variant="destructive">{score}</Badge>;
 }
 
+function getSeverityVariant(severity: string): "destructive" | "secondary" | "outline" {
+  if (severity === "critical" || severity === "high") return "destructive";
+  if (severity === "medium") return "secondary";
+  return "outline";
+}
+
 function statusBadge(status: string) {
   switch (status) {
     case "success":
@@ -332,13 +338,7 @@ export default function PingCastlePage() {
                     <TableRow key={idx}>
                       <TableCell className="font-mono font-bold">{rule.points}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={
-                            rule.severity === "critical" ? "destructive" :
-                            rule.severity === "high" ? "destructive" :
-                            rule.severity === "medium" ? "secondary" : "outline"
-                          }
-                        >
+                        <Badge variant={getSeverityVariant(rule.severity)}>
                           {rule.severity}
                         </Badge>
                       </TableCell>
