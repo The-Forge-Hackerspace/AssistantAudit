@@ -171,7 +171,7 @@ class PingCastleRunner:
             )
 
             if process_result.returncode != 0:
-                stderr = process_result.stderr or process_result.stdout or "Erreur inconnue"
+                stderr = process_result.stderr or process_result.stdout or f"PingCastle exited with code {process_result.returncode} (no output)"
                 logger.warning(f"[PINGCASTLE] Erreur PingCastle : {stderr[:500]}")
                 # PingCastle peut retourner un code non-zero mais
                 # générer quand même un rapport. On essaie de parser.

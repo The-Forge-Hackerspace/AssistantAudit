@@ -82,10 +82,16 @@ if (-not (Test-Path $PingCastleDir)) {
             if (-not (Test-Path $toolsDir)) {
                 New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null
             }
-            git clone --depth 1 $PingCastleRepo $PingCastleDir 2>&1 | Out-Null
-            Write-Ok "PingCastle clone depuis GitHub"
+            $cloneOutput = git clone --depth 1 $PingCastleRepo $PingCastleDir 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Ok "PingCastle clone depuis GitHub"
+            } else {
+                Write-Warn "Impossible de cloner PingCastle"
+                Write-Host $cloneOutput -ForegroundColor Yellow
+                Write-Warn "Vous devrez installer PingCastle manuellement"
+            }
         } catch {
-            Write-Warn "Impossible de cloner PingCastle : $_"
+            Write-Warn "Erreur lors du clonage de PingCastle : $_"
             Write-Warn "Vous devrez installer PingCastle manuellement"
         }
     } else {
@@ -100,11 +106,14 @@ if (-not (Test-Path $PingCastleDir)) {
             $gitStatus = git status --porcelain 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Log "Mise a jour de PingCastle..."
-                git pull --quiet origin master 2>&1 | Out-Null
+                $pullOutput = git pull --quiet origin master 2>&1
                 if ($LASTEXITCODE -eq 0) {
                     Write-Ok "PingCastle mis a jour"
                 } else {
-                    Write-Warn "Impossible de mettre a jour PingCastle (verifiez votre connexion)"
+                    Write-Warn "Impossible de mettre a jour PingCastle"
+                    if ($pullOutput -and $pullOutput -ne "Already up to date.") {
+                        Write-Host $pullOutput -ForegroundColor Yellow
+                    }
                 }
             }
         } catch {
