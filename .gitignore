@@ -44,6 +44,9 @@ data/
 monkey365_output/
 integrations/monkey365/
 
+# PingCastle
+tools/pingcastle/
+
 # Node (future frontend)
 node_modules/
 .next/

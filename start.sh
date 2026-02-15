@@ -58,6 +58,15 @@ else
     warn "Nmap non trouvé — le scanner réseau ne fonctionnera pas"
 fi
 
+# ── PingCastle Setup (Windows only) ──
+log "Vérification de PingCastle..."
+warn "PingCastle est un outil Windows uniquement (.NET)"
+warn "Sur Linux/macOS, vous devrez exécuter PingCastle via Wine ou une VM Windows"
+warn "Référence : https://github.com/netwrix/pingcastle"
+
+# Note: PingCastle is a Windows-only tool, so we just note it for Linux/macOS users
+# They can still use the API to trigger PingCastle on a remote Windows machine
+
 # ── Environnement virtuel Python ──
 if [ ! -d "$VENV_DIR" ]; then
     log "Création de l'environnement virtuel Python..."
