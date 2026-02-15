@@ -708,3 +708,74 @@ export interface ADAuditResultRead extends ADAuditResultSummary {
   laps_deployed: boolean | null;
   findings: ADAuditFinding[] | null;
 }
+
+// ── PingCastle ──
+export interface PingCastleCreate {
+  target_host: string;
+  domain: string;
+  username: string;
+  password: string;
+  equipement_id?: number;
+}
+
+export type PingCastleStatus = "running" | "success" | "failed";
+
+export interface PingCastleScores {
+  global: number;
+  stale_objects: number;
+  privileged_accounts: number;
+  trust: number;
+  anomaly: number;
+}
+
+export interface PingCastleSummary {
+  tool: string;
+  domain: string;
+  global_score: number;
+  maturity_level: number;
+  maturity_label: string;
+  total_findings: number;
+  compliant: number;
+  non_compliant: number;
+  partial: number;
+  total_risk_rules: number;
+  critical_rules: number;
+  high_rules: number;
+  scores: PingCastleScores;
+}
+
+export interface PingCastleRiskRule {
+  rule_id: string;
+  category: string;
+  model: string;
+  points: number;
+  rationale: string;
+  severity: string;
+}
+
+export interface PingCastleResultSummary {
+  id: number;
+  equipement_id: number | null;
+  status: PingCastleStatus;
+  target_host: string;
+  domain: string;
+  global_score: number | null;
+  maturity_level: number | null;
+  stale_objects_score: number | null;
+  privileged_accounts_score: number | null;
+  trust_score: number | null;
+  anomaly_score: number | null;
+  summary: PingCastleSummary | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+  duration_seconds: number | null;
+}
+
+export interface PingCastleResultRead extends PingCastleResultSummary {
+  username: string;
+  risk_rules: PingCastleRiskRule[] | null;
+  domain_info: Record<string, unknown> | null;
+  findings: ADAuditFinding[] | null;
+  report_html_path: string | null;
+}

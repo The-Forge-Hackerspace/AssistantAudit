@@ -67,6 +67,88 @@ if (Get-Command nmap -ErrorAction SilentlyContinue) {
     Write-Warn "Nmap non trouve - le scanner reseau ne fonctionnera pas"
 }
 
+# ── PingCastle Setup ──
+$PingCastleDir = Join-Path $RootDir "tools\pingcastle"
+$PingCastleExe = Join-Path $PingCastleDir "PingCastle.exe"
+$PingCastleRepo = "https://github.com/netwrix/pingcastle"
+
+Write-Log "Verification de PingCastle..."
+
+if (-not (Test-Path $PingCastleDir)) {
+    Write-Log "Clonage du depot PingCastle..."
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        try {
+            $toolsDir = Join-Path $RootDir "tools"
+            if (-not (Test-Path $toolsDir)) {
+                New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null
+            }
+            $cloneOutput = git clone --depth 1 $PingCastleRepo $PingCastleDir 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Ok "PingCastle clone depuis GitHub"
+            } else {
+                Write-Warn "Impossible de cloner PingCastle"
+                Write-Host $cloneOutput -ForegroundColor Yellow
+                Write-Warn "Vous devrez installer PingCastle manuellement"
+            }
+        } catch {
+            Write-Warn "Erreur lors du clonage de PingCastle : $_"
+            Write-Warn "Vous devrez installer PingCastle manuellement"
+        }
+    } else {
+        Write-Warn "Git non trouve - impossible de cloner PingCastle automatiquement"
+        Write-Warn "Telechargez PingCastle depuis : https://github.com/netwrix/pingcastle/releases"
+    }
+} else {
+    # Update existing PingCastle repository
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        Push-Location $PingCastleDir
+        try {
+            $gitStatus = git status --porcelain 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Log "Mise a jour de PingCastle..."
+                $pullOutput = git pull --quiet origin master 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Ok "PingCastle mis a jour"
+                } else {
+                    Write-Warn "Impossible de mettre a jour PingCastle"
+                    if ($pullOutput -and $pullOutput -ne "Already up to date.") {
+                        Write-Host $pullOutput -ForegroundColor Yellow
+                    }
+                }
+            }
+        } catch {
+            Write-Warn "Erreur lors de la mise a jour de PingCastle : $_"
+        } finally {
+            Pop-Location
+        }
+    }
+}
+
+# Check if PingCastle.exe exists and update .env
+if (Test-Path $PingCastleExe) {
+    Write-Ok "PingCastle.exe trouve : $PingCastleExe"
+    
+    # Update .env with PingCastle path
+    $envFile = Join-Path $RootDir ".env"
+    if (Test-Path $envFile) {
+        $envContent = Get-Content $envFile -Raw
+        if ($envContent -notmatch "PINGCASTLE_PATH=") {
+            # Add PINGCASTLE_PATH if not present
+            Add-Content -Path $envFile -Value "`nPINGCASTLE_PATH=$PingCastleExe"
+            Write-Ok "PINGCASTLE_PATH configure dans .env"
+        } else {
+            # Update existing PINGCASTLE_PATH
+            $envContent = $envContent -replace "PINGCASTLE_PATH=.*", "PINGCASTLE_PATH=$PingCastleExe"
+            Set-Content -Path $envFile -Value $envContent -NoNewline
+            Write-Ok "PINGCASTLE_PATH mis a jour dans .env"
+        }
+    }
+} else {
+    Write-Warn "PingCastle.exe non trouve dans $PingCastleDir"
+    Write-Warn "Les fonctionnalites PingCastle ne seront pas disponibles"
+    Write-Warn "Telechargez la derniere version : https://github.com/netwrix/pingcastle/releases"
+}
+
 # ── Environnement virtuel Python ──
 if (-not (Test-Path $VenvDir)) {
     Write-Log "Creation de l'environnement virtuel Python..."

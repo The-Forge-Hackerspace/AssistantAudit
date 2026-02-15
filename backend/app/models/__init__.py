@@ -32,6 +32,7 @@ from .attachment import Attachment
 from .config_analysis import ConfigAnalysis
 from .collect_result import CollectResult, CollectMethod, CollectStatus
 from .ad_audit_result import ADAuditResultModel, ADAuditStatus
+from .pingcastle_result import PingCastleResult, PingCastleStatus
 
 __all__ = [
     "User",
@@ -64,4 +65,6 @@ __all__ = [
     "CollectStatus",
     "ADAuditResultModel",
     "ADAuditStatus",
+    "PingCastleResult",
+    "PingCastleStatus",
 ]

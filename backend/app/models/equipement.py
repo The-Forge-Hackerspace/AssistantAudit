@@ -73,6 +73,9 @@ class Equipement(Base):
     ad_audit_results: Mapped[list["ADAuditResultModel"]] = relationship(  # type: ignore[name-defined]
         back_populates="equipement", cascade="all, delete-orphan", lazy="selectin"
     )
+    pingcastle_results: Mapped[list["PingCastleResult"]] = relationship(  # type: ignore[name-defined]
+        back_populates="equipement", cascade="all, delete-orphan", lazy="selectin"
+    )
 
     __table_args__ = (
         UniqueConstraint("site_id", "ip_address", name="uq_site_ip"),
