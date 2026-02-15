@@ -41,6 +41,9 @@ import type {
   ADAuditCreate,
   ADAuditResultSummary,
   ADAuditResultRead,
+  PingCastleCreate,
+  PingCastleResultSummary,
+  PingCastleResultRead,
 } from "@/types";
 
 // ── Auth ──
@@ -551,6 +554,34 @@ export const toolsApi = {
   async prefillFromADAudit(auditId: number, assessmentId: number): Promise<PrefillResult> {
     const { data } = await api.post(
       `/tools/ad-audits/${auditId}/prefill/${assessmentId}`
+    );
+    return data;
+  },
+
+  // PingCastle
+  async launchPingCastle(params: PingCastleCreate): Promise<PingCastleResultSummary> {
+    const { data } = await api.post("/tools/pingcastle", params);
+    return data;
+  },
+
+  async listPingCastleResults(equipementId?: number): Promise<PingCastleResultSummary[]> {
+    const params = equipementId ? { equipement_id: equipementId } : {};
+    const { data } = await api.get("/tools/pingcastle-results", { params });
+    return data;
+  },
+
+  async getPingCastleResult(resultId: number): Promise<PingCastleResultRead> {
+    const { data } = await api.get(`/tools/pingcastle-results/${resultId}`);
+    return data;
+  },
+
+  async deletePingCastleResult(resultId: number): Promise<void> {
+    await api.delete(`/tools/pingcastle-results/${resultId}`);
+  },
+
+  async prefillFromPingCastle(resultId: number, assessmentId: number): Promise<PrefillResult> {
+    const { data } = await api.post(
+      `/tools/pingcastle-results/${resultId}/prefill/${assessmentId}`
     );
     return data;
   },

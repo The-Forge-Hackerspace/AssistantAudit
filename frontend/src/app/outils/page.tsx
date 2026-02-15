@@ -9,6 +9,7 @@ import {
   Wrench,
   ArrowRight,
   ShieldCheck,
+  Castle,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,15 @@ const tools = [
     href: "/outils/ad-auditor",
     color: "text-cyan-500",
     bgColor: "bg-cyan-500/10",
+  },
+  {
+    title: "PingCastle",
+    description:
+      "Audit avancé Active Directory avec PingCastle : analyse healthcheck, scores de risque, règles de sécurité et terminal interactif.",
+    icon: Castle,
+    href: "/outils/pingcastle",
+    color: "text-red-500",
+    bgColor: "bg-red-500/10",
   },
 ];
 
