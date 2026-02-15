@@ -2,6 +2,8 @@
 Configuration de l'application via Pydantic Settings.
 Charge automatiquement les variables depuis .env
 """
+import os
+import secrets
 from pathlib import Path
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -42,25 +44,33 @@ class Settings(BaseSettings):
     DATABASE_URL: str = f"sqlite:///{BASE_DIR / 'instance' / 'assistantaudit.db'}"
 
     # --- Sécurité / JWT ---
-    SECRET_KEY: str = "dev-only-insecure-key-change-me-in-production"
+    SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
 
-    def validate_secret_key(self) -> None:
-        """Vérifie que la clé secrète est sûre en production / preprod."""
-        insecure_defaults = ("dev-only", "change-me", "secret", "insecure")
+    def model_post_init(self, __context):
+        """Initialise la SECRET_KEY après le chargement de la config."""
+        # Si SECRET_KEY n'est pas définie, la générer
+        if not self.SECRET_KEY:
+            env_key = os.getenv("SECRET_KEY")
+            if env_key:
+                self.SECRET_KEY = env_key
+            else:
+                # Générer une clé sécurisée automatiquement en développement
+                self.SECRET_KEY = secrets.token_urlsafe(64)
+                if self.ENV in ("production", "preprod", "staging"):
+                    raise ValueError(
+                        "ERREUR CRITIQUE: SECRET_KEY doit être défini en production!\n"
+                        "Générez une clé avec: python -c 'import secrets; print(secrets.token_urlsafe(64))'\n"
+                        "Puis ajoutez SECRET_KEY=<clé> dans votre fichier .env"
+                    )
+        
+        # Validation en production
         is_safe_env = self.ENV in ("production", "preprod", "staging")
-
-        if is_safe_env:
-            if any(tok in self.SECRET_KEY.lower() for tok in insecure_defaults):
-                raise ValueError(
-                    "SECRET_KEY doit être défini en production ! "
-                    "Ajoutez SECRET_KEY=<votre-clé> dans .env"
-                )
-            if len(self.SECRET_KEY) < 32:
-                raise ValueError(
-                    "SECRET_KEY trop courte (min 32 caractères en production). "
-                    "Générez-en une avec : python -c 'import secrets; print(secrets.token_urlsafe(64))'"
-                )
+        if is_safe_env and len(self.SECRET_KEY) < 32:
+            raise ValueError(
+                "SECRET_KEY trop courte en production (min 32 caractères). "
+                "Générez-en une avec : python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
 
     # --- CORS ---
     CORS_ALLOW_METHODS: list[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
@@ -72,7 +82,7 @@ class Settings(BaseSettings):
     # --- Upload ---
     MAX_CONFIG_UPLOAD_SIZE_MB: int = 5  # taille max fichier config analysis
 
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # Sécur: accès court (15 min), refresh plus long
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # --- Uploads ---
@@ -95,6 +105,11 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = str(BASE_DIR / "logs")
 
+    # --- Monitoring: Sentry ---
+    SENTRY_DSN: str = ""  # Sentry error tracking DSN (optional)
+    SENTRY_TRACING_ENABLED: bool = False  # Enable performance tracing (uses more resources)
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1  # Fraction of transactions to trace (0.0-1.0)
+
     # --- Pagination ---
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
@@ -104,5 +119,4 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Retourne l'instance de settings (singleton via cache)"""
     s = Settings()
-    s.validate_secret_key()
     return s

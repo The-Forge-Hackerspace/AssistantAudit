@@ -12,7 +12,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from typing import Optional
-from xml.etree import ElementTree as ET
+import defusedxml.ElementTree as ET
 
 import paramiko
 

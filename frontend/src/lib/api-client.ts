@@ -5,6 +5,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/a
 
 const TOKEN_KEY = "aa_access_token";
 const REFRESH_KEY = "aa_refresh_token";
+const TOKEN_EXPIRY_MINUTES = 15; // Doit correspondre au backend: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
 
 // ── Client Axios ──
 const api = axios.create({
@@ -41,7 +42,10 @@ api.interceptors.response.use(
 // ── Helpers Auth ──
 export function setTokens(accessToken: string, refreshToken: string) {
   const isSecure = typeof window !== "undefined" && window.location.protocol === "https:";
-  Cookies.set(TOKEN_KEY, accessToken, { expires: 1, sameSite: "strict", secure: isSecure });
+  // Acc\u00e8s: expiry court align\u00e9 avec backend (15 min)
+  // Note: js-cookie ne supporte pas httpOnly (restriction navigateur)
+  // Les tokens rest JSON stockés en plain text mais avec sameSite=strict et secure pour CSRF
+  Cookies.set(TOKEN_KEY, accessToken, { expires: TOKEN_EXPIRY_MINUTES / (24 * 60), sameSite: "strict", secure: isSecure });
   Cookies.set(REFRESH_KEY, refreshToken, { expires: 7, sameSite: "strict", secure: isSecure });
 }
 

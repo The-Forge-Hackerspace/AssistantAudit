@@ -7,15 +7,16 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+from .validators import IPAddress, MACAddress, Hostname, Description
 
 
 class EquipementBase(BaseModel):
-    ip_address: str = Field(..., max_length=45)
-    mac_address: Optional[str] = Field(default=None, max_length=17)
-    hostname: Optional[str] = Field(default=None, max_length=255)
+    ip_address: IPAddress = Field(...)
+    mac_address: Optional[MACAddress] = Field(default=None)
+    hostname: Optional[Hostname] = Field(default=None)
     fabricant: Optional[str] = Field(default=None, max_length=200)
     os_detected: Optional[str] = Field(default=None, max_length=255)
-    notes_audit: Optional[str] = None
+    notes_audit: Optional[Description] = None
 
 
 class EquipementCreate(EquipementBase):

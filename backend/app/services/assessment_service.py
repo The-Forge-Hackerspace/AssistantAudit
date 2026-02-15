@@ -6,7 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..models.assessment import (
     AssessmentCampaign,
@@ -50,7 +50,14 @@ class AssessmentService:
     def list_campaigns(
         db: Session, audit_id: int = None, offset: int = 0, limit: int = 20
     ) -> tuple[list[AssessmentCampaign], int]:
-        query = db.query(AssessmentCampaign)
+        """
+        List assessment campaigns with pagination.
+        Optimized to avoid N+1 queries by eagerly loading assessments.
+        """
+        query = db.query(AssessmentCampaign).options(
+            selectinload(AssessmentCampaign.assessments),
+            selectinload(AssessmentCampaign.audit),
+        )
         if audit_id:
             query = query.filter(AssessmentCampaign.audit_id == audit_id)
         total = query.count()
@@ -320,16 +327,28 @@ class AssessmentService:
 
     @staticmethod
     def get_assessment_score(db: Session, assessment_id: int) -> dict | None:
-        """Calcule le score d'un assessment"""
-        assessment = db.get(Assessment, assessment_id)
+        """
+        Calculate compliance score for an assessment.
+        Optimized to eagerly load control results.
+        """
+        assessment = db.query(Assessment).options(
+            selectinload(Assessment.results).selectinload(ControlResult.control),
+        ).filter(Assessment.id == assessment_id).first()
+        
         if not assessment:
             return None
         return AssessmentService.compute_score(assessment.results)
 
     @staticmethod
     def get_campaign_score(db: Session, campaign_id: int) -> dict | None:
-        """Calcule le score d'une campagne (agrégé sur tous ses assessments)"""
-        campaign = db.get(AssessmentCampaign, campaign_id)
+        """
+        Calculate compliance score for a campaign (aggregated across all assessments).
+        Optimized to eagerly load assessment results.
+        """
+        campaign = db.query(AssessmentCampaign).options(
+            selectinload(AssessmentCampaign.assessments).selectinload(Assessment.results),
+        ).filter(AssessmentCampaign.id == campaign_id).first()
+        
         if not campaign:
             return None
         all_results = []

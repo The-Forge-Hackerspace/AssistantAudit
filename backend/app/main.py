@@ -11,30 +11,34 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .core.config import get_settings
 from .core.database import create_all_tables, SessionLocal
+from .core.logging_config import configure_structured_logging
+from .core.audit_logger import AuditLoggingMiddleware
+from .core.metrics import init_app_metrics, get_metrics
+from .core.metrics_middleware import PrometheusMiddleware
+from .core.sentry_integration import init_sentry
+from .core.health_check import HealthCheckService
 
 settings = get_settings()
-
-
-def configure_logging():
-    """Configure le logging global"""
-    log_dir = Path(settings.LOG_DIR)
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    logging.basicConfig(
-        level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler(log_dir / "assistantaudit.log", encoding="utf-8"),
-        ],
-    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle de l'application : démarrage et arrêt"""
-    configure_logging()
+    # Configure structured JSON logging
+    configure_structured_logging(settings.LOG_LEVEL)
     logger = logging.getLogger(__name__)
+    
+    # Initialize Prometheus metrics
+    init_app_metrics(version=settings.APP_VERSION, environment=settings.ENV)
+    
+    # Initialize Sentry error tracking (if DSN configured)
+    init_sentry(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENV,
+        version=settings.APP_VERSION,
+        enable_tracing=settings.SENTRY_TRACING_ENABLED,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+    )
 
     # Création des tables en développement
     if settings.ENV == "development":
@@ -119,6 +123,12 @@ def create_app() -> FastAPI:
 
     app.add_middleware(SecurityHeadersMiddleware)
 
+    # ── Prometheus Metrics Middleware ────────────────────────────────────
+    app.add_middleware(PrometheusMiddleware)
+
+    # ── Audit Logging Middleware (for tracing and business audit trail) ────
+    app.add_middleware(AuditLoggingMiddleware)
+
     # ── CORS (restreint aux méthodes et en-têtes nécessaires) ────────────
     app.add_middleware(
         CORSMiddleware,
@@ -131,6 +141,65 @@ def create_app() -> FastAPI:
     # Enregistrement du router API v1
     from .api.v1.router import api_router
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+    # ── Prometheus metrics endpoint ────────────────────────────────────────
+    @app.get(
+        "/metrics",
+        responses={200: {"description": "Prometheus metrics"}},
+        tags=["monitoring"],
+    )
+    async def metrics():
+        """Expose Prometheus metrics for monitoring"""
+        return Response(content=get_metrics(), media_type="text/plain")
+
+    # ── Health check endpoints ────────────────────────────────────────────
+    @app.get(
+        "/health",
+        responses={200: {"description": "Application health status"}},
+        tags=["monitoring"],
+    )
+    async def health():
+        """Basic health check endpoint - always responds if application is running"""
+        status = HealthCheckService.get_health_status()
+        return status
+
+    @app.get(
+        "/ready",
+        responses={
+            200: {"description": "Application is ready to serve requests"},
+            503: {"description": "Application is not ready (dependencies unavailable)"},
+        },
+        tags=["monitoring"],
+    )
+    async def ready():
+        """
+        Readiness check endpoint - includes database connectivity check.
+        Returns 503 if dependencies are not available.
+        """
+        status = HealthCheckService.get_ready_status()
+        status_code = 200 if status["ready"] else 503
+        return Response(
+            content=str(status),
+            status_code=status_code,
+            media_type="application/json",
+        )
+
+    @app.get(
+        "/liveness",
+        responses={200: {"description": "Application is alive"}},
+        tags=["monitoring"],
+    )
+    async def liveness():
+        """
+        Liveness check endpoint for Kubernetes.
+        Returns 200 if the application is running.
+        """
+        status = HealthCheckService.get_liveness_status()
+        return status
+
+    # Enregistrement des gestionnaires d'exceptions globaux
+    from .core.exception_handlers import register_exception_handlers
+    register_exception_handlers(app)
 
     return app
 

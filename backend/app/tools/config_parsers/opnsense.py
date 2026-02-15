@@ -6,7 +6,8 @@ Extrait : hostname, firmware, interfaces, règles de filtrage, constats de sécu
 """
 import logging
 from typing import Optional
-from xml.etree import ElementTree as ET
+import defusedxml.ElementTree as ET
+from xml.etree.ElementTree import Element
 
 from .base import ConfigParserBase
 from ...schemas.scan import (
@@ -79,7 +80,7 @@ class OPNsenseParser(ConfigParserBase):
             },
         )
 
-    def _parse_interfaces(self, root: ET.Element) -> list[InterfaceInfo]:
+    def _parse_interfaces(self, root: Element) -> list[InterfaceInfo]:
         """Parse la section <interfaces>."""
         interfaces: list[InterfaceInfo] = []
         iface_node = root.find(".//interfaces")
@@ -108,7 +109,7 @@ class OPNsenseParser(ConfigParserBase):
 
         return interfaces
 
-    def _parse_firewall_rules(self, root: ET.Element) -> list[FirewallRuleInfo]:
+    def _parse_firewall_rules(self, root: Element) -> list[FirewallRuleInfo]:
         """Parse la section <filter> dans <rules>."""
         rules: list[FirewallRuleInfo] = []
         filter_node = root.find(".//filter")
@@ -167,7 +168,7 @@ class OPNsenseParser(ConfigParserBase):
 
     def _analyze_security(
         self,
-        root: ET.Element,
+        root: Element,
         interfaces: list[InterfaceInfo],
         rules: list[FirewallRuleInfo],
     ) -> list[SecurityFinding]:
@@ -252,7 +253,7 @@ class OPNsenseParser(ConfigParserBase):
         return findings
 
     @staticmethod
-    def _get_text(element: ET.Element, path: str) -> Optional[str]:
+    def _get_text(element: Element, path: str) -> Optional[str]:
         node = element.find(path)
         if node is not None and node.text:
             return node.text.strip()

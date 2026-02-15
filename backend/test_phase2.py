@@ -34,11 +34,18 @@ print("=" * 65)
 print("  TEST PHASE 1+2 — Chaine complete + Roles + Scoring + Monkey365")
 print("=" * 65)
 
+import os
+
 client = httpx.Client(base_url=BASE, timeout=10)
+
+# Charger depuis les variables d'environnement avec des valeurs par défaut sûres
+ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD", "TestAdmin@2026!")
+AUDITEUR_PASSWORD = os.getenv("TEST_AUDITEUR_PASSWORD", "TestAuditeur@2026!")
+LECTEUR_PASSWORD = os.getenv("TEST_LECTEUR_PASSWORD", "TestLecteur@2026!")
 
 # 1. AUTH ---------------------------------------------------------------
 print("\n[1] Authentification")
-r = check("POST /auth/login (admin)", client.post("/auth/login", data={"username": "admin", "password": "Admin@2026!"}))
+r = check("POST /auth/login (admin)", client.post("/auth/login", data={"username": "admin", "password": ADMIN_PASSWORD}))
 token = r.json()["access_token"]
 headers = {"Authorization": f"Bearer {token}"}
 
@@ -46,18 +53,18 @@ check("GET  /auth/me", client.get("/auth/me", headers=headers))
 
 # Creer un auditeur et un lecteur pour tester les roles
 check("POST /auth/register (auditeur)", client.post("/auth/register", headers=headers, json={
-    "username": "auditeur1", "email": "auditeur@test.fr", "password": "Audit@2026!", "role": "auditeur",
+    "username": "auditeur1", "email": "auditeur@test.fr", "password": AUDITEUR_PASSWORD, "role": "auditeur",
 }), 201)
 check("POST /auth/register (lecteur)", client.post("/auth/register", headers=headers, json={
-    "username": "lecteur1", "email": "lecteur@test.fr", "password": "Lect@2026!", "role": "lecteur",
+    "username": "lecteur1", "email": "lecteur@test.fr", "password": LECTEUR_PASSWORD, "role": "lecteur",
 }), 201)
 
 # Login auditeur
-r = client.post("/auth/login", data={"username": "auditeur1", "password": "Audit@2026!"})
+r = client.post("/auth/login", data={"username": "auditeur1", "password": AUDITEUR_PASSWORD})
 auditeur_headers = {"Authorization": f"Bearer " + r.json()["access_token"]}
 
 # Login lecteur
-r = client.post("/auth/login", data={"username": "lecteur1", "password": "Lect@2026!"})
+r = client.post("/auth/login", data={"username": "lecteur1", "password": LECTEUR_PASSWORD})
 lecteur_headers = {"Authorization": f"Bearer " + r.json()["access_token"]}
 
 # 2. ENTREPRISE ---------------------------------------------------------

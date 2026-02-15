@@ -46,16 +46,28 @@ def init_database():
         if existing:
             print("  [SKIP] L'utilisateur 'admin' existe deja")
         else:
+            # Utiliser un mot de passe depuis l'environnement ou demander à l'utilisateur
+            import os
+            admin_password = os.getenv("ADMIN_PASSWORD")
+            if not admin_password:
+                # Générer un mot de passe aléatoire pour la première initialisation
+                import secrets
+                import string
+                alphabet = string.ascii_letters + string.digits + "!@#$%"
+                admin_password = "".join(secrets.choice(alphabet) for _ in range(16))
+                print(f"  [INFO] Mot de passe admin généré aléatoirement (à changer dès la première connexion)")
+            
             admin = User(
                 username="admin",
                 email="admin@assistantaudit.fr",
-                password_hash=hash_password("Admin@2026!"),
+                password_hash=hash_password(admin_password),
                 full_name="Administrateur",
                 role="admin",
             )
             db.add(admin)
             db.commit()
-            print("  [OK] Utilisateur admin cree (login: admin / Admin@2026!)")
+            print(f"  [OK] Utilisateur admin cree (login: admin / <mot_de_passe_genere>)")
+            print(f"  [INFO] Mot de passe initial: {admin_password}")
 
         # 3. Importer les référentiels
         print("\n[3/3] Import des referentiels YAML...")

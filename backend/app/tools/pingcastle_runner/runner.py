@@ -11,7 +11,7 @@ et son chemin configuré via PINGCASTLE_PATH dans les settings.
 import logging
 import os
 import subprocess
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
