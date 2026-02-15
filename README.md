@@ -25,7 +25,7 @@ Plateforme d'audit d'infrastructure IT — évaluation de conformité des équip
 | **Frontend** | Next.js 16 · React 19 · TypeScript · Tailwind CSS v4 · shadcn/ui · Recharts |
 | **Auth** | JWT (python-jose + bcrypt) |
 | **BDD** | SQLite (dev) / PostgreSQL (prod) |
-| **Outils** | Nmap · OpenSSL · Monkey365 |
+| **Outils** | Nmap · OpenSSL · Monkey365 · PingCastle |
 | **Infra** | Docker · Docker Compose |
 
 ## Démarrage rapide
@@ -34,7 +34,9 @@ Plateforme d'audit d'infrastructure IT — évaluation de conformité des équip
 
 - **Python 3.12+**
 - **Node.js 20+** et npm
+- **Git** (recommandé pour le clonage automatique de PingCastle)
 - **Nmap** (optionnel, pour le scanner réseau)
+- **PingCastle** (Windows uniquement, téléchargé automatiquement par `start.ps1`)
 
 ### Installation automatique
 
@@ -190,6 +192,68 @@ LOG_LEVEL=INFO
 # Outils
 NMAP_TIMEOUT=600         # Timeout Nmap en secondes
 MONKEY365_PATH=          # Chemin vers Invoke-Monkey365.ps1
+PINGCASTLE_PATH=         # Chemin vers PingCastle.exe (auto-configuré par start.ps1)
+PINGCASTLE_TIMEOUT=300   # Timeout PingCastle en secondes
+```
+
+## PingCastle — Audit Active Directory avancé
+
+PingCastle est un outil d'audit Active Directory qui fournit un healthcheck approfondi du domaine AD avec des scores de risque et des recommandations de sécurité.
+
+### Configuration automatique (Windows)
+
+Sur Windows, le script `start.ps1` clone automatiquement le dépôt PingCastle depuis GitHub et configure le chemin dans `.env` :
+
+```powershell
+# Le script télécharge et configure PingCastle automatiquement
+.\start.ps1
+```
+
+Le dépôt PingCastle sera cloné dans `tools/pingcastle/` et mis à jour automatiquement à chaque lancement.
+
+### Configuration manuelle
+
+Si vous préférez télécharger PingCastle manuellement :
+
+1. Téléchargez la dernière version depuis [https://github.com/netwrix/pingcastle/releases](https://github.com/netwrix/pingcastle/releases)
+2. Extrayez `PingCastle.exe` dans un répertoire de votre choix
+3. Configurez le chemin dans `.env` :
+
+```env
+PINGCASTLE_PATH=C:\chemin\vers\PingCastle.exe
+```
+
+### Utilisation
+
+PingCastle propose deux modes d'utilisation dans AssistantAudit :
+
+#### 1. Audit automatisé (Healthcheck)
+
+Depuis l'interface web (`http://localhost:3000/outils/pingcastle`), onglet **Audit automatisé** :
+
+- Saisissez les informations du contrôleur de domaine
+- Lancez l'audit en arrière-plan
+- Consultez les résultats : scores de risque, règles violées, niveau de maturité
+- Utilisez les findings pour pré-remplir automatiquement les contrôles d'audit AD
+
+#### 2. Terminal interactif
+
+Depuis l'interface web, onglet **Terminal interactif** :
+
+- Ouvrez un terminal PingCastle complet avec menu interactif
+- Naviguez dans les options d'audit (healthcheck, scanner, etc.)
+- Consultez les rapports en temps réel
+
+### Intégration avec les référentiels d'audit
+
+Les résultats PingCastle peuvent être utilisés pour pré-remplir automatiquement les contrôles du référentiel Active Directory :
+
+- **AD-001** : Comptes privilégiés (score PingCastle Privileged Accounts)
+- **AD-002** : Objets obsolètes (score Stale Objects)
+- **AD-010** : Relations d'approbation (score Trusts)
+- **AD-012** : Anomalies (score Anomaly)
+- **AD-020** : Score global
+
 ```
 
 ## Documentation
