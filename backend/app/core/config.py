@@ -86,6 +86,11 @@ class Settings(BaseSettings):
     NMAP_TIMEOUT: int = 600  # secondes
     MONKEY365_PATH: str = ""  # chemin vers Invoke-Monkey365.ps1
 
+    # --- PingCastle ---
+    PINGCASTLE_PATH: str = ""  # chemin vers PingCastle.exe
+    PINGCASTLE_TIMEOUT: int = 300  # secondes
+    PINGCASTLE_OUTPUT_DIR: str = str(BASE_DIR / "uploads" / "pingcastle")
+
     # --- Logging ---
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = str(BASE_DIR / "logs")
