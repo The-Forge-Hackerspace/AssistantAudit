@@ -1,0 +1,125 @@
+site_name: Monkey365
+site_url: https://silverhack.github.io/monkey365/
+site_description: Monkey365
+site_author: Juan Garrido
+
+repo_url: https://github.com/silverhack/monkey365
+edit_uri: blob/main/docs/
+
+extra_css:
+- assets/css/extra.css
+
+hooks:
+- docs_overrides/hooks/year.py
+
+theme:
+  language: en
+  name: material
+  font:
+    text: Roboto
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+      primary: black
+      accent: blue
+    - scheme: slate
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to light mode
+      primary: black
+  logo: assets/images/MonkeyLogo.png
+  favicon: assets/images/favicon.ico
+  icon:
+    repo: fontawesome/brands/github
+  features:
+  - navigation.instant
+  - navigation.indexes
+  - navigation.sections:
+      level: 1
+  - navigation.tabs
+  - content.code.annotate
+
+nav:
+  - Home: index.md
+  - Getting started:
+    - Overview:
+      - Installation: install/install-instructions.md
+      - Permissions: getting_started/permissions.md
+      - Basic Usage: getting_started/basic-usage.md
+    - Configuration:
+      - General Options: configuration/general-options.md
+      - Azure Options: configuration/azure-options.md
+      - Microsoft365 Options: configuration/microsoft365-options.md
+      - Configuration File: configuration/configuration-file.md
+      - Handle Rate Limit: configuration/rate-limit.md
+    - Authentication:
+      - Overview: authentication/overview.md
+      - Authentication Flows:
+        - Web Browser Interactive: authentication/authFlows/interactive.md
+        - Device Code: authentication/authFlows/devicecode.md
+        - Service Principal: authentication/authFlows/sp.md
+        - Resource Owner Password Credential: authentication/authFlows/ropc.md
+      - Supported Authentication Methods Matrix: authentication/supported_auth_methods_byapp.md
+      - Service Principal Authentication:
+        - Manual Setup: authentication/sp_authentication/getting_started.md
+        - Automatic Setup: authentication/sp_authentication/automatic_setup.md
+      - Authentication Prompts: authentication/authprompts.md
+      - Current limitations: authentication/limitations.md
+    - Docker:
+      - Overview: docker/docker.md
+    - Export Data:
+      - Overview: exporting/exporting-data.md
+      - CSV: exporting/export-csv.md
+      - JSON: exporting/export-json.md
+      - CLIXML: exporting/export-clixml.md
+      - HTML: exporting/export-html.md
+    - Logging:
+      - Introduction: logging/introduction.md
+      - Channels: logging/channels.md
+      - File logger: logging/File.md
+      - Slack logger: logging/Slack.md
+      - Teams logger: logging/Teams.md
+    - Security Checks:
+      - Overview: security_checks/overview.md
+      - Create a custom rule: security_checks/custom-rule.md
+      - Custom ruleset: security_checks/custom-ruleset.md
+  - License and Contributing: license/license-contributing.md
+  - Support: support/support.md
+  - Disclaimer: support/disclaimer.md
+  - Sample Report: sample/monkey365.html
+
+extra:
+  consent:
+    title: Cookie consent
+    description: >- 
+      We use cookies to recognize your repeated visits and preferences, as well
+      as to measure the effectiveness of our documentation and whether users
+      find what they're searching for. With your consent, you're helping us to
+      make our documentation better.
+  analytics:
+    provider: google
+    property: G-M9919NENQD
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/silverhack/monkey365
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/tr1ana
+  local:
+    social_preview: https://user-images.githubusercontent.com/5271640/178448433-2eb54eaa-ffc4-40b7-9b90-4a6021a2f609.png
+    repo_issue: https://github.com/silverhack/monkey365/issues
+    repo_discussion: https://github.com/silverhack/monkey365/discussions
+    
+copyright: Copyright &copy; {year} <a href="https://twitter.com/tr1ana" target="blank">Juan Garrido</a>
+
+markdown_extensions:
+  - admonition
+  - footnotes
+  - pymdownx.details
+  - pymdownx.superfences
+  - attr_list
+  - md_in_html
+  - pymdownx.blocks.caption
+  - toc:
+      permalink: true
