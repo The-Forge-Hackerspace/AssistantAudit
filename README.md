@@ -34,9 +34,9 @@ Plateforme d'audit d'infrastructure IT — évaluation de conformité des équip
 
 - **Python 3.12+**
 - **Node.js 20+** et npm
-- **Git** (recommandé pour le clonage automatique de PingCastle)
+- **PowerShell 7+** (recommandé pour Monkey365)
+- **Git** (recommandé pour le téléchargement automatique des outils)
 - **Nmap** (optionnel, pour le scanner réseau)
-- **PingCastle** (Windows uniquement, téléchargé automatiquement par `start.ps1`)
 
 ### Installation automatique
 
@@ -44,13 +44,28 @@ Plateforme d'audit d'infrastructure IT — évaluation de conformité des équip
 # Cloner le projet
 git clone <url> && cd AssistantAudit
 
-# Lancer tout (backend + frontend)
-# Linux / macOS :
-chmod +x start.sh && ./start.sh
+# Windows (PowerShell 7 recommandé) :
 
-# Windows (PowerShell) :
+# Mode standard
 .\start.ps1
+
+# Mode développement (logs DEBUG + hot-reload)
+.\start.ps1 --dev
+
+# Mode production (build optimisé)
+.\start.ps1 --build
 ```
+
+**Nouveautés v2.0 du script de démarrage :**
+- ✨ Téléchargement automatique de **Monkey365** (similaire à PingCastle)
+- ✨ Création automatique du fichier `.env` avec SECRET_KEY générée
+- ✨ Mode `--dev` avec logs verbeux sur tous les composants
+- ✨ Mode `--build` pour tests de performance
+- ✨ Rotation automatique des logs (max 10MB)
+- ✨ Gestion améliorée des processus avec fichiers PID
+- ✨ Validation PowerShell 7+ pour Monkey365
+
+📖 **Guide détaillé :** Voir [START_GUIDE.md](START_GUIDE.md) pour toutes les fonctionnalités
 
 ### Installation manuelle
 
