@@ -57,6 +57,7 @@ git clone <url> && cd AssistantAudit
 ```
 
 **Nouveautés v2.0 du script de démarrage :**
+
 - ✨ Téléchargement automatique de **Monkey365** (similaire à PingCastle)
 - ✨ Création automatique du fichier `.env` avec SECRET_KEY générée
 - ✨ Mode `--dev` avec logs verbeux sur tous les composants
@@ -269,7 +270,7 @@ Les résultats PingCastle peuvent être utilisés pour pré-remplir automatiquem
 - **AD-012** : Anomalies (score Anomaly)
 - **AD-020** : Score global
 
-```
+```text
 
 ## Documentation
 

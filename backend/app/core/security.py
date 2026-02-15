@@ -3,11 +3,14 @@ Sécurité : hashing de mots de passe et gestion JWT.
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import logging
 
 import bcrypt
 from jose import JWTError, jwt
 
 from .config import get_settings
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
