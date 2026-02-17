@@ -626,15 +626,15 @@ function Clean-PidFile {
     
     if (Test-Path $PidFile) {
         Write-Verbose-Custom "Nettoyage du fichier PID: $PidFile"
-        $pid = Get-Content $PidFile -ErrorAction SilentlyContinue
+        $processId = Get-Content $PidFile -ErrorAction SilentlyContinue
         
-        if ($pid) {
-            Write-Verbose-Custom "PID trouvé: $pid"
-            $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+        if ($processId) {
+            Write-Verbose-Custom "PID trouvé: $processId"
+            $proc = Get-Process -Id $processId -ErrorAction SilentlyContinue
             if ($proc) {
-                Write-Verbose-Custom "Processus zombie détecté (PID $pid), arrêt..."
+                Write-Verbose-Custom "Processus zombie détecté (PID $processId), arrêt..."
                 try {
-                    taskkill /PID $pid /T /F 2>$null | Out-Null
+                    taskkill /PID $processId /T /F 2>$null | Out-Null
                 } catch {}
             }
         }
