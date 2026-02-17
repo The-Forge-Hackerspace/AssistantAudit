@@ -119,21 +119,31 @@ function Stop-PortProcess {
     param([int]$Port)
     
     Write-Verbose-Custom "Vérification du port $Port..."
-    $procIds = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty OwningProcess -Unique
+    try {
+        $procIds = Get-NetTCPConnection -LocalPort $Port -ErrorAction Stop |
+            Select-Object -ExpandProperty OwningProcess -Unique
+    } catch {
+        Write-Verbose-Custom "Impossible d'utiliser Get-NetTCPConnection pour le port $Port. Le module réseau ou la cmdlet peuvent être indisponibles sur ce système."
+        return
+    }
     
     if ($procIds) {
         Write-Verbose-Custom "Processus trouvés sur le port ${Port}: $($procIds -join ', ')"
         foreach ($p in $procIds) {
             try {
                 Write-Verbose-Custom "Arrêt du processus PID $p..."
-                taskkill /PID $p /T /F 2>$null | Out-Null
+                Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
             } catch {}
         }
         
         # Attendre que le port soit libéré (max 10s)
         for ($w = 0; $w -lt 10; $w++) {
-            $still = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+            try {
+                $still = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop
+            } catch {
+                Write-Verbose-Custom "Impossible de vérifier l'état du port $Port avec Get-NetTCPConnection."
+                break
+            }
             if (-not $still) {
                 Write-Verbose-Custom "Port $Port libéré après ${w}s"
                 break
@@ -191,8 +201,9 @@ function Setup-GitTool {
             try {
                 Write-Verbose-Custom "git clone --depth 1 $RepoUrl $TargetDir"
                 $cloneOutput = git clone --depth 1 $RepoUrl $TargetDir 2>&1
+                $gitCloneExitCode = $LASTEXITCODE
                 
-                if ($LASTEXITCODE -eq 0) {
+                if ($gitCloneExitCode -eq 0) {
                     Write-Ok "$Name cloné depuis GitHub"
                 } else {
                     Write-Warn "Impossible de cloner $Name"
@@ -303,8 +314,31 @@ function Update-PingCastle {
             }
             
             Push-Location $TargetDir
-            $updateOutput = & .\PingCastleAutoUpdater.exe @args 2>&1
-            Pop-Location
+            $argumentList = $args -join ' '
+            $stdoutFile = Join-Path -Path $TargetDir -ChildPath "PingCastleAutoUpdater_stdout.log"
+            $stderrFile = Join-Path -Path $TargetDir -ChildPath "PingCastleAutoUpdater_stderr.log"
+            try {
+                $process = Start-Process -FilePath ".\PingCastleAutoUpdater.exe" `
+                                          -ArgumentList $argumentList `
+                                          -NoNewWindow `
+                                          -Wait `
+                                          -PassThru `
+                                          -RedirectStandardOutput $stdoutFile `
+                                          -RedirectStandardError $stderrFile
+                $updateOutput = ""
+                if (Test-Path $stdoutFile) {
+                    $updateOutput += Get-Content -Path $stdoutFile -Raw
+                    Remove-Item $stdoutFile -ErrorAction SilentlyContinue
+                }
+                if (Test-Path $stderrFile) {
+                    if ($updateOutput) { $updateOutput += [Environment]::NewLine }
+                    $updateOutput += Get-Content -Path $stderrFile -Raw
+                    Remove-Item $stderrFile -ErrorAction SilentlyContinue
+                }
+                $LASTEXITCODE = $process.ExitCode
+            } finally {
+                Pop-Location
+            }
             
             if ($LASTEXITCODE -eq 0) {
                 if ($DevMode -and $updateOutput -match "dry-run") {
@@ -495,7 +529,54 @@ function Update-ToolFromGitHub {
         
         # Extraire le ZIP
         try {
-            [System.IO.Compression.ZipFile]::ExtractToDirectory($tempZip, $TargetDir, $true)
+            # Extraction sécurisée du ZIP avec validation des chemins
+            $targetFullPath = [System.IO.Path]::GetFullPath($TargetDir)
+            $targetDirInfo = New-Object System.IO.DirectoryInfo($targetFullPath)
+            $targetRoot = $targetDirInfo.FullName.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+
+            $zip = [System.IO.Compression.ZipFile]::OpenRead($tempZip)
+            try {
+                foreach ($entry in $zip.Entries) {
+                    if ([string]::IsNullOrEmpty($entry.FullName)) { continue }
+
+                    $destinationPath = [System.IO.Path]::Combine($targetFullPath, $entry.FullName)
+                    $destinationFullPath = [System.IO.Path]::GetFullPath($destinationPath)
+
+                    # Vérifier que le chemin reste dans le dossier cible (protection contre la traversée de répertoires)
+                    if (-not $destinationFullPath.StartsWith($targetRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        throw "Entrée ZIP avec chemin non valide détectée: '$($entry.FullName)'"
+                    }
+
+                    # Gérer les répertoires
+                    if ($entry.FullName.EndsWith('/') -or $entry.FullName.EndsWith('\')) {
+                        if (-not (Test-Path -LiteralPath $destinationFullPath)) {
+                            New-Item -ItemType Directory -Path $destinationFullPath -Force | Out-Null
+                        }
+                        continue
+                    }
+
+                    $destDir = [System.IO.Path]::GetDirectoryName($destinationFullPath)
+                    if (-not [string]::IsNullOrEmpty($destDir) -and -not (Test-Path -LiteralPath $destDir)) {
+                        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+                    }
+
+                    # Extraire le fichier
+                    $entryStream = $entry.Open()
+                    try {
+                        $fileStream = [System.IO.File]::Open($destinationFullPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+                        try {
+                            $entryStream.CopyTo($fileStream)
+                        } finally {
+                            $fileStream.Dispose()
+                        }
+                    } finally {
+                        $entryStream.Dispose()
+                    }
+                }
+            } finally {
+                $zip.Dispose()
+            }
+
             Write-Ok "$ToolName $latestVersion installé avec succès"
         } catch {
             Write-Warn "Erreur lors de l'extraction: $_"
