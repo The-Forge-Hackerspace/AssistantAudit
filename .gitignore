@@ -23,6 +23,9 @@ env/
 
 # Tools
 tools/
+.tools/
+./tool
+
 # Environment
 .env
 .env.local
