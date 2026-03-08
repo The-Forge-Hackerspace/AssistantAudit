@@ -13,7 +13,6 @@ build/
 # Virtual environments
 venv/
 .venv/
-.env/
 
 # IDE
 .vscode/
@@ -22,14 +21,13 @@ venv/
 *.swo
 
 # Tools
-./tools/
+tools/
 .tools/
 ./tool
 
 # Environment
 .env
-.env.local
-.env.production
+.env.*
 
 # Wiki
 wiki/
