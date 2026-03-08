@@ -483,7 +483,9 @@ cd backend
 python test_phase2.py
 ```
 
-**Identifiants admin** : `admin` / `Admin@2026!`
+**Identifiants admin** : `admin` / mot de passe affiché lors de l'exécution de `init_db.py`
+
+Vous pouvez forcer un mot de passe fixe en définissant `ADMIN_PASSWORD` avant l'initialisation.
 
 ### Comment lancer le frontend
 

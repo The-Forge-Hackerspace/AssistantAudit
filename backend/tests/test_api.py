@@ -69,6 +69,17 @@ def test_login_success(client):
     assert data["token_type"] == "bearer"
 
 
+def test_login_success_with_email(client):
+    response = client.post(
+        "/api/v1/auth/login",
+        data={"username": "test@test.com", "password": "TestPass@2026"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+
+
 def test_login_fail(client):
     response = client.post(
         "/api/v1/auth/login",

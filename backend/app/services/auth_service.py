@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..core.security import hash_password, verify_password, create_access_token, create_refresh_token
@@ -17,20 +18,26 @@ class AuthService:
 
     @staticmethod
     def authenticate(db: Session, username: str, password: str) -> Optional[User]:
-        """Authentifie un utilisateur par username/password"""
-        user = db.query(User).filter(User.username == username).first()
+        """Authentifie un utilisateur par identifiant (username ou email) + mot de passe"""
+        identifier = username.strip()
+        user = db.query(User).filter(
+            or_(
+                User.username == identifier,
+                User.email.ilike(identifier),
+            )
+        ).first()
         if user is None or not verify_password(password, user.password_hash):
-            logger.warning(f"Tentative de connexion échouée pour: {username}")
+            logger.warning(f"Tentative de connexion échouée pour: {identifier}")
             return None
         if not user.is_active:
-            logger.warning(f"Connexion refusée (compte désactivé): {username}")
+            logger.warning(f"Connexion refusée (compte désactivé): {identifier}")
             return None
 
         # Mettre à jour la dernière connexion
         user.last_login = datetime.now(timezone.utc)
         db.commit()
 
-        logger.info(f"Connexion réussie: {username}")
+        logger.info(f"Connexion réussie: {user.username}")
         return user
 
     @staticmethod
