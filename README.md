@@ -100,7 +100,9 @@ npm run dev
 | **Swagger UI** | <http://localhost:8000/docs> |
 | **ReDoc** | <http://localhost:8000/redoc> |
 
-**Identifiants par défaut** : `admin` / `Admin@2026!`
+**Identifiants admin initiaux** : `admin` / mot de passe généré par `backend/init_db.py`
+
+> Astuce : définissez `ADMIN_PASSWORD` avant l'initialisation pour imposer un mot de passe connu.
 
 ### Docker
 
