@@ -51,6 +51,8 @@ class Framework(Base):
     version: Mapped[str] = mapped_column(String(20), default="1.0", nullable=False)
     engine: Mapped[str | None] = mapped_column(String(50))  # nmap | monkey365 | ssh | winrm | manual
     engine_config: Mapped[dict | None] = mapped_column(JSON)  # config moteur (auth, plugins...)
+    source: Mapped[str | None] = mapped_column(String(500))  # recommandations sur lesquelles le framework est basé
+    author: Mapped[str | None] = mapped_column(String(200))  # créateur du framework
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     source_file: Mapped[str | None] = mapped_column(String(500))  # chemin YAML source
     source_hash: Mapped[str | None] = mapped_column(String(64))  # SHA-256 du fichier YAML

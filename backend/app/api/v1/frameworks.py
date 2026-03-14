@@ -161,6 +161,8 @@ async def create_framework(
             description=body.description,
             engine=body.engine,
             engine_config=body.engine_config,
+            source=body.source,
+            author=body.author,
             categories=categories_data,
         )
         return framework

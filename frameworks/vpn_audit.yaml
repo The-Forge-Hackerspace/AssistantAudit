@@ -4,6 +4,8 @@ framework:
   description: "Référentiel d'audit des infrastructures VPN (site-to-site et remote access)"
   version: "1.0"
   engine: manual
+  source: ""
+  author: ""
 
   categories:
     - name: "Architecture VPN"

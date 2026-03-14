@@ -16,6 +16,8 @@ framework:
       - "CIS FreeBSD Benchmark v1.1.0"
       - "CIS Controls v8"
       - "NIST SP 800-41 Rev 1 - Guidelines on Firewalls and Firewall Policy"
+  source: ""
+  author: ""
 
   categories:
     # ── 1. Système & Mises à jour ────────────────────────────
