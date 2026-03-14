@@ -918,11 +918,36 @@ Update-ToolFromGitHub -ToolName "Monkey365" `
 #  ENVIRONNEMENT VIRTUEL PYTHON
 # ═══════════════════════════════════════════════════════════
 
+$venvPython = Join-Path $VenvDir "Scripts\python.exe"
+$recreateVenv = $false
+
+if (Test-Path $VenvDir) {
+    if (-not (Test-Path $venvPython)) {
+        Write-Warn "venv détecté mais python.exe introuvable : $venvPython"
+        $recreateVenv = $true
+    } else {
+        $venvCheckOutput = & $venvPython --version 2>&1
+        if ($LASTEXITCODE -ne 0 -or ($venvCheckOutput -match "did not find executable")) {
+            Write-Warn "venv invalide détecté (probablement créé sur un autre OS). Recréation nécessaire."
+            if ($DevMode -and $venvCheckOutput) {
+                Write-Verbose-Custom "Diagnostic venv: $venvCheckOutput"
+            }
+            $recreateVenv = $true
+        }
+    }
+}
+
+if ($recreateVenv) {
+    Write-Log "Suppression du venv invalide..."
+    Remove-Item -Path $VenvDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 if (-not (Test-Path $VenvDir)) {
     Write-Log "Création de l'environnement virtuel Python..."
     Write-Verbose-Custom "python -m venv $VenvDir"
     python -m venv $VenvDir
     Write-Ok "venv créé dans $VenvDir"
+    $venvPython = Join-Path $VenvDir "Scripts\python.exe"
 }
 
 Write-Verbose-Custom "Activation du venv..."
@@ -970,11 +995,19 @@ $dbPath = Join-Path $BackendDir "instance\assistantaudit.db"
 
 if (-not (Test-Path $dbPath)) {
     Write-Log "Première exécution - initialisation de la base de données..."
+    # Garantit un mot de passe admin connu au premier démarrage si non fourni.
+    $adminPasswordForInit = $env:ADMIN_PASSWORD
+    if (-not $adminPasswordForInit) {
+        $adminPasswordForInit = "Admin@2026!"
+        $env:ADMIN_PASSWORD = $adminPasswordForInit
+        Write-Warn "ADMIN_PASSWORD non défini: utilisation du mot de passe admin par défaut pour l'initialisation."
+    }
+
     Push-Location $BackendDir
     Write-Verbose-Custom "python init_db.py"
     python init_db.py
     Pop-Location
-    Write-Ok "Base de données initialisée (admin / Admin@2026!)"
+    Write-Ok "Base de données initialisée (admin / $adminPasswordForInit)"
 } else {
     Write-Ok "Base de données existante détectée"
 }
