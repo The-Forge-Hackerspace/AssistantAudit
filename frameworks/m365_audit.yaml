@@ -4,6 +4,8 @@ framework:
   description: "Référentiel d'audit M365 — basé sur CIS Benchmark, moteur Monkey365"
   version: "1.0"
   engine: monkey365
+  source: ""
+  author: ""
 
   categories:
     - name: "Entra ID — Authentification"

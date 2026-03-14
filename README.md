@@ -100,9 +100,19 @@ npm run dev
 | **Swagger UI** | <http://localhost:8000/docs> |
 | **ReDoc** | <http://localhost:8000/redoc> |
 
-**Identifiants admin initiaux** : `admin` / mot de passe généré par `backend/init_db.py`
+**Identifiants admin initiaux** :
+
+- Via `start.ps1` (Windows) : `admin` / `Admin@2026!` (si `ADMIN_PASSWORD` n'est pas défini)
+- Via `python backend/init_db.py` : `admin` / mot de passe généré aléatoirement (affiché dans la console)
 
 > Astuce : définissez `ADMIN_PASSWORD` avant l'initialisation pour imposer un mot de passe connu.
+
+Si vous ne pouvez plus vous connecter (401) sur une base existante, vous pouvez réinitialiser le mot de passe admin:
+
+```bash
+cd backend
+python reset_admin_password.py --username admin --password "Admin@2026!"
+```
 
 ### Docker
 
