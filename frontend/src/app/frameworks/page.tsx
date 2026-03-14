@@ -536,6 +536,16 @@ function FrameworkDetail({
               {framework.description && (
                 <p className="text-sm text-muted-foreground">{framework.description}</p>
               )}
+              {(framework.source || framework.author) && (
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+                  {framework.source && (
+                    <span><span className="font-medium text-foreground">Source :</span> {framework.source}</span>
+                  )}
+                  {framework.author && (
+                    <span><span className="font-medium text-foreground">Auteur :</span> {framework.author}</span>
+                  )}
+                </div>
+              )}
 
               <Separator />
 
@@ -953,6 +963,8 @@ function frameworkToEditor(fw: Framework): { meta: EditorMeta; categories: Edito
       version: fw.version,
       engine: fw.engine || "manual",
       engine_config: fw.engine_config ? JSON.stringify(fw.engine_config, null, 2) : "",
+      source: fw.source || "",
+      author: fw.author || "",
     },
     categories: fw.categories.map((cat) => ({
       _key: makeCategoryKey(),
@@ -981,6 +993,8 @@ interface EditorMeta {
   version: string;
   engine: string;
   engine_config: string;
+  source: string;
+  author: string;
 }
 
 function FrameworkEditor({
@@ -998,7 +1012,7 @@ function FrameworkEditor({
   const initial = framework
     ? frameworkToEditor(framework)
     : {
-        meta: { ref_id: "", name: "", description: "", version: "1.0", engine: "manual", engine_config: "" },
+        meta: { ref_id: "", name: "", description: "", version: "1.0", engine: "manual", engine_config: "", source: "", author: "" },
         categories: [newEmptyCategory()],
       };
 
@@ -1142,6 +1156,8 @@ function FrameworkEditor({
       version: meta.version.trim(),
       engine: meta.engine || undefined,
       engine_config: meta.engine_config.trim() ? JSON.parse(meta.engine_config) : undefined,
+      source: meta.source.trim() || undefined,
+      author: meta.author.trim() || undefined,
       categories: categories.map((cat) => ({
         name: cat.name.trim(),
         description: cat.description.trim() || undefined,
@@ -1264,6 +1280,28 @@ function FrameworkEditor({
               onChange={(e) => updateMeta("description", e.target.value)}
               className="min-h-[60px]"
             />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="source">Source</Label>
+              <Input
+                id="source"
+                placeholder="Ex : CIS Benchmarks, ANSSI, NIST…"
+                value={meta.source}
+                onChange={(e) => updateMeta("source", e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">Recommandations sur lesquelles se base ce référentiel</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="author">Auteur</Label>
+              <Input
+                id="author"
+                placeholder="Ex : Équipe sécurité, John Doe…"
+                value={meta.author}
+                onChange={(e) => updateMeta("author", e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">Créateur de ce référentiel</p>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">

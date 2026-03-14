@@ -5,6 +5,8 @@ framework:
   version: '1.0'
   engine: manual
   engine_config: null
+  source: ""
+  author: ""
   categories:
   - name: test
     description: null

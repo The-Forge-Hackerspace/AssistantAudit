@@ -106,6 +106,8 @@ class FrameworkService:
             framework.description = fw_data.get("description")
             framework.engine = fw_data.get("engine")
             framework.engine_config = fw_data.get("engine_config")
+            framework.source = fw_data.get("source")
+            framework.author = fw_data.get("author")
             framework.source_file = str(yaml_path)
             framework.source_hash = file_hash
         else:
@@ -117,6 +119,8 @@ class FrameworkService:
                 version=version,
                 engine=fw_data.get("engine"),
                 engine_config=fw_data.get("engine_config"),
+                source=fw_data.get("source"),
+                author=fw_data.get("author"),
                 source_file=str(yaml_path),
                 source_hash=file_hash,
             )
@@ -258,6 +262,8 @@ class FrameworkService:
                 "description": fw.description,
                 "version": fw.version,
                 "engine": fw.engine,
+                "source": fw.source,
+                "author": fw.author,
                 "engine_config": fw.engine_config,
                 "categories": [],
             }
@@ -316,6 +322,8 @@ class FrameworkService:
             version=new_version,
             engine=original.engine,
             engine_config=original.engine_config,
+            source=original.source,
+            author=original.author,
             source_file=original.source_file,
             parent_version_id=original.id,
         )
@@ -383,6 +391,8 @@ class FrameworkService:
         description: str | None = None,
         engine: str | None = None,
         engine_config: dict | None = None,
+        source: str | None = None,
+        author: str | None = None,
         categories: list[dict] | None = None,
     ) -> Framework:
         """Crée un nouveau framework depuis l'éditeur (pas YAML)."""
@@ -401,6 +411,8 @@ class FrameworkService:
             version=version,
             engine=engine,
             engine_config=engine_config,
+            source=source,
+            author=author,
         )
         db.add(framework)
         db.flush()
@@ -464,7 +476,7 @@ class FrameworkService:
             raise ValueError(f"Framework {framework_id} introuvable")
 
         # Champs simples
-        for field in ("name", "description", "engine", "engine_config"):
+        for field in ("name", "description", "engine", "engine_config", "source", "author"):
             if field in data:
                 setattr(framework, field, data[field])
 

@@ -4,6 +4,8 @@ framework:
   description: "Référentiel d'audit des systèmes de sauvegarde et plans de restauration"
   version: "1.0"
   engine: manual
+  source: ""
+  author: ""
 
   categories:
     - name: "Politique de sauvegarde"
