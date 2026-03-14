@@ -60,6 +60,8 @@ class FrameworkBase(BaseModel):
     version: str = Field(default="1.0", max_length=20)
     engine: Optional[str] = None
     engine_config: Optional[dict] = None
+    source: Optional[str] = Field(None, max_length=500, description="Recommandations sur lesquelles le framework est basé")
+    author: Optional[str] = Field(None, max_length=200, description="Créateur du framework")
 
 
 class FrameworkCreate(FrameworkBase):
@@ -86,6 +88,8 @@ class FrameworkSummary(BaseModel):
     name: str
     version: str
     engine: Optional[str] = None
+    source: Optional[str] = None
+    author: Optional[str] = None
     is_active: bool
     parent_version_id: Optional[int] = None
     total_controls: int = 0

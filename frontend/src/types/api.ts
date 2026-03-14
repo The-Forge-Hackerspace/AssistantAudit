@@ -193,6 +193,8 @@ export interface FrameworkSummary {
   version: string;
   engine: string | null;
   engine_config: Record<string, unknown> | null;
+  source: string | null;
+  author: string | null;
   is_active: boolean;
   total_controls: number;
   parent_version_id: number | null;
@@ -228,6 +230,8 @@ export interface FrameworkCreatePayload {
   version: string;
   engine?: string;
   engine_config?: Record<string, unknown>;
+  source?: string;
+  author?: string;
   categories: CategoryCreate[];
 }
 
