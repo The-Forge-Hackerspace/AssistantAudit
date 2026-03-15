@@ -19,6 +19,12 @@ import {
   Globe,
   Terminal,
   AlertCircle,
+  Router,
+  Printer,
+  Video,
+  Cloud,
+  Phone,
+  Cpu,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -103,6 +109,16 @@ const TYPE_ICONS: Record<string, typeof Server> = {
   firewall: Shield,
   reseau: Wifi,
   equipement: Server,
+  switch: Wifi,
+  router: Router,
+  access_point: Wifi,
+  printer: Printer,
+  camera: Video,
+  nas: Server,
+  hyperviseur: Cpu,
+  telephone: Phone,
+  iot: Server,
+  cloud_gateway: Cloud,
 };
 
 export default function ScannerPage() {
@@ -812,7 +828,17 @@ function HostRow({
                   <SelectContent>
                     <SelectItem value="serveur">Serveur</SelectItem>
                     <SelectItem value="reseau">Réseau</SelectItem>
+                    <SelectItem value="switch">Switch</SelectItem>
+                    <SelectItem value="router">Router</SelectItem>
+                    <SelectItem value="access_point">Access Point</SelectItem>
                     <SelectItem value="firewall">Firewall</SelectItem>
+                    <SelectItem value="printer">Printer</SelectItem>
+                    <SelectItem value="camera">Camera</SelectItem>
+                    <SelectItem value="nas">NAS</SelectItem>
+                    <SelectItem value="hyperviseur">Hyperviseur</SelectItem>
+                    <SelectItem value="telephone">Téléphone</SelectItem>
+                    <SelectItem value="iot">IoT</SelectItem>
+                    <SelectItem value="cloud_gateway">Cloud Gateway</SelectItem>
                     <SelectItem value="equipement">Autre</SelectItem>
                   </SelectContent>
                 </Select>

@@ -1,10 +1,9 @@
-"""
-Modèles Equipement — Équipements d'infrastructure avec héritage (STI).
-"""
+"""Modèles Equipement — Équipements d'infrastructure avec héritage STI."""
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
 from sqlalchemy import (
+    JSON,
     DateTime,
     Enum,
     ForeignKey,
@@ -13,7 +12,6 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -28,6 +26,24 @@ class EquipementAuditStatus(str, PyEnum):
     EN_COURS = "EN_COURS"
     CONFORME = "CONFORME"
     NON_CONFORME = "NON_CONFORME"
+
+
+EQUIPEMENT_TYPE_VALUES: tuple[str, ...] = (
+    "reseau",
+    "serveur",
+    "firewall",
+    "equipement",
+    "switch",
+    "router",
+    "access_point",
+    "printer",
+    "camera",
+    "nas",
+    "hyperviseur",
+    "telephone",
+    "iot",
+    "cloud_gateway",
+)
 
 
 class Equipement(Base):
@@ -75,6 +91,18 @@ class Equipement(Base):
     )
     pingcastle_results: Mapped[list["PingCastleResult"]] = relationship(  # type: ignore[name-defined]
         back_populates="equipement", cascade="all, delete-orphan", lazy="selectin"
+    )
+    source_links: Mapped[list["NetworkLink"]] = relationship(  # type: ignore[name-defined]
+        back_populates="source_equipement",
+        foreign_keys="NetworkLink.source_equipement_id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    target_links: Mapped[list["NetworkLink"]] = relationship(  # type: ignore[name-defined]
+        back_populates="target_equipement",
+        foreign_keys="NetworkLink.target_equipement_id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
     __table_args__ = (
@@ -124,3 +152,61 @@ class EquipementFirewall(Equipement):
     rules_count: Mapped[int] = mapped_column(Integer, default=0)
 
     __mapper_args__ = {"polymorphic_identity": "firewall"}
+
+
+class EquipementSwitch(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "switch"}
+
+
+class EquipementRouter(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "router"}
+
+
+class EquipementAccessPoint(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "access_point"}
+
+
+class EquipementPrinter(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "printer"}
+
+
+class EquipementCamera(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "camera"}
+
+
+class EquipementNAS(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "nas"}
+
+
+class EquipementHyperviseur(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "hyperviseur"}
+
+
+class EquipementTelephone(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "telephone"}
+
+
+class EquipementIoT(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "iot"}
+
+
+class EquipementCloudGateway(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "cloud_gateway"}
+
+
+EQUIPEMENT_TYPE_CLASS_MAP: dict[str, type[Equipement]] = {
+    "reseau": EquipementReseau,
+    "serveur": EquipementServeur,
+    "firewall": EquipementFirewall,
+    "equipement": Equipement,
+    "switch": EquipementSwitch,
+    "router": EquipementRouter,
+    "access_point": EquipementAccessPoint,
+    "printer": EquipementPrinter,
+    "camera": EquipementCamera,
+    "nas": EquipementNAS,
+    "hyperviseur": EquipementHyperviseur,
+    "telephone": EquipementTelephone,
+    "iot": EquipementIoT,
+    "cloud_gateway": EquipementCloudGateway,
+}

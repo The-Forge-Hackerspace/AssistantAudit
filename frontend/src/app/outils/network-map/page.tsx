@@ -654,7 +654,7 @@ export default function NetworkMapPage() {
   const [siteMap, setSiteMap] = useState<NetworkMap | null>(null);
   const [overview, setOverview] = useState<MultiSiteOverview | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"site" | "overview">("site");
+  const [activeTab, setActiveTab] = useState<"site" | "overview" | "detailed">("site");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [layoutDirection, setLayoutDirection] = useState<"TB" | "LR">("TB");
 
@@ -761,8 +761,12 @@ export default function NetworkMapPage() {
   const [overviewNodes, setOverviewNodes, onOverviewNodesChange] = useNodesState<Node<FlowNodeData>>([]);
   const [overviewEdges, setOverviewEdges, onOverviewEdgesChange] = useEdgesState<Edge>([]);
 
+  const [detailedNodes, setDetailedNodes, onDetailedNodesChange] = useNodesState<Node<DetailedNodeData>>([]);
+  const [detailedEdges, setDetailedEdges, onDetailedEdgesChange] = useEdgesState<Edge>([]);
+
   const siteFlowRef = useRef<HTMLDivElement>(null);
   const overviewFlowRef = useRef<HTMLDivElement>(null);
+  const detailedFlowRef = useRef<HTMLDivElement>(null);
 
   const siteEquipements = useMemo(() => {
     if (!siteMap) return [];
@@ -838,6 +842,138 @@ export default function NetworkMapPage() {
     setOverviewEdges(oEdges);
   }, [setOverviewEdges, setOverviewNodes]);
 
+  const loadDetailedView = useCallback(async (siteId: number) => {
+    const data = await networkMapApi.getSiteMap(siteId);
+    setSiteMap(data);
+
+    const links = await networkMapApi.listLinks(siteId);
+
+    const equipmentDetailsPromises = data.nodes.map((node) => 
+      equipementsApi.get(node.equipement_id)
+    );
+    const equipmentDetails = await Promise.all(equipmentDetailsPromises);
+
+    const equipmentMap = new Map<number, Equipement>();
+    equipmentDetails.forEach((eq) => {
+      equipmentMap.set(eq.id, eq);
+    });
+
+    const connectedPortIds = new Set<string>();
+    links.forEach((link) => {
+      if (link.source_interface) connectedPortIds.add(link.source_interface);
+      if (link.target_interface) connectedPortIds.add(link.target_interface);
+    });
+
+    const detailedNodesArray: Node<DetailedNodeData | FlowNodeData>[] = data.nodes.map((node) => {
+      const equipment = equipmentMap.get(node.equipement_id);
+      const ports = equipment?.ports_status || [];
+      const hasPorts = ports.length > 0;
+
+      const equipmentConnectedPortIds = ports
+        .map((p) => p.id)
+        .filter((id) => connectedPortIds.has(id));
+
+      const saved = toPosition(node.position);
+
+      if (hasPorts) {
+        return {
+          id: node.id,
+          type: "detailed",
+          data: {
+            label: node.label,
+            ip: node.ip_address,
+            type: node.type_equipement,
+            ports,
+            connectedPortIds: equipmentConnectedPortIds,
+          },
+          position: saved ?? { x: 0, y: 0 },
+        } as Node<DetailedNodeData>;
+      } else {
+        return {
+          id: node.id,
+          type: "device",
+          data: {
+            label: node.label,
+            ip: node.ip_address,
+            type: node.type_equipement,
+          },
+          position: saved ?? { x: 0, y: 0 },
+        } as Node<FlowNodeData>;
+      }
+    });
+
+    const detailedEdgesArray: Edge[] = links.map((link) => {
+      const lt = link.link_type;
+      const bw = link.bandwidth ?? "";
+      const edgeStyle = edgeStyleByLinkType[lt] ?? edgeStyleByLinkType.other;
+
+      const parts: string[] = [lt.toUpperCase()];
+      if (bw) {
+        parts.push(bandwidthShort[bw] ?? bw);
+      }
+      const label = parts.join(" • ");
+
+      const sourceNode = data.nodes.find(n => n.equipement_id === link.source_equipement_id);
+      const targetNode = data.nodes.find(n => n.equipement_id === link.target_equipement_id);
+
+      if (!sourceNode || !targetNode) return null;
+
+      return {
+        id: String(link.id),
+        source: sourceNode.id,
+        target: targetNode.id,
+        sourceHandle: link.source_interface ? `port-${link.source_interface}` : undefined,
+        targetHandle: link.target_interface ? `port-${link.target_interface}-in` : undefined,
+        type: "parallel",
+        label,
+        style: { stroke: edgeStyle.stroke, strokeWidth: 2, strokeDasharray: edgeStyle.strokeDasharray },
+        data: { linkId: link.id },
+      };
+    }).filter((edge): edge is Edge => edge !== null);
+
+    const hasSavedPositions = detailedNodesArray.some(
+      (n) => n.position.x !== 0 || n.position.y !== 0
+    );
+
+    const layoutedNodes = hasSavedPositions 
+      ? detailedNodesArray 
+      : autoLayoutWithCustomDimensions(detailedNodesArray, detailedEdgesArray, layoutDirection);
+
+    setDetailedNodes(layoutedNodes as Node<DetailedNodeData>[]);
+    setDetailedEdges(detailedEdgesArray);
+  }, [setDetailedNodes, setDetailedEdges, layoutDirection]);
+
+  function autoLayoutWithCustomDimensions(
+    nodes: Node<DetailedNodeData | FlowNodeData>[],
+    edges: Edge[],
+    direction: "TB" | "LR" = "TB"
+  ): Node<DetailedNodeData | FlowNodeData>[] {
+    const g = new dagre.graphlib.Graph();
+    g.setDefaultEdgeLabel(() => ({}));
+    g.setGraph({ rankdir: direction, ranksep: 120, nodesep: 80 });
+
+    nodes.forEach((node) => {
+      if (node.type === "detailed") {
+        g.setNode(node.id, { width: 250, height: 180 });
+      } else {
+        g.setNode(node.id, { width: 180, height: 80 });
+      }
+    });
+    edges.forEach((edge) => {
+      g.setEdge(edge.source, edge.target);
+    });
+    dagre.layout(g);
+
+    return nodes.map((node) => {
+      const p = g.node(node.id);
+      if (!p || typeof p.x !== "number" || typeof p.y !== "number") return node;
+      return {
+        ...node,
+        position: { x: p.x, y: p.y },
+      };
+    });
+  }
+
   useEffect(() => {
     const run = async () => {
       setLoading(true);
@@ -879,6 +1015,19 @@ export default function NetworkMapPage() {
     };
     run();
   }, [selectedSiteId, loadSiteMap]);
+
+  useEffect(() => {
+    if (!selectedSiteId || activeTab !== "detailed") return;
+    const run = async () => {
+      try {
+        await loadDetailedView(selectedSiteId);
+      } catch (error) {
+        console.error(error);
+        toast.error("Impossible de charger la vue détaillée");
+      }
+    };
+    run();
+  }, [selectedSiteId, activeTab, loadDetailedView]);
 
   const handleAutoLayout = useCallback((dir?: "TB" | "LR") => {
     const d = dir ?? layoutDirection;
@@ -1207,10 +1356,11 @@ export default function NetworkMapPage() {
           </CardContent>
         </Card>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "site" | "overview")}>
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "site" | "overview" | "detailed")}>
           <TabsList>
             <TabsTrigger value="site">Topologie site</TabsTrigger>
             <TabsTrigger value="overview">Vue multi-site</TabsTrigger>
+            <TabsTrigger value="detailed">Vue détaillée</TabsTrigger>
           </TabsList>
 
           <TabsContent value="site" className="space-y-4">
@@ -1336,6 +1486,75 @@ export default function NetworkMapPage() {
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Globe className="h-4 w-4" />
                 {overview.nodes.length} site(s), {overview.edges.length} connexion(s) inter-sites
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="detailed" className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => {
+                const layoutedNodes = autoLayoutWithCustomDimensions(detailedNodes, detailedEdges, layoutDirection);
+                setDetailedNodes(layoutedNodes as Node<DetailedNodeData>[]);
+              }}>
+                Auto-layout
+              </Button>
+              <Button variant="outline" onClick={() => {
+                if (!selectedSiteId) {
+                  toast.error("Aucun site sélectionné");
+                  return;
+                }
+                loadDetailedView(selectedSiteId);
+              }}>
+                Recharger
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (detailedFlowRef.current) exportDiagramPng(detailedFlowRef.current, detailedNodes);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exporter PNG
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (detailedFlowRef.current) exportDiagramSvg(detailedFlowRef.current, detailedNodes);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exporter SVG
+              </Button>
+            </div>
+
+            <div ref={detailedFlowRef}>
+              <Card>
+                <CardContent className="h-[70vh] p-0">
+                  <ReactFlow
+                    nodes={detailedNodes}
+                    edges={detailedEdges}
+                    onNodesChange={onDetailedNodesChange}
+                    onEdgesChange={onDetailedEdgesChange}
+                    nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
+                    colorMode={rfColorMode}
+                    zoomOnDoubleClick={false}
+                    fitView
+                    nodesDraggable
+                    nodesConnectable={false}
+                    elementsSelectable
+                  >
+                    <Background />
+                    <Controls />
+                    <MiniMap />
+                  </ReactFlow>
+                </CardContent>
+              </Card>
+            </div>
+            {siteMap && (
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                <Network className="h-4 w-4" />
+                {detailedNodes.length} équipement(s), {detailedEdges.length} lien(s)
               </div>
             )}
           </TabsContent>

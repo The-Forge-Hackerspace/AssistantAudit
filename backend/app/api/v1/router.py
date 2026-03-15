@@ -15,6 +15,7 @@ from .scans import router as scans_router
 from .tools import router as tools_router
 from .pingcastle_terminal import router as pingcastle_ws_router
 from .health import router as health_router
+from .network_map import router as network_map_router
 
 api_router = APIRouter()
 
@@ -28,5 +29,6 @@ api_router.include_router(frameworks_router, prefix="/frameworks", tags=["Réfé
 api_router.include_router(assessments_router, prefix="/assessments", tags=["Évaluations"])
 api_router.include_router(attachments_router, prefix="/attachments", tags=["Pièces jointes"])
 api_router.include_router(scans_router, prefix="/scans", tags=["Scanner réseau"])
+api_router.include_router(network_map_router, prefix="/network-map", tags=["Cartographie réseau"])
 api_router.include_router(tools_router)
 api_router.include_router(pingcastle_ws_router)

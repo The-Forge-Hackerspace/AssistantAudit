@@ -44,6 +44,12 @@ import type {
   PingCastleCreate,
   PingCastleResultSummary,
   PingCastleResultRead,
+  NetworkLink,
+  NetworkLinkCreate,
+  NetworkMap,
+  SiteConnection,
+  SiteConnectionCreate,
+  MultiSiteOverview,
 } from "@/types";
 
 // ── Auth ──
@@ -434,6 +440,77 @@ export const scansApi = {
     custom_args?: string;
   }): Promise<{ command: string }> {
     const { data } = await api.get("/scans/preview-command", { params });
+    return data;
+  },
+};
+
+export const networkMapApi = {
+  async getSiteMap(siteId: number): Promise<NetworkMap> {
+    const { data } = await api.get(`/network-map/site/${siteId}`);
+    return data;
+  },
+
+  async saveSiteLayout(siteId: number, layoutData: NetworkMap["layout_data"]): Promise<{ message: string }> {
+    const { data } = await api.put(`/network-map/site/${siteId}/layout`, {
+      layout_data: layoutData,
+    });
+    return data;
+  },
+
+  async listLinks(siteId: number): Promise<NetworkLink[]> {
+    const { data } = await api.get("/network-map/links", { params: { site_id: siteId } });
+    return data;
+  },
+
+  async getLink(linkId: number): Promise<NetworkLink> {
+    const { data } = await api.get(`/network-map/links/${linkId}`);
+    return data;
+  },
+
+  async createLink(payload: NetworkLinkCreate): Promise<NetworkLink> {
+    const { data } = await api.post("/network-map/links", payload);
+    return data;
+  },
+
+  async updateLink(linkId: number, payload: Partial<NetworkLinkCreate>): Promise<NetworkLink> {
+    const { data } = await api.put(`/network-map/links/${linkId}`, payload);
+    return data;
+  },
+
+  async deleteLink(linkId: number): Promise<{ message: string }> {
+    const { data } = await api.delete(`/network-map/links/${linkId}`);
+    return data;
+  },
+
+  async getOverview(entrepriseId: number): Promise<MultiSiteOverview> {
+    const { data } = await api.get(`/network-map/overview/${entrepriseId}`);
+    return data;
+  },
+
+  async getSiteConnection(connectionId: number): Promise<SiteConnection> {
+    const { data } = await api.get(`/network-map/site-connections/${connectionId}`);
+    return data;
+  },
+
+  async listSiteConnections(entrepriseId: number): Promise<SiteConnection[]> {
+    const { data } = await api.get("/network-map/site-connections", {
+      params: { entreprise_id: entrepriseId },
+    });
+    return data;
+  },
+
+  async createSiteConnection(payload: SiteConnectionCreate): Promise<SiteConnection> {
+    const { data } = await api.post("/network-map/site-connections", payload);
+    return data;
+  },
+
+  async updateSiteConnection(connectionId: number, payload: Partial<SiteConnectionCreate>): Promise<SiteConnection> {
+    const { data } = await api.put(`/network-map/site-connections/${connectionId}`, payload);
+    return data;
+  },
+
+  async deleteSiteConnection(connectionId: number): Promise<{ message: string }> {
+    const { data } = await api.delete(`/network-map/site-connections/${connectionId}`);
     return data;
   },
 };
