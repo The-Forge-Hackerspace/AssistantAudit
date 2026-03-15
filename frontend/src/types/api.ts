@@ -125,8 +125,31 @@ export interface SiteCreate {
 }
 
 // ── Equipement ──
-export type TypeEquipement = "reseau" | "serveur" | "firewall" | "equipement";
+export type TypeEquipement =
+  | "reseau"
+  | "serveur"
+  | "firewall"
+  | "equipement"
+  | "switch"
+  | "router"
+  | "access_point"
+  | "printer"
+  | "camera"
+  | "nas"
+  | "hyperviseur"
+  | "telephone"
+  | "iot"
+  | "cloud_gateway";
 export type StatusAudit = "A_AUDITER" | "EN_COURS" | "CONFORME" | "NON_CONFORME";
+
+export interface PortDefinition {
+  id: string;          // unique within equipment, e.g. "ge-0/0/1"
+  name: string;        // display name, e.g. "GigE 1"
+  type: "ethernet" | "sfp" | "sfp+" | "console" | "mgmt";
+  speed: string;       // e.g. "1 Gbps", "10 Gbps"
+  row: number;         // visual row (0 = top, 1 = bottom)
+  index: number;       // position within row (left to right)
+}
 
 export interface Equipement {
   id: number;
@@ -139,14 +162,14 @@ export interface Equipement {
   status_audit: StatusAudit;
   notes_audit: string | null;
   // Spécifiques réseau
-  vlan_config: string | null;
-  ports_status: string | null;
+  vlan_config: Record<string, unknown> | null;
+  ports_status: PortDefinition[] | null;
   firmware_version: string | null;
   // Spécifiques serveur
   os_version_detail: string | null;
   modele_materiel: string | null;
   role_list: Record<string, unknown> | null;
-  cpu_ram_info: string | null;
+  cpu_ram_info: Record<string, unknown> | null;
   // Spécifiques firewall
   license_status: string | null;
   vpn_users_count: number | null;
@@ -427,6 +450,107 @@ export interface ScanHostDecision {
   chosen_type?: TypeEquipement;
   hostname_override?: string;
   create_equipement?: boolean;
+}
+
+export interface NetworkLink {
+  id: number;
+  site_id: number;
+  source_equipement_id: number;
+  target_equipement_id: number;
+  source_interface: string | null;
+  target_interface: string | null;
+  link_type: "ethernet" | "fiber" | "wifi" | "vpn" | "wan" | "serial" | "other";
+  bandwidth: string | null;
+  vlan: string | null;
+  network_segment: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NetworkLinkCreate {
+  site_id: number;
+  source_equipement_id: number;
+  target_equipement_id: number;
+  source_interface?: string;
+  target_interface?: string;
+  link_type?: "ethernet" | "fiber" | "wifi" | "vpn" | "wan" | "serial" | "other";
+  bandwidth?: string;
+  vlan?: string;
+  network_segment?: string;
+  description?: string;
+}
+
+export interface NetworkMapNode {
+  id: string;
+  equipement_id: number;
+  site_id: number;
+  type_equipement: TypeEquipement;
+  ip_address: string;
+  hostname: string | null;
+  label: string;
+  metadata: Record<string, unknown>;
+  position?: { id: string; x: number; y: number };
+}
+
+export interface NetworkMapEdge {
+  id: string;
+  link_id: number;
+  source: string;
+  target: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface NetworkMap {
+  site_id: number;
+  nodes: NetworkMapNode[];
+  edges: NetworkMapEdge[];
+  layout_data: {
+    nodes?: Array<{ id: string; x: number; y: number }>;
+    viewport?: { x: number; y: number; zoom: number };
+  };
+}
+
+export interface SiteConnection {
+  id: number;
+  entreprise_id: number;
+  source_site_id: number;
+  target_site_id: number;
+  link_type: "wan" | "vpn" | "mpls" | "sdwan" | "other";
+  bandwidth: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SiteConnectionCreate {
+  entreprise_id: number;
+  source_site_id: number;
+  target_site_id: number;
+  link_type?: "wan" | "vpn" | "mpls" | "sdwan" | "other";
+  bandwidth?: string;
+  description?: string;
+}
+
+export interface MultiSiteNode {
+  id: string;
+  site_id: number;
+  site_name: string;
+  equipement_count: number;
+}
+
+export interface MultiSiteEdge {
+  id: string;
+  connection_id: number;
+  source: string;
+  target: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface MultiSiteOverview {
+  entreprise_id: number;
+  nodes: MultiSiteNode[];
+  edges: MultiSiteEdge[];
 }
 
 // ── Config Parser ──
