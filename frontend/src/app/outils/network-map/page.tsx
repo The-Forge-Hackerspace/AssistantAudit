@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import dagre from "@dagrejs/dagre";
 import {
   Background,
@@ -28,6 +28,7 @@ import "@xyflow/react/dist/style.css";
 import {
   Cloud,
   Cpu,
+  Download,
   Globe,
   HardDrive,
   Map,
@@ -81,6 +82,7 @@ import type {
   NetworkLink,
   NetworkLinkCreate,
   NetworkMap,
+  PortDefinition,
   Site,
   SiteConnection,
   SiteConnectionCreate,
@@ -432,6 +434,75 @@ export default function NetworkMapPage() {
     { id: number; campaign_id: number; framework_id: number; framework_name: string; created_at: string }[]
   >([]);
 
+  const [editingPorts, setEditingPorts] = useState<PortDefinition[]>([]);
+  const [newPortName, setNewPortName] = useState("");
+  const [newPortType, setNewPortType] = useState<PortDefinition["type"]>("ethernet");
+  const [newPortSpeed, setNewPortSpeed] = useState("1 Gbps");
+  const [newPortRow, setNewPortRow] = useState<number>(0);
+  const [isPortPresetConfirmOpen, setIsPortPresetConfirmOpen] = useState(false);
+  const [pendingPreset, setPendingPreset] = useState<string | null>(null);
+  const [savingPorts, setSavingPorts] = useState(false);
+
+  useEffect(() => {
+    if (detailEquipement) {
+      setEditingPorts(detailEquipement.ports_status || []);
+    } else {
+      setEditingPorts([]);
+    }
+  }, [detailEquipement]);
+
+  const handleAddPort = useCallback(() => {
+    if (!newPortName.trim()) return;
+    const id = newPortName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const maxIndex = Math.max(-1, ...editingPorts.filter(p => p.row === newPortRow).map(p => p.index));
+    const newPort: PortDefinition = {
+      id,
+      name: newPortName.trim(),
+      type: newPortType,
+      speed: newPortSpeed,
+      row: newPortRow,
+      index: maxIndex + 1,
+    };
+    setEditingPorts((prev) => [...prev, newPort]);
+    setNewPortName("");
+  }, [editingPorts, newPortName, newPortRow, newPortSpeed, newPortType]);
+
+  const handleRemovePort = useCallback((id: string) => {
+    setEditingPorts((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
+  const handleApplyPreset = useCallback((preset: string) => {
+    if (editingPorts.length > 0) {
+      setPendingPreset(preset);
+      setIsPortPresetConfirmOpen(true);
+    } else {
+      setEditingPorts(generatePortPreset(preset));
+    }
+  }, [editingPorts.length]);
+
+  const confirmPreset = useCallback(() => {
+    if (pendingPreset) {
+      setEditingPorts(generatePortPreset(pendingPreset));
+    }
+    setIsPortPresetConfirmOpen(false);
+    setPendingPreset(null);
+  }, [pendingPreset]);
+
+  const handleSavePorts = useCallback(async () => {
+    if (!detailEquipement) return;
+    setSavingPorts(true);
+    try {
+      await equipementsApi.update(detailEquipement.id, { ports_status: editingPorts });
+      toast.success("Ports sauvegardés");
+      setDetailEquipement(prev => prev ? { ...prev, ports_status: editingPorts } : null);
+    } catch (error) {
+      console.error(error);
+      toast.error("Impossible de sauvegarder les ports");
+    } finally {
+      setSavingPorts(false);
+    }
+  }, [detailEquipement, editingPorts]);
+
   const [sourceEquipementId, setSourceEquipementId] = useState<string>("");
   const [targetEquipementId, setTargetEquipementId] = useState<string>("");
   const [sourceInterface, setSourceInterface] = useState("");
@@ -458,6 +529,9 @@ export default function NetworkMapPage() {
 
   const [overviewNodes, setOverviewNodes, onOverviewNodesChange] = useNodesState<Node<FlowNodeData>>([]);
   const [overviewEdges, setOverviewEdges, onOverviewEdgesChange] = useEdgesState<Edge>([]);
+
+  const siteFlowRef = useRef<HTMLDivElement>(null);
+  const overviewFlowRef = useRef<HTMLDivElement>(null);
 
   const siteEquipements = useMemo(() => {
     if (!siteMap) return [];
@@ -923,35 +997,55 @@ export default function NetworkMapPage() {
               </Button>
               <Button variant="outline" onClick={handleSaveLayout}>Sauvegarder layout</Button>
               <Button onClick={() => { resetLinkForm(); setLinkDialogOpen(true); }}>Ajouter un lien</Button>
-              {selectedSiteId && (
-                <Button variant="outline" onClick={() => loadSiteMap(selectedSiteId)}>
-                  Recharger
-                </Button>
-              )}
+               {selectedSiteId && (
+                 <Button variant="outline" onClick={() => loadSiteMap(selectedSiteId)}>
+                   Recharger
+                 </Button>
+               )}
+               <Button
+                 variant="outline"
+                 onClick={() => {
+                   if (siteFlowRef.current) exportDiagramPng(siteFlowRef.current, nodes);
+                 }}
+               >
+                 <Download className="h-4 w-4 mr-2" />
+                 Export PNG
+               </Button>
+               <Button
+                 variant="outline"
+                 onClick={() => {
+                   if (siteFlowRef.current) exportDiagramSvg(siteFlowRef.current, nodes);
+                 }}
+               >
+                 <Download className="h-4 w-4 mr-2" />
+                 Export SVG
+               </Button>
             </div>
 
-            <Card>
-              <CardContent className="h-[70vh] p-0">
-                <ReactFlow
-                  nodes={nodes}
-                  edges={edges}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  onConnect={onConnect}
-                  onNodeDoubleClick={onNodeDoubleClick}
-                  onEdgeDoubleClick={onEdgeDoubleClick}
-                  nodeTypes={nodeTypes}
-                  edgeTypes={edgeTypes}
-                  colorMode={rfColorMode}
-                  zoomOnDoubleClick={false}
-                  fitView
-                >
-                  <Background />
-                  <Controls />
-                  <MiniMap />
-                </ReactFlow>
-              </CardContent>
-            </Card>
+            <div ref={siteFlowRef}>
+              <Card>
+                <CardContent className="h-[70vh] p-0">
+                  <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
+                    onNodeDoubleClick={onNodeDoubleClick}
+                    onEdgeDoubleClick={onEdgeDoubleClick}
+                    nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
+                    colorMode={rfColorMode}
+                    zoomOnDoubleClick={false}
+                    fitView
+                  >
+                    <Background />
+                    <Controls />
+                    <MiniMap />
+                  </ReactFlow>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="overview" className="space-y-4">
@@ -962,31 +1056,51 @@ export default function NetworkMapPage() {
                   Recharger
                 </Button>
               )}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (overviewFlowRef.current) exportDiagramPng(overviewFlowRef.current, overviewNodes);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export PNG
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (overviewFlowRef.current) exportDiagramSvg(overviewFlowRef.current, overviewNodes);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export SVG
+              </Button>
             </div>
 
-            <Card>
-              <CardContent className="h-[70vh] p-0">
-                <ReactFlow
-                  nodes={overviewNodes}
-                  edges={overviewEdges}
-                  onNodesChange={onOverviewNodesChange}
-                  onEdgesChange={onOverviewEdgesChange}
-                  onEdgeDoubleClick={onOverviewEdgeDoubleClick}
-                  nodeTypes={nodeTypes}
-                  edgeTypes={edgeTypes}
-                  colorMode={rfColorMode}
-                  zoomOnDoubleClick={false}
-                  fitView
-                  nodesDraggable
-                  nodesConnectable={false}
-                  elementsSelectable
-                >
-                  <Background />
-                  <Controls />
-                  <MiniMap />
-                </ReactFlow>
-              </CardContent>
-            </Card>
+            <div ref={overviewFlowRef}>
+              <Card>
+                <CardContent className="h-[70vh] p-0">
+                  <ReactFlow
+                    nodes={overviewNodes}
+                    edges={overviewEdges}
+                    onNodesChange={onOverviewNodesChange}
+                    onEdgesChange={onOverviewEdgesChange}
+                    onEdgeDoubleClick={onOverviewEdgeDoubleClick}
+                    nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
+                    colorMode={rfColorMode}
+                    zoomOnDoubleClick={false}
+                    fitView
+                    nodesDraggable
+                    nodesConnectable={false}
+                    elementsSelectable
+                  >
+                    <Background />
+                    <Controls />
+                    <MiniMap />
+                  </ReactFlow>
+                </CardContent>
+              </Card>
+            </div>
             {overview && (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Globe className="h-4 w-4" />
@@ -1345,6 +1459,109 @@ export default function NetworkMapPage() {
                     </div>
                   </div>
                 )}
+
+                {["reseau", "switch", "router", "access_point"].includes(detailEquipement.type_equipement) && (
+                  <div className="border-t pt-4 space-y-4">
+                    <p className="text-sm font-medium text-muted-foreground">Configuration des ports</p>
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Préréglages</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleApplyPreset("24×GigE+4×SFP+")}>24×GigE+4×SFP+</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleApplyPreset("48×GigE+4×SFP+")}>48×GigE+4×SFP+</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleApplyPreset("8×SFP+10G")}>8×SFP+10G</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleApplyPreset("4×SFP28-25G")}>4×SFP28-25G</Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nom</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Vitesse</TableHead>
+                            <TableHead>Rangée</TableHead>
+                            <TableHead className="w-10">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {editingPorts.map((port) => (
+                            <TableRow key={port.id}>
+                              <TableCell>{port.name}</TableCell>
+                              <TableCell>{port.type}</TableCell>
+                              <TableCell>{port.speed}</TableCell>
+                              <TableCell>{port.row === 0 ? "Haut (0)" : "Bas (1)"}</TableCell>
+                              <TableCell>
+                                <Button variant="ghost" size="sm" className="text-destructive h-8 w-8 p-0" onClick={() => handleRemovePort(port.id)}>
+                                  &times;
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {editingPorts.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
+                                Aucun port configuré
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="flex items-end gap-2 border p-3 rounded-md bg-muted/50">
+                      <div className="grid grid-cols-4 gap-2 flex-1">
+                        <div>
+                          <Label className="text-xs">Nom</Label>
+                          <Input className="h-8" value={newPortName} onChange={e => setNewPortName(e.target.value)} placeholder="ex: GigE 1" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Type</Label>
+                          <Select value={newPortType} onValueChange={(v) => setNewPortType(v as PortDefinition["type"])}>
+                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ethernet">Ethernet</SelectItem>
+                              <SelectItem value="sfp">SFP</SelectItem>
+                              <SelectItem value="sfp+">SFP+</SelectItem>
+                              <SelectItem value="console">Console</SelectItem>
+                              <SelectItem value="mgmt">Mgmt</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Vitesse</Label>
+                          <Select value={newPortSpeed} onValueChange={setNewPortSpeed}>
+                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="100 Mbps">100 Mbps</SelectItem>
+                              <SelectItem value="1 Gbps">1 Gbps</SelectItem>
+                              <SelectItem value="10 Gbps">10 Gbps</SelectItem>
+                              <SelectItem value="25 Gbps">25 Gbps</SelectItem>
+                              <SelectItem value="40 Gbps">40 Gbps</SelectItem>
+                              <SelectItem value="100 Gbps">100 Gbps</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Rangée</Label>
+                          <Select value={String(newPortRow)} onValueChange={v => setNewPortRow(Number(v))}>
+                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">Haut (0)</SelectItem>
+                              <SelectItem value="1">Bas (1)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <Button size="sm" className="h-8" onClick={handleAddPort}>Ajouter</Button>
+                    </div>
+                    <div className="flex justify-end pt-2">
+                      <Button onClick={handleSavePorts} disabled={savingPorts}>
+                        Sauvegarder les ports
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1352,6 +1569,21 @@ export default function NetworkMapPage() {
               <Button variant="outline" onClick={() => setDetailOpen(false)}>
                 Fermer
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isPortPresetConfirmOpen} onOpenChange={setIsPortPresetConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Remplacer les ports existants ?</DialogTitle>
+              <DialogDescription>
+                Vous êtes sur le point d&apos;appliquer un préréglage. Cela effacera les {editingPorts.length} ports actuellement configurés. Voulez-vous continuer ?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsPortPresetConfirmOpen(false); setPendingPreset(null); }}>Annuler</Button>
+              <Button variant="destructive" onClick={confirmPreset}>Remplacer</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
