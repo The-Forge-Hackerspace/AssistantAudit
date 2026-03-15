@@ -68,6 +68,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { entreprisesApi, equipementsApi, networkMapApi, sitesApi, toolsApi } from "@/services/api";
 import {
   EQUIPEMENT_TYPE_LABELS,
@@ -95,7 +96,13 @@ type FlowNodeData = Record<string, unknown> & {
   type: TypeEquipement;
 };
 
+export type DetailedNodeData = FlowNodeData & {
+  ports: PortDefinition[];
+  connectedPortIds: string[];
+};
+
 type DeviceNodeType = Node<FlowNodeData, "device">;
+type DetailedNodeType = Node<DetailedNodeData, "detailed">;
 
 const iconByType: Record<TypeEquipement, typeof Server> = {
   reseau: Network,
@@ -255,6 +262,70 @@ function DeviceNode({ data }: NodeProps<DeviceNodeType>) {
   );
 }
 
+function DetailedEquipmentNode({ data }: NodeProps<DetailedNodeType>) {
+  const nodeData = data as DetailedNodeData;
+  const Icon = iconByType[nodeData.type] ?? Server;
+  const borderColor = nodeColorByType[nodeData.type] ?? "#6b7280";
+
+  const portsRow0 = (nodeData.ports || []).filter(p => p.row === 0).sort((a, b) => a.index - b.index);
+  const portsRow1 = (nodeData.ports || []).filter(p => p.row === 1).sort((a, b) => a.index - b.index);
+  
+  const cols = Math.max(portsRow0.length, portsRow1.length);
+
+  const portColorMap: Record<string, string> = {
+    ethernet: "#6b7280",
+    sfp: "#3b82f6",
+    "sfp+": "#8b5cf6",
+    console: "#f97316",
+    mgmt: "#22c55e",
+  };
+
+  const renderPort = (port: PortDefinition) => {
+    const isConnected = nodeData.connectedPortIds?.includes(port.id);
+    const bgColor = portColorMap[port.type] ?? "#6b7280";
+    
+    return (
+      <div 
+        key={port.id}
+        title={port.name}
+        className={`w-[28px] h-[22px] rounded-[2px] relative transition-colors ${isConnected ? "ring-2 ring-primary z-10" : ""}`}
+        style={{ backgroundColor: bgColor }}
+      >
+        <Handle type="target" id={`port-${port.id}-in`} position={Position.Top} className="!w-1 !h-1 !min-w-0 !min-h-0 opacity-0" />
+        <Handle type="source" id={`port-${port.id}`} position={Position.Bottom} className="!w-1 !h-1 !min-w-0 !min-h-0 opacity-0" />
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className="rounded-md border bg-card p-3 shadow-sm min-w-[180px] flex flex-col gap-3"
+      style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
+    >
+      <div>
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4" style={{ color: borderColor }} />
+          <span className="text-sm font-medium truncate">{nodeData.label}</span>
+        </div>
+        <div className="text-xs text-muted-foreground mt-1 font-mono">{nodeData.ip}</div>
+      </div>
+
+      <div className="flex flex-col gap-1 mx-auto bg-muted/30 p-1.5 rounded-md border border-border/50">
+        {portsRow0.length > 0 && (
+          <div className="grid gap-1 justify-center" style={{ gridTemplateColumns: `repeat(${cols}, 28px)` }}>
+            {portsRow0.map(renderPort)}
+          </div>
+        )}
+        {portsRow1.length > 0 && (
+          <div className="grid gap-1 justify-center" style={{ gridTemplateColumns: `repeat(${cols}, 28px)` }}>
+            {portsRow1.map(renderPort)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const PARALLEL_EDGE_SPACING = 35;
 
 function ParallelEdge({
@@ -326,8 +397,168 @@ function ParallelEdge({
   );
 }
 
-const nodeTypes: NodeTypes = { device: DeviceNode };
+const nodeTypes: NodeTypes = { device: DeviceNode, detailed: memo(DetailedEquipmentNode) };
 const edgeTypes: EdgeTypes = { parallel: ParallelEdge };
+
+/**
+ * Generates pre-configured port arrays for common network equipment.
+ * Port IDs auto-generate as: {type_short}-{row}-{index}
+ * Port names auto-generate as: {TypeLabel} {global_index+1}
+ * 
+ * Supported presets:
+ * - "24×GigE+4×SFP+" → 24 GigE 1Gbps + 4 SFP+ 10Gbps (28 total)
+ * - "48×GigE+4×SFP+" → 48 GigE 1Gbps + 4 SFP+ 10Gbps (52 total)
+ * - "8×SFP+10G" → 8 SFP+ 10Gbps (8 total)
+ * - "4×SFP28-25G" → 4 SFP+ 25Gbps (4 total, all row 0)
+ */
+function generatePortPreset(presetType: string): PortDefinition[] {
+  const ports: PortDefinition[] = [];
+  
+  switch (presetType) {
+    case "24×GigE+4×SFP+": {
+      // 24× GigE 1Gbps: 12 on row 0, 12 on row 1
+      let globalIdx = 1;
+      for (let row = 0; row < 2; row++) {
+        for (let i = 0; i < 12; i++) {
+          ports.push({
+            id: `ge-${row}-${i}`,
+            name: `GigE ${globalIdx}`,
+            type: "ethernet",
+            speed: "1 Gbps",
+            row,
+            index: i,
+          });
+          globalIdx++;
+        }
+      }
+      // 4× SFP+ 10Gbps: 2 on row 0 indices 12-13, 2 on row 1 indices 12-13
+      ports.push({
+        id: "sfp-0-12",
+        name: "SFP+ 25",
+        type: "sfp+",
+        speed: "10 Gbps",
+        row: 0,
+        index: 12,
+      });
+      ports.push({
+        id: "sfp-0-13",
+        name: "SFP+ 26",
+        type: "sfp+",
+        speed: "10 Gbps",
+        row: 0,
+        index: 13,
+      });
+      ports.push({
+        id: "sfp-1-12",
+        name: "SFP+ 27",
+        type: "sfp+",
+        speed: "10 Gbps",
+        row: 1,
+        index: 12,
+      });
+      ports.push({
+        id: "sfp-1-13",
+        name: "SFP+ 28",
+        type: "sfp+",
+        speed: "10 Gbps",
+        row: 1,
+        index: 13,
+      });
+      break;
+    }
+    
+    case "48×GigE+4×SFP+": {
+      // 48× GigE 1Gbps: 24 on row 0, 24 on row 1
+      let globalIdx = 1;
+      for (let row = 0; row < 2; row++) {
+        for (let i = 0; i < 24; i++) {
+          ports.push({
+            id: `ge-${row}-${i}`,
+            name: `GigE ${globalIdx}`,
+            type: "ethernet",
+            speed: "1 Gbps",
+            row,
+            index: i,
+          });
+          globalIdx++;
+        }
+      }
+      // 4× SFP+ 10Gbps: 2 on row 0 indices 24-25, 2 on row 1 indices 24-25
+      ports.push({
+        id: "sfp-0-24",
+        name: "SFP+ 49",
+        type: "sfp+",
+        speed: "10 Gbps",
+        row: 0,
+        index: 24,
+      });
+      ports.push({
+        id: "sfp-0-25",
+        name: "SFP+ 50",
+        type: "sfp+",
+        speed: "10 Gbps",
+        row: 0,
+        index: 25,
+      });
+      ports.push({
+        id: "sfp-1-24",
+        name: "SFP+ 51",
+        type: "sfp+",
+        speed: "10 Gbps",
+        row: 1,
+        index: 24,
+      });
+      ports.push({
+        id: "sfp-1-25",
+        name: "SFP+ 52",
+        type: "sfp+",
+        speed: "10 Gbps",
+        row: 1,
+        index: 25,
+      });
+      break;
+    }
+    
+    case "8×SFP+10G": {
+      // 8× SFP+ 10Gbps: 4 on row 0, 4 on row 1
+      let globalIdx = 1;
+      for (let row = 0; row < 2; row++) {
+        for (let i = 0; i < 4; i++) {
+          ports.push({
+            id: `sfp-${row}-${i}`,
+            name: `SFP+ ${globalIdx}`,
+            type: "sfp+",
+            speed: "10 Gbps",
+            row,
+            index: i,
+          });
+          globalIdx++;
+        }
+      }
+      break;
+    }
+    
+    case "4×SFP28-25G": {
+      // 4× SFP+ 25Gbps: all on row 0
+      for (let i = 0; i < 4; i++) {
+        ports.push({
+          id: `sfp-0-${i}`,
+          name: `SFP+ ${i + 1}`,
+          type: "sfp+",
+          speed: "25 Gbps",
+          row: 0,
+          index: i,
+        });
+      }
+      break;
+    }
+    
+    default:
+      console.warn(`Unknown preset type: ${presetType}`);
+  }
+  
+  return ports;
+}
 
 async function exportDiagramPng(flowElement: HTMLElement, nodes: Node[]): Promise<void> {
   const imageWidth = 1024;
