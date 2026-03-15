@@ -8,6 +8,10 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 from .validators import IPAddress, MACAddress, Hostname, Description
+from ..models.equipement import EQUIPEMENT_TYPE_VALUES
+
+
+EQUIPEMENT_TYPE_PATTERN = "^(" + "|".join(EQUIPEMENT_TYPE_VALUES) + ")$"
 
 
 class EquipementBase(BaseModel):
@@ -23,8 +27,8 @@ class EquipementCreate(EquipementBase):
     site_id: int
     type_equipement: str = Field(
         ...,
-        pattern=r"^(reseau|serveur|firewall|equipement)$",
-        description="Type : reseau, serveur, firewall, equipement",
+        pattern=EQUIPEMENT_TYPE_PATTERN,
+        description="Type d'équipement réseau/infrastructure",
     )
     # Champs spécifiques réseau
     vlan_config: Optional[dict] = None

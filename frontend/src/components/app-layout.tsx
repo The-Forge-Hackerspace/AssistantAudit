@@ -45,6 +45,7 @@ import {
   Lock,
   Terminal,
   Castle,
+  Map,
 } from "lucide-react";
 
 const navItems = [
@@ -77,6 +78,7 @@ const navItems = [
       { title: "Collecte SSH/WinRM", href: "/outils/collecte", icon: Terminal },
       { title: "SSL/TLS", href: "/outils/ssl-checker", icon: Lock },
       { title: "Audit AD", href: "/outils/ad-auditor", icon: ShieldCheck },
+      { title: "Cartographie réseau", href: "/outils/network-map", icon: Map },
       { title: "PingCastle", href: "/outils/pingcastle", icon: Castle },
     ],
   },

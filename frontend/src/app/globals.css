@@ -133,3 +133,51 @@
     transform: translateX(300%);
   }
 }
+
+/* ── React Flow: theme-aware MiniMap & Controls ── */
+/* Override React Flow's design tokens with shadcn theme variables.
+   The --xy-* variables are read by React Flow's own selectors, so no
+   !important or class overrides are needed — just set the tokens. */
+.react-flow {
+  --xy-minimap-background-color-default: var(--card);
+  --xy-minimap-mask-background-color-default: color-mix(in oklch, var(--muted) 60%, transparent);
+  --xy-minimap-node-background-color-default: var(--primary);
+  --xy-minimap-node-stroke-color-default: var(--border);
+  --xy-minimap-node-stroke-width-default: 1;
+
+  --xy-controls-button-background-color-default: var(--card);
+  --xy-controls-button-background-color-hover-default: var(--accent);
+  --xy-controls-button-color-default: var(--card-foreground);
+  --xy-controls-button-color-hover-default: var(--card-foreground);
+  --xy-controls-button-border-color-default: var(--border);
+  --xy-controls-box-shadow-default: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+/* Also override when React Flow applies its own .dark class */
+.react-flow.dark {
+  --xy-minimap-background-color-default: var(--card);
+  --xy-minimap-mask-background-color-default: color-mix(in oklch, var(--muted) 60%, transparent);
+  --xy-minimap-node-background-color-default: var(--primary);
+  --xy-minimap-node-stroke-color-default: var(--border);
+  --xy-minimap-node-stroke-width-default: 1;
+
+  --xy-controls-button-background-color-default: var(--card);
+  --xy-controls-button-background-color-hover-default: var(--accent);
+  --xy-controls-button-color-default: var(--card-foreground);
+  --xy-controls-button-color-hover-default: var(--card-foreground);
+  --xy-controls-button-border-color-default: var(--border);
+  --xy-controls-box-shadow-default: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.react-flow__controls {
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.react-flow__minimap {
+  border-radius: var(--radius);
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}

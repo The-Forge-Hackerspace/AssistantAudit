@@ -1,0 +1,10 @@
+Evidence: Export Functions Added to network-map/page.tsx
+=========================================================
+
+Command: grep -n "^async function export" frontend/src/app/outils/network-map/page.tsx
+
+Results:
+330:async function exportDiagramPng(flowElement: HTMLElement, nodes: Node[]): Promise<void> {
+372:async function exportDiagramSvg(flowElement: HTMLElement, nodes: Node[]): Promise<void> {
+
+Both export functions successfully added before NetworkMapPage component (line 414).

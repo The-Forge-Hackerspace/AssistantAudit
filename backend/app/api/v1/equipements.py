@@ -3,6 +3,8 @@ Routes Equipements : CRUD des assets d'infrastructure.
 
 Gère les 3 sous-types STI (réseau, serveur, firewall) via un champ type_equipement.
 """
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -10,10 +12,9 @@ from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
 from ...models.equipement import (
     Equipement,
-    EquipementReseau,
-    EquipementServeur,
-    EquipementFirewall,
     EquipementAuditStatus,
+    EQUIPEMENT_TYPE_CLASS_MAP,
+    EQUIPEMENT_TYPE_VALUES,
 )
 from ...models.site import Site
 from ...models.user import User
@@ -28,19 +29,21 @@ from ...schemas.common import PaginatedResponse, MessageResponse
 router = APIRouter()
 
 # Mapping type → classe SQLAlchemy
-_TYPE_MAP = {
-    "reseau": EquipementReseau,
-    "serveur": EquipementServeur,
-    "firewall": EquipementFirewall,
-    "equipement": Equipement,
-}
+_TYPE_MAP = EQUIPEMENT_TYPE_CLASS_MAP
 
 # Champs spécifiques par type
 _TYPE_FIELDS = {
     "reseau": ["vlan_config", "ports_status", "firmware_version"],
+    "switch": ["vlan_config", "ports_status", "firmware_version"],
+    "router": ["vlan_config", "ports_status", "firmware_version"],
+    "access_point": ["vlan_config", "ports_status", "firmware_version"],
     "serveur": ["os_version_detail", "modele_materiel", "role_list", "cpu_ram_info"],
+    "hyperviseur": ["os_version_detail", "modele_materiel", "role_list", "cpu_ram_info"],
+    "nas": ["os_version_detail", "modele_materiel", "role_list", "cpu_ram_info"],
     "firewall": ["license_status", "vpn_users_count", "rules_count"],
 }
+
+TYPE_PATTERN = "^(" + "|".join(EQUIPEMENT_TYPE_VALUES) + ")$"
 
 
 def _equipement_to_read(eq: Equipement) -> EquipementRead:
@@ -69,10 +72,10 @@ def _equipement_to_read(eq: Equipement) -> EquipementRead:
 
 @router.get("", response_model=PaginatedResponse[EquipementSummary])
 async def list_equipements(
-    site_id: int = None,
-    entreprise_id: int = None,
-    type_equipement: str = Query(default=None, pattern=r"^(reseau|serveur|firewall|equipement)$"),
-    status_audit: str = Query(default=None, pattern=r"^(A_AUDITER|EN_COURS|CONFORME|NON_CONFORME)$"),
+    site_id: Optional[int] = None,
+    entreprise_id: Optional[int] = None,
+    type_equipement: Optional[str] = Query(default=None, pattern=TYPE_PATTERN),
+    status_audit: Optional[str] = Query(default=None, pattern=r"^(A_AUDITER|EN_COURS|CONFORME|NON_CONFORME)$"),
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
