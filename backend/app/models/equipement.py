@@ -1,10 +1,9 @@
-"""
-Modèles Equipement — Équipements d'infrastructure avec héritage (STI).
-"""
+"""Modèles Equipement — Équipements d'infrastructure avec héritage STI."""
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
 from sqlalchemy import (
+    JSON,
     DateTime,
     Enum,
     ForeignKey,
@@ -13,7 +12,6 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -28,6 +26,24 @@ class EquipementAuditStatus(str, PyEnum):
     EN_COURS = "EN_COURS"
     CONFORME = "CONFORME"
     NON_CONFORME = "NON_CONFORME"
+
+
+EQUIPEMENT_TYPE_VALUES: tuple[str, ...] = (
+    "reseau",
+    "serveur",
+    "firewall",
+    "equipement",
+    "switch",
+    "router",
+    "access_point",
+    "printer",
+    "camera",
+    "nas",
+    "hyperviseur",
+    "telephone",
+    "iot",
+    "cloud_gateway",
+)
 
 
 class Equipement(Base):
@@ -59,6 +75,9 @@ class Equipement(Base):
     )
     notes_audit: Mapped[str | None] = mapped_column(Text)
 
+    # Ports (commun à tous les équipements)
+    ports_status: Mapped[list | None] = mapped_column(JSON)
+
     # Relations
     site: Mapped["Site"] = relationship(back_populates="equipements")  # type: ignore[name-defined]
     assessments: Mapped[list["Assessment"]] = relationship(  # type: ignore[name-defined]
@@ -75,6 +94,18 @@ class Equipement(Base):
     )
     pingcastle_results: Mapped[list["PingCastleResult"]] = relationship(  # type: ignore[name-defined]
         back_populates="equipement", cascade="all, delete-orphan", lazy="selectin"
+    )
+    source_links: Mapped[list["NetworkLink"]] = relationship(  # type: ignore[name-defined]
+        back_populates="source_equipement",
+        foreign_keys="NetworkLink.source_equipement_id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    target_links: Mapped[list["NetworkLink"]] = relationship(  # type: ignore[name-defined]
+        back_populates="target_equipement",
+        foreign_keys="NetworkLink.target_equipement_id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
     __table_args__ = (
@@ -95,7 +126,6 @@ class EquipementReseau(Equipement):
 
     id: Mapped[int] = mapped_column(Integer, ForeignKey("equipements.id"), primary_key=True)
     vlan_config: Mapped[dict | None] = mapped_column(JSON)
-    ports_status: Mapped[dict | None] = mapped_column(JSON)
     firmware_version: Mapped[str | None] = mapped_column(String(100))
 
     __mapper_args__ = {"polymorphic_identity": "reseau"}
@@ -124,3 +154,93 @@ class EquipementFirewall(Equipement):
     rules_count: Mapped[int] = mapped_column(Integer, default=0)
 
     __mapper_args__ = {"polymorphic_identity": "firewall"}
+
+
+class EquipementSwitch(EquipementReseau):
+    """Switch réseau — hérite de EquipementReseau pour accéder à ports_status, vlan_config, firmware_version."""
+    __mapper_args__ = {"polymorphic_identity": "switch"}
+
+
+class EquipementRouter(EquipementReseau):
+    """Routeur — hérite de EquipementReseau pour accéder à ports_status, vlan_config, firmware_version."""
+    __mapper_args__ = {"polymorphic_identity": "router"}
+
+
+class EquipementAccessPoint(EquipementReseau):
+    """Borne WiFi — hérite de EquipementReseau pour accéder à ports_status, vlan_config, firmware_version."""
+    __mapper_args__ = {"polymorphic_identity": "access_point"}
+
+
+class EquipementPrinter(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "printer"}
+
+
+class EquipementCamera(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "camera"}
+
+
+class EquipementNAS(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "nas"}
+
+
+class EquipementHyperviseur(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "hyperviseur"}
+
+
+class EquipementTelephone(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "telephone"}
+
+
+class EquipementIoT(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "iot"}
+
+
+class EquipementCloudGateway(Equipement):
+    __mapper_args__ = {"polymorphic_identity": "cloud_gateway"}
+
+
+class VlanDefinition(Base):
+    """VLAN definition scoped to a site."""
+    __tablename__ = "vlan_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    site_id: Mapped[int] = mapped_column(Integer, ForeignKey("sites.id"), nullable=False, index=True)
+    vlan_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    subnet: Mapped[str | None] = mapped_column(String(50))
+    color: Mapped[str] = mapped_column(String(7), nullable=False, default="#6b7280")
+    description: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+    # Relationship
+    site: Mapped["Site"] = relationship(back_populates="vlan_definitions")  # type: ignore[name-defined]
+
+    __table_args__ = (
+        UniqueConstraint("site_id", "vlan_id", name="uq_site_vlan_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<VlanDefinition(id={self.id}, site_id={self.site_id}, vlan_id={self.vlan_id}, name='{self.name}')>"
+
+
+EQUIPEMENT_TYPE_CLASS_MAP: dict[str, type[Equipement]] = {
+    "reseau": EquipementReseau,
+    "serveur": EquipementServeur,
+    "firewall": EquipementFirewall,
+    "equipement": Equipement,
+    "switch": EquipementSwitch,
+    "router": EquipementRouter,
+    "access_point": EquipementAccessPoint,
+    "printer": EquipementPrinter,
+    "camera": EquipementCamera,
+    "nas": EquipementNAS,
+    "hyperviseur": EquipementHyperviseur,
+    "telephone": EquipementTelephone,
+    "iot": EquipementIoT,
+    "cloud_gateway": EquipementCloudGateway,
+}

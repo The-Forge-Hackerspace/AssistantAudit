@@ -9,11 +9,18 @@ from sqlalchemy.orm import Session
 
 from ..models.scan import ScanReseau, ScanHost, ScanPort
 from ..models.site import Site
-from ..models.equipement import Equipement
+from ..models.equipement import Equipement, EQUIPEMENT_TYPE_VALUES
 from ..tools.nmap_scanner.scanner import NmapScanner, NmapScanResult
 from ..core.database import SessionLocal
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_TYPE_BY_LEGACY: dict[str, str] = {
+    "reseau": "switch",
+    "serveur": "serveur",
+    "firewall": "firewall",
+    "equipement": "equipement",
+}
 
 # Mapping type_scan → arguments nmap (pour affichage)
 NMAP_TYPE_ARGS: dict[str, list[str]] = {
@@ -218,6 +225,8 @@ def update_host_decision(
 
     host.decision = decision
     if chosen_type:
+        if chosen_type not in EQUIPEMENT_TYPE_VALUES:
+            raise ValueError(f"Type d'équipement invalide: {chosen_type}")
         host.chosen_type = chosen_type
     if hostname_override is not None:
         host.hostname = hostname_override
@@ -242,9 +251,12 @@ def update_host_decision(
             host.equipement_id = existing.id
             logger.info(f"Host {host.ip_address} lié à l'équipement existant #{existing.id}")
         else:
+            equip_type = chosen_type or "equipement"
+            if equip_type not in EQUIPEMENT_TYPE_VALUES:
+                raise ValueError(f"Type d'équipement invalide: {equip_type}")
             equip = Equipement(
                 site_id=scan.site_id,
-                type_equipement=chosen_type or "equipement",
+                type_equipement=equip_type,
                 ip_address=host.ip_address,
                 hostname=hostname_override or host.hostname,
                 mac_address=host.mac_address,
@@ -388,15 +400,34 @@ def _guess_equipement_type(host: ScanHost) -> str:
         return "firewall"
 
     # Network equipment
+    vendor_lower = (host.vendor or "").lower()
+    if "router" in os_lower or "mikrotik" in vendor_lower or "juniper" in vendor_lower:
+        return "router"
     if 161 in port_numbers and not (22 in port_numbers or 3389 in port_numbers):
-        return "reseau"
-    if "cisco" in (host.vendor or "").lower() or "switch" in os_lower:
-        return "reseau"
+        return "switch"
+    if "cisco" in vendor_lower or "switch" in os_lower:
+        return "switch"
+    if "access point" in os_lower or "ubiquiti" in vendor_lower or any(s in services for s in ["ubnt", "airmax"]):
+        return "access_point"
 
     # Server signatures
     if any(p in port_numbers for p in [22, 80, 443, 3389, 5985, 5986]):
         return "serveur"
+    if any(p in port_numbers for p in [631, 9100, 515]) or "printer" in os_lower:
+        return "printer"
+    if any(p in port_numbers for p in [554]) or "camera" in os_lower or "hikvision" in vendor_lower:
+        return "camera"
+    if "vmware" in os_lower or "hyper-v" in os_lower or "esxi" in os_lower:
+        return "hyperviseur"
+    if any(p in port_numbers for p in [445, 2049]) and "synology" in vendor_lower:
+        return "nas"
+    if any(p in port_numbers for p in [5060, 5061]) or "voip" in os_lower:
+        return "telephone"
+    if "iot" in os_lower or "smart" in os_lower:
+        return "iot"
+    if "azure" in os_lower or "aws" in os_lower or "cloud" in os_lower:
+        return "cloud_gateway"
     if "windows" in os_lower or "linux" in os_lower:
         return "serveur"
 
-    return "equipement"
+    return DEFAULT_TYPE_BY_LEGACY.get("equipement", "equipement")

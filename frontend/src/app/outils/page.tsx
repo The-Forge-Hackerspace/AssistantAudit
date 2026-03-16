@@ -10,6 +10,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Castle,
+  Map,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,15 @@ const tools = [
     href: "/outils/ad-auditor",
     color: "text-cyan-500",
     bgColor: "bg-cyan-500/10",
+  },
+  {
+    title: "Cartographie Réseau",
+    description:
+      "Création de diagrammes réseau simplifiés par site et vue multi-site, avec symboles par type d'équipement et liens logiques/physiques.",
+    icon: Map,
+    href: "/outils/network-map",
+    color: "text-indigo-500",
+    bgColor: "bg-indigo-500/10",
   },
   {
     title: "PingCastle",

@@ -1,0 +1,9 @@
+export interface PortDefinition {
+  id: string;          // unique within equipment, e.g. "ge-0/0/1"
+  name: string;        // display name, e.g. "GigE 1"
+  type: "ethernet" | "sfp" | "sfp+" | "console" | "mgmt";
+  speed: string;       // e.g. "1 Gbps", "10 Gbps"
+  row: number;         // visual row (0 = top, 1 = bottom)
+  index: number;       // position within row (left to right)
+}
+

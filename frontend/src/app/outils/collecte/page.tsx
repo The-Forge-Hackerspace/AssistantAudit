@@ -1094,7 +1094,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                     </>
                   )}
                 </div>
-                {isOPNsense && collect.updates.pkg_audit && (
+                {isOPNsense && !!collect.updates.pkg_audit && (
                   <div className="mt-3">
                     <h4 className="text-sm font-medium mb-1">Audit des packages (pkg audit)</h4>
                     <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
@@ -1116,7 +1116,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                       <InfoRow label="WireGuard" value={collect.services.wireguard_status as string || "Non configuré"} />
                       <InfoRow label="CARP (HA)" value={collect.services.carp_status as string || "Non configuré"} />
                     </div>
-                    {collect.services.services_list && (
+                    {!!collect.services.services_list && (
                       <div className="mt-2">
                         <h4 className="text-sm font-medium mb-1">Liste des services</h4>
                         <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
@@ -1153,7 +1153,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                         <InfoRow label="Nombre de règles" value={String(collect.security.firewall_rules_count ?? 0)} />
                         <InfoRow label="États actifs" value={collect.security.states_count as string || "N/A"} />
                       </div>
-                      {collect.security.firewall_rules && (
+                      {!!collect.security.firewall_rules && (
                         <div>
                           <h4 className="text-sm font-medium mb-1">Règles pf</h4>
                           <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
@@ -1161,7 +1161,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                           </pre>
                         </div>
                       )}
-                      {collect.security.nat_rules && (
+                      {!!collect.security.nat_rules && (
                         <div>
                           <h4 className="text-sm font-medium mb-1">Règles NAT</h4>
                           <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
@@ -1169,7 +1169,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                           </pre>
                         </div>
                       )}
-                      {collect.security.aliases && (
+                      {!!collect.security.aliases && (
                         <div>
                           <h4 className="text-sm font-medium mb-1">Aliases</h4>
                           <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
@@ -1206,7 +1206,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <InfoRow label="PermitRootLogin" value={collect.security.ssh_permit_root_login as string} />
                       </div>
-                      {collect.security.ssh_config_raw && (
+                      {!!collect.security.ssh_config_raw && (
                         <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto mt-2">
                           {collect.security.ssh_config_raw as string}
                         </pre>
@@ -1297,7 +1297,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                    collect.network.ip_addresses as string || "N/A"}
                 </pre>
               </div>
-              {isOPNsense && collect.network.routes && (
+              {isOPNsense && !!collect.network.routes && (
                 <div className="rounded-lg border p-4">
                   <h3 className="font-semibold mb-2">Routes</h3>
                   <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">

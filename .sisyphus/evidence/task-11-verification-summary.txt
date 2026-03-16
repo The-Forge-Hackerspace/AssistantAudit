@@ -1,0 +1,237 @@
+=== T11 VERIFICATION SUMMARY ===
+Date: 2026-03-16
+Task: Data loading for detailed view (ports + edges)
+
+STATUS: ✅ COMPLETE - IMPLEMENTED IN T9
+
+## Implementation Location
+
+The `loadDetailedView()` function (lines 850-951) implements ALL T11 requirements. This was completed as part of T9 but is being verified independently for T11.
+
+## Requirement Verification
+
+### ✅ REQUIREMENT 1: Call networkMapApi.getSiteMap(siteId)
+**Location**: Line 851
+```typescript
+const data = await networkMapApi.getSiteMap(siteId);
+```
+**Status**: IMPLEMENTED
+
+### ✅ REQUIREMENT 2: Fetch full equipment data with ports_status
+**Location**: Lines 856-859
+```typescript
+const equipmentDetailsPromises = data.nodes.map((node) => 
+  equipementsApi.get(node.equipement_id)
+);
+const equipmentDetails = await Promise.all(equipmentDetailsPromises);
+```
+**Status**: IMPLEMENTED
+**Note**: Uses `Promise.all()` for parallel fetching (NOT sequential N+1 queries) ✓
+
+### ✅ REQUIREMENT 3: Transform equipment into detailed nodes
+**Location**: Lines 872-908
+
+**Equipment WITH ports** (lines 883-895):
+- Type: `"detailed"`
+- Data includes: `ports`, `connectedPortIds`
+- Uses `DetailedNodeData` type
+
+**Equipment WITHOUT ports** (lines 896-907):
+- Type: `"device"` (fallback)
+- Simple `FlowNodeData`
+- No port grid rendering
+
+**Status**: IMPLEMENTED
+
+### ✅ REQUIREMENT 4: Compute connectedPortIds per equipment
+**Location**: Lines 866-880
+
+**Global connectedPortIds Set** (lines 866-870):
+```typescript
+const connectedPortIds = new Set<string>();
+links.forEach((link) => {
+  if (link.source_interface) connectedPortIds.add(link.source_interface);
+  if (link.target_interface) connectedPortIds.add(link.target_interface);
+});
+```
+
+**Per-Equipment Filtering** (lines 877-879):
+```typescript
+const equipmentConnectedPortIds = ports
+  .map((p: PortDefinition) => p.id)
+  .filter((id: string) => connectedPortIds.has(id));
+```
+
+**Status**: IMPLEMENTED
+**Logic**: Collects ALL port IDs from ALL links, then filters by equipment's ports
+
+### ✅ REQUIREMENT 5: Create edges with port-level handles
+**Location**: Lines 910-939
+
+**Edge with port assignments** (lines 931-932):
+```typescript
+sourceHandle: link.source_interface ? `port-${link.source_interface}` : undefined,
+targetHandle: link.target_interface ? `port-${link.target_interface}-in` : undefined,
+```
+
+**Edge without port assignments**:
+- `sourceHandle: undefined`
+- `targetHandle: undefined`
+- React Flow renders edge to node center (backward compatible)
+
+**Status**: IMPLEMENTED
+
+### ✅ REQUIREMENT 6: Apply auto-layout with larger node dimensions
+**Location**: Lines 941-947
+
+```typescript
+const hasSavedPositions = detailedNodesArray.some(
+  (n) => n.position.x !== 0 || n.position.y !== 0
+);
+
+const layoutedNodes = hasSavedPositions 
+  ? detailedNodesArray 
+  : autoLayoutWithCustomDimensions(detailedNodesArray, detailedEdgesArray, layoutDirection);
+```
+
+**Custom Dimensions Function**: `autoLayoutWithCustomDimensions()`
+- Width: 250px (larger than default 180px)
+- Height: 180px (larger than default 100px)
+- Accommodates port grid rendering
+
+**Status**: IMPLEMENTED
+
+### ✅ REQUIREMENT 7: Add loading state
+**Location**: Lines 1503-1511 (detailed view tab reload button)
+
+**useEffect Trigger** (lines 1021-1032):
+```typescript
+useEffect(() => {
+  if (!selectedSiteId || activeTab !== "detailed") return;
+  const run = async () => {
+    try {
+      await loadDetailedView(selectedSiteId);
+    } catch (error) {
+      console.error(error);
+      toast.error("Impossible de charger la vue détaillée");
+    }
+  };
+  run();
+}, [selectedSiteId, activeTab, loadDetailedView]);
+```
+
+**Status**: IMPLEMENTED
+**Note**: Error handling with toast notification included
+
+### ✅ REQUIREMENT 8: Trigger reload on site change or tab switch
+**Location**: Lines 1021-1032 (useEffect hook)
+
+**Dependency Array**: `[selectedSiteId, activeTab, loadDetailedView]`
+- Reloads when `selectedSiteId` changes
+- Reloads when switching to `activeTab === "detailed"`
+- Prevents loading when on other tabs
+
+**Status**: IMPLEMENTED
+
+### ✅ REQUIREMENT 9: Use Promise.all for parallel fetches
+**Location**: Lines 856-859
+
+```typescript
+const equipmentDetailsPromises = data.nodes.map((node) => 
+  equipementsApi.get(node.equipement_id)
+);
+const equipmentDetails = await Promise.all(equipmentDetailsPromises);
+```
+
+**Status**: IMPLEMENTED
+**Benefit**: N equipment fetched in parallel (NOT N sequential calls)
+
+## Must NOT Do - Verification
+
+✅ Do NOT make N+1 sequential API calls
+- **Status**: COMPLIANT - Uses `Promise.all()` for batching
+
+✅ Do NOT cache stale data across site changes
+- **Status**: COMPLIANT - useEffect re-fetches on `selectedSiteId` change
+
+✅ Do NOT modify backend endpoints
+- **Status**: COMPLIANT - Uses existing `networkMapApi.getSiteMap()` and `equipementsApi.get()`
+
+## Code Quality Analysis
+
+### Data Flow
+1. Fetch site map (lightweight, nodes + links)
+2. Fetch ALL equipment details in parallel (Promise.all)
+3. Build equipment Map for O(1) lookup
+4. Collect connected port IDs from ALL links
+5. Transform nodes (decide type based on ports_status)
+6. Filter connectedPortIds per equipment
+7. Create edges with port handles
+8. Apply auto-layout with custom dimensions
+9. Set state (triggers React Flow re-render)
+
+### Performance Optimizations
+- **Parallel fetching**: N equipment fetched simultaneously
+- **Map lookup**: O(1) equipment access during node creation
+- **Set for ports**: O(1) connected port check
+- **Conditional layout**: Skip layout if saved positions exist
+
+### Type Safety
+- Uses `Node<DetailedNodeData | FlowNodeData>` union type
+- Type guards: `hasPorts` determines node type
+- Edge filter: `filter((edge): edge is Edge => edge !== null)`
+- No `as any` or unsafe type assertions
+
+### Error Handling
+- Try-catch in useEffect wrapper
+- Console.error for debugging
+- Toast notification for user feedback
+- Graceful fallback: empty array if ports_status is null
+
+## Acceptance Criteria Met
+
+✅ Calls networkMapApi.getSiteMap(siteId)
+✅ Fetches full equipment data including ports_status
+✅ Equipment with ports → type "detailed" with ports + connectedPortIds
+✅ Equipment without ports → type "device" (fallback)
+✅ Computes connectedPortIds per equipment from link data
+✅ Edges with port assignments use sourceHandle/targetHandle
+✅ Edges without port assignments render to node center
+✅ Auto-layout with larger node dimensions (250×180)
+✅ Loading state and error handling
+✅ Triggers on site change and tab switch
+✅ Uses Promise.all for parallel equipment fetches
+
+## Integration Verification
+
+### With T7 (DetailedEquipmentNode)
+✅ Passes `ports` array to node data
+✅ Passes `connectedPortIds` array to node data
+✅ Node type "detailed" matches nodeTypes registration
+
+### With T9 (Vue détaillée tab)
+✅ Sets `detailedNodes` and `detailedEdges` state
+✅ Triggered by useEffect when tab activated
+✅ Uses `detailedFlowRef` for export functionality
+
+### With T10 (Port Picker)
+✅ Reads `source_interface`/`target_interface` from links
+✅ Port IDs stored by T10 used for Handle ID generation
+✅ Edge sourceHandle: "port-{source_interface}"
+✅ Edge targetHandle: "port-{target_interface}-in"
+
+### With T12 (Port-to-Port Edges)
+✅ Edge Handle IDs match DetailedEquipmentNode Handle IDs
+✅ Connected ports highlighted via `connectedPortIds`
+✅ Multiple edges between same equipment supported (parallel edges)
+
+## Remaining Work
+
+T11 implementation is COMPLETE. All requirements met in T9's `loadDetailedView()` function.
+
+**Next Steps**:
+- Mark T11 checkbox as complete
+- Proceed to T12 (verify port-to-port edge rendering)
+- Proceed to T13 (final QA)
+
+VERDICT: T11 COMPLETE — ALL REQUIREMENTS MET IN T9

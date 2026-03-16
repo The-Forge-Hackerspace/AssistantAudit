@@ -354,10 +354,11 @@ function EquipementsContent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous les types</SelectItem>
-                <SelectItem value="serveur">Serveur</SelectItem>
-                <SelectItem value="firewall">Firewall</SelectItem>
-                <SelectItem value="reseau">Réseau</SelectItem>
-                <SelectItem value="equipement">Autre</SelectItem>
+                {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -519,10 +520,11 @@ function EquipementsContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="serveur">Serveur</SelectItem>
-                  <SelectItem value="firewall">Firewall</SelectItem>
-                  <SelectItem value="reseau">Réseau (switch, routeur, borne...)</SelectItem>
-                  <SelectItem value="equipement">Autre</SelectItem>
+                  {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

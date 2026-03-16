@@ -8,6 +8,10 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 from .validators import IPAddress, MACAddress, Hostname, Description
+from ..models.equipement import EQUIPEMENT_TYPE_VALUES
+
+
+EQUIPEMENT_TYPE_PATTERN = "^(" + "|".join(EQUIPEMENT_TYPE_VALUES) + ")$"
 
 
 class EquipementBase(BaseModel):
@@ -23,12 +27,12 @@ class EquipementCreate(EquipementBase):
     site_id: int
     type_equipement: str = Field(
         ...,
-        pattern=r"^(reseau|serveur|firewall|equipement)$",
-        description="Type : reseau, serveur, firewall, equipement",
+        pattern=EQUIPEMENT_TYPE_PATTERN,
+        description="Type d'équipement réseau/infrastructure",
     )
     # Champs spécifiques réseau
     vlan_config: Optional[dict] = None
-    ports_status: Optional[dict] = None
+    ports_status: Optional[list] = None
     firmware_version: Optional[str] = Field(default=None, max_length=100)
     # Champs spécifiques serveur
     os_version_detail: Optional[str] = Field(default=None, max_length=500)
@@ -52,7 +56,7 @@ class EquipementUpdate(BaseModel):
     )
     # Champs spécifiques réseau
     vlan_config: Optional[dict] = None
-    ports_status: Optional[dict] = None
+    ports_status: Optional[list] = None
     firmware_version: Optional[str] = Field(default=None, max_length=100)
     # Champs spécifiques serveur
     os_version_detail: Optional[str] = Field(default=None, max_length=500)
@@ -74,7 +78,7 @@ class EquipementRead(EquipementBase):
     date_derniere_maj: datetime
     # Champs spécifiques (présents selon le type)
     vlan_config: Optional[dict] = None
-    ports_status: Optional[dict] = None
+    ports_status: Optional[list] = None
     firmware_version: Optional[str] = None
     os_version_detail: Optional[str] = None
     modele_materiel: Optional[str] = None
