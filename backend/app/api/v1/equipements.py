@@ -32,15 +32,22 @@ router = APIRouter()
 _TYPE_MAP = EQUIPEMENT_TYPE_CLASS_MAP
 
 # Champs spécifiques par type
+# ports_status est commun à tous les équipements (colonne sur la table de base)
 _TYPE_FIELDS = {
     "reseau": ["vlan_config", "ports_status", "firmware_version"],
     "switch": ["vlan_config", "ports_status", "firmware_version"],
     "router": ["vlan_config", "ports_status", "firmware_version"],
     "access_point": ["vlan_config", "ports_status", "firmware_version"],
-    "serveur": ["os_version_detail", "modele_materiel", "role_list", "cpu_ram_info"],
-    "hyperviseur": ["os_version_detail", "modele_materiel", "role_list", "cpu_ram_info"],
-    "nas": ["os_version_detail", "modele_materiel", "role_list", "cpu_ram_info"],
-    "firewall": ["license_status", "vpn_users_count", "rules_count"],
+    "serveur": ["os_version_detail", "modele_materiel", "role_list", "cpu_ram_info", "ports_status"],
+    "hyperviseur": ["os_version_detail", "modele_materiel", "role_list", "cpu_ram_info", "ports_status"],
+    "nas": ["os_version_detail", "modele_materiel", "role_list", "cpu_ram_info", "ports_status"],
+    "firewall": ["license_status", "vpn_users_count", "rules_count", "ports_status"],
+    "printer": ["ports_status"],
+    "camera": ["ports_status"],
+    "telephone": ["ports_status"],
+    "iot": ["ports_status"],
+    "cloud_gateway": ["ports_status"],
+    "equipement": ["ports_status"],
 }
 
 TYPE_PATTERN = "^(" + "|".join(EQUIPEMENT_TYPE_VALUES) + ")$"
