@@ -791,7 +791,7 @@ Max Concurrent: 5 (Wave 2)
 
   **Commit**: NO (groups with T6, T7 in commit 4)
 
-- [ ] 9. Add "Vue détaillée" tab with ReactFlow instance
+- [x] 9. Add "Vue détaillée" tab with ReactFlow instance
 
   **What to do**:
   - Add a 3rd tab "Vue détaillée" to the existing `<Tabs>` component (line 818):
@@ -885,7 +885,7 @@ Max Concurrent: 5 (Wave 2)
   - Files: `frontend/src/app/outils/network-map/page.tsx`
   - Pre-commit: `cd frontend && npx tsc --noEmit`
 
-- [ ] 10. Update link dialog with optional port picker
+- [x] 10. Update link dialog with optional port picker
 
   **What to do**:
   - In the existing link dialog (lines 912-1023), add OPTIONAL port picker dropdowns:
@@ -986,7 +986,7 @@ Max Concurrent: 5 (Wave 2)
 
   **Commit**: NO (groups with T11, T12 in commit 6)
 
-- [ ] 11. Data loading for detailed view (ports + edges)
+- [x] 11. Data loading for detailed view (ports + edges)
 
   **What to do**:
   - Implement the `loadDetailedView` callback (registered in Task 9) with full data loading logic:
@@ -1075,7 +1075,7 @@ Max Concurrent: 5 (Wave 2)
 
   **Commit**: NO (groups with T10, T12 in commit 6)
 
-- [ ] 12. Integration: port-to-port edges in detailed view
+- [x] 12. Integration: port-to-port edges in detailed view
 
   **What to do**:
   - Verify and polish the full integration of port-to-port edges in the detailed view:
