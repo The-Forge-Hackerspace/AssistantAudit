@@ -211,7 +211,7 @@ async def upload_attachment(
     "/control-result/{result_id}",
     response_model=list[AttachmentRead],
 )
-async def list_attachments(
+def list_attachments(
     result_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -233,7 +233,7 @@ async def list_attachments(
 # ── Download ──
 
 @router.get("/{attachment_id}/download")
-async def download_attachment(
+def download_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -264,7 +264,7 @@ async def download_attachment(
 # ── Preview (inline) ──
 
 @router.get("/{attachment_id}/preview")
-async def preview_attachment(
+def preview_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -302,7 +302,7 @@ async def preview_attachment(
 # ── Delete ──
 
 @router.delete("/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_attachment(
+def delete_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),

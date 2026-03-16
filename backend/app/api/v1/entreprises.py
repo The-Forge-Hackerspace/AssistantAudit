@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=PaginatedResponse[EntrepriseRead])
-async def list_entreprises(
+def list_entreprises(
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -43,7 +43,7 @@ async def list_entreprises(
 
 
 @router.post("", response_model=EntrepriseRead, status_code=status.HTTP_201_CREATED)
-async def create_entreprise(
+def create_entreprise(
     body: EntrepriseCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -90,7 +90,7 @@ async def create_entreprise(
 
 
 @router.get("/{entreprise_id}", response_model=EntrepriseRead)
-async def get_entreprise(
+def get_entreprise(
     entreprise_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -103,7 +103,7 @@ async def get_entreprise(
 
 
 @router.put("/{entreprise_id}", response_model=EntrepriseRead)
-async def update_entreprise(
+def update_entreprise(
     entreprise_id: int,
     body: EntrepriseUpdate,
     db: Session = Depends(get_db),
@@ -124,7 +124,7 @@ async def update_entreprise(
 
 
 @router.delete("/{entreprise_id}", response_model=MessageResponse)
-async def delete_entreprise(
+def delete_entreprise(
     entreprise_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),

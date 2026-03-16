@@ -66,8 +66,22 @@ def init_database():
             )
             db.add(admin)
             db.commit()
-            print(f"  [OK] Utilisateur admin cree (login: admin / <mot_de_passe_genere>)")
-            print(f"  [INFO] Mot de passe initial: {admin_password}")
+            print(f"  [OK] Utilisateur admin cree (login: admin)")
+
+            # Écrire le mot de passe dans un fichier à permissions restreintes
+            # plutôt que de l'afficher dans la console (sécurité: évite les logs)
+            cred_file = Path(__file__).parent / "instance" / ".admin_credentials"
+            cred_file.parent.mkdir(parents=True, exist_ok=True)
+            cred_file.write_text(
+                f"username=admin\npassword={admin_password}\n",
+                encoding="utf-8",
+            )
+            try:
+                cred_file.chmod(0o600)
+            except OSError:
+                pass  # Windows ne supporte pas chmod, le fichier est quand même créé
+            print(f"  [INFO] Mot de passe initial sauvegardé dans: {cred_file}")
+            print(f"  [WARN] Supprimez ce fichier après votre première connexion !")
 
         # 3. Importer les référentiels
         print("\n[3/3] Import des referentiels YAML...")

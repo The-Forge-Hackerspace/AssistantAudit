@@ -1260,10 +1260,8 @@ export default function NetworkMapPage() {
     let vlans: VlanDefinition[] = [];
     try { vlans = await vlansApi.list(siteId); setSiteVlans(vlans); } catch { /* VLANs not available yet */ }
 
-    const equipmentDetailsPromises = data.nodes.map((node) => 
-      equipementsApi.get(node.equipement_id)
-    );
-    const equipmentDetails = await Promise.all(equipmentDetailsPromises);
+    const equipmentIds = data.nodes.map((node) => node.equipement_id);
+    const equipmentDetails = await equipementsApi.batchGet(equipmentIds);
 
     const equipmentMap = new Map<number, Equipement>();
     equipmentDetails.forEach((eq) => {

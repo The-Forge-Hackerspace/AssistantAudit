@@ -3,6 +3,7 @@ Structured JSON logging configuration for AssistantAudit.
 Provides production-ready JSON logging with context support and filtering.
 """
 
+import contextvars
 import json
 import logging
 import sys
@@ -136,32 +137,54 @@ def get_logger(name: str) -> logging.Logger:
 # ────────────────────────────────────────────────────────────────────────
 
 
-class LogContext:
-    """Context manager for adding structured logging context"""
+# Per-request context storage — async-safe via contextvars (unlike a class-level dict)
+_log_context_var: contextvars.ContextVar[dict] = contextvars.ContextVar(
+    "log_context", default={}
+)
 
-    _contexts: dict = {}
+
+class LogContext:
+    """Context manager for adding structured logging context.
+
+    Uses contextvars.ContextVar so each async task / request gets its own
+    isolated context — no cross-request data leakage.
+    """
+
+    @classmethod
+    def _get_ctx(cls) -> dict:
+        return _log_context_var.get()
+
+    @classmethod
+    def _set_ctx(cls, ctx: dict) -> None:
+        _log_context_var.set(ctx)
 
     @classmethod
     def set_request_id(cls, request_id: str) -> None:
         """Set request ID for current context"""
-        cls._contexts["request_id"] = request_id
+        ctx = cls._get_ctx().copy()
+        ctx["request_id"] = request_id
+        cls._set_ctx(ctx)
 
     @classmethod
     def set_user_id(cls, user_id: int) -> None:
         """Set user ID for current context"""
-        cls._contexts["user_id"] = user_id
+        ctx = cls._get_ctx().copy()
+        ctx["user_id"] = user_id
+        cls._set_ctx(ctx)
 
     @classmethod
     def set_operation(cls, operation: str) -> None:
         """Set operation type for current context"""
-        cls._contexts["operation"] = operation
+        ctx = cls._get_ctx().copy()
+        ctx["operation"] = operation
+        cls._set_ctx(ctx)
 
     @classmethod
     def clear(cls) -> None:
         """Clear all context"""
-        cls._contexts.clear()
+        _log_context_var.set({})
 
     @classmethod
     def get(cls) -> dict:
         """Get current context"""
-        return cls._contexts.copy()
+        return cls._get_ctx().copy()

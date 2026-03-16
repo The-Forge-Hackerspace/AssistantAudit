@@ -22,6 +22,46 @@ logger = logging.getLogger(__name__)
 class FrameworkService:
 
     # ------------------------------------------------------------------ #
+    #  Helpers
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _create_categories_from_dicts(
+        db: Session, framework_id: int, categories: list[dict]
+    ) -> None:
+        """
+        Crée les catégories et contrôles pour un framework à partir de dicts
+        provenant de l'éditeur (API CRUD).  Utilisé par create_framework et
+        update_framework — les clés attendues sont celles du schéma Pydantic
+        (ref_id, auto_check_function, …).
+        """
+        for cat_order, cat_data in enumerate(categories, start=1):
+            category = FrameworkCategory(
+                name=cat_data["name"],
+                description=cat_data.get("description"),
+                order=cat_order,
+                framework_id=framework_id,
+            )
+            db.add(category)
+            db.flush()
+            for ctrl_order, ctrl_data in enumerate(cat_data.get("controls", []), start=1):
+                control = Control(
+                    ref_id=ctrl_data["ref_id"],
+                    title=ctrl_data["title"],
+                    description=ctrl_data.get("description"),
+                    severity=ControlSeverity(ctrl_data.get("severity", "medium")),
+                    check_type=CheckType(ctrl_data.get("check_type", "manual")),
+                    order=ctrl_order,
+                    auto_check_function=ctrl_data.get("auto_check_function"),
+                    engine_rule_id=ctrl_data.get("engine_rule_id"),
+                    cis_reference=ctrl_data.get("cis_reference"),
+                    remediation=ctrl_data.get("remediation"),
+                    evidence_required=ctrl_data.get("evidence_required", False),
+                    category_id=category.id,
+                )
+                db.add(control)
+
+    # ------------------------------------------------------------------ #
     #  Listing / get
     # ------------------------------------------------------------------ #
 
@@ -417,31 +457,8 @@ class FrameworkService:
         db.add(framework)
         db.flush()
 
-        for cat_order, cat_data in enumerate(categories or [], start=1):
-            category = FrameworkCategory(
-                name=cat_data["name"],
-                description=cat_data.get("description"),
-                order=cat_order,
-                framework_id=framework.id,
-            )
-            db.add(category)
-            db.flush()
-            for ctrl_order, ctrl_data in enumerate(cat_data.get("controls", []), start=1):
-                control = Control(
-                    ref_id=ctrl_data["ref_id"],
-                    title=ctrl_data["title"],
-                    description=ctrl_data.get("description"),
-                    severity=ControlSeverity(ctrl_data.get("severity", "medium")),
-                    check_type=CheckType(ctrl_data.get("check_type", "manual")),
-                    order=ctrl_order,
-                    auto_check_function=ctrl_data.get("auto_check_function"),
-                    engine_rule_id=ctrl_data.get("engine_rule_id"),
-                    cis_reference=ctrl_data.get("cis_reference"),
-                    remediation=ctrl_data.get("remediation"),
-                    evidence_required=ctrl_data.get("evidence_required", False),
-                    category_id=category.id,
-                )
-                db.add(control)
+        if categories:
+            FrameworkService._create_categories_from_dicts(db, framework.id, categories)
 
         db.commit()
         db.refresh(framework)
@@ -486,31 +503,9 @@ class FrameworkService:
                 db.delete(cat)
             db.flush()
 
-            for cat_order, cat_data in enumerate(data["categories"], start=1):
-                category = FrameworkCategory(
-                    name=cat_data["name"],
-                    description=cat_data.get("description"),
-                    order=cat_order,
-                    framework_id=framework.id,
-                )
-                db.add(category)
-                db.flush()
-                for ctrl_order, ctrl_data in enumerate(cat_data.get("controls", []), start=1):
-                    control = Control(
-                        ref_id=ctrl_data["ref_id"],
-                        title=ctrl_data["title"],
-                        description=ctrl_data.get("description"),
-                        severity=ControlSeverity(ctrl_data.get("severity", "medium")),
-                        check_type=CheckType(ctrl_data.get("check_type", "manual")),
-                        order=ctrl_order,
-                        auto_check_function=ctrl_data.get("auto_check_function"),
-                        engine_rule_id=ctrl_data.get("engine_rule_id"),
-                        cis_reference=ctrl_data.get("cis_reference"),
-                        remediation=ctrl_data.get("remediation"),
-                        evidence_required=ctrl_data.get("evidence_required", False),
-                        category_id=category.id,
-                    )
-                    db.add(control)
+            FrameworkService._create_categories_from_dicts(
+                db, framework.id, data["categories"]
+            )
 
         db.commit()
         db.refresh(framework)

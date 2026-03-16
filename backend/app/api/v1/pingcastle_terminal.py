@@ -22,12 +22,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tools", tags=["tools"])
 
 
-async def _authenticate_ws(token: str | None) -> User | None:
-    """Authentifie un utilisateur via un token JWT passé en query param."""
-    if not token:
+async def _authenticate_ws(websocket: WebSocket, token: str | None) -> User | None:
+    """
+    Authentifie un utilisateur via :
+      1. Cookie httpOnly « aa_access_token » (prioritaire — SEC-03)
+      2. Query parameter ?token=<JWT> (fallback — legacy / API clients)
+    """
+    effective_token = websocket.cookies.get("aa_access_token") or token
+    if not effective_token:
         return None
 
-    payload = decode_token(token)
+    payload = decode_token(effective_token)
     if payload is None or payload.get("type") != "access":
         return None
 
@@ -59,7 +64,7 @@ async def pingcastle_terminal(
     - Transmet les saisies WebSocket → stdin du process.
     """
     # ── Authentification ──
-    user = await _authenticate_ws(token)
+    user = await _authenticate_ws(websocket, token)
     if not user:
         await websocket.close(code=4001, reason="Non authentifié")
         return

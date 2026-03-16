@@ -46,6 +46,46 @@ def get_nmap_command_preview(target: str, scan_type: str, custom_args: Optional[
     return _build_display_command(target or "<cible>", scan_type, custom_args)
 
 
+def _find_or_create_equipement(
+    db: Session,
+    site_id: int,
+    ip_address: str,
+    equip_type: str,
+    hostname: Optional[str] = None,
+    mac_address: Optional[str] = None,
+    vendor: Optional[str] = None,
+    os_guess: Optional[str] = None,
+) -> tuple[Equipement, bool]:
+    """
+    Look up an existing equipment by site+IP or create a new one.
+
+    Returns (equipment, created) where created is True if a new row was inserted.
+    """
+    existing = (
+        db.query(Equipement)
+        .filter(Equipement.site_id == site_id, Equipement.ip_address == ip_address)
+        .first()
+    )
+    if existing:
+        return existing, False
+
+    if equip_type not in EQUIPEMENT_TYPE_VALUES:
+        raise ValueError(f"Type d'équipement invalide: {equip_type}")
+
+    equip = Equipement(
+        site_id=site_id,
+        type_equipement=equip_type,
+        ip_address=ip_address,
+        hostname=hostname,
+        mac_address=mac_address,
+        fabricant=vendor,
+        os_detected=os_guess,
+    )
+    db.add(equip)
+    db.flush()
+    return equip, True
+
+
 def create_pending_scan(
     db: Session,
     site_id: int,
@@ -133,6 +173,12 @@ def execute_scan_background(
         scan.statut = "completed"
         db.flush()
 
+        # Batch-prefetch all equipment for this site to avoid N+1 queries
+        site_equipements = {
+            eq.ip_address: eq
+            for eq in db.query(Equipement).filter(Equipement.site_id == site_id).all()
+        }
+
         # Persister les hosts et ports
         for discovered_host in result.hosts:
             host = ScanHost(
@@ -146,15 +192,8 @@ def execute_scan_background(
                 ports_open_count=len([p for p in discovered_host.ports if p.state == "open"]),
                 decision="pending",
             )
-            # Vérifier si un équipement existe déjà avec cette IP sur ce site
-            existing = (
-                db.query(Equipement)
-                .filter(
-                    Equipement.site_id == site_id,
-                    Equipement.ip_address == discovered_host.ip_address,
-                )
-                .first()
-            )
+            # Check if equipment already exists for this IP (using prefetched data)
+            existing = site_equipements.get(discovered_host.ip_address)
             if existing:
                 host.equipement_id = existing.id
                 host.decision = "kept"
@@ -237,39 +276,25 @@ def update_host_decision(
         if not scan:
             raise ValueError("Scan introuvable pour ce host")
 
-        # Vérifier qu'un équipement n'existe pas déjà
-        existing = (
-            db.query(Equipement)
-            .filter(
-                Equipement.site_id == scan.site_id,
-                Equipement.ip_address == host.ip_address,
-            )
-            .first()
+        equip_type = chosen_type or "equipement"
+        equip, created = _find_or_create_equipement(
+            db,
+            site_id=scan.site_id,
+            ip_address=host.ip_address,
+            equip_type=equip_type,
+            hostname=hostname_override or host.hostname,
+            mac_address=host.mac_address,
+            vendor=host.vendor,
+            os_guess=host.os_guess,
         )
-
-        if existing:
-            host.equipement_id = existing.id
-            logger.info(f"Host {host.ip_address} lié à l'équipement existant #{existing.id}")
-        else:
-            equip_type = chosen_type or "equipement"
-            if equip_type not in EQUIPEMENT_TYPE_VALUES:
-                raise ValueError(f"Type d'équipement invalide: {equip_type}")
-            equip = Equipement(
-                site_id=scan.site_id,
-                type_equipement=equip_type,
-                ip_address=host.ip_address,
-                hostname=hostname_override or host.hostname,
-                mac_address=host.mac_address,
-                fabricant=host.vendor,
-                os_detected=host.os_guess,
-            )
-            db.add(equip)
-            db.flush()
-            host.equipement_id = equip.id
+        host.equipement_id = equip.id
+        if created:
             logger.info(
                 f"Équipement créé depuis scan: {host.ip_address} "
-                f"(type={chosen_type}, id={equip.id})"
+                f"(type={equip_type}, id={equip.id})"
             )
+        else:
+            logger.info(f"Host {host.ip_address} lié à l'équipement existant #{equip.id}")
 
     db.commit()
     db.refresh(host)
@@ -345,40 +370,23 @@ def import_all_kept_hosts(db: Session, scan_id: int) -> list[Equipement]:
         if host.equipement_id:
             continue
 
-        # Vérifier si l'IP existe déjà
-        existing = (
-            db.query(Equipement)
-            .filter(
-                Equipement.site_id == scan.site_id,
-                Equipement.ip_address == host.ip_address,
-            )
-            .first()
-        )
-        if existing:
-            host.equipement_id = existing.id
-            host.decision = "kept"
-            host.chosen_type = existing.type_equipement
-            continue
-
-        # Deviner le type en fonction des ports
         guessed_type = _guess_equipement_type(host)
-
-        equip = Equipement(
+        equip, was_created = _find_or_create_equipement(
+            db,
             site_id=scan.site_id,
-            type_equipement=guessed_type,
             ip_address=host.ip_address,
+            equip_type=guessed_type,
             hostname=host.hostname,
             mac_address=host.mac_address,
-            fabricant=host.vendor,
-            os_detected=host.os_guess,
+            vendor=host.vendor,
+            os_guess=host.os_guess,
         )
-        db.add(equip)
-        db.flush()
 
         host.equipement_id = equip.id
         host.decision = "kept"
-        host.chosen_type = guessed_type
-        created.append(equip)
+        host.chosen_type = equip.type_equipement
+        if was_created:
+            created.append(equip)
 
     db.commit()
     logger.info(f"Import scan #{scan_id}: {len(created)} équipements créés")

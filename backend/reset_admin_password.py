@@ -42,8 +42,8 @@ def main() -> int:
     parser.add_argument("--username", default="admin", help="Username to update (default: admin)")
     parser.add_argument(
         "--password",
-        default="Admin@2026!",
-        help="New password to set (default: Admin@2026!)",
+        required=True,
+        help="New password to set (required)",
     )
     args = parser.parse_args()
 

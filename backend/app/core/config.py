@@ -64,6 +64,10 @@ class Settings(BaseSettings):
                         "Puis ajoutez SECRET_KEY=<clé> dans votre fichier .env"
                     )
         
+        # En développement, les cookies Secure ne fonctionnent pas sur http://localhost
+        if self.ENV == "development":
+            self.COOKIE_SECURE = False
+
         # Validation en production
         is_safe_env = self.ENV in ("production", "preprod", "staging")
         if is_safe_env and len(self.SECRET_KEY) < 32:
@@ -82,8 +86,13 @@ class Settings(BaseSettings):
     # --- Upload ---
     MAX_CONFIG_UPLOAD_SIZE_MB: int = 5  # taille max fichier config analysis
 
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # Sécur: accès court (15 min), refresh plus long
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 heures — session de travail d'audit complète
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # --- Cookies httpOnly (auth) ---
+    COOKIE_SECURE: bool = True   # False en développement (HTTP localhost)
+    COOKIE_SAMESITE: str = "lax"
+    COOKIE_DOMAIN: str = ""      # Vide = domaine courant
 
     # --- Uploads ---
     UPLOAD_DIR: str = str(BASE_DIR / "uploads")

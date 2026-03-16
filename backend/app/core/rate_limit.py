@@ -2,7 +2,13 @@
 Rate limiter in-memory pour protéger contre le brute-force.
 
 Limite les tentatives par IP sur les endpoints sensibles (login).
-En production avec plusieurs workers, remplacer par Redis-backed (slowapi).
+
+⚠️ LIMITATION: This uses a per-process in-memory dict + threading.Lock.
+   With multiple uvicorn workers (--workers N), each worker has its own
+   independent counter — an attacker can get N × MAX_ATTEMPTS tries before
+   being blocked. For production multi-worker deployments, replace with a
+   Redis-backed solution (e.g. slowapi + Redis, or a shared rate limiter).
+   See: https://github.com/laurentS/slowapi
 """
 import time
 import logging

@@ -89,7 +89,7 @@ def validate_username(username: str) -> str:
     """Valide un nom d'utilisateur."""
     username = username.strip()
     if not re.match(r"^[a-zA-Z0-9._-]{3,32}$", username):
-        raise ValueError("Username debe tener 3-32 caracteres alphanumericos")
+        raise ValueError("Le nom d'utilisateur doit contenir 3-32 caractères alphanumériques (a-z, 0-9, . _ -)")
     return username
 
 

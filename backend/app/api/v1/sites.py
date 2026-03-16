@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=PaginatedResponse[SiteRead])
-async def list_sites(
+def list_sites(
     entreprise_id: int = None,
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
@@ -39,7 +39,7 @@ async def list_sites(
 
 
 @router.post("", response_model=SiteRead, status_code=status.HTTP_201_CREATED)
-async def create_site(
+def create_site(
     body: SiteCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -77,7 +77,7 @@ async def create_site(
 
 
 @router.get("/{site_id}", response_model=SiteRead)
-async def get_site(
+def get_site(
     site_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -97,7 +97,7 @@ async def get_site(
 
 
 @router.put("/{site_id}", response_model=SiteRead)
-async def update_site(
+def update_site(
     site_id: int,
     body: SiteUpdate,
     db: Session = Depends(get_db),
@@ -125,7 +125,7 @@ async def update_site(
 
 
 @router.delete("/{site_id}", response_model=MessageResponse)
-async def delete_site(
+def delete_site(
     site_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),

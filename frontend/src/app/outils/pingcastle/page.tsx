@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, lazy, Suspense } from "react";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import {
   Castle,
   Play,
@@ -21,7 +21,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import Link from "next/link";
-import Cookies from "js-cookie";
+
+import { useAuth } from "@/contexts/auth-context";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,8 +140,8 @@ export default function PingCastlePage() {
     password: "",
   });
 
-  // JWT token for WebSocket
-  const token = useMemo(() => Cookies.get("access_token") || "", []);
+  // Auth context — WebSocket now uses httpOnly cookies (SEC-03)
+  const { user } = useAuth();
 
   // ── Load results ──
   const loadResults = useCallback(async () => {
@@ -611,7 +612,7 @@ export default function PingCastlePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {token ? (
+              {user ? (
                 <Suspense
                   fallback={
                     <div className="flex items-center justify-center h-64">
@@ -619,7 +620,7 @@ export default function PingCastlePage() {
                     </div>
                   }
                 >
-                  <PingCastleTerminal token={token} />
+                  <PingCastleTerminal token="" />
                 </Suspense>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">

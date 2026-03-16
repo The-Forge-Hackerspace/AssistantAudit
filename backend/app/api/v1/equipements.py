@@ -78,7 +78,7 @@ def _equipement_to_read(eq: Equipement) -> EquipementRead:
 
 
 @router.get("", response_model=PaginatedResponse[EquipementSummary])
-async def list_equipements(
+def list_equipements(
     site_id: Optional[int] = None,
     entreprise_id: Optional[int] = None,
     type_equipement: Optional[str] = Query(default=None, pattern=TYPE_PATTERN),
@@ -114,8 +114,28 @@ async def list_equipements(
     )
 
 
+@router.get("/batch", response_model=list[EquipementRead])
+def batch_get_equipements(
+    ids: str = Query(..., description="Comma-separated equipment IDs"),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    MAX_BATCH = 200
+    try:
+        id_list = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="IDs must be comma-separated integers")
+    if not id_list:
+        return []
+    if len(id_list) > MAX_BATCH:
+        raise HTTPException(status_code=400, detail=f"Maximum {MAX_BATCH} IDs per batch request")
+
+    items = db.query(Equipement).filter(Equipement.id.in_(id_list)).all()
+    return [_equipement_to_read(eq) for eq in items]
+
+
 @router.post("", response_model=EquipementRead, status_code=status.HTTP_201_CREATED)
-async def create_equipement(
+def create_equipement(
     body: EquipementCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -165,7 +185,7 @@ async def create_equipement(
 
 
 @router.get("/{equipement_id}", response_model=EquipementRead)
-async def get_equipement(
+def get_equipement(
     equipement_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -178,7 +198,7 @@ async def get_equipement(
 
 
 @router.put("/{equipement_id}", response_model=EquipementRead)
-async def update_equipement(
+def update_equipement(
     equipement_id: int,
     body: EquipementUpdate,
     db: Session = Depends(get_db),
@@ -213,7 +233,7 @@ async def update_equipement(
 
 
 @router.delete("/{equipement_id}", response_model=MessageResponse)
-async def delete_equipement(
+def delete_equipement(
     equipement_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),

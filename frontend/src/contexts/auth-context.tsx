@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { authApi } from "@/services/api";
-import { isAuthenticated } from "@/lib/api-client";
 import type { User } from "@/types";
 
 interface AuthContextType {
@@ -20,18 +19,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!isAuthenticated()) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
+    // SEC-03 : les cookies httpOnly sont invisibles pour le JS.
+    // On interroge /auth/me — si le cookie est valide, on récupère le profil.
     try {
       const me = await authApi.me();
       setUser(me);
-    } catch (err) {
-      console.error("[AuthContext] refresh() failed:", err);
+    } catch {
       setUser(null);
-      authApi.logout();
     } finally {
       setLoading(false);
     }
@@ -46,8 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await refresh();
   };
 
-  const logout = () => {
-    authApi.logout();
+  const logout = async () => {
+    await authApi.logout();
     setUser(null);
     window.location.href = "/login";
   };

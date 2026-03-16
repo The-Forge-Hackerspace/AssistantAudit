@@ -1,6 +1,5 @@
-import api, { setTokens, clearTokens } from "@/lib/api-client";
+import api from "@/lib/api-client";
 import type {
-  TokenResponse,
   User,
   PaginatedResponse,
   Entreprise,
@@ -57,15 +56,15 @@ import type {
 
 // ── Auth ──
 export const authApi = {
-  async login(username: string, password: string): Promise<TokenResponse> {
+  async login(username: string, password: string): Promise<void> {
     const form = new URLSearchParams();
     form.append("username", username);
     form.append("password", password);
-    const { data } = await api.post<TokenResponse>("/auth/login", form, {
+    // Le backend positionne les cookies httpOnly dans la réponse.
+    // Pas besoin de stocker les tokens côté client.
+    await api.post("/auth/login", form, {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
-    setTokens(data.access_token, data.refresh_token);
-    return data;
   },
 
   async me(): Promise<User> {
@@ -86,8 +85,13 @@ export const authApi = {
     return data;
   },
 
-  logout() {
-    clearTokens();
+  async logout(): Promise<void> {
+    // Le backend supprime les cookies httpOnly dans la réponse.
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // Ignorer les erreurs réseau au logout
+    }
   },
 };
 
@@ -211,6 +215,14 @@ export const equipementsApi = {
 
   async delete(id: number): Promise<MessageResponse> {
     const { data } = await api.delete(`/equipements/${id}`);
+    return data;
+  },
+
+  async batchGet(ids: number[]): Promise<Equipement[]> {
+    if (ids.length === 0) return [];
+    const { data } = await api.get("/equipements/batch", {
+      params: { ids: ids.join(",") },
+    });
     return data;
   },
 };

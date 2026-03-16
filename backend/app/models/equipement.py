@@ -63,7 +63,7 @@ class Equipement(Base):
 
     # Audit
     status_audit: Mapped[EquipementAuditStatus] = mapped_column(
-        Enum(EquipementAuditStatus), default=EquipementAuditStatus.A_AUDITER, nullable=False
+        Enum(EquipementAuditStatus), default=EquipementAuditStatus.A_AUDITER, nullable=False, index=True
     )
 
     # Métadonnées

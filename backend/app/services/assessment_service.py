@@ -96,12 +96,18 @@ class AssessmentService:
         campaign.status = CampaignStatus.IN_PROGRESS
         campaign.started_at = datetime.now(timezone.utc)
 
-        # Passer tous les équipements liés à cette campagne en EN_COURS
-        for assessment in campaign.assessments:
-            eq = db.get(Equipement, assessment.equipement_id)
-            if eq and eq.status_audit == EquipementAuditStatus.A_AUDITER:
-                eq.status_audit = EquipementAuditStatus.EN_COURS
-                logger.info(f"Équipement #{eq.id} '{eq.hostname}' → EN_COURS (campagne démarrée)")
+        # Batch-prefetch all equipment to avoid N+1 queries
+        eq_ids = [a.equipement_id for a in campaign.assessments if a.equipement_id]
+        if eq_ids:
+            equipements = {
+                eq.id: eq
+                for eq in db.query(Equipement).filter(Equipement.id.in_(eq_ids)).all()
+            }
+            for assessment in campaign.assessments:
+                eq = equipements.get(assessment.equipement_id)
+                if eq and eq.status_audit == EquipementAuditStatus.A_AUDITER:
+                    eq.status_audit = EquipementAuditStatus.EN_COURS
+                    logger.info(f"Équipement #{eq.id} '{eq.hostname}' → EN_COURS (campagne démarrée)")
 
         db.commit()
         db.refresh(campaign)
@@ -116,20 +122,26 @@ class AssessmentService:
         campaign.status = CampaignStatus.COMPLETED
         campaign.completed_at = datetime.now(timezone.utc)
 
-        # Mettre à jour le statut de chaque équipement selon ses résultats
-        for assessment in campaign.assessments:
-            eq = db.get(Equipement, assessment.equipement_id)
-            if not eq:
-                continue
-            score = AssessmentService.compute_score(assessment.results)
-            if score["non_compliant"] > 0:
-                eq.status_audit = EquipementAuditStatus.NON_CONFORME
-            elif score["assessed_controls"] > 0 and score["non_compliant"] == 0:
-                eq.status_audit = EquipementAuditStatus.CONFORME
-            logger.info(
-                f"Équipement #{eq.id} '{eq.hostname}' → {eq.status_audit.value} "
-                f"(campagne terminée, score={score['compliance_score']}%)"
-            )
+        # Batch-prefetch all equipment to avoid N+1 queries
+        eq_ids = [a.equipement_id for a in campaign.assessments if a.equipement_id]
+        if eq_ids:
+            equipements = {
+                eq.id: eq
+                for eq in db.query(Equipement).filter(Equipement.id.in_(eq_ids)).all()
+            }
+            for assessment in campaign.assessments:
+                eq = equipements.get(assessment.equipement_id)
+                if not eq:
+                    continue
+                score = AssessmentService.compute_score(assessment.results)
+                if score["non_compliant"] > 0:
+                    eq.status_audit = EquipementAuditStatus.NON_CONFORME
+                elif score["assessed_controls"] > 0 and score["non_compliant"] == 0:
+                    eq.status_audit = EquipementAuditStatus.CONFORME
+                logger.info(
+                    f"Équipement #{eq.id} '{eq.hostname}' → {eq.status_audit.value} "
+                    f"(campagne terminée, score={score['compliance_score']}%)"
+                )
 
         db.commit()
         db.refresh(campaign)

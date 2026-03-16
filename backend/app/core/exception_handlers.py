@@ -3,11 +3,12 @@ Global exception handlers pour FastAPI.
 Centralise la gestion des erreurs avec des réponses standardisées.
 """
 import logging
-import traceback
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from pydantic import ValidationError
+
+from .config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -45,36 +46,34 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):
         """Gère les erreurs SQLAlchemy génériques."""
         logger.error(f"SQLAlchemy error: {exc}")
-        detail = "Erreur de base de données"
-        if logger.isEnabledFor(logging.DEBUG):
-            detail = str(exc)
+        # Never expose DB internals to the client — details are already logged server-side
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": detail, "error_type": "database_error"},
+            content={"detail": "Erreur de base de données", "error_type": "database_error"},
         )
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
         """Gestionnaire d'exception générique pour tous les autres erreurs non gérées."""
-        # Log l'erreur complète
+        # Log l'erreur complète server-side (always — no information is lost)
         logger.error(
             f"Unhandled exception on {request.method} {request.url.path}",
             exc_info=exc,
         )
 
-        # En développement, retourner le stack trace; en production, un message générique
-        if logger.isEnabledFor(logging.DEBUG):
+        settings = get_settings()
+
+        # Only expose exception message in development — NEVER in production
+        if settings.ENV == "development":
             detail = str(exc)
-            traceback_str = traceback.format_exc()
         else:
             detail = "Une erreur interne s'est produite. Cette erreur a été enregistrée."
-            traceback_str = None
 
+        # Never send traceback to client — it's already in server logs
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "detail": detail,
                 "error_type": "internal_server_error",
-                "traceback": traceback_str,
             },
         )

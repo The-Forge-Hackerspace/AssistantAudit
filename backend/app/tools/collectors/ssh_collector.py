@@ -306,6 +306,40 @@ PROFILE_COMMANDS: dict[str, dict[str, str]] = {
 }
 
 
+def _load_private_key(
+    private_key: str,
+    passphrase: Optional[str] = None,
+) -> paramiko.PKey:
+    """
+    Auto-detect and load a private key (RSA, Ed25519, ECDSA).
+
+    Tries each key type in order; raises ValueError if none match.
+    """
+    import io
+
+    key_classes: list[type[paramiko.PKey]] = [
+        paramiko.RSAKey,
+        paramiko.Ed25519Key,
+        paramiko.ECDSAKey,
+    ]
+
+    last_error: Exception | None = None
+    for cls in key_classes:
+        try:
+            return cls.from_private_key(  # type: ignore[attr-defined]
+                io.StringIO(private_key),
+                password=passphrase,
+            )
+        except (paramiko.SSHException, ValueError) as exc:
+            last_error = exc
+            continue
+
+    raise ValueError(
+        f"Impossible de charger la clé privée — aucun format reconnu "
+        f"(RSA, Ed25519, ECDSA). Dernière erreur : {last_error}"
+    )
+
+
 def collect_via_ssh(
     host: str,
     port: int = 22,
@@ -343,6 +377,8 @@ def collect_via_ssh(
     except Exception:
         pass
 
+    # Security tradeoff: WarningPolicy (not RejectPolicy) because audit tools
+    # connect to arbitrary infrastructure — pre-populating known_hosts is impractical.
     client.set_missing_host_key_policy(paramiko.WarningPolicy())
 
     try:
@@ -357,11 +393,7 @@ def collect_via_ssh(
         }
 
         if private_key:
-            import io
-            pkey = paramiko.RSAKey.from_private_key(
-                io.StringIO(private_key),
-                password=passphrase,
-            )
+            pkey = _load_private_key(private_key, passphrase)
             connect_kwargs["pkey"] = pkey
         elif password:
             connect_kwargs["password"] = password

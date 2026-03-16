@@ -30,7 +30,7 @@ router = APIRouter()
 # --- Campagnes ---
 
 @router.get("/campaigns", response_model=PaginatedResponse[CampaignSummary])
-async def list_campaigns(
+def list_campaigns(
     audit_id: int = None,
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
@@ -61,7 +61,7 @@ async def list_campaigns(
 
 
 @router.post("/campaigns", response_model=CampaignSummary, status_code=status.HTTP_201_CREATED)
-async def create_campaign(
+def create_campaign(
     body: CampaignCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -82,7 +82,7 @@ async def create_campaign(
 
 
 @router.get("/campaigns/{campaign_id}", response_model=CampaignRead)
-async def get_campaign(
+def get_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -95,7 +95,7 @@ async def get_campaign(
 
 
 @router.put("/campaigns/{campaign_id}", response_model=CampaignSummary)
-async def update_campaign(
+def update_campaign(
     campaign_id: int,
     body: CampaignUpdate,
     db: Session = Depends(get_db),
@@ -118,7 +118,7 @@ async def update_campaign(
 
 
 @router.post("/campaigns/{campaign_id}/start", response_model=MessageResponse)
-async def start_campaign(
+def start_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -132,7 +132,7 @@ async def start_campaign(
 
 
 @router.post("/campaigns/{campaign_id}/complete", response_model=MessageResponse)
-async def complete_campaign(
+def complete_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -146,7 +146,7 @@ async def complete_campaign(
 
 
 @router.delete("/campaigns/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_campaign(
+def delete_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -161,7 +161,7 @@ async def delete_campaign(
 # --- Assessments ---
 
 @router.post("", response_model=AssessmentRead, status_code=status.HTTP_201_CREATED)
-async def create_assessment(
+def create_assessment(
     body: AssessmentCreate,
     campaign_id: int = None,
     db: Session = Depends(get_db),
@@ -184,7 +184,7 @@ async def create_assessment(
 
 
 @router.get("/{assessment_id}", response_model=AssessmentRead)
-async def get_assessment(
+def get_assessment(
     assessment_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -197,7 +197,7 @@ async def get_assessment(
 
 
 @router.delete("/{assessment_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_assessment(
+def delete_assessment(
     assessment_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -212,7 +212,7 @@ async def delete_assessment(
 # --- Résultats de contrôle ---
 
 @router.put("/results/{result_id}", response_model=MessageResponse)
-async def update_control_result(
+def update_control_result(
     result_id: int,
     body: ControlResultUpdate,
     db: Session = Depends(get_db),
@@ -237,7 +237,7 @@ async def update_control_result(
 # --- Scoring ---
 
 @router.get("/{assessment_id}/score", response_model=ScoreResponse)
-async def get_assessment_score(
+def get_assessment_score(
     assessment_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -250,7 +250,7 @@ async def get_assessment_score(
 
 
 @router.get("/campaigns/{campaign_id}/score", response_model=ScoreResponse)
-async def get_campaign_score(
+def get_campaign_score(
     campaign_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -265,7 +265,7 @@ async def get_campaign_score(
 # --- Monkey365 / M365 Scan ---
 
 @router.post("/{assessment_id}/scan/m365", response_model=M365ScanResponse)
-async def run_m365_scan(
+def run_m365_scan(
     assessment_id: int,
     body: M365ScanRequest,
     db: Session = Depends(get_db),
@@ -304,7 +304,7 @@ async def run_m365_scan(
 
 
 @router.post("/{assessment_id}/scan/simulate", response_model=M365ScanResponse)
-async def simulate_m365_scan(
+def simulate_m365_scan(
     assessment_id: int,
     body: M365ScanSimulateRequest,
     db: Session = Depends(get_db),
