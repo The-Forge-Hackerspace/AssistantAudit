@@ -33,6 +33,34 @@ class Site(Base):
     scans: Mapped[list["ScanReseau"]] = relationship(  # type: ignore[name-defined]
         back_populates="site", cascade="all, delete-orphan", lazy="selectin"
     )
+    network_links: Mapped[list["NetworkLink"]] = relationship(  # type: ignore[name-defined]
+        back_populates="site",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    network_map_layout: Mapped["NetworkMapLayout | None"] = relationship(  # type: ignore[name-defined]
+        back_populates="site",
+        cascade="all, delete-orphan",
+        uselist=False,
+        lazy="selectin",
+    )
+    outbound_site_connections: Mapped[list["SiteConnection"]] = relationship(  # type: ignore[name-defined]
+        back_populates="source_site",
+        foreign_keys="SiteConnection.source_site_id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    inbound_site_connections: Mapped[list["SiteConnection"]] = relationship(  # type: ignore[name-defined]
+        back_populates="target_site",
+        foreign_keys="SiteConnection.target_site_id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    vlan_definitions: Mapped[list["VlanDefinition"]] = relationship(  # type: ignore[name-defined]
+        back_populates="site",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     def __repr__(self) -> str:
         return f"<Site(id={self.id}, nom='{self.nom}')>"

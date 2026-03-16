@@ -44,6 +44,11 @@ class Entreprise(Base):
     sites: Mapped[list["Site"]] = relationship(  # type: ignore[name-defined]
         back_populates="entreprise", cascade="all, delete-orphan", lazy="selectin"
     )
+    site_connections: Mapped[list["SiteConnection"]] = relationship(  # type: ignore[name-defined]
+        back_populates="entreprise",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     def __repr__(self) -> str:
         return f"<Entreprise(id={self.id}, nom='{self.nom}')>"

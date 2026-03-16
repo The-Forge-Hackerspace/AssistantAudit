@@ -5,6 +5,10 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+from ..models.equipement import EQUIPEMENT_TYPE_VALUES
+
+
+EQUIPEMENT_TYPE_PATTERN = "^(" + "|".join(EQUIPEMENT_TYPE_VALUES) + ")$"
 
 
 # ─── Scan Réseau ──────────────────────────────────────────────
@@ -95,9 +99,23 @@ class ScanSummary(BaseModel):
 class ScanHostDecision(BaseModel):
     """Décision sur un host découvert : garder, ignorer, lier à un équipement."""
     decision: str = Field(..., description="kept | ignored")
-    chosen_type: Optional[str] = Field(None, description="serveur | reseau | firewall | equipement")
+    chosen_type: Optional[str] = Field(
+        None,
+        pattern=EQUIPEMENT_TYPE_PATTERN,
+        description="Type d'équipement choisi",
+    )
     hostname: Optional[str] = None
     create_equipement: bool = Field(False, description="Créer automatiquement un équipement")
+
+
+class ScanHostLink(BaseModel):
+    equipement_id: Optional[int] = None
+    source_interface: Optional[str] = Field(default=None, max_length=100)
+    target_interface: Optional[str] = Field(default=None, max_length=100)
+    link_type: str = Field(default="ethernet", pattern=r"^(ethernet|fiber|wifi|vpn|wan|serial|other)$")
+    bandwidth: Optional[str] = Field(default=None, max_length=50)
+    vlan: Optional[str] = Field(default=None, max_length=100)
+    network_segment: Optional[str] = Field(default=None, max_length=100)
 
 
 # ─── Config Parser ────────────────────────────────────────────

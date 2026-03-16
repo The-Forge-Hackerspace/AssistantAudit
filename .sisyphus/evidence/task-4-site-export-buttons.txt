@@ -1,0 +1,31 @@
+                 Export PNG
+               </Button>
+               <Button
+                 variant="outline"
+                 onClick={() => {
+                   if (siteFlowRef.current) exportDiagramSvg(siteFlowRef.current, nodes);
+                 }}
+               >
+                 <Download className="h-4 w-4 mr-2" />
+                 Export SVG
+               </Button>
+            </div>
+
+            <div ref={siteFlowRef}>
+              <Card>
+                <CardContent className="h-[70vh] p-0">
+                  <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    onConnect={onConnect}
+                    onNodeDoubleClick={onNodeDoubleClick}
+                    onEdgeDoubleClick={onEdgeDoubleClick}
+                    nodeTypes={nodeTypes}
+                    edgeTypes={edgeTypes}
+                    colorMode={rfColorMode}
+                    zoomOnDoubleClick={false}
+                    fitView
+                  >
+                    <Background />

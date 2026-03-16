@@ -25,6 +25,15 @@ import {
   Monitor,
   Wifi,
   Server,
+  Network,
+  Router,
+  Printer,
+  Video,
+  HardDrive,
+  Cpu,
+  Phone,
+  Radio,
+  Cloud,
 } from "lucide-react";
 
 // ─── Severity ────────────────────────────────────────────────
@@ -198,6 +207,16 @@ export const EQUIPEMENT_TYPE_LABELS: Record<TypeEquipement, string> = {
   firewall: "Firewall",
   reseau: "Réseau",
   equipement: "Autre",
+  switch: "Switch",
+  router: "Routeur",
+  access_point: "Point d'accès",
+  printer: "Imprimante",
+  camera: "Caméra",
+  nas: "NAS",
+  hyperviseur: "Hyperviseur",
+  telephone: "Téléphone",
+  iot: "IoT",
+  cloud_gateway: "Passerelle cloud",
 };
 
 export const EQUIPEMENT_TYPE_ICONS: Record<TypeEquipement, typeof Server> = {
@@ -205,6 +224,16 @@ export const EQUIPEMENT_TYPE_ICONS: Record<TypeEquipement, typeof Server> = {
   firewall: Shield,
   reseau: Wifi,
   equipement: Server,
+  switch: Network,
+  router: Router,
+  access_point: Wifi,
+  printer: Printer,
+  camera: Video,
+  nas: HardDrive,
+  hyperviseur: Cpu,
+  telephone: Phone,
+  iot: Radio,
+  cloud_gateway: Cloud,
 };
 
 export const EQUIPEMENT_STATUS_LABELS: Record<StatusAudit, string> = {
