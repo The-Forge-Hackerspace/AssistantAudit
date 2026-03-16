@@ -766,7 +766,7 @@ export default function NetworkMapPage() {
   const [overviewNodes, setOverviewNodes, onOverviewNodesChange] = useNodesState<Node<FlowNodeData>>([]);
   const [overviewEdges, setOverviewEdges, onOverviewEdgesChange] = useEdgesState<Edge>([]);
 
-  const [detailedNodes, setDetailedNodes, onDetailedNodesChange] = useNodesState<Node<DetailedNodeData>>([]);
+  const [detailedNodes, setDetailedNodes, onDetailedNodesChange] = useNodesState<Node<DetailedNodeData | FlowNodeData>>([]);
   const [detailedEdges, setDetailedEdges, onDetailedEdgesChange] = useEdgesState<Edge>([]);
 
   const siteFlowRef = useRef<HTMLDivElement>(null);
@@ -907,6 +907,8 @@ export default function NetworkMapPage() {
       }
     });
 
+    const nodeByEquipId = new Map(data.nodes.map(n => [n.equipement_id, n]));
+
     const detailedEdgesArray: Edge[] = links
       .map((link): Edge | null => {
         const lt = link.link_type;
@@ -919,8 +921,8 @@ export default function NetworkMapPage() {
         }
         const label = parts.join(" • ");
 
-        const sourceNode = data.nodes.find(n => n.equipement_id === link.source_equipement_id);
-        const targetNode = data.nodes.find(n => n.equipement_id === link.target_equipement_id);
+        const sourceNode = nodeByEquipId.get(link.source_equipement_id);
+        const targetNode = nodeByEquipId.get(link.target_equipement_id);
 
         if (!sourceNode || !targetNode) return null;
 
@@ -946,7 +948,7 @@ export default function NetworkMapPage() {
       ? detailedNodesArray 
       : autoLayoutWithCustomDimensions(detailedNodesArray, detailedEdgesArray, layoutDirection);
 
-    setDetailedNodes(layoutedNodes as Node<DetailedNodeData>[]);
+                 setDetailedNodes(layoutedNodes);
     setDetailedEdges(detailedEdgesArray);
   }, [setDetailedNodes, setDetailedEdges, layoutDirection]);
 
@@ -1025,15 +1027,19 @@ export default function NetworkMapPage() {
 
   useEffect(() => {
     if (!selectedSiteId || activeTab !== "detailed") return;
+    let cancelled = false;
     const run = async () => {
       try {
         await loadDetailedView(selectedSiteId);
       } catch (error) {
-        console.error(error);
-        toast.error("Impossible de charger la vue détaillée");
+        if (!cancelled) {
+          console.error(error);
+          toast.error("Impossible de charger la vue détaillée");
+        }
       }
     };
     run();
+    return () => { cancelled = true; };
   }, [selectedSiteId, activeTab, loadDetailedView]);
 
   useEffect(() => {
@@ -1042,16 +1048,18 @@ export default function NetworkMapPage() {
       setSelectedSourcePortId("");
       return;
     }
+    let cancelled = false;
     const fetchPorts = async () => {
       try {
         const eq = await equipementsApi.get(Number(sourceEquipementId));
-        setSourceEquipPorts(eq.ports_status || []);
+        if (!cancelled) setSourceEquipPorts(eq.ports_status || []);
       } catch (error) {
         console.error("Error fetching source equipment ports:", error);
-        setSourceEquipPorts([]);
+        if (!cancelled) setSourceEquipPorts([]);
       }
     };
     fetchPorts();
+    return () => { cancelled = true; };
   }, [sourceEquipementId]);
 
   useEffect(() => {
@@ -1060,16 +1068,18 @@ export default function NetworkMapPage() {
       setSelectedTargetPortId("");
       return;
     }
+    let cancelled = false;
     const fetchPorts = async () => {
       try {
         const eq = await equipementsApi.get(Number(targetEquipementId));
-        setTargetEquipPorts(eq.ports_status || []);
+        if (!cancelled) setTargetEquipPorts(eq.ports_status || []);
       } catch (error) {
         console.error("Error fetching target equipment ports:", error);
-        setTargetEquipPorts([]);
+        if (!cancelled) setTargetEquipPorts([]);
       }
     };
     fetchPorts();
+    return () => { cancelled = true; };
   }, [targetEquipementId]);
 
   const handleAutoLayout = useCallback((dir?: "TB" | "LR") => {
@@ -1541,7 +1551,7 @@ export default function NetworkMapPage() {
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => {
                 const layoutedNodes = autoLayoutWithCustomDimensions(detailedNodes, detailedEdges, layoutDirection);
-                setDetailedNodes(layoutedNodes as Node<DetailedNodeData>[]);
+    setDetailedNodes(layoutedNodes);
               }}>
                 Auto-layout
               </Button>
