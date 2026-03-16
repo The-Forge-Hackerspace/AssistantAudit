@@ -149,6 +149,37 @@ export interface PortDefinition {
   speed: string;       // e.g. "1 Gbps", "10 Gbps"
   row: number;         // visual row (0 = top, 1 = bottom)
   index: number;       // position within row (left to right)
+  untaggedVlan?: number | null;  // access/native VLAN ID
+  taggedVlans?: number[];        // trunk tagged VLAN IDs
+}
+
+export interface VlanDefinition {
+  id: number;
+  site_id: number;
+  vlan_id: number;
+  name: string;
+  subnet: string | null;
+  color: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VlanDefinitionCreate {
+  site_id: number;
+  vlan_id: number;
+  name: string;
+  subnet?: string | null;
+  color?: string;
+  description?: string | null;
+}
+
+export interface VlanDefinitionUpdate {
+  vlan_id?: number;
+  name?: string;
+  subnet?: string | null;
+  color?: string;
+  description?: string | null;
 }
 
 export interface Equipement {

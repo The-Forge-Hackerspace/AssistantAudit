@@ -42,6 +42,8 @@ import {
   Shield,
   Video,
   Wifi,
+  Settings2,
+  Trash2,
 } from "lucide-react";
 import { toPng, toSvg } from "html-to-image";
 import { toast } from "sonner";
@@ -69,7 +71,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { entreprisesApi, equipementsApi, networkMapApi, sitesApi, toolsApi } from "@/services/api";
+import { entreprisesApi, equipementsApi, networkMapApi, sitesApi, toolsApi, vlansApi } from "@/services/api";
 import {
   EQUIPEMENT_TYPE_LABELS,
   EQUIPEMENT_TYPE_ICONS,
@@ -88,6 +90,8 @@ import type {
   SiteConnection,
   SiteConnectionCreate,
   TypeEquipement,
+  VlanDefinition,
+  VlanDefinitionCreate,
 } from "@/types";
 
 type FlowNodeData = Record<string, unknown> & {
@@ -99,6 +103,8 @@ type FlowNodeData = Record<string, unknown> & {
 export type DetailedNodeData = FlowNodeData & {
   ports: PortDefinition[];
   connectedPortIds: string[];
+  portConnectionInfo: Record<string, { equipName: string; portName: string }>;
+  vlanColorMap?: Record<number, string>;
 };
 
 type DeviceNodeType = Node<FlowNodeData, "device">;
@@ -269,8 +275,6 @@ function DetailedEquipmentNode({ data }: NodeProps<DetailedNodeType>) {
 
   const portsRow0 = (nodeData.ports || []).filter(p => p.row === 0).sort((a, b) => a.index - b.index);
   const portsRow1 = (nodeData.ports || []).filter(p => p.row === 1).sort((a, b) => a.index - b.index);
-  
-  const cols = Math.max(portsRow0.length, portsRow1.length);
 
   const portColorMap: Record<string, string> = {
     ethernet: "#6b7280",
@@ -282,17 +286,68 @@ function DetailedEquipmentNode({ data }: NodeProps<DetailedNodeType>) {
 
   const renderPort = (port: PortDefinition) => {
     const isConnected = nodeData.connectedPortIds?.includes(port.id);
-    const bgColor = portColorMap[port.type] ?? "#6b7280";
+    let bgColor = portColorMap[port.type] ?? "#6b7280";
+    const connInfo = nodeData.portConnectionInfo?.[port.id];
     
+    let title = connInfo
+      ? `${port.name} → ${connInfo.equipName}${connInfo.portName ? ` (${connInfo.portName})` : ""}`
+      : port.name;
+
+    const vlanColors = nodeData.vlanColorMap || {};
+    let borderStyle = isConnected ? "ring-2 ring-primary z-10" : "";
+    let extraStyle: React.CSSProperties = {};
+
+    if (port.untaggedVlan) {
+      title += `
+VLAN natif: ${port.untaggedVlan}`;
+    }
+    if (port.taggedVlans && port.taggedVlans.length > 0) {
+      title += `
+VLANs taggés: ${port.taggedVlans.join(", ")}`;
+    }
+
+    if (port.taggedVlans && port.taggedVlans.length > 0) {
+      const colors = port.taggedVlans.map(v => vlanColors[v] || "#ccc");
+      if (colors.length === 1) {
+        extraStyle.backgroundImage = `repeating-linear-gradient(45deg, ${colors[0]}, ${colors[0]} 4px, transparent 4px, transparent 8px)`;
+      } else {
+        const stops = colors.map((c, i) => `${c} ${(i * 100) / colors.length}%, ${c} ${((i + 1) * 100) / colors.length}%`).join(", ");
+        extraStyle.backgroundImage = `linear-gradient(to right, ${stops})`;
+      }
+      bgColor = "transparent";
+      if (port.untaggedVlan) {
+         borderStyle = "border-2 z-10";
+         extraStyle.borderColor = vlanColors[port.untaggedVlan] || "#000";
+      }
+    } else if (port.untaggedVlan) {
+      bgColor = vlanColors[port.untaggedVlan] || "#ccc";
+    }
+
+    const innerLabel = connInfo
+      ? `${connInfo.equipName}${connInfo.portName ? ` · ${connInfo.portName}` : ""}`
+      : null;
+
     return (
       <div 
         key={port.id}
-        title={port.name}
-        className={`w-[28px] h-[22px] rounded-[2px] relative transition-colors ${isConnected ? "ring-2 ring-primary z-10" : ""}`}
-        style={{ backgroundColor: bgColor }}
+        title={title}
+        className={`rounded-[2px] flex items-center justify-center overflow-hidden transition-colors ${borderStyle}`}
+        style={{
+          backgroundColor: bgColor,
+          minWidth: 28,
+          height: 22,
+          padding: innerLabel ? "0 3px" : 0,
+          width: innerLabel ? "auto" : 28,
+          ...extraStyle
+        }}
       >
         <Handle type="target" id={`port-${port.id}-in`} position={Position.Top} className="!w-1 !h-1 !min-w-0 !min-h-0 opacity-0" />
         <Handle type="source" id={`port-${port.id}`} position={Position.Bottom} className="!w-1 !h-1 !min-w-0 !min-h-0 opacity-0" />
+        {innerLabel && (
+          <span className="text-[6px] leading-tight text-white font-medium whitespace-nowrap select-none pointer-events-none">
+            {innerLabel}
+          </span>
+        )}
       </div>
     );
   };
@@ -312,12 +367,12 @@ function DetailedEquipmentNode({ data }: NodeProps<DetailedNodeType>) {
 
       <div className="flex flex-col gap-1 mx-auto bg-muted/30 p-1.5 rounded-md border border-border/50">
         {portsRow0.length > 0 && (
-          <div className="grid gap-1 justify-center" style={{ gridTemplateColumns: `repeat(${cols}, 28px)` }}>
+          <div className="flex gap-1 justify-center flex-wrap">
             {portsRow0.map(renderPort)}
           </div>
         )}
         {portsRow1.length > 0 && (
-          <div className="grid gap-1 justify-center" style={{ gridTemplateColumns: `repeat(${cols}, 28px)` }}>
+          <div className="flex gap-1 justify-center flex-wrap">
             {portsRow1.map(renderPort)}
           </div>
         )}
@@ -357,20 +412,55 @@ function ParallelEdge({
       offset = (idx - mid) * PARALLEL_EDGE_SPACING;
     }
 
-    const dx = targetX - sourceX;
-    const dy = targetY - sourceY;
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const nx = -dy / len;
-    const ny = dx / len;
+    // Orthogonal (90° angle) routing with rounded corners
+    // Offset shifts the horizontal segment vertically to separate parallel edges
+    const midY = (sourceY + targetY) / 2 + offset;
+    const r = 8;
 
-    const cx = (sourceX + targetX) / 2 + nx * offset;
-    const cy = (sourceY + targetY) / 2 + ny * offset;
+    const dy1 = midY - sourceY;
+    const dy2 = targetY - midY;
+    const dxMid = targetX - sourceX;
 
-    const d = `M ${sourceX},${sourceY} Q ${cx},${cy} ${targetX},${targetY}`;
+    let d: string;
+    if (Math.abs(dxMid) < 1 && Math.abs(offset) < 1) {
+      d = `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
+    } else if (Math.abs(dxMid) < 1) {
+      // Same X but needs offset — jog out and back
+      const jog = offset > 0 ? PARALLEL_EDGE_SPACING : -PARALLEL_EDGE_SPACING;
+      const cr = Math.min(r, Math.abs(dy1) / 2, Math.abs(dy2) / 2, Math.abs(jog) / 2);
+      const signJ = jog > 0 ? 1 : -1;
+      const signY1 = dy1 > 0 ? 1 : -1;
+      const signY2 = dy2 > 0 ? 1 : -1;
+      d = [
+        `M ${sourceX},${sourceY}`,
+        `L ${sourceX},${midY - signY1 * cr}`,
+        `Q ${sourceX},${midY} ${sourceX + signJ * cr},${midY}`,
+        `L ${sourceX + jog - signJ * cr},${midY}`,
+        `Q ${sourceX + jog},${midY} ${sourceX + jog},${midY + signY2 * cr}`,
+        `L ${sourceX + jog},${midY + (targetY - midY) / 2 - signY2 * cr}`,
+        `Q ${sourceX + jog},${midY + (targetY - midY) / 2} ${sourceX + jog - signJ * cr},${midY + (targetY - midY) / 2}`,
+        `L ${targetX + signJ * cr},${midY + (targetY - midY) / 2}`,
+        `Q ${targetX},${midY + (targetY - midY) / 2} ${targetX},${midY + (targetY - midY) / 2 + signY2 * cr}`,
+        `L ${targetX},${targetY}`,
+      ].join(" ");
+    } else {
+      const cr = Math.min(r, Math.abs(dy1) / 2, Math.abs(dy2) / 2, Math.abs(dxMid) / 2);
+      const signX = dxMid > 0 ? 1 : -1;
+      const signY1 = dy1 > 0 ? 1 : -1;
+      const signY2 = dy2 > 0 ? 1 : -1;
 
-    const t = 0.5;
-    const lx = (1 - t) * (1 - t) * sourceX + 2 * (1 - t) * t * cx + t * t * targetX;
-    const ly = (1 - t) * (1 - t) * sourceY + 2 * (1 - t) * t * cy + t * t * targetY;
+      d = [
+        `M ${sourceX},${sourceY}`,
+        `L ${sourceX},${midY - signY1 * cr}`,
+        `Q ${sourceX},${midY} ${sourceX + signX * cr},${midY}`,
+        `L ${targetX - signX * cr},${midY}`,
+        `Q ${targetX},${midY} ${targetX},${midY + signY2 * cr}`,
+        `L ${targetX},${targetY}`,
+      ].join(" ");
+    }
+
+    const lx = (sourceX + targetX) / 2;
+    const ly = midY;
 
     return { path: d, labelX: lx, labelY: ly };
   }, [id, source, target, sourceX, sourceY, targetX, targetY, getEdges]);
@@ -553,6 +643,146 @@ function generatePortPreset(presetType: string): PortDefinition[] {
       break;
     }
     
+    case "1×Ethernet": {
+      ports.push({
+        id: "eth-0-0",
+        name: "Eth 1",
+        type: "ethernet",
+        speed: "1 Gbps",
+        row: 0,
+        index: 0,
+      });
+      break;
+    }
+
+    case "2×Ethernet": {
+      for (let i = 0; i < 2; i++) {
+        ports.push({
+          id: `eth-0-${i}`,
+          name: `Eth ${i + 1}`,
+          type: "ethernet",
+          speed: "1 Gbps",
+          row: 0,
+          index: i,
+        });
+      }
+      break;
+    }
+
+    case "4×Ethernet": {
+      for (let i = 0; i < 4; i++) {
+        ports.push({
+          id: `eth-0-${i}`,
+          name: `Eth ${i + 1}`,
+          type: "ethernet",
+          speed: "1 Gbps",
+          row: 0,
+          index: i,
+        });
+      }
+      break;
+    }
+
+    case "2×Ethernet+1×Mgmt": {
+      for (let i = 0; i < 2; i++) {
+        ports.push({
+          id: `eth-0-${i}`,
+          name: `Eth ${i + 1}`,
+          type: "ethernet",
+          speed: "1 Gbps",
+          row: 0,
+          index: i,
+        });
+      }
+      ports.push({
+        id: "mgmt-0-2",
+        name: "Mgmt",
+        type: "mgmt",
+        speed: "1 Gbps",
+        row: 0,
+        index: 2,
+      });
+      break;
+    }
+
+    case "4×Ethernet+1×Mgmt": {
+      for (let i = 0; i < 4; i++) {
+        ports.push({
+          id: `eth-0-${i}`,
+          name: `Eth ${i + 1}`,
+          type: "ethernet",
+          speed: "1 Gbps",
+          row: 0,
+          index: i,
+        });
+      }
+      ports.push({
+        id: "mgmt-0-4",
+        name: "Mgmt",
+        type: "mgmt",
+        speed: "1 Gbps",
+        row: 0,
+        index: 4,
+      });
+      break;
+    }
+
+    case "8×Ethernet+1×Mgmt": {
+      for (let i = 0; i < 4; i++) {
+        ports.push({
+          id: `eth-0-${i}`,
+          name: `Eth ${i + 1}`,
+          type: "ethernet",
+          speed: "1 Gbps",
+          row: 0,
+          index: i,
+        });
+      }
+      for (let i = 0; i < 4; i++) {
+        ports.push({
+          id: `eth-1-${i}`,
+          name: `Eth ${i + 5}`,
+          type: "ethernet",
+          speed: "1 Gbps",
+          row: 1,
+          index: i,
+        });
+      }
+      ports.push({
+        id: "mgmt-0-4",
+        name: "Mgmt",
+        type: "mgmt",
+        speed: "1 Gbps",
+        row: 0,
+        index: 4,
+      });
+      break;
+    }
+
+    case "2×Ethernet+2×SFP+": {
+      for (let i = 0; i < 2; i++) {
+        ports.push({
+          id: `eth-0-${i}`,
+          name: `Eth ${i + 1}`,
+          type: "ethernet",
+          speed: "1 Gbps",
+          row: 0,
+          index: i,
+        });
+      }
+      for (let i = 0; i < 2; i++) {
+        ports.push({
+          id: `sfp-0-${i + 2}`,
+          name: `SFP+ ${i + 1}`,
+          type: "sfp+",
+          speed: "10 Gbps",
+          row: 0,
+          index: i + 2,
+        });
+      }
+      break;
+    }
+
     default:
       console.warn(`Unknown preset type: ${presetType}`);
   }
@@ -666,6 +896,16 @@ export default function NetworkMapPage() {
   >([]);
 
   const [editingPorts, setEditingPorts] = useState<PortDefinition[]>([]);
+
+  const [siteVlans, setSiteVlans] = useState<VlanDefinition[]>([]);
+  const [vlanDialogOpen, setVlanDialogOpen] = useState(false);
+  const [savingVlan, setSavingVlan] = useState(false);
+  const [newVlanId, setNewVlanId] = useState("");
+  const [newVlanName, setNewVlanName] = useState("");
+  const [newVlanSubnet, setNewVlanSubnet] = useState("");
+  const [newVlanColor, setNewVlanColor] = useState("#6b7280");
+  const [newVlanDescription, setNewVlanDescription] = useState("");
+
   const [newPortName, setNewPortName] = useState("");
   const [newPortType, setNewPortType] = useState<PortDefinition["type"]>("ethernet");
   const [newPortSpeed, setNewPortSpeed] = useState("1 Gbps");
@@ -733,6 +973,50 @@ export default function NetworkMapPage() {
       setSavingPorts(false);
     }
   }, [detailEquipement, editingPorts]);
+
+  const loadVlans = useCallback(async (siteId: number) => {
+    try {
+      const vlans = await vlansApi.list(siteId);
+      setSiteVlans(vlans);
+    } catch { /* VLANs table may not exist yet */ }
+  }, []);
+
+  const handleCreateVlan = useCallback(async () => {
+    if (!selectedSiteId || !newVlanId || !newVlanName) return;
+    setSavingVlan(true);
+    try {
+      await vlansApi.create({
+        site_id: Number(selectedSiteId),
+        vlan_id: parseInt(newVlanId),
+        name: newVlanName,
+        subnet: newVlanSubnet || null,
+        color: newVlanColor,
+        description: newVlanDescription || null,
+      });
+      toast.success("VLAN créé");
+      setNewVlanId("");
+      setNewVlanName("");
+      setNewVlanSubnet("");
+      setNewVlanColor("#6b7280");
+      setNewVlanDescription("");
+      await loadVlans(Number(selectedSiteId));
+    } catch {
+      toast.error("Impossible de créer le VLAN");
+    } finally {
+      setSavingVlan(false);
+    }
+  }, [selectedSiteId, newVlanId, newVlanName, newVlanSubnet, newVlanColor, newVlanDescription, loadVlans]);
+
+  const handleDeleteVlan = useCallback(async (vlanDefId: number) => {
+    if (!selectedSiteId) return;
+    try {
+      await vlansApi.delete(vlanDefId);
+      toast.success("VLAN supprimé");
+      await loadVlans(Number(selectedSiteId));
+    } catch {
+      toast.error("Impossible de supprimer le VLAN");
+    }
+  }, [selectedSiteId, loadVlans]);
 
   const [sourceEquipementId, setSourceEquipementId] = useState<string>("");
   const [targetEquipementId, setTargetEquipementId] = useState<string>("");
@@ -852,6 +1136,8 @@ export default function NetworkMapPage() {
     setSiteMap(data);
 
     const links = await networkMapApi.listLinks(siteId);
+    let vlans: VlanDefinition[] = [];
+    try { vlans = await vlansApi.list(siteId); setSiteVlans(vlans); } catch { /* VLANs not available yet */ }
 
     const equipmentDetailsPromises = data.nodes.map((node) => 
       equipementsApi.get(node.equipement_id)
@@ -864,10 +1150,40 @@ export default function NetworkMapPage() {
     });
 
     const connectedPortIds = new Set<string>();
+    const portConnectionInfoByEquipId = new Map<number, Record<string, { equipName: string; portName: string }>>();
+
     links.forEach((link) => {
       if (link.source_interface) connectedPortIds.add(link.source_interface);
       if (link.target_interface) connectedPortIds.add(link.target_interface);
+
+      const srcEquip = equipmentMap.get(link.source_equipement_id);
+      const tgtEquip = equipmentMap.get(link.target_equipement_id);
+      const srcPorts: PortDefinition[] = srcEquip?.ports_status || [];
+      const tgtPorts: PortDefinition[] = tgtEquip?.ports_status || [];
+
+      if (link.source_interface && tgtEquip) {
+        if (!portConnectionInfoByEquipId.has(link.source_equipement_id)) {
+          portConnectionInfoByEquipId.set(link.source_equipement_id, {});
+        }
+        const tgtPortName = tgtPorts.find(p => p.id === link.target_interface)?.name ?? link.target_interface ?? "";
+        portConnectionInfoByEquipId.get(link.source_equipement_id)![link.source_interface] = {
+          equipName: tgtEquip.hostname || tgtEquip.ip_address,
+          portName: tgtPortName,
+        };
+      }
+      if (link.target_interface && srcEquip) {
+        if (!portConnectionInfoByEquipId.has(link.target_equipement_id)) {
+          portConnectionInfoByEquipId.set(link.target_equipement_id, {});
+        }
+        const srcPortName = srcPorts.find(p => p.id === link.source_interface)?.name ?? link.source_interface ?? "";
+        portConnectionInfoByEquipId.get(link.target_equipement_id)![link.target_interface] = {
+          equipName: srcEquip.hostname || srcEquip.ip_address,
+          portName: srcPortName,
+        };
+      }
     });
+
+    const vlanColors = vlans.reduce((acc, v) => { acc[v.vlan_id] = v.color; return acc; }, {} as Record<number, string>);
 
     const detailedNodesArray: Node<DetailedNodeData | FlowNodeData>[] = data.nodes.map((node) => {
       const equipment = equipmentMap.get(node.equipement_id);
@@ -890,6 +1206,8 @@ export default function NetworkMapPage() {
             type: node.type_equipement,
             ports,
             connectedPortIds: equipmentConnectedPortIds,
+            portConnectionInfo: portConnectionInfoByEquipId.get(node.equipement_id) ?? {},
+            vlanColorMap: vlanColors,
           },
           position: saved ?? { x: 0, y: 0 },
         } as Node<DetailedNodeData>;
@@ -1206,6 +1524,7 @@ export default function NetworkMapPage() {
     setDetailEquipement(null);
     setDetailAssessments([]);
     setDetailLoading(true);
+    if (selectedSiteId) loadVlans(Number(selectedSiteId));
     try {
       const [eq, assessments] = await Promise.all([
         equipementsApi.get(eqId),
@@ -1220,7 +1539,7 @@ export default function NetworkMapPage() {
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [selectedSiteId, loadVlans]);
 
   const onEdgeDoubleClick = useCallback(async (_event: React.MouseEvent, edge: Edge) => {
     const linkId = (edge.data as Record<string, unknown> | undefined)?.linkId;
@@ -1608,6 +1927,21 @@ export default function NetworkMapPage() {
                 </CardContent>
               </Card>
             </div>
+            {siteVlans.length > 0 && (
+              <div className="flex flex-wrap gap-3 items-center p-2 rounded-md border bg-card">
+                <span className="text-xs font-medium text-muted-foreground">VLANs :</span>
+                {siteVlans.map(v => (
+                  <div key={v.id} className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm border" style={{ backgroundColor: v.color }} />
+                    <span className="text-xs">
+                      <span className="font-mono font-medium">{v.vlan_id}</span>
+                      {" — "}{v.name}
+                      {v.subnet && <span className="text-muted-foreground"> ({v.subnet})</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             {siteMap && (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Network className="h-4 w-4" />
@@ -1671,11 +2005,12 @@ export default function NetworkMapPage() {
                   <div>
                     <Label>Port source</Label>
                     <Select 
-                      value={selectedSourcePortId} 
+                      value={selectedSourcePortId || "__none__"} 
                       onValueChange={(value) => {
-                        setSelectedSourcePortId(value);
-                        if (value) {
-                          const port = sourceEquipPorts.find(p => p.id === value);
+                        const resolved = value === "__none__" ? "" : value;
+                        setSelectedSourcePortId(resolved);
+                        if (resolved) {
+                          const port = sourceEquipPorts.find(p => p.id === resolved);
                           if (port) setSourceInterface(port.id);
                         } else {
                           setSourceInterface("");
@@ -1686,7 +2021,7 @@ export default function NetworkMapPage() {
                         <SelectValue placeholder="Aucun" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Aucun</SelectItem>
+                        <SelectItem value="__none__">Aucun</SelectItem>
                         {sourceEquipPorts.map(port => (
                           <SelectItem key={port.id} value={port.id}>
                             {port.name} ({port.type}, {port.speed})
@@ -1699,11 +2034,12 @@ export default function NetworkMapPage() {
                     <div>
                       <Label>Port cible</Label>
                       <Select 
-                        value={selectedTargetPortId} 
+                        value={selectedTargetPortId || "__none__"} 
                         onValueChange={(value) => {
-                          setSelectedTargetPortId(value);
-                          if (value) {
-                            const port = targetEquipPorts.find(p => p.id === value);
+                          const resolved = value === "__none__" ? "" : value;
+                          setSelectedTargetPortId(resolved);
+                          if (resolved) {
+                            const port = targetEquipPorts.find(p => p.id === resolved);
                             if (port) setTargetInterface(port.id);
                           } else {
                             setTargetInterface("");
@@ -1714,7 +2050,7 @@ export default function NetworkMapPage() {
                           <SelectValue placeholder="Aucun" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Aucun</SelectItem>
+                          <SelectItem value="__none__">Aucun</SelectItem>
                           {targetEquipPorts.map(port => (
                             <SelectItem key={port.id} value={port.id}>
                               {port.name} ({port.type}, {port.speed})
@@ -1730,11 +2066,12 @@ export default function NetworkMapPage() {
                 <div>
                   <Label>Port cible</Label>
                   <Select 
-                    value={selectedTargetPortId} 
+                    value={selectedTargetPortId || "__none__"} 
                     onValueChange={(value) => {
-                      setSelectedTargetPortId(value);
-                      if (value) {
-                        const port = targetEquipPorts.find(p => p.id === value);
+                      const resolved = value === "__none__" ? "" : value;
+                      setSelectedTargetPortId(resolved);
+                      if (resolved) {
+                        const port = targetEquipPorts.find(p => p.id === resolved);
                         if (port) setTargetInterface(port.id);
                       } else {
                         setTargetInterface("");
@@ -1745,7 +2082,7 @@ export default function NetworkMapPage() {
                       <SelectValue placeholder="Aucun" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Aucun</SelectItem>
+                      <SelectItem value="__none__">Aucun</SelectItem>
                       {targetEquipPorts.map(port => (
                         <SelectItem key={port.id} value={port.id}>
                           {port.name} ({port.type}, {port.speed})
@@ -2056,16 +2393,46 @@ export default function NetworkMapPage() {
                   </div>
                 )}
 
-                {["reseau", "switch", "router", "access_point"].includes(detailEquipement.type_equipement) && (
+                {detailEquipement && (
                   <div className="border-t pt-4 space-y-4">
-                    <p className="text-sm font-medium text-muted-foreground">Configuration des ports</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-muted-foreground">Configuration des ports</p>
+                      <Button variant="outline" size="sm" onClick={() => { if (selectedSiteId) { loadVlans(selectedSiteId); } setVlanDialogOpen(true); }}>
+                        Gérer les VLANs
+                      </Button>
+                    </div>
                     <div className="space-y-2">
                       <p className="text-xs text-muted-foreground">Préréglages</p>
                       <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleApplyPreset("24×GigE+4×SFP+")}>24×GigE+4×SFP+</Button>
-                        <Button variant="outline" size="sm" onClick={() => handleApplyPreset("48×GigE+4×SFP+")}>48×GigE+4×SFP+</Button>
-                        <Button variant="outline" size="sm" onClick={() => handleApplyPreset("8×SFP+10G")}>8×SFP+10G</Button>
-                        <Button variant="outline" size="sm" onClick={() => handleApplyPreset("4×SFP28-25G")}>4×SFP28-25G</Button>
+                        {["reseau", "switch", "router", "access_point"].includes(detailEquipement.type_equipement) && (
+                          <>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("24×GigE+4×SFP+")}>24×GigE+4×SFP+</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("48×GigE+4×SFP+")}>48×GigE+4×SFP+</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("8×SFP+10G")}>8×SFP+10G</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("4×SFP28-25G")}>4×SFP28-25G</Button>
+                          </>
+                        )}
+                        {["serveur", "hyperviseur", "nas"].includes(detailEquipement.type_equipement) && (
+                          <>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("2×Ethernet")}>2×Ethernet</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("4×Ethernet")}>4×Ethernet</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("2×Ethernet+1×Mgmt")}>2×Ethernet+1×Mgmt</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("4×Ethernet+1×Mgmt")}>4×Ethernet+1×Mgmt</Button>
+                          </>
+                        )}
+                        {detailEquipement.type_equipement === "firewall" && (
+                          <>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("4×Ethernet+1×Mgmt")}>4×Ethernet+1×Mgmt</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("8×Ethernet+1×Mgmt")}>8×Ethernet+1×Mgmt</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("2×Ethernet+2×SFP+")}>2×Ethernet+2×SFP+</Button>
+                          </>
+                        )}
+                        {["printer", "camera", "telephone", "iot", "cloud_gateway", "equipement"].includes(detailEquipement.type_equipement) && (
+                          <>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("1×Ethernet")}>1×Ethernet</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleApplyPreset("2×Ethernet")}>2×Ethernet</Button>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -2077,16 +2444,63 @@ export default function NetworkMapPage() {
                             <TableHead>Type</TableHead>
                             <TableHead>Vitesse</TableHead>
                             <TableHead>Rangée</TableHead>
+                            <TableHead>VLAN Natif</TableHead>
+                            <TableHead>VLANs Taggés</TableHead>
                             <TableHead className="w-10">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {editingPorts.map((port) => (
+                          {editingPorts.map((port, idx) => (
                             <TableRow key={port.id}>
                               <TableCell>{port.name}</TableCell>
                               <TableCell>{port.type}</TableCell>
                               <TableCell>{port.speed}</TableCell>
                               <TableCell>{port.row === 0 ? "Haut (0)" : "Bas (1)"}</TableCell>
+                              <TableCell>
+                                <Select
+                                  value={port.untaggedVlan ? String(port.untaggedVlan) : "none"}
+                                  onValueChange={(val) => {
+                                    const newPorts = [...editingPorts];
+                                    newPorts[idx].untaggedVlan = val === "none" ? null : parseInt(val);
+                                    setEditingPorts(newPorts);
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[120px] h-8">
+                                    <SelectValue placeholder="Aucun" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Aucun</SelectItem>
+                                    {siteVlans.map(v => (
+                                      <SelectItem key={v.vlan_id} value={String(v.vlan_id)}>
+                                        {v.vlan_id} - {v.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-2 max-w-[200px]">
+                                  {siteVlans.map(v => (
+                                    <label key={v.vlan_id} className="flex items-center space-x-1 text-xs whitespace-nowrap">
+                                      <input
+                                        type="checkbox"
+                                        checked={(port.taggedVlans || []).includes(v.vlan_id)}
+                                        onChange={(e) => {
+                                          const newPorts = [...editingPorts];
+                                          const current = newPorts[idx].taggedVlans || [];
+                                          if (e.target.checked) {
+                                            newPorts[idx].taggedVlans = [...current, v.vlan_id];
+                                          } else {
+                                            newPorts[idx].taggedVlans = current.filter(id => id !== v.vlan_id);
+                                          }
+                                          setEditingPorts(newPorts);
+                                        }}
+                                      />
+                                      <span>{v.vlan_id}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </TableCell>
                               <TableCell>
                                 <Button variant="ghost" size="sm" className="text-destructive h-8 w-8 p-0" onClick={() => handleRemovePort(port.id)}>
                                   &times;
@@ -2096,7 +2510,7 @@ export default function NetworkMapPage() {
                           ))}
                           {editingPorts.length === 0 && (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
+                              <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
                                 Aucun port configuré
                               </TableCell>
                             </TableRow>
@@ -2165,6 +2579,87 @@ export default function NetworkMapPage() {
               <Button variant="outline" onClick={() => setDetailOpen(false)}>
                 Fermer
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={vlanDialogOpen} onOpenChange={setVlanDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Gestion des VLANs</DialogTitle>
+              <DialogDescription>
+                Définir les VLANs disponibles pour ce site. Ils pourront être assignés aux ports des équipements.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">Couleur</TableHead>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Sous-réseau</TableHead>
+                    <TableHead className="w-10">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {siteVlans.map(v => (
+                    <TableRow key={v.id}>
+                      <TableCell>
+                        <div className="w-5 h-5 rounded border" style={{ backgroundColor: v.color }} />
+                      </TableCell>
+                      <TableCell className="font-mono">{v.vlan_id}</TableCell>
+                      <TableCell>{v.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{v.subnet || "—"}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" className="text-destructive h-8 w-8 p-0" onClick={() => handleDeleteVlan(v.id)}>
+                          &times;
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {siteVlans.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
+                        Aucun VLAN défini
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex items-end gap-2 border p-3 rounded-md bg-muted/50">
+              <div className="grid grid-cols-5 gap-2 flex-1">
+                <div>
+                  <Label className="text-xs">ID VLAN</Label>
+                  <Input className="h-8" type="number" min={1} max={4094} value={newVlanId} onChange={e => setNewVlanId(e.target.value)} placeholder="10" />
+                </div>
+                <div>
+                  <Label className="text-xs">Nom</Label>
+                  <Input className="h-8" value={newVlanName} onChange={e => setNewVlanName(e.target.value)} placeholder="Management" />
+                </div>
+                <div>
+                  <Label className="text-xs">Sous-réseau</Label>
+                  <Input className="h-8" value={newVlanSubnet} onChange={e => setNewVlanSubnet(e.target.value)} placeholder="192.168.10.0/24" />
+                </div>
+                <div>
+                  <Label className="text-xs">Couleur</Label>
+                  <input type="color" className="h-8 w-full rounded border cursor-pointer" value={newVlanColor} onChange={e => setNewVlanColor(e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Description</Label>
+                  <Input className="h-8" value={newVlanDescription} onChange={e => setNewVlanDescription(e.target.value)} placeholder="Optionnel" />
+                </div>
+              </div>
+              <Button size="sm" className="h-8" onClick={handleCreateVlan} disabled={savingVlan || !newVlanId || !newVlanName}>
+                Ajouter
+              </Button>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setVlanDialogOpen(false)}>Fermer</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
