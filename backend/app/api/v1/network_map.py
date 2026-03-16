@@ -5,11 +5,12 @@ from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_auditeur
 from ...models.entreprise import Entreprise
-from ...models.equipement import Equipement
+from ...models.equipement import Equipement, VlanDefinition
 from ...models.network_map import NetworkLink, NetworkMapLayout, SiteConnection
 from ...models.site import Site
 from ...models.user import User
 from ...schemas.common import MessageResponse
+from ...schemas.vlan import VlanDefinitionCreate, VlanDefinitionRead, VlanDefinitionUpdate
 from ...schemas.network_map import (
     MultiSiteEdge,
     MultiSiteNode,
@@ -352,3 +353,93 @@ async def delete_site_connection(
     db.delete(connection)
     db.commit()
     return MessageResponse(message="Connexion inter-site supprimée")
+
+
+# ── VLAN Definitions ──
+
+@router.get("/vlans", response_model=list[VlanDefinitionRead])
+async def list_vlans(
+    site_id: int = Query(...),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    site = db.get(Site, site_id)
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+    return db.query(VlanDefinition).filter(VlanDefinition.site_id == site_id).order_by(VlanDefinition.vlan_id).all()
+
+
+@router.get("/vlans/{vlan_def_id}", response_model=VlanDefinitionRead)
+async def get_vlan(
+    vlan_def_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    vlan = db.get(VlanDefinition, vlan_def_id)
+    if not vlan:
+        raise HTTPException(status_code=404, detail="Définition VLAN introuvable")
+    return vlan
+
+
+@router.post("/vlans", response_model=VlanDefinitionRead, status_code=status.HTTP_201_CREATED)
+async def create_vlan(
+    body: VlanDefinitionCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_auditeur),
+):
+    site = db.get(Site, body.site_id)
+    if not site:
+        raise HTTPException(status_code=404, detail="Site introuvable")
+
+    vlan = VlanDefinition(**body.model_dump())
+    db.add(vlan)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Un VLAN avec l'ID {body.vlan_id} existe déjà pour ce site",
+        )
+    db.refresh(vlan)
+    return vlan
+
+
+@router.put("/vlans/{vlan_def_id}", response_model=VlanDefinitionRead)
+async def update_vlan(
+    vlan_def_id: int,
+    body: VlanDefinitionUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_auditeur),
+):
+    vlan = db.get(VlanDefinition, vlan_def_id)
+    if not vlan:
+        raise HTTPException(status_code=404, detail="Définition VLAN introuvable")
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(vlan, field, value)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Conflit : un VLAN avec cet ID existe déjà pour ce site",
+        )
+    db.refresh(vlan)
+    return vlan
+
+
+@router.delete("/vlans/{vlan_def_id}", response_model=MessageResponse)
+async def delete_vlan(
+    vlan_def_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_auditeur),
+):
+    vlan = db.get(VlanDefinition, vlan_def_id)
+    if not vlan:
+        raise HTTPException(status_code=404, detail="Définition VLAN introuvable")
+    db.delete(vlan)
+    db.commit()
+    return MessageResponse(message="Définition VLAN supprimée")
