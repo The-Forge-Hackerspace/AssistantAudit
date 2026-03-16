@@ -75,6 +75,9 @@ class Equipement(Base):
     )
     notes_audit: Mapped[str | None] = mapped_column(Text)
 
+    # Ports (commun à tous les équipements)
+    ports_status: Mapped[list | None] = mapped_column(JSON)
+
     # Relations
     site: Mapped["Site"] = relationship(back_populates="equipements")  # type: ignore[name-defined]
     assessments: Mapped[list["Assessment"]] = relationship(  # type: ignore[name-defined]
@@ -123,7 +126,6 @@ class EquipementReseau(Equipement):
 
     id: Mapped[int] = mapped_column(Integer, ForeignKey("equipements.id"), primary_key=True)
     vlan_config: Mapped[dict | None] = mapped_column(JSON)
-    ports_status: Mapped[list | None] = mapped_column(JSON)
     firmware_version: Mapped[str | None] = mapped_column(String(100))
 
     __mapper_args__ = {"polymorphic_identity": "reseau"}
@@ -195,6 +197,35 @@ class EquipementIoT(Equipement):
 
 class EquipementCloudGateway(Equipement):
     __mapper_args__ = {"polymorphic_identity": "cloud_gateway"}
+
+
+class VlanDefinition(Base):
+    """VLAN definition scoped to a site."""
+    __tablename__ = "vlan_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    site_id: Mapped[int] = mapped_column(Integer, ForeignKey("sites.id"), nullable=False, index=True)
+    vlan_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    subnet: Mapped[str | None] = mapped_column(String(50))
+    color: Mapped[str] = mapped_column(String(7), nullable=False, default="#6b7280")
+    description: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+    # Relationship
+    site: Mapped["Site"] = relationship(back_populates="vlan_definitions")  # type: ignore[name-defined]
+
+    __table_args__ = (
+        UniqueConstraint("site_id", "vlan_id", name="uq_site_vlan_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<VlanDefinition(id={self.id}, site_id={self.site_id}, vlan_id={self.vlan_id}, name='{self.name}')>"
 
 
 EQUIPEMENT_TYPE_CLASS_MAP: dict[str, type[Equipement]] = {
