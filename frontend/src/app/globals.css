@@ -181,3 +181,44 @@
 .react-flow__controls-button svg {
   fill: currentColor;
 }
+
+/* ── Recharts chart container styling ──
+   Replaces Tailwind arbitrary-variant selectors that Turbopack's CSS
+   parser cannot handle (garbled Unicode in compiled output).           */
+.chart-container .recharts-cartesian-axis-tick text {
+  fill: var(--muted-foreground);
+}
+.chart-container .recharts-cartesian-grid line[stroke='#ccc'] {
+  stroke: var(--border);
+  opacity: 0.5;
+}
+.chart-container .recharts-curve.recharts-tooltip-cursor {
+  stroke: var(--border);
+}
+.chart-container .recharts-polar-grid [stroke='#ccc'] {
+  stroke: var(--border);
+}
+.chart-container .recharts-radial-bar-background-sector {
+  fill: var(--muted);
+}
+.chart-container .recharts-rectangle.recharts-tooltip-cursor {
+  fill: var(--muted);
+}
+.chart-container .recharts-reference-line [stroke='#ccc'] {
+  stroke: var(--border);
+}
+.chart-container .recharts-dot[stroke='#fff'] {
+  stroke: transparent;
+}
+.chart-container .recharts-layer {
+  outline: none;
+}
+.chart-container .recharts-sector {
+  outline: none;
+}
+.chart-container .recharts-sector[stroke='#fff'] {
+  stroke: transparent;
+}
+.chart-container .recharts-surface {
+  outline: none;
+}
