@@ -31,7 +31,7 @@ import {
   Download,
   Globe,
   HardDrive,
-  Map,
+  Map as MapIcon,
   Monitor,
   Network,
   Phone,
@@ -746,6 +746,11 @@ export default function NetworkMapPage() {
   const [editingLinkId, setEditingLinkId] = useState<number | null>(null);
   const [linkSaving, setLinkSaving] = useState(false);
 
+  const [sourceEquipPorts, setSourceEquipPorts] = useState<PortDefinition[]>([]);
+  const [targetEquipPorts, setTargetEquipPorts] = useState<PortDefinition[]>([]);
+  const [selectedSourcePortId, setSelectedSourcePortId] = useState<string>("");
+  const [selectedTargetPortId, setSelectedTargetPortId] = useState<string>("");
+
   const [siteConnDialogOpen, setSiteConnDialogOpen] = useState(false);
   const [editingSiteConnId, setEditingSiteConnId] = useState<number | null>(null);
   const [connSourceSiteId, setConnSourceSiteId] = useState<string>("");
@@ -870,8 +875,8 @@ export default function NetworkMapPage() {
       const hasPorts = ports.length > 0;
 
       const equipmentConnectedPortIds = ports
-        .map((p) => p.id)
-        .filter((id) => connectedPortIds.has(id));
+        .map((p: PortDefinition) => p.id)
+        .filter((id: string) => connectedPortIds.has(id));
 
       const saved = toPosition(node.position);
 
@@ -902,34 +907,36 @@ export default function NetworkMapPage() {
       }
     });
 
-    const detailedEdgesArray: Edge[] = links.map((link) => {
-      const lt = link.link_type;
-      const bw = link.bandwidth ?? "";
-      const edgeStyle = edgeStyleByLinkType[lt] ?? edgeStyleByLinkType.other;
+    const detailedEdgesArray: Edge[] = links
+      .map((link): Edge | null => {
+        const lt = link.link_type;
+        const bw = link.bandwidth ?? "";
+        const edgeStyle = edgeStyleByLinkType[lt] ?? edgeStyleByLinkType.other;
 
-      const parts: string[] = [lt.toUpperCase()];
-      if (bw) {
-        parts.push(bandwidthShort[bw] ?? bw);
-      }
-      const label = parts.join(" • ");
+        const parts: string[] = [lt.toUpperCase()];
+        if (bw) {
+          parts.push(bandwidthShort[bw] ?? bw);
+        }
+        const label = parts.join(" • ");
 
-      const sourceNode = data.nodes.find(n => n.equipement_id === link.source_equipement_id);
-      const targetNode = data.nodes.find(n => n.equipement_id === link.target_equipement_id);
+        const sourceNode = data.nodes.find(n => n.equipement_id === link.source_equipement_id);
+        const targetNode = data.nodes.find(n => n.equipement_id === link.target_equipement_id);
 
-      if (!sourceNode || !targetNode) return null;
+        if (!sourceNode || !targetNode) return null;
 
-      return {
-        id: String(link.id),
-        source: sourceNode.id,
-        target: targetNode.id,
-        sourceHandle: link.source_interface ? `port-${link.source_interface}` : undefined,
-        targetHandle: link.target_interface ? `port-${link.target_interface}-in` : undefined,
-        type: "parallel",
-        label,
-        style: { stroke: edgeStyle.stroke, strokeWidth: 2, strokeDasharray: edgeStyle.strokeDasharray },
-        data: { linkId: link.id },
-      };
-    }).filter((edge): edge is Edge => edge !== null);
+        return {
+          id: String(link.id),
+          source: sourceNode.id,
+          target: targetNode.id,
+          sourceHandle: link.source_interface ? `port-${link.source_interface}` : undefined,
+          targetHandle: link.target_interface ? `port-${link.target_interface}-in` : undefined,
+          type: "parallel",
+          label,
+          style: { stroke: edgeStyle.stroke, strokeWidth: 2, strokeDasharray: edgeStyle.strokeDasharray },
+          data: { linkId: link.id },
+        };
+      })
+      .filter((edge): edge is Edge => edge !== null);
 
     const hasSavedPositions = detailedNodesArray.some(
       (n) => n.position.x !== 0 || n.position.y !== 0
@@ -1029,6 +1036,42 @@ export default function NetworkMapPage() {
     run();
   }, [selectedSiteId, activeTab, loadDetailedView]);
 
+  useEffect(() => {
+    if (!sourceEquipementId) {
+      setSourceEquipPorts([]);
+      setSelectedSourcePortId("");
+      return;
+    }
+    const fetchPorts = async () => {
+      try {
+        const eq = await equipementsApi.get(Number(sourceEquipementId));
+        setSourceEquipPorts(eq.ports_status || []);
+      } catch (error) {
+        console.error("Error fetching source equipment ports:", error);
+        setSourceEquipPorts([]);
+      }
+    };
+    fetchPorts();
+  }, [sourceEquipementId]);
+
+  useEffect(() => {
+    if (!targetEquipementId) {
+      setTargetEquipPorts([]);
+      setSelectedTargetPortId("");
+      return;
+    }
+    const fetchPorts = async () => {
+      try {
+        const eq = await equipementsApi.get(Number(targetEquipementId));
+        setTargetEquipPorts(eq.ports_status || []);
+      } catch (error) {
+        console.error("Error fetching target equipment ports:", error);
+        setTargetEquipPorts([]);
+      }
+    };
+    fetchPorts();
+  }, [targetEquipementId]);
+
   const handleAutoLayout = useCallback((dir?: "TB" | "LR") => {
     const d = dir ?? layoutDirection;
     setNodes((curr) => autoLayout(curr, edges, d));
@@ -1058,6 +1101,10 @@ export default function NetworkMapPage() {
     setNetworkSegment("");
     setLinkDescription("");
     setEditingLinkId(null);
+    setSourceEquipPorts([]);
+    setTargetEquipPorts([]);
+    setSelectedSourcePortId("");
+    setSelectedTargetPortId("");
   }, []);
 
   const handleSaveLink = useCallback(async () => {
@@ -1304,7 +1351,7 @@ export default function NetworkMapPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Map className="h-6 w-6" />
+            <MapIcon className="h-6 w-6" />
             Cartographie réseau
           </h1>
           <p className="text-muted-foreground">
@@ -1334,8 +1381,8 @@ export default function NetworkMapPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div>
+              </div>
+              <div>
               <Label>Site</Label>
               <Select
                 value={selectedSiteId ? String(selectedSiteId) : ""}
@@ -1609,6 +1656,95 @@ export default function NetworkMapPage() {
                   <Input value={targetInterface} onChange={(e) => setTargetInterface(e.target.value)} placeholder="eth0" />
                 </div>
               </div>
+              {sourceEquipPorts.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label>Port source</Label>
+                    <Select 
+                      value={selectedSourcePortId} 
+                      onValueChange={(value) => {
+                        setSelectedSourcePortId(value);
+                        if (value) {
+                          const port = sourceEquipPorts.find(p => p.id === value);
+                          if (port) setSourceInterface(port.id);
+                        } else {
+                          setSourceInterface("");
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Aucun" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Aucun</SelectItem>
+                        {sourceEquipPorts.map(port => (
+                          <SelectItem key={port.id} value={port.id}>
+                            {port.name} ({port.type}, {port.speed})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {targetEquipPorts.length > 0 && (
+                    <div>
+                      <Label>Port cible</Label>
+                      <Select 
+                        value={selectedTargetPortId} 
+                        onValueChange={(value) => {
+                          setSelectedTargetPortId(value);
+                          if (value) {
+                            const port = targetEquipPorts.find(p => p.id === value);
+                            if (port) setTargetInterface(port.id);
+                          } else {
+                            setTargetInterface("");
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Aucun" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Aucun</SelectItem>
+                          {targetEquipPorts.map(port => (
+                            <SelectItem key={port.id} value={port.id}>
+                              {port.name} ({port.type}, {port.speed})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
+              {sourceEquipPorts.length === 0 && targetEquipPorts.length > 0 && (
+                <div>
+                  <Label>Port cible</Label>
+                  <Select 
+                    value={selectedTargetPortId} 
+                    onValueChange={(value) => {
+                      setSelectedTargetPortId(value);
+                      if (value) {
+                        const port = targetEquipPorts.find(p => p.id === value);
+                        if (port) setTargetInterface(port.id);
+                      } else {
+                        setTargetInterface("");
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Aucun" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Aucun</SelectItem>
+                      {targetEquipPorts.map(port => (
+                        <SelectItem key={port.id} value={port.id}>
+                          {port.name} ({port.type}, {port.speed})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <Label>Type de lien</Label>
                 <Select value={linkType} onValueChange={(value) => setLinkType(value as NetworkLinkCreate["link_type"])}>
