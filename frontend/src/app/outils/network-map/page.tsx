@@ -26,6 +26,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
+  ChevronDown,
+  ChevronUp,
   Cloud,
   Cpu,
   Download,
@@ -101,10 +103,12 @@ type FlowNodeData = Record<string, unknown> & {
 };
 
 export type DetailedNodeData = FlowNodeData & {
+  equipementId: number;
   ports: PortDefinition[];
   connectedPortIds: string[];
   portConnectionInfo: Record<string, { equipName: string; portName: string }>;
   vlanColorMap?: Record<number, string>;
+  onPortClick?: (equipementId: number, port: PortDefinition, position?: { x: number; y: number }) => void;
 };
 
 type DeviceNodeType = Node<FlowNodeData, "device">;
@@ -331,14 +335,19 @@ VLANs taggés: ${port.taggedVlans.join(", ")}`;
       <div 
         key={port.id}
         title={title}
-        className={`rounded-[2px] flex items-center justify-center overflow-hidden transition-colors ${borderStyle}`}
+        className={`nodrag rounded-[2px] flex items-center justify-center overflow-hidden transition-colors ${borderStyle}`}
         style={{
           backgroundColor: bgColor,
           minWidth: 28,
           height: 22,
           padding: innerLabel ? "0 3px" : 0,
           width: innerLabel ? "auto" : 28,
+          cursor: "pointer",
           ...extraStyle
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          nodeData.onPortClick?.(nodeData.equipementId, port, { x: e.clientX, y: e.clientY });
         }}
       >
         <Handle type="target" id={`port-${port.id}-in`} position={Position.Top} className="!w-1 !h-1 !min-w-0 !min-h-0 opacity-0" />
@@ -913,6 +922,10 @@ export default function NetworkMapPage() {
   const [isPortPresetConfirmOpen, setIsPortPresetConfirmOpen] = useState(false);
   const [pendingPreset, setPendingPreset] = useState<string | null>(null);
   const [savingPorts, setSavingPorts] = useState(false);
+  const [inlineEditPort, setInlineEditPort] = useState<PortDefinition | null>(null);
+  const [inlineEditEquipId, setInlineEditEquipId] = useState<number | null>(null);
+  const [inlineEditPosition, setInlineEditPosition] = useState<{ x: number; y: number } | null>(null);
+  const [vlanPanelExpanded, setVlanPanelExpanded] = useState(false);
 
   useEffect(() => {
     if (detailEquipement) {
@@ -1056,6 +1069,114 @@ export default function NetworkMapPage() {
   const siteFlowRef = useRef<HTMLDivElement>(null);
   const overviewFlowRef = useRef<HTMLDivElement>(null);
   const detailedFlowRef = useRef<HTMLDivElement>(null);
+  const detailedSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handlePortClick = useCallback((equipementId: number, port: PortDefinition, position?: { x: number; y: number }) => {
+    setInlineEditPort({
+      ...port,
+      untaggedVlan: port.untaggedVlan ?? null,
+      taggedVlans: [...(port.taggedVlans || [])],
+    });
+    setInlineEditEquipId(equipementId);
+    setInlineEditPosition(position ?? null);
+    if (siteVlans.length === 0 && selectedSiteId) {
+      loadVlans(selectedSiteId);
+    }
+  }, [siteVlans.length, selectedSiteId, loadVlans]);
+
+  const handlePortClickRef = useRef(handlePortClick);
+  handlePortClickRef.current = handlePortClick;
+
+  const closeInlineEdit = useCallback(() => {
+    setInlineEditPort(null);
+    setInlineEditEquipId(null);
+    setInlineEditPosition(null);
+  }, []);
+
+  const handleSaveDetailedLayout = useCallback(async (nodesToSave?: Node<DetailedNodeData | FlowNodeData>[]) => {
+    if (!selectedSiteId) return;
+    const currentNodes = nodesToSave ?? detailedNodes;
+    const existingLayoutData = siteMap?.layout_data ?? {};
+    try {
+      await networkMapApi.saveSiteLayout(selectedSiteId, {
+        ...existingLayoutData,
+        detailed_nodes: currentNodes.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y })),
+      });
+      toast.success("Layout détaillé sauvegardé");
+    } catch (error) {
+      console.error(error);
+      toast.error("Échec de sauvegarde du layout détaillé");
+    }
+  }, [selectedSiteId, detailedNodes, siteMap]);
+
+  const onDetailedNodeDragStop = useCallback((_: React.MouseEvent, __: Node, nodesAfterDrag: Node[]) => {
+    if (detailedSaveTimeoutRef.current) {
+      clearTimeout(detailedSaveTimeoutRef.current);
+    }
+    detailedSaveTimeoutRef.current = setTimeout(() => {
+      handleSaveDetailedLayout(nodesAfterDrag as Node<DetailedNodeData | FlowNodeData>[]);
+    }, 500);
+  }, [handleSaveDetailedLayout]);
+
+  const handleSaveInlinePort = useCallback(async () => {
+    if (!inlineEditPort || !inlineEditEquipId) return;
+    try {
+      const equipment = await equipementsApi.get(inlineEditEquipId);
+      const currentPorts = equipment.ports_status || [];
+      const updatedPorts = currentPorts.map((port) => {
+        if (port.id !== inlineEditPort.id) return port;
+        return {
+          ...port,
+          untaggedVlan: inlineEditPort.untaggedVlan ?? null,
+          taggedVlans: [...(inlineEditPort.taggedVlans || [])],
+        };
+      });
+
+      await equipementsApi.update(inlineEditEquipId, { ports_status: updatedPorts });
+
+      setDetailedNodes((curr) =>
+        curr.map((node) => {
+          if (node.type !== "detailed") return node;
+          const data = node.data as DetailedNodeData;
+          if (data.equipementId !== inlineEditEquipId) return node;
+          return {
+            ...node,
+            data: {
+              ...data,
+              ports: updatedPorts,
+              vlanColorMap: siteVlans.reduce((acc, v) => {
+                acc[v.vlan_id] = v.color;
+                return acc;
+              }, {} as Record<number, string>),
+            },
+          };
+        }),
+      );
+
+      setDetailEquipement((prev) => {
+        if (!prev || prev.id !== inlineEditEquipId) return prev;
+        return { ...prev, ports_status: updatedPorts };
+      });
+      setEditingPorts((prev) => {
+        if (!detailEquipement || detailEquipement.id !== inlineEditEquipId) return prev;
+        return updatedPorts;
+      });
+
+      toast.success("Port mis à jour");
+      closeInlineEdit();
+    } catch (error) {
+      console.error(error);
+      toast.error("Impossible de mettre à jour le port");
+    }
+  }, [inlineEditPort, inlineEditEquipId, setDetailedNodes, siteVlans, detailEquipement, closeInlineEdit]);
+
+  useEffect(() => {
+    return () => {
+      if (detailedSaveTimeoutRef.current) {
+        clearTimeout(detailedSaveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const siteEquipements = useMemo(() => {
     if (!siteMap) return [];
@@ -1184,6 +1305,8 @@ export default function NetworkMapPage() {
     });
 
     const vlanColors = vlans.reduce((acc, v) => { acc[v.vlan_id] = v.color; return acc; }, {} as Record<number, string>);
+    const detailedPositions = new Map((data.layout_data?.detailed_nodes || []).map((n) => [n.id, { x: n.x, y: n.y }]));
+    const topologyPositions = new Map((data.layout_data?.nodes || []).map((n) => [n.id, { x: n.x, y: n.y }]));
 
     const detailedNodesArray: Node<DetailedNodeData | FlowNodeData>[] = data.nodes.map((node) => {
       const equipment = equipmentMap.get(node.equipement_id);
@@ -1194,7 +1317,7 @@ export default function NetworkMapPage() {
         .map((p: PortDefinition) => p.id)
         .filter((id: string) => connectedPortIds.has(id));
 
-      const saved = toPosition(node.position);
+      const saved = detailedPositions.get(node.id) ?? topologyPositions.get(node.id) ?? { x: 0, y: 0 };
 
       if (hasPorts) {
         return {
@@ -1204,12 +1327,14 @@ export default function NetworkMapPage() {
             label: node.label,
             ip: node.ip_address,
             type: node.type_equipement,
+            equipementId: node.equipement_id,
             ports,
             connectedPortIds: equipmentConnectedPortIds,
             portConnectionInfo: portConnectionInfoByEquipId.get(node.equipement_id) ?? {},
             vlanColorMap: vlanColors,
+            onPortClick: handlePortClickRef.current,
           },
-          position: saved ?? { x: 0, y: 0 },
+          position: saved,
         } as Node<DetailedNodeData>;
       } else {
         return {
@@ -1220,7 +1345,7 @@ export default function NetworkMapPage() {
             ip: node.ip_address,
             type: node.type_equipement,
           },
-          position: saved ?? { x: 0, y: 0 },
+          position: saved,
         } as Node<FlowNodeData>;
       }
     });
@@ -1874,6 +1999,9 @@ export default function NetworkMapPage() {
               }}>
                 Auto-layout
               </Button>
+              <Button variant="outline" onClick={() => handleSaveDetailedLayout()}>
+                Sauvegarder layout
+              </Button>
               <Button variant="outline" onClick={() => {
                 if (!selectedSiteId) {
                   toast.error("Aucun site sélectionné");
@@ -1911,6 +2039,8 @@ export default function NetworkMapPage() {
                     edges={detailedEdges}
                     onNodesChange={onDetailedNodesChange}
                     onEdgesChange={onDetailedEdgesChange}
+                    onNodeDragStop={onDetailedNodeDragStop}
+                    onNodeDoubleClick={onNodeDoubleClick}
                     nodeTypes={nodeTypes}
                     edgeTypes={edgeTypes}
                     colorMode={rfColorMode}
@@ -1927,26 +2057,122 @@ export default function NetworkMapPage() {
                 </CardContent>
               </Card>
             </div>
-            {siteVlans.length > 0 && (
-              <div className="flex flex-wrap gap-3 items-center p-2 rounded-md border bg-card">
-                <span className="text-xs font-medium text-muted-foreground">VLANs :</span>
-                {siteVlans.map(v => (
-                  <div key={v.id} className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm border" style={{ backgroundColor: v.color }} />
-                    <span className="text-xs">
-                      <span className="font-mono font-medium">{v.vlan_id}</span>
-                      {" — "}{v.name}
-                      {v.subnet && <span className="text-muted-foreground"> ({v.subnet})</span>}
-                    </span>
+            <div className="rounded-md border bg-card">
+              <button
+                type="button"
+                className="w-full flex items-center justify-between px-3 py-2 text-sm"
+                onClick={() => setVlanPanelExpanded((prev) => !prev)}
+              >
+                <span className="font-medium">VLANs ({siteVlans.length})</span>
+                {vlanPanelExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </button>
+              {vlanPanelExpanded && (
+                <div className="border-t px-3 py-3 space-y-3">
+                  {siteVlans.length > 0 ? (
+                    <div className="space-y-2">
+                      {siteVlans.map((v) => (
+                        <div key={v.id} className="grid grid-cols-[16px_56px_minmax(120px,1fr)_minmax(120px,1fr)] gap-3 items-start text-xs">
+                          <div className="w-4 h-4 rounded-sm border" style={{ backgroundColor: v.color }} />
+                          <span className="font-mono font-bold leading-4">{v.vlan_id}</span>
+                          <div>
+                            <div className="font-medium text-foreground">{v.name}</div>
+                            {v.description && <div className="text-muted-foreground">{v.description}</div>}
+                          </div>
+                          <div className="font-mono text-muted-foreground">{v.subnet || "—"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">Aucun VLAN défini pour ce site.</div>
+                  )}
+                  <div className="pt-1">
+                    <Button variant="outline" size="sm" onClick={() => setVlanDialogOpen(true)}>
+                      Gérer les VLANs
+                    </Button>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
             {siteMap && (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Network className="h-4 w-4" />
                 {detailedNodes.length} équipement(s), {detailedEdges.length} lien(s)
               </div>
+            )}
+
+            {inlineEditPort && inlineEditEquipId && inlineEditPosition && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={closeInlineEdit} />
+                <div
+                  className="fixed z-50 w-[320px] rounded-md border bg-card p-3 shadow-xl space-y-3"
+                  style={{ left: inlineEditPosition.x + 8, top: inlineEditPosition.y + 8 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div>
+                    <p className="text-sm font-medium">{inlineEditPort.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      VLAN natif: {inlineEditPort.untaggedVlan ?? "Aucun"}
+                      {" · "}
+                      VLANs taggés: {(inlineEditPort.taggedVlans || []).length > 0 ? inlineEditPort.taggedVlans?.join(", ") : "Aucun"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">VLAN natif</Label>
+                    <Select
+                      value={inlineEditPort.untaggedVlan ? String(inlineEditPort.untaggedVlan) : "none"}
+                      onValueChange={(value) => {
+                        setInlineEditPort((prev) => {
+                          if (!prev) return prev;
+                          return {
+                            ...prev,
+                            untaggedVlan: value === "none" ? null : parseInt(value),
+                          };
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Aucun" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Aucun</SelectItem>
+                        {siteVlans.map((v) => (
+                          <SelectItem key={v.vlan_id} value={String(v.vlan_id)}>
+                            {v.vlan_id} - {v.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">VLANs taggés</Label>
+                    <div className="max-h-28 overflow-auto rounded border p-2 space-y-1">
+                      {siteVlans.length > 0 ? siteVlans.map((v) => (
+                        <label key={v.vlan_id} className="flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={(inlineEditPort.taggedVlans || []).includes(v.vlan_id)}
+                            onChange={(e) => {
+                              setInlineEditPort((prev) => {
+                                if (!prev) return prev;
+                                const current = prev.taggedVlans || [];
+                                const taggedVlans = e.target.checked
+                                  ? [...current, v.vlan_id]
+                                  : current.filter((id) => id !== v.vlan_id);
+                                return { ...prev, taggedVlans };
+                              });
+                            }}
+                          />
+                          <span>{v.vlan_id} - {v.name}</span>
+                        </label>
+                      )) : <div className="text-xs text-muted-foreground">Aucun VLAN disponible</div>}
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={closeInlineEdit}>Annuler</Button>
+                    <Button size="sm" onClick={handleSaveInlinePort}>Sauvegarder</Button>
+                  </div>
+                </div>
+              </>
             )}
           </TabsContent>
         </Tabs>

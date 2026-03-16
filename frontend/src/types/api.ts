@@ -538,6 +538,7 @@ export interface NetworkMap {
   edges: NetworkMapEdge[];
   layout_data: {
     nodes?: Array<{ id: string; x: number; y: number }>;
+    detailed_nodes?: Array<{ id: string; x: number; y: number }>;
     viewport?: { x: number; y: number; zoom: number };
   };
 }
