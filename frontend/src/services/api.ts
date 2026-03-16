@@ -50,6 +50,9 @@ import type {
   SiteConnection,
   SiteConnectionCreate,
   MultiSiteOverview,
+  VlanDefinition,
+  VlanDefinitionCreate,
+  VlanDefinitionUpdate,
 } from "@/types";
 
 // ── Auth ──
@@ -511,6 +514,33 @@ export const networkMapApi = {
 
   async deleteSiteConnection(connectionId: number): Promise<{ message: string }> {
     const { data } = await api.delete(`/network-map/site-connections/${connectionId}`);
+    return data;
+  },
+};
+
+export const vlansApi = {
+  async list(siteId: number): Promise<VlanDefinition[]> {
+    const { data } = await api.get("/network-map/vlans", { params: { site_id: siteId } });
+    return data;
+  },
+
+  async get(vlanDefId: number): Promise<VlanDefinition> {
+    const { data } = await api.get(`/network-map/vlans/${vlanDefId}`);
+    return data;
+  },
+
+  async create(payload: VlanDefinitionCreate): Promise<VlanDefinition> {
+    const { data } = await api.post("/network-map/vlans", payload);
+    return data;
+  },
+
+  async update(vlanDefId: number, payload: VlanDefinitionUpdate): Promise<VlanDefinition> {
+    const { data } = await api.put(`/network-map/vlans/${vlanDefId}`, payload);
+    return data;
+  },
+
+  async delete(vlanDefId: number): Promise<{ message: string }> {
+    const { data } = await api.delete(`/network-map/vlans/${vlanDefId}`);
     return data;
   },
 };
