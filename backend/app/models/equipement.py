@@ -123,7 +123,7 @@ class EquipementReseau(Equipement):
 
     id: Mapped[int] = mapped_column(Integer, ForeignKey("equipements.id"), primary_key=True)
     vlan_config: Mapped[dict | None] = mapped_column(JSON)
-    ports_status: Mapped[dict | None] = mapped_column(JSON)
+    ports_status: Mapped[list | None] = mapped_column(JSON)
     firmware_version: Mapped[str | None] = mapped_column(String(100))
 
     __mapper_args__ = {"polymorphic_identity": "reseau"}
@@ -154,15 +154,18 @@ class EquipementFirewall(Equipement):
     __mapper_args__ = {"polymorphic_identity": "firewall"}
 
 
-class EquipementSwitch(Equipement):
+class EquipementSwitch(EquipementReseau):
+    """Switch réseau — hérite de EquipementReseau pour accéder à ports_status, vlan_config, firmware_version."""
     __mapper_args__ = {"polymorphic_identity": "switch"}
 
 
-class EquipementRouter(Equipement):
+class EquipementRouter(EquipementReseau):
+    """Routeur — hérite de EquipementReseau pour accéder à ports_status, vlan_config, firmware_version."""
     __mapper_args__ = {"polymorphic_identity": "router"}
 
 
-class EquipementAccessPoint(Equipement):
+class EquipementAccessPoint(EquipementReseau):
+    """Borne WiFi — hérite de EquipementReseau pour accéder à ports_status, vlan_config, firmware_version."""
     __mapper_args__ = {"polymorphic_identity": "access_point"}
 
 

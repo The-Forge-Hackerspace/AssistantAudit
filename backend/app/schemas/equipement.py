@@ -32,7 +32,7 @@ class EquipementCreate(EquipementBase):
     )
     # Champs spécifiques réseau
     vlan_config: Optional[dict] = None
-    ports_status: Optional[dict] = None
+    ports_status: Optional[list] = None
     firmware_version: Optional[str] = Field(default=None, max_length=100)
     # Champs spécifiques serveur
     os_version_detail: Optional[str] = Field(default=None, max_length=500)
@@ -56,7 +56,7 @@ class EquipementUpdate(BaseModel):
     )
     # Champs spécifiques réseau
     vlan_config: Optional[dict] = None
-    ports_status: Optional[dict] = None
+    ports_status: Optional[list] = None
     firmware_version: Optional[str] = Field(default=None, max_length=100)
     # Champs spécifiques serveur
     os_version_detail: Optional[str] = Field(default=None, max_length=500)
@@ -78,7 +78,7 @@ class EquipementRead(EquipementBase):
     date_derniere_maj: datetime
     # Champs spécifiques (présents selon le type)
     vlan_config: Optional[dict] = None
-    ports_status: Optional[dict] = None
+    ports_status: Optional[list] = None
     firmware_version: Optional[str] = None
     os_version_detail: Optional[str] = None
     modele_materiel: Optional[str] = None
