@@ -41,10 +41,14 @@ import type {
   ADAuditCreate,
   ADAuditResultSummary,
   ADAuditResultRead,
-  PingCastleCreate,
-  PingCastleResultSummary,
-  PingCastleResultRead,
-  NetworkLink,
+   PingCastleCreate,
+   PingCastleResultSummary,
+   PingCastleResultRead,
+   Monkey365Config,
+   Monkey365ScanCreate,
+   Monkey365ScanResultSummary,
+   Monkey365ScanResultDetail,
+   NetworkLink,
   NetworkLinkCreate,
   NetworkMap,
   SiteConnection,
@@ -691,5 +695,21 @@ export const toolsApi = {
       `/tools/pingcastle-results/${resultId}/prefill/${assessmentId}`
     );
     return data;
+  },
+
+  // Monkey365
+  async launchMonkey365Scan(data: Monkey365ScanCreate): Promise<Monkey365ScanResultSummary> {
+    const response = await api.post("/tools/monkey365/run", data);
+    return response.data;
+  },
+
+  async listMonkey365Scans(entrepriseId: number): Promise<Monkey365ScanResultSummary[]> {
+    const response = await api.get(`/tools/monkey365/scans/${entrepriseId}`);
+    return response.data;
+  },
+
+  async getMonkey365ScanDetail(resultId: number): Promise<Monkey365ScanResultDetail> {
+    const response = await api.get(`/tools/monkey365/scans/result/${resultId}`);
+    return response.data;
   },
 };

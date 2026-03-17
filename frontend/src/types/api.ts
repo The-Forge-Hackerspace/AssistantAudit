@@ -939,3 +939,46 @@ export interface PingCastleResultRead extends PingCastleResultSummary {
   findings: ADAuditFinding[] | null;
   report_html_path: string | null;
 }
+
+// ── Monkey365 ──
+export interface Monkey365Config {
+  provider?: string;
+  auth_method?: string;
+  tenant_id: string;
+  client_id: string;
+  client_secret: string;
+  certificate_path?: string | null;
+  output_dir?: string;
+  rulesets?: string[];
+  plugins?: string[];
+  collect?: string[];
+  prompt_behavior?: string;
+  include_entra_id?: boolean;
+  export_to?: string[];
+  scan_sites?: string[];
+  force_msal_desktop?: boolean;
+  verbose?: boolean;
+}
+
+export interface Monkey365ScanCreate {
+  entreprise_id: number;
+  config: Monkey365Config;
+}
+
+export interface Monkey365ScanResultSummary {
+  id: number;
+  entreprise_id: number;
+  scan_id: string;
+  status: string;
+  entreprise_slug?: string | null;
+  findings_count?: number | null;
+  created_at: string;
+  completed_at?: string | null;
+  duration_seconds?: number | null;
+}
+
+export interface Monkey365ScanResultDetail extends Monkey365ScanResultSummary {
+  config_snapshot?: Record<string, unknown> | null;
+  output_path?: string | null;
+  error_message?: string | null;
+}
