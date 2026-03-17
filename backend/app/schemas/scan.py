@@ -4,7 +4,7 @@ Schémas Pydantic pour les scans réseau (Nmap) et les outils intégrés.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from ..models.equipement import EQUIPEMENT_TYPE_VALUES
 
 
@@ -474,3 +474,107 @@ class PingCastleResultRead(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+# ─── Monkey365 Audit ─────────────────────────────────────────
+
+class Monkey365ConfigSchema(BaseModel):
+    """Configuration pour un audit Monkey365."""
+    provider: str = Field("Microsoft365", description="Fournisseur (Microsoft365, Azure)")
+    auth_method: str = Field("client_credentials", description="Méthode d'authentification")
+    tenant_id: str = Field(..., description="ID du tenant Azure")
+    client_id: str = Field(..., description="ID de l'application")
+    client_secret: str = Field(..., description="Secret client")
+    certificate_path: Optional[str] = Field(None, description="Chemin du certificat (optionnel)")
+    output_dir: str = Field("./monkey365_output", description="Répertoire de sortie")
+    rulesets: list[str] = Field(default_factory=lambda: ["cis_m365_benchmark"], description="Ensembles de règles")
+    plugins: list[str] = Field(default_factory=list, description="Plugins supplémentaires")
+    collect: list[str] = Field(default_factory=list, description="Collecteurs à activer")
+    prompt_behavior: str = Field("Auto", description="Comportement des prompts")
+    include_entra_id: bool = Field(True, description="Inclure Entra ID")
+    export_to: list[str] = Field(default_factory=lambda: ["JSON", "HTML"], description="Formats d'export")
+    scan_sites: list[str] = Field(default_factory=list, description="Sites à scanner")
+    force_msal_desktop: bool = Field(False, description="Forcer MSAL Desktop")
+    verbose: bool = Field(False, description="Mode verbeux")
+
+    @field_validator("collect")
+    @classmethod
+    def validate_collect(cls, v: list[str]) -> list[str]:
+        """Valide que chaque collecteur correspond au pattern alphanumériques."""
+        import re
+        pattern = re.compile(r"^[a-zA-Z0-9]+$")
+        for item in v:
+            if not pattern.match(item):
+                raise ValueError(f"Collecteur '{item}' invalide (doit être alphanumérique)")
+        return v
+
+    @field_validator("prompt_behavior")
+    @classmethod
+    def validate_prompt_behavior(cls, v: str) -> str:
+        """Valide que prompt_behavior est dans les valeurs autorisées."""
+        allowed = ["Auto", "SelectAccount", "Always", "Never"]
+        if v not in allowed:
+            raise ValueError(f"prompt_behavior doit être l'une de: {allowed}")
+        return v
+
+    @field_validator("export_to")
+    @classmethod
+    def validate_export_to(cls, v: list[str]) -> list[str]:
+        """Valide export_to et ajoute automatiquement JSON s'il est absent."""
+        allowed = ["JSON", "HTML", "CSV", "CLIXML"]
+        for item in v:
+            if item not in allowed:
+                raise ValueError(f"Format '{item}' invalide (doit être dans {allowed})")
+        # Ajoute automatiquement JSON s'il est absent
+        if "JSON" not in v:
+            v.append("JSON")
+        return v
+
+    @field_validator("scan_sites")
+    @classmethod
+    def validate_scan_sites(cls, v: list[str]) -> list[str]:
+        """Valide que chaque site commence par https:// et est une URL valide."""
+        import re
+        pattern = re.compile(r"^https://[a-zA-Z0-9._/-]+$")
+        for site in v:
+            if not pattern.match(site):
+                raise ValueError(f"Site '{site}' invalide (doit être une URL https://)")
+        return v
+
+
+class Monkey365ScanCreate(BaseModel):
+    """Paramètres pour lancer un audit Monkey365."""
+    entreprise_id: int = Field(..., description="ID de l'entreprise")
+    config: Monkey365ConfigSchema = Field(..., description="Configuration Monkey365")
+
+
+class Monkey365ScanResultSummary(BaseModel):
+    """Résumé d'un audit Monkey365 pour la liste."""
+    id: int
+    entreprise_id: int
+    status: str
+    scan_id: str
+    entreprise_slug: Optional[str] = None
+    findings_count: Optional[int] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
+class Monkey365ScanResultRead(BaseModel):
+    """Détail complet d'un audit Monkey365."""
+    id: int
+    entreprise_id: int
+    status: str
+    scan_id: str
+    config_snapshot: Optional[dict] = None
+    output_path: Optional[str] = None
+    entreprise_slug: Optional[str] = None
+    findings_count: Optional[int] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+
+    model_config = {"from_attributes": True}
