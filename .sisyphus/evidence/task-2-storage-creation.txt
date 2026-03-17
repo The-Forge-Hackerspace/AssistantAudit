@@ -1,0 +1,7 @@
+Path created: E:\AssistantAudit\data\test-corp\Cloud\M365\scan-001
+Directory exists: PASS
+Meta file: E:\AssistantAudit\data\test-corp\Cloud\M365\scan-001\meta.json
+meta.json exists: PASS
+meta.json content verified: PASS
+Path structure verified: PASS
+ALL TESTS PASSED
