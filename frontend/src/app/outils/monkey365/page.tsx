@@ -133,7 +133,7 @@ export default function Monkey365Page() {
     const loadEntreprises = async () => {
       try {
         const data = await entreprisesApi.list();
-        setEntreprises(Array.isArray(data) ? data : (data as any).items || []);
+        setEntreprises(Array.isArray(data) ? data : data.items || []);
       } catch (err) {
         toast.error("Impossible de charger les entreprises");
       }
