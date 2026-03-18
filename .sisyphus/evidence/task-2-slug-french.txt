@@ -1,7 +1,0 @@
-Test 1: Societe Generale
-Result: societe-generale
-PASS
-
-Test 2: Ca Marche Bien!
-Result: ca-marche-bien
-PASS
