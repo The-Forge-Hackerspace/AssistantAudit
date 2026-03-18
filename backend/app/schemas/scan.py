@@ -480,7 +480,6 @@ class PingCastleResultRead(BaseModel):
 class Monkey365ConfigSchema(BaseModel):
     """Configuration pour un audit Monkey365."""
     provider: str = Field("Microsoft365", description="Fournisseur (Microsoft365, Azure)")
-    auth_method: str = Field("client_credentials", description="Méthode d'authentification")
     tenant_id: str = Field(..., description="ID du tenant Azure")
     client_id: str = Field(..., description="ID de l'application")
     client_secret: str = Field(..., description="Secret client")
@@ -488,32 +487,23 @@ class Monkey365ConfigSchema(BaseModel):
     output_dir: str = Field("./monkey365_output", description="Répertoire de sortie")
     rulesets: list[str] = Field(default_factory=lambda: ["cis_m365_benchmark"], description="Ensembles de règles")
     plugins: list[str] = Field(default_factory=list, description="Plugins supplémentaires")
-    collect: list[str] = Field(default_factory=list, description="Collecteurs à activer")
-    prompt_behavior: str = Field("Auto", description="Comportement des prompts")
+    collect: list[str] = Field(default_factory=list, description="Modules Monkey365 à collecter (ExchangeOnline, SharePointOnline, Purview, MicrosoftTeams, AdminPortal)")
     include_entra_id: bool = Field(True, description="Inclure Entra ID")
     export_to: list[str] = Field(default_factory=lambda: ["JSON", "HTML"], description="Formats d'export")
-    scan_sites: list[str] = Field(default_factory=list, description="Sites à scanner")
-    force_msal_desktop: bool = Field(False, description="Forcer MSAL Desktop")
+    scan_sites: list[str] = Field(default_factory=list, description="Sites SharePoint à scanner")
+    force_msal_desktop: bool = Field(False, description="Forcer authentification MSAL Desktop (nécessite navigateur)")
     verbose: bool = Field(False, description="Mode verbeux")
 
     @field_validator("collect")
     @classmethod
     def validate_collect(cls, v: list[str]) -> list[str]:
-        """Valide que chaque collecteur correspond au pattern alphanumériques."""
-        import re
-        pattern = re.compile(r"^[a-zA-Z0-9]+$")
+        """Valide que chaque module est un module Monkey365 valide."""
+        allowed_modules = {"ExchangeOnline", "SharePointOnline", "Purview", "MicrosoftTeams", "AdminPortal"}
         for item in v:
-            if not pattern.match(item):
-                raise ValueError(f"Collecteur '{item}' invalide (doit être alphanumérique)")
-        return v
-
-    @field_validator("prompt_behavior")
-    @classmethod
-    def validate_prompt_behavior(cls, v: str) -> str:
-        """Valide que prompt_behavior est dans les valeurs autorisées."""
-        allowed = ["Auto", "SelectAccount", "Always", "Never"]
-        if v not in allowed:
-            raise ValueError(f"prompt_behavior doit être l'une de: {allowed}")
+            if item not in allowed_modules:
+                raise ValueError(
+                    f"Module '{item}' invalide. Modules autorisés: {', '.join(sorted(allowed_modules))}"
+                )
         return v
 
     @field_validator("export_to")

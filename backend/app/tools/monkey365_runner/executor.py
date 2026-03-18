@@ -25,10 +25,17 @@ _SECRET_PATTERN = re.compile(r"^[a-zA-Z0-9_.~\-]{1,256}$")
 _THUMBPRINT_PATTERN = re.compile(r"^[0-9a-fA-F]{40}$")
 # Nom d'analyse / ruleset : alphanum, underscores, tirets
 _SAFE_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]+$")
-_COLLECT_PATTERN = re.compile(r"^[a-zA-Z0-9]+$")
 _SCAN_SITE_PATTERN = re.compile(r"^https://[a-zA-Z0-9._/-]+$")
 
-_ALLOWED_PROMPT_BEHAVIORS = {"Auto", "SelectAccount", "Always", "Never"}
+# Valid Monkey365 modules for data collection
+_ALLOWED_COLLECT_MODULES = {
+    "ExchangeOnline",
+    "SharePointOnline",
+    "Purview",
+    "MicrosoftTeams",
+    "AdminPortal",
+}
+
 _ALLOWED_EXPORT_FORMATS = {"JSON", "HTML", "CSV", "CLIXML"}
 
 
@@ -105,7 +112,6 @@ class Monkey365Config:
     rulesets: list[str] = field(default_factory=lambda: ["cis_m365_benchmark"])
     plugins: list[str] = field(default_factory=list)
     collect: list[str] = field(default_factory=list)
-    prompt_behavior: str = "Auto"
     include_entra_id: bool = True
     export_to: list[str] = field(default_factory=lambda: ["JSON", "HTML"])
     scan_sites: list[str] = field(default_factory=list)
@@ -114,16 +120,11 @@ class Monkey365Config:
 
     def validate(self) -> None:
         for item in self.collect:
-            if not _COLLECT_PATTERN.match(item):
+            if item not in _ALLOWED_COLLECT_MODULES:
                 raise ValueError(
-                    "collect invalide : chaque élément doit respecter ^[a-zA-Z0-9]+$"
+                    f"collect invalide : '{item}' n'est pas un module valide. "
+                    f"Modules autorisés : {', '.join(sorted(_ALLOWED_COLLECT_MODULES))}"
                 )
-
-        if self.prompt_behavior not in _ALLOWED_PROMPT_BEHAVIORS:
-            raise ValueError(
-                "prompt_behavior invalide : valeurs autorisées = Auto, SelectAccount, "
-                + "Always, Never"
-            )
 
         for fmt in self.export_to:
             if fmt not in _ALLOWED_EXPORT_FORMATS:
@@ -240,7 +241,6 @@ class Monkey365Executor:
             f"'{_escape_ps_string(a)}'" for a in self._get_analyses(active_config)
         )
 
-        # Échapper toutes les valeurs interpolées
         safe_module_path = _escape_ps_string(str(self.monkey365_path.parent))
         provider_value = str(active_config.provider)
         if isinstance(active_config.provider, M365Provider):
@@ -250,7 +250,6 @@ class Monkey365Executor:
         safe_tenant = _escape_ps_string(active_config.tenant_id)
         export_to = ", ".join(f"'{_escape_ps_string(fmt)}'" for fmt in active_config.export_to)
         include_entra_id = "$true" if active_config.include_entra_id else "$false"
-        safe_prompt_behavior = _escape_ps_string(active_config.prompt_behavior)
 
         collect_param = ""
         if active_config.collect:
@@ -278,7 +277,7 @@ $params = @{{
     Instance   = '{safe_provider}'
     Analysis   = @({analyses})
     ExportTo   = @({export_to})
-    PromptBehavior = '{safe_prompt_behavior}'
+    PromptBehavior = 'SelectAccount'
     IncludeEntraID = {include_entra_id}{collect_param}{scan_sites_param}{force_msal_desktop_param}{verbose_param}
     OutDir     = '{safe_output}'
     TenantId   = '{safe_tenant}'

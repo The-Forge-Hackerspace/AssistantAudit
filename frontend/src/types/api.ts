@@ -943,7 +943,6 @@ export interface PingCastleResultRead extends PingCastleResultSummary {
 // ── Monkey365 ──
 export interface Monkey365Config {
   provider?: string;
-  auth_method?: string;
   tenant_id: string;
   client_id: string;
   client_secret: string;
@@ -952,7 +951,6 @@ export interface Monkey365Config {
   rulesets?: string[];
   plugins?: string[];
   collect?: string[];
-  prompt_behavior?: string;
   include_entra_id?: boolean;
   export_to?: string[];
   scan_sites?: string[];

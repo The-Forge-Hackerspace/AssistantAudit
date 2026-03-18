@@ -45,11 +45,9 @@ export default function Monkey365Page() {
   const [tenantId, setTenantId] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
-  const [authMethod, setAuthMethod] = useState("client_credentials");
 
   // Config fields
   const [collectModules, setCollectModules] = useState<string[]>([]);
-  const [promptBehavior, setPromptBehavior] = useState("Auto");
   const [includeEntraId, setIncludeEntraId] = useState(true);
   const [exportFormats, setExportFormats] = useState<string[]>(["JSON"]);
   const [scanSites, setScanSites] = useState<string[]>([]);
@@ -188,9 +186,8 @@ export default function Monkey365Page() {
       params.push(`    Collect = "${collectModules.join(",")}"`);
     }
 
-    if (promptBehavior !== "Auto") {
-      params.push(`    PromptBehavior = "${promptBehavior}"`);
-    }
+    // PromptBehavior is always hardcoded to 'SelectAccount' in backend
+    params.push(`    PromptBehavior = 'SelectAccount'`);
 
     if (includeEntraId) {
       params.push(`    IncludeEntraID = $true`);
@@ -233,9 +230,7 @@ export default function Monkey365Page() {
         tenant_id: tenantId,
         client_id: clientId,
         client_secret: clientSecret,
-        auth_method: authMethod,
         collect: collectModules.length > 0 ? collectModules : undefined,
-        prompt_behavior: promptBehavior,
         include_entra_id: includeEntraId,
         export_to: exportFormats,
         scan_sites: scanSites.length > 0 ? scanSites : undefined,
@@ -354,18 +349,6 @@ export default function Monkey365Page() {
                     placeholder="••••••••••••••••••••••••"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="authMethod">Méthode d'authentification</Label>
-                  <Select value={authMethod} onValueChange={setAuthMethod}>
-                    <SelectTrigger id="authMethod">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="client_credentials">Client Credentials (Application)</SelectItem>
-                      <SelectItem value="interactive">Interactive (User)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -427,22 +410,6 @@ export default function Monkey365Page() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  {/* Prompt Behavior */}
-                  <div className="space-y-2">
-                    <Label htmlFor="promptBehavior">Prompt Behavior</Label>
-                    <Select value={promptBehavior} onValueChange={setPromptBehavior}>
-                      <SelectTrigger id="promptBehavior">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Auto">Auto</SelectItem>
-                        <SelectItem value="SelectAccount">SelectAccount</SelectItem>
-                        <SelectItem value="Always">Always</SelectItem>
-                        <SelectItem value="Never">Never</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   {/* Export Formats */}
                   <div className="space-y-3">
                     <Label>Formats d'export (ExportTo)</Label>
