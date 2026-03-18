@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Castle,
   Map,
+  Cloud,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,15 @@ const tools = [
     href: "/outils/pingcastle",
     color: "text-red-500",
     bgColor: "bg-red-500/10",
+  },
+  {
+    title: "Monkey365",
+    description:
+      "Audit Microsoft 365 et Azure AD — configuration complète des paramètres de scan, collecte de données de sécurité et analyse de conformité.",
+    icon: Cloud,
+    href: "/outils/monkey365",
+    color: "text-sky-500",
+    bgColor: "bg-sky-500/10",
   },
 ];
 
