@@ -16,21 +16,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "monkey365_scan_results",
-        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("entreprise_id", sa.Integer(), sa.ForeignKey("entreprises.id"), nullable=False, index=True),
-        sa.Column("status", sa.Enum("running", "success", "failed", name="monkey365scanstatus"), nullable=False, server_default="running"),
-        sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("scan_id", sa.String(100), nullable=False, unique=True),
-        sa.Column("config_snapshot", sa.JSON(), nullable=True),
-        sa.Column("output_path", sa.String(500), nullable=True),
-        sa.Column("entreprise_slug", sa.String(200), nullable=True),
-        sa.Column("findings_count", sa.Integer(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("duration_seconds", sa.Integer(), nullable=True),
-    )
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    
+    if "monkey365_scan_results" not in inspector.get_table_names():
+        op.create_table(
+            "monkey365_scan_results",
+            sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+            sa.Column("entreprise_id", sa.Integer(), sa.ForeignKey("entreprises.id"), nullable=False, index=True),
+            sa.Column("status", sa.Enum("running", "success", "failed", name="monkey365scanstatus"), nullable=False, server_default="running"),
+            sa.Column("error_message", sa.Text(), nullable=True),
+            sa.Column("scan_id", sa.String(100), nullable=False, unique=True),
+            sa.Column("config_snapshot", sa.JSON(), nullable=True),
+            sa.Column("output_path", sa.String(500), nullable=True),
+            sa.Column("entreprise_slug", sa.String(200), nullable=True),
+            sa.Column("findings_count", sa.Integer(), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+            sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
+            sa.Column("duration_seconds", sa.Integer(), nullable=True),
+        )
 
 
 def downgrade() -> None:
