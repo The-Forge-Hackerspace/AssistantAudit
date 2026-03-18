@@ -1,5 +1,7 @@
 "use client";
 
+import { useCallback } from "react";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Play,
@@ -16,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -24,12 +27,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 
 import { toolsApi, entreprisesApi } from "@/services/api";
-import type { Entreprise, Monkey365Config, Monkey365ScanCreate } from "@/types/api";
+import type { Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail } from "@/types/api";
 
 export default function Monkey365Page() {
   const [activeTab, setActiveTab] = useState("launch");
   const [loading, setLoading] = useState(false);
   const [launching, setLaunching] = useState(false);
+
+
+
 
   // Entreprises state
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
@@ -53,6 +59,74 @@ export default function Monkey365Page() {
   // Tag inputs state
   const [collectInput, setCollectInput] = useState("");
   const [siteInput, setSiteInput] = useState("");
+
+  const [scans, setScans] = useState<Monkey365ScanResultSummary[]>([]);
+  const [selectedScan, setSelectedScan] = useState<Monkey365ScanResultDetail | null>(null);
+
+  // Helper functions
+  function formatDuration(seconds: number | null | undefined): string {
+    if (!seconds) return "-";
+    if (seconds < 60) return `${seconds}s`;
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+    return `${min}m ${sec}s`;
+  }
+
+  function formatDate(dateStr: string | null): string {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function getStatusBadge(status: string) {
+    switch (status) {
+      case "success":
+        return <Badge variant="default">Succès</Badge>;
+      case "failed":
+        return <Badge variant="destructive">Échec</Badge>;
+      case "running":
+        return <Badge className="bg-blue-500"><Loader2 className="h-3 w-3 mr-1 animate-spin" />En cours</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  }
+
+  const loadScans = useCallback(async () => {
+    if (!selectedEntrepriseId) return;
+    setLoading(true);
+    try {
+      const data = await toolsApi.listMonkey365Scans(parseInt(selectedEntrepriseId, 10));
+      setScans(data);
+    } catch (err) {
+      console.error("Failed to load scans:", err);
+      toast.error("Erreur lors du chargement des scans");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedEntrepriseId]);
+
+  const loadScanDetail = async (scanId: number) => {
+    try {
+      const detail = await toolsApi.getMonkey365ScanDetail(scanId);
+      setSelectedScan(detail);
+    } catch (err) {
+      console.error("Failed to load scan detail:", err);
+      toast.error("Erreur lors du chargement des détails");
+    }
+  };
+
+  // Poll every 5 seconds when any scan is "running"
+  useEffect(() => {
+    if (scans.some(s => s.status === "running")) {
+      const interval = setInterval(loadScans, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [scans, loadScans]);
 
   // Load entreprises
   useEffect(() => {
@@ -182,6 +256,7 @@ export default function Monkey365Page() {
       
       // Navigate to history tab
       setActiveTab("history");
+      loadScans();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erreur lors du lancement";
       toast.error(msg);
@@ -455,12 +530,92 @@ export default function Monkey365Page() {
           </div>
         </TabsContent>
 
-        <TabsContent value="history">
+                <TabsContent value="history" className="space-y-6">
+          {/* Scan history table */}
           <Card>
-            <CardContent className="p-6 text-center text-muted-foreground">
-              Implémentation de l'historique dans la tâche suivante (Task 13).
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Historique des scans</CardTitle>
+                <Button variant="outline" size="sm" onClick={loadScans} disabled={loading}>
+                  <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
+                  Actualiser
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {scans.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  Aucun scan Monkey365 pour cette entreprise. Lancez un scan depuis l&apos;onglet "Lancer un scan".
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID Scan</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Durée</TableHead>
+                      <TableHead>Findings</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {scans.map((scan) => (
+                      <TableRow
+                        key={scan.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => loadScanDetail(scan.id)}
+                      >
+                        <TableCell className="font-mono text-xs">
+                          {scan.id.toString().substring(0, 8)}...
+                        </TableCell>
+                        <TableCell>{getStatusBadge(scan.status)}</TableCell>
+                        <TableCell>{formatDate(scan.created_at)}</TableCell>
+                        <TableCell>{formatDuration(scan.duration_seconds)}</TableCell>
+                        <TableCell>{scan.findings_count ?? "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
+
+          {/* Detail view */}
+          {selectedScan && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Détails du scan</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedScan(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {selectedScan.error_message && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertDescription>{selectedScan.error_message}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">Configuration</h4>
+                    <pre className="bg-muted p-4 rounded text-xs overflow-auto">
+                      {JSON.stringify(selectedScan.config_snapshot, null, 2)}
+                    </pre>
+                  </div>
+                  {selectedScan.output_path && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Chemin de sortie</h4>
+                      <code className="bg-muted p-2 rounded text-xs block">
+                        {selectedScan.output_path}
+                      </code>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

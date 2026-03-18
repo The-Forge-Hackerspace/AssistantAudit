@@ -758,3 +758,27 @@ There is a **silent Python parsing/execution issue** that causes the module to s
 - Installed missing shadcn/ui components: switch, alert, checkbox
 - TypeScript: clean, Build: success
 
+
+## Task 13: Monkey365 Scan History Tab + Polling (2026-03-18)
+
+### Implementation Summary
+- Implemented "Scans passés" tab in existing page.tsx
+- Added scan history table with status badges (green/yellow/red)
+- Implemented status polling (5s interval when scans are "running")
+- Added detail view with config_snapshot, output_path, error_message
+- Auto-switch to history tab after launching scan
+- Followed PingCastle pattern exactly
+
+### Technical Details
+- Polling: useEffect with setInterval + cleanup, stops when no scans are "running"
+- Status badges: success (green), running (blue with spinner), failed (red)
+- Helper functions: formatDate, formatDuration, getStatusBadge (copied from PingCastle)
+- Empty state: Friendly message when no scans exist
+- Noted field mismatches vs prompt instructions and fixed them (`Monkey365ScanResultSummary` instead of `Monkey365ScanSummary`, `duration_seconds` instead of `duration`)
+
+### Verification Results
+- TypeScript: 0 errors (npx tsc --noEmit)
+- Build: SUCCESS (npm run build)
+- Table renders correctly with all columns
+- Polling starts/stops based on scan status
+- Detail view shows all expected fields
