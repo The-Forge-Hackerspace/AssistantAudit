@@ -24,3 +24,45 @@ Project started 2026-03-19.
 
 **Owner:** T0SAGA97
 **GitHub:** https://github.com/The-Forge-Hackerspace/AssistantAudit
+
+---
+
+## Security Reviews Conducted
+
+### **2026-03-19 — Monkey365 Authentication System (4 auth modes)**
+
+**Trigger:** Auto-triggered review — Redfoot rewrote Monkey365 auth with subprocess calls and user credentials
+
+**Scope:**
+- `backend/app/tools/monkey365_runner/executor.py` (PowerShell script generation)
+- `backend/app/schemas/scan.py` (Monkey365ConfigSchema validation)
+- `backend/app/api/v1/tools.py` (Monkey365 endpoints)
+- `backend/app/services/monkey365_scan_service.py` (service layer)
+- `backend/app/models/monkey365_scan_result.py` (data model)
+
+**Findings:** 8 findings total (0 BLOCKING, 3 HIGH, 3 MEDIUM, 2 LOW)
+
+**Critical Security Observations:**
+1. ✅ **Command injection fully mitigated** — UUID regex + email validation + PowerShell single-quote escaping
+2. ✅ **Credentials never logged in plaintext** — `_mask_password()` used consistently
+3. ✅ **Credentials NOT stored in database** — excluded from `config_snapshot` JSON field
+4. ⚠️ **HIGH (S2):** PowerShell script files with plaintext credentials written to disk, cleaned up in `finally` — recommend `-Command` instead of `-File` to avoid disk entirely
+5. ⚠️ **HIGH (S1):** Credentials passed to background thread via `config.model_dump()` — verify no inadvertent serialization
+6. ⚠️ **MEDIUM (S5):** `provider` field is free-text string, should be enum-constrained like `auth_mode`
+
+**Positive Controls Identified:**
+- Auth-mode-specific credential validation (Pydantic `@model_validator`)
+- JWT + RBAC authorization (`get_current_auditeur`)
+- Allowlist validation for collect modules, export formats, scan sites
+- 1-hour subprocess timeout
+- Conditional PowerShell parameter generation (no credentials for INTERACTIVE/DEVICE_CODE)
+
+**Approval:** ✅ **APPROVED WITH CONDITIONS** — S1, S2, S5 must be fixed before production
+
+**Report Location:** `.squad/decisions/inbox/kujan-monkey365-security.md`
+
+**Lessons Learned:**
+- Subprocess scripts containing credentials are HIGH RISK even with cleanup — prefer stdin or environment variables
+- Defense-in-depth validation (schema + executor) is good practice but creates DRY risk — document clearly
+- PowerShell single-quote escaping (`'` → `''`) is correct for single-quoted strings (verified secure)
+- Masking credentials in logs is not enough — also sanitize subprocess error output

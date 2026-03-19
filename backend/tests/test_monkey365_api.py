@@ -25,7 +25,7 @@ def test_launch_scan_unauthorized(client: TestClient, db_session):
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -45,7 +45,7 @@ def test_launch_scan_lecteur_forbidden(client: TestClient, db_session, lecteur_h
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -82,7 +82,7 @@ def test_launch_scan_missing_entreprise_id(client: TestClient, auditeur_headers)
         json={
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -103,7 +103,7 @@ def test_launch_scan_missing_required_config(client: TestClient, db_session, aud
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
             }
         },
         headers=auditeur_headers,
@@ -121,7 +121,7 @@ def test_launch_scan_invalid_collect_pattern(client: TestClient, db_session, aud
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -133,8 +133,8 @@ def test_launch_scan_invalid_collect_pattern(client: TestClient, db_session, aud
     assert response.status_code == 422
 
 
-def test_launch_scan_invalid_prompt_behavior(client: TestClient, db_session, auditeur_headers):
-    """Test launching scan with invalid prompt_behavior returns 422."""
+def test_launch_scan_invalid_auth_mode(client: TestClient, db_session, auditeur_headers):
+    """Test launching scan with invalid auth_mode returns 422."""
     entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
     
     response = client.post(
@@ -143,11 +143,10 @@ def test_launch_scan_invalid_prompt_behavior(client: TestClient, db_session, aud
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "invalid_mode",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
-                "client_secret": "test-secret",
-                "prompt_behavior": "InvalidValue"
+                "client_secret": "test-secret"
             }
         },
         headers=auditeur_headers,
@@ -165,7 +164,7 @@ def test_launch_scan_invalid_scan_sites(client: TestClient, db_session, auditeur
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -194,7 +193,7 @@ def test_launch_scan_success_auditeur(mock_exec, client: TestClient, db_session,
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -225,7 +224,7 @@ def test_launch_scan_success_admin(mock_exec, client: TestClient, db_session, ad
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -250,7 +249,7 @@ def test_launch_scan_invalid_entreprise(mock_exec, client: TestClient, auditeur_
             "entreprise_id": 99999,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -275,7 +274,7 @@ def test_list_scans_success(mock_exec, client: TestClient, db_session, auditeur_
                 "entreprise_id": entreprise.id,
                 "config": {
                     "provider": "Microsoft365",
-                    "auth_method": "client_credentials",
+                    "auth_mode": "client_credentials",
                     "tenant_id": f"12345678-1234-1234-1234-12345678{i:04d}",
                     "client_id": "87654321-4321-4321-4321-cba987654321",
                     "client_secret": "test-secret",
@@ -313,7 +312,7 @@ def test_get_scan_detail_success(mock_exec, client: TestClient, db_session, audi
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -365,11 +364,10 @@ def test_launch_scan_excludes_client_secret_from_response(mock_exec, client: Tes
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "super-secret-value",
-                "certificate_path": "/path/to/secret/cert.pem",
             }
         },
         headers=auditeur_headers,
@@ -379,7 +377,6 @@ def test_launch_scan_excludes_client_secret_from_response(mock_exec, client: Tes
     # Summary response does not include config_snapshot
     data = response.json()
     assert "client_secret" not in str(data)
-    assert "certificate_path" not in str(data)
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
@@ -395,11 +392,10 @@ def test_get_scan_detail_excludes_secrets_from_config_snapshot(mock_exec, client
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "super-secret-value",
-                "certificate_path": "/path/to/secret/cert.pem",
             }
         },
         headers=auditeur_headers,
@@ -417,11 +413,43 @@ def test_get_scan_detail_excludes_secrets_from_config_snapshot(mock_exec, client
     data = response.json()
     config = data["config_snapshot"]
     assert "client_secret" not in config
-    assert "certificate_path" not in config
     # Verify non-secret fields are present
     assert config["provider"] == "Microsoft365"
     assert config["tenant_id"] == "12345678-1234-1234-1234-123456789abc"
     assert config["client_id"] == "87654321-4321-4321-4321-cba987654321"
+
+
+@patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
+def test_get_scan_detail_excludes_password_from_config_snapshot(mock_exec, client: TestClient, db_session, auditeur_headers):
+    """Test that config_snapshot excludes ROPC password values."""
+    mock_exec.return_value = None
+    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+
+    launch_response = client.post(
+        "/api/v1/tools/monkey365/run",
+        json={
+            "entreprise_id": entreprise.id,
+            "config": {
+                "provider": "Microsoft365",
+                "auth_mode": "ropc",
+                "tenant_id": "12345678-1234-1234-1234-123456789abc",
+                "username": "auditor@example.com",
+                "password": "super-secret-password",
+            }
+        },
+        headers=auditeur_headers,
+    )
+    assert launch_response.status_code == 201
+    result_id = launch_response.json()["id"]
+
+    response = client.get(
+        f"/api/v1/tools/monkey365/scans/result/{result_id}",
+        headers=auditeur_headers,
+    )
+
+    assert response.status_code == 200
+    config = response.json()["config_snapshot"]
+    assert "password" not in config
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -441,7 +469,7 @@ def test_launch_scan_response_schema(mock_exec, client: TestClient, db_session, 
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -480,7 +508,7 @@ def test_get_scan_detail_response_schema(mock_exec, client: TestClient, db_sessi
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -531,7 +559,7 @@ def test_launch_scan_export_to_auto_includes_json(mock_exec, client: TestClient,
             "entreprise_id": entreprise.id,
             "config": {
                 "provider": "Microsoft365",
-                "auth_method": "client_credentials",
+                "auth_mode": "client_credentials",
                 "tenant_id": "12345678-1234-1234-1234-123456789abc",
                 "client_id": "87654321-4321-4321-4321-cba987654321",
                 "client_secret": "test-secret",
@@ -554,3 +582,4 @@ def test_launch_scan_export_to_auto_includes_json(mock_exec, client: TestClient,
     config = detail_response.json()["config_snapshot"]
     assert "JSON" in config["export_to"]
     assert "HTML" in config["export_to"]
+

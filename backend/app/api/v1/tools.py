@@ -720,9 +720,11 @@ async def launch_monkey365_scan(
     except ValueError as e:
         raise HTTPException(404, str(e))
 
+    auth_mode = request.config.auth_mode.value if hasattr(request.config.auth_mode, "value") else str(request.config.auth_mode)
+    tenant_display = request.config.tenant_id or "n/a"
     logger.info(
         f"Monkey365 scan #{result.id} lancé en background "
-        f"(tenant={request.config.tenant_id}, entreprise={request.entreprise_id})"
+        f"(mode={auth_mode}, tenant={tenant_display}, entreprise={request.entreprise_id})"
     )
     return result
 

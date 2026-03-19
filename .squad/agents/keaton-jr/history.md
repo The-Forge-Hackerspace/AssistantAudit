@@ -24,3 +24,30 @@ Project started 2026-03-19.
 
 **Owner:** T0SAGA97
 **GitHub:** https://github.com/The-Forge-Hackerspace/AssistantAudit
+
+---
+
+### 2026-03-19 — Monkey365 Dynamic Authentication Form
+
+**Task:** Implemented dynamic authentication form for Monkey365 that adapts to selected auth_mode.
+
+**Implementation:**
+- Added `Monkey365AuthMode` type to TypeScript API types ("interactive" | "device_code" | "ropc" | "client_credentials")
+- Updated `Monkey365Config` interface to support new auth_mode field and optional username/password fields
+- Modified Monkey365 page.tsx to render credential fields conditionally based on auth_mode selection
+- Implemented visual badges for auth modes: 🟢 green for safest modes (interactive, device_code), 🟡 yellow for credential-based modes
+- Added informative alerts for interactive (browser window) and device_code (device code flow) modes
+- Updated PowerShell preview generator to display correct authentication parameters per mode
+- Modified form validation to enforce required fields based on selected auth_mode
+
+**Key UI Features:**
+- Auth mode dropdown selector with visual badges indicating security level
+- Dynamic form fields that appear/hide based on selection:
+  - Interactive: No credentials required
+  - Device Code: No credentials required
+  - ROPC: TenantId + Username + Password
+  - Client Credentials: TenantId + ClientId + ClientSecret
+- Info badges explaining what each auth mode does
+- Form validation tailored to each auth mode
+
+**Pattern:** Dynamic form rendering based on enum selection with conditional validation.

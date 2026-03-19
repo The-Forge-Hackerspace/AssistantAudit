@@ -9,8 +9,8 @@ import pytest
 from app.tools.monkey365_runner.executor import (
     Monkey365Config,
     M365Provider,
-    AuthMethod,
 )
+from app.tools.monkey365_runner.config import Monkey365AuthMode
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ def test_monkey365_config_defaults():
     """Test Monkey365Config has correct defaults for new fields."""
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="test-tenant-id",
         client_id="test-client-id",
         client_secret="test-secret-123",
@@ -30,11 +30,9 @@ def test_monkey365_config_defaults():
     
     # Verify new field defaults
     assert config.collect == [], f"Expected empty collect, got {config.collect}"
-    assert config.prompt_behavior == "Auto", f"Expected 'Auto', got {config.prompt_behavior}"
     assert config.include_entra_id == True, f"Expected True, got {config.include_entra_id}"
     assert config.export_to == ["JSON", "HTML"], f"Expected ['JSON', 'HTML'], got {config.export_to}"
     assert config.scan_sites == [], f"Expected empty scan_sites, got {config.scan_sites}"
-    assert config.force_msal_desktop == False, f"Expected False, got {config.force_msal_desktop}"
     assert config.verbose == False, f"Expected False, got {config.verbose}"
 
 
@@ -42,7 +40,7 @@ def test_monkey365_config_minimal():
     """Test minimal Monkey365Config works with required fields only."""
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="abcdef123456",
@@ -50,7 +48,7 @@ def test_monkey365_config_minimal():
     
     # Should not raise, defaults should be set
     assert config.provider == "Microsoft365"
-    assert config.auth_method == "client_credentials"
+    assert config.auth_mode == "client_credentials"
     assert config.collect == []
 
 
@@ -63,7 +61,7 @@ def test_validation_invalid_collect():
     """Test validation rejects invalid collect items with special chars."""
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -78,7 +76,7 @@ def test_validation_valid_collect():
     """Test validation accepts valid collect items."""
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -91,45 +89,6 @@ def test_validation_valid_collect():
 
 
 # ────────────────────────────────────────────────────────────────────────
-# Validation Tests - prompt_behavior
-# ────────────────────────────────────────────────────────────────────────
-
-
-def test_validation_invalid_prompt_behavior():
-    """Test validation rejects invalid prompt_behavior."""
-    config = Monkey365Config(
-        provider="Microsoft365",
-        auth_method="client_credentials",
-        tenant_id="12345678-1234-1234-1234-123456789abc",
-        client_id="87654321-4321-4321-4321-cba987654321",
-        client_secret="test-secret",
-        prompt_behavior="InvalidBehavior"
-    )
-    
-    with pytest.raises(ValueError, match="prompt_behavior invalide"):
-        config.validate()
-
-
-def test_validation_valid_prompt_behaviors():
-    """Test validation accepts all valid prompt_behavior values."""
-    valid_behaviors = ["Auto", "SelectAccount", "Always", "Never"]
-    
-    for behavior in valid_behaviors:
-        config = Monkey365Config(
-            provider="Microsoft365",
-            auth_method="client_credentials",
-            tenant_id="12345678-1234-1234-1234-123456789abc",
-            client_id="87654321-4321-4321-4321-cba987654321",
-            client_secret="test-secret",
-            prompt_behavior=behavior
-        )
-        
-        # Should not raise
-        config.validate()
-        assert config.prompt_behavior == behavior
-
-
-# ────────────────────────────────────────────────────────────────────────
 # Validation Tests - export_to
 # ────────────────────────────────────────────────────────────────────────
 
@@ -138,7 +97,7 @@ def test_validation_invalid_export_to():
     """Test validation rejects invalid export_to formats."""
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -153,7 +112,7 @@ def test_validation_json_auto_append():
     """Test validation auto-appends JSON to export_to if not present."""
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -171,7 +130,7 @@ def test_validation_json_not_duplicated():
     """Test validation does not duplicate JSON if already present."""
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -194,7 +153,7 @@ def test_validation_invalid_scan_sites_http():
     """Test validation rejects HTTP URLs (requires HTTPS)."""
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -209,7 +168,7 @@ def test_validation_valid_scan_sites():
     """Test validation accepts valid HTTPS URLs."""
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -232,7 +191,7 @@ def test_build_script_collect_present_when_non_empty(tmp_path):
     
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -259,7 +218,7 @@ def test_build_script_collect_absent_when_empty(tmp_path):
     
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -280,16 +239,12 @@ def test_build_script_collect_absent_when_empty(tmp_path):
 
 
 def test_build_script_prompt_behavior_present(tmp_path):
-    """Test build_script includes PromptBehavior parameter."""
+    """Test build_script includes PromptBehavior for interactive auth."""
     from app.tools.monkey365_runner.executor import Monkey365Executor
     
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
-        tenant_id="12345678-1234-1234-1234-123456789abc",
-        client_id="87654321-4321-4321-4321-cba987654321",
-        client_secret="test-secret",
-        prompt_behavior="Never",
+        auth_mode=Monkey365AuthMode.INTERACTIVE,
         output_dir=str(tmp_path)
     )
     
@@ -301,7 +256,7 @@ def test_build_script_prompt_behavior_present(tmp_path):
     script = executor.build_script("test-scan")
     
     assert "PromptBehavior" in script, "Expected 'PromptBehavior' parameter in script"
-    assert "'Never'" in script, "Expected 'Never' value in script"
+    assert "SelectAccount" in script, "Expected 'SelectAccount' value in script"
 
 
 def test_build_script_export_to_dynamic(tmp_path):
@@ -310,7 +265,7 @@ def test_build_script_export_to_dynamic(tmp_path):
     
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -336,7 +291,7 @@ def test_build_script_verbose_present_when_true(tmp_path):
     
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -361,7 +316,7 @@ def test_build_script_verbose_absent_when_false(tmp_path):
     
     config = Monkey365Config(
         provider="Microsoft365",
-        auth_method="client_credentials",
+        auth_mode="client_credentials",
         tenant_id="12345678-1234-1234-1234-123456789abc",
         client_id="87654321-4321-4321-4321-cba987654321",
         client_secret="test-secret",
@@ -381,26 +336,3 @@ def test_build_script_verbose_absent_when_false(tmp_path):
     assert "Verbose         = $true" not in script, "Did not expect 'Verbose = $true' when False"
 
 
-def test_build_script_force_msal_desktop_present_when_true(tmp_path):
-    """Test build_script includes ForceMSALDesktop when force_msal_desktop=True."""
-    from app.tools.monkey365_runner.executor import Monkey365Executor
-    
-    config = Monkey365Config(
-        provider="Microsoft365",
-        auth_method="client_credentials",
-        tenant_id="12345678-1234-1234-1234-123456789abc",
-        client_id="87654321-4321-4321-4321-cba987654321",
-        client_secret="test-secret",
-        force_msal_desktop=True,
-        output_dir=str(tmp_path)
-    )
-    
-    executor = Monkey365Executor.__new__(Monkey365Executor)
-    executor.config = config
-    executor.monkey365_path = tmp_path / "Invoke-Monkey365.ps1"
-    executor.output_dir = tmp_path
-    
-    script = executor.build_script("test-scan")
-    
-    assert "ForceMSALDesktop" in script, "Expected 'ForceMSALDesktop' parameter in script"
-    assert "$true" in script, "Expected '$true' value for ForceMSALDesktop"

@@ -24,3 +24,15 @@ Project started 2026-03-19.
 
 **Owner:** T0SAGA97
 **GitHub:** https://github.com/The-Forge-Hackerspace/AssistantAudit
+
+---
+
+## Documentation Updates
+
+**2026-03-19 16:29 — Monkey365 Authentication Modes Documentation**
+- Added "Authentication Modes" section to CONCEPT.md Phase 4b (Monkey365)
+- Documents 4 auth methods: Interactive Browser, Device Code, ROPC, Client Credentials
+- Clarifies which modes require credentials vs. browser popup
+- Notes implementation details: Pydantic validation, conditional PowerShell generation, password masking
+- No existing Known Issues found for Monkey365 auth (bug fix verified)
+- Decision: baer-monkey365-docs.md

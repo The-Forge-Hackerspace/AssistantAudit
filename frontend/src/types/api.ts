@@ -941,11 +941,16 @@ export interface PingCastleResultRead extends PingCastleResultSummary {
 }
 
 // ── Monkey365 ──
+export type Monkey365AuthMode = "interactive" | "device_code" | "ropc" | "client_credentials";
+
 export interface Monkey365Config {
+  auth_mode: Monkey365AuthMode;
   provider?: string;
-  tenant_id: string;
-  client_id: string;
-  client_secret: string;
+  tenant_id?: string;
+  client_id?: string;
+  client_secret?: string;
+  username?: string;
+  password?: string;
   certificate_path?: string | null;
   output_dir?: string;
   rulesets?: string[];

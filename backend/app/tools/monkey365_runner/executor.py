@@ -1,14 +1,21 @@
 """
 Monkey365 Executor — Bridge Python → PowerShell pour l'audit M365/Azure.
+
+CRITICAL FIX: Authentication modes are now properly conditional.
+- INTERACTIVE: Requires ONLY PromptBehavior (no credentials)
+- DEVICE_CODE: Requires ONLY DeviceCode flag (no credentials)
+- ROPC: Requires username + password + tenant_id
+- CLIENT_CREDENTIALS: Requires client_id + client_secret + tenant_id
 """
 import json
 import logging
 import re
 import subprocess
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
 from typing import ClassVar, cast
+
+from .config import Monkey365AuthMode, M365Provider
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +28,8 @@ _UUID_PATTERN = re.compile(
 )
 # Client secret : alphanumériques, tirets, tildes, points, underscores (Azure AD format)
 _SECRET_PATTERN = re.compile(r"^[a-zA-Z0-9_.~\-]{1,256}$")
-# Certificate thumbprint : hexadécimal 40 chars (SHA-1)
-_THUMBPRINT_PATTERN = re.compile(r"^[0-9a-fA-F]{40}$")
+# Email format for username validation
+_EMAIL_PATTERN = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 # Nom d'analyse / ruleset : alphanum, underscores, tirets
 _SAFE_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]+$")
 _SCAN_SITE_PATTERN = re.compile(r"^https://[a-zA-Z0-9._/-]+$")
@@ -69,11 +76,11 @@ def _validate_secret(value: str) -> str:
     return value
 
 
-def _validate_thumbprint(value: str) -> str:
-    """Valide un thumbprint de certificat."""
-    if not _THUMBPRINT_PATTERN.match(value):
+def _validate_email(value: str, field_name: str) -> str:
+    """Valide un email format pour username."""
+    if not _EMAIL_PATTERN.match(value):
         raise ValueError(
-            "Thumbprint de certificat invalide : 40 caractères hexadécimaux attendus."
+            f"{field_name} invalide : format email attendu (ex: user@domain.com)"
         )
     return value
 
@@ -88,26 +95,32 @@ def _validate_safe_name(value: str, field_name: str) -> str:
     return value
 
 
-class M365Provider(str, Enum):
-    MICROSOFT365 = "Microsoft365"
-    AZURE = "Azure"
-    ENTRA_ID = "EntraID"
-
-
-class AuthMethod(str, Enum):
-    INTERACTIVE = "interactive"
-    CLIENT_CREDENTIALS = "client_credentials"
-    CERTIFICATE = "certificate"
+def _mask_password(password: str) -> str:
+    """Masque un mot de passe pour les logs (NEVER log plaintext passwords)."""
+    return "***" if password else ""
 
 
 @dataclass
 class Monkey365Config:
+    """
+    Configuration for Monkey365 execution.
+    
+    Auth modes have different credential requirements:
+    - INTERACTIVE: No credentials needed (browser popup)
+    - DEVICE_CODE: No credentials needed (device code flow)
+    - ROPC: Requires username + password + tenant_id
+    - CLIENT_CREDENTIALS: Requires client_id + client_secret + tenant_id
+    """
     provider: M365Provider | str = M365Provider.MICROSOFT365
-    auth_method: AuthMethod | str = AuthMethod.CLIENT_CREDENTIALS
+    auth_mode: Monkey365AuthMode | str = Monkey365AuthMode.INTERACTIVE
+    
+    # Optional credentials (required based on auth_mode)
     tenant_id: str = ""
     client_id: str = ""
     client_secret: str = ""
-    certificate_path: str | None = None
+    username: str = ""
+    password: str = ""
+    
     output_dir: str = "./monkey365_output"
     rulesets: list[str] = field(default_factory=lambda: ["cis_m365_benchmark"])
     plugins: list[str] = field(default_factory=list)
@@ -115,10 +128,49 @@ class Monkey365Config:
     include_entra_id: bool = True
     export_to: list[str] = field(default_factory=lambda: ["JSON", "HTML"])
     scan_sites: list[str] = field(default_factory=list)
-    force_msal_desktop: bool = False
     verbose: bool = False
 
     def validate(self) -> None:
+        """Validate configuration based on auth_mode."""
+        # Normalize auth_mode to enum value
+        auth_mode_value = (
+            self.auth_mode.value
+            if hasattr(self.auth_mode, "value")
+            else str(self.auth_mode)
+        )
+        
+        # CRITICAL: Validate credentials based on auth mode
+        if auth_mode_value == Monkey365AuthMode.CLIENT_CREDENTIALS.value:
+            if not self.tenant_id or not self.client_id or not self.client_secret:
+                raise ValueError(
+                    "CLIENT_CREDENTIALS mode requires: tenant_id, client_id, client_secret"
+                )
+            _validate_uuid(self.tenant_id, "tenant_id")
+            _validate_uuid(self.client_id, "client_id")
+            _validate_secret(self.client_secret)
+        
+        elif auth_mode_value == Monkey365AuthMode.ROPC.value:
+            if not self.tenant_id or not self.username or not self.password:
+                raise ValueError(
+                    "ROPC mode requires: tenant_id, username, password"
+                )
+            _validate_uuid(self.tenant_id, "tenant_id")
+            _validate_email(self.username, "username")
+            # Password validation: just ensure it's not empty, don't log it
+            if len(self.password) < 1:
+                raise ValueError("Password cannot be empty for ROPC mode")
+        
+        elif auth_mode_value in [Monkey365AuthMode.INTERACTIVE.value, Monkey365AuthMode.DEVICE_CODE.value]:
+            # These modes require NO credentials
+            pass
+        
+        else:
+            raise ValueError(
+                f"Invalid auth_mode: {auth_mode_value}. Must be one of: "
+                f"interactive, device_code, ropc, client_credentials"
+            )
+
+        # Validate collect modules
         for item in self.collect:
             if item not in _ALLOWED_COLLECT_MODULES:
                 raise ValueError(
@@ -126,6 +178,7 @@ class Monkey365Config:
                     f"Modules autorisés : {', '.join(sorted(_ALLOWED_COLLECT_MODULES))}"
                 )
 
+        # Validate export formats
         for fmt in self.export_to:
             if fmt not in _ALLOWED_EXPORT_FORMATS:
                 raise ValueError(
@@ -135,6 +188,7 @@ class Monkey365Config:
         if "JSON" not in self.export_to:
             self.export_to.append("JSON")
 
+        # Validate scan sites
         for site in self.scan_sites:
             if not _SCAN_SITE_PATTERN.match(site):
                 raise ValueError(
@@ -203,7 +257,14 @@ class Monkey365Executor:
     def build_script(self, scan_id: str | Monkey365Config) -> str:
         """
         Génère le script PowerShell pour lancer le scan.
-        Tous les paramètres utilisateur sont validés ET échappés.
+        
+        CRITICAL FIX: PowerShell parameters are now CONDITIONAL based on auth_mode:
+        - INTERACTIVE: Only PromptBehavior (NO credentials)
+        - DEVICE_CODE: Only DeviceCode flag (NO credentials)
+        - ROPC: Username + Password + TenantId
+        - CLIENT_CREDENTIALS: ClientId + ClientSecret + TenantId
+        
+        All user parameters are validated AND escaped.
         """
         # ── Validation des paramètres sensibles ──────────────────────────
         active_config = self.config
@@ -212,20 +273,15 @@ class Monkey365Executor:
         if isinstance(scan_id, Monkey365Config):
             active_config = scan_id
 
+        # Validate configuration (includes auth-mode-specific credential checks)
         active_config.validate()
-        _ = _validate_uuid(active_config.tenant_id, "tenant_id")
 
-        auth_method_value = str(active_config.auth_method)
-        if isinstance(active_config.auth_method, AuthMethod):
-            auth_method_value = active_config.auth_method.value
-
-        if auth_method_value == AuthMethod.CLIENT_CREDENTIALS.value:
-            _ = _validate_uuid(active_config.client_id, "client_id")
-            _ = _validate_secret(active_config.client_secret)
-        elif auth_method_value == AuthMethod.CERTIFICATE.value:
-            _ = _validate_uuid(active_config.client_id, "client_id")
-            if active_config.certificate_path:
-                _ = _validate_thumbprint(active_config.certificate_path)
+        # Normalize auth_mode to enum value
+        auth_mode_value = (
+            active_config.auth_mode.value
+            if hasattr(active_config.auth_mode, "value")
+            else str(active_config.auth_mode)
+        )
 
         # Valider les noms d'analyses et rulesets
         for analysis in self._get_analyses(active_config):
@@ -237,77 +293,99 @@ class Monkey365Executor:
 
         # ── Construction du script avec échappement ──────────────────────
         output_path = self.output_dir / effective_scan_id
-        analyses = ", ".join(
-            f"'{_escape_ps_string(a)}'" for a in self._get_analyses(active_config)
-        )
-
+        
         safe_module_path = _escape_ps_string(str(self.monkey365_path.parent))
         provider_value = str(active_config.provider)
         if isinstance(active_config.provider, M365Provider):
             provider_value = active_config.provider.value
         safe_provider = _escape_ps_string(provider_value)
         safe_output = _escape_ps_string(str(output_path))
-        safe_tenant = _escape_ps_string(active_config.tenant_id)
         export_to = ", ".join(f"'{_escape_ps_string(fmt)}'" for fmt in active_config.export_to)
         include_entra_id = "$true" if active_config.include_entra_id else "$false"
 
+        # Optional collect parameter
         collect_param = ""
         if active_config.collect:
             collect_items = ", ".join(
                 f"'{_escape_ps_string(item)}'" for item in active_config.collect
             )
-            collect_param = f"\n    Collect         = @({collect_items})"
+            collect_param = f"\n    Collect         = @({collect_items});"
 
+        # Optional scan sites parameter
         scan_sites_param = ""
         if active_config.scan_sites:
             scan_sites_items = ", ".join(
                 f"'{_escape_ps_string(site)}'" for site in active_config.scan_sites
             )
-            scan_sites_param = f"\n    ScanSites       = @({scan_sites_items})"
+            scan_sites_param = f"\n    ScanSites       = @({scan_sites_items});"
 
-        force_msal_desktop_param = (
-            "\n    ForceMSALDesktop = $true" if active_config.force_msal_desktop else ""
-        )
-        verbose_param = "\n    Verbose         = $true" if active_config.verbose else ""
+        verbose_param = "\n    Verbose         = $true;" if active_config.verbose else ""
 
+        # ── Build script header (common for all auth modes) ──────────────
         script = f"""
 Import-Module '{safe_module_path}' -Force
 
-$params = @{{
-    Instance   = '{safe_provider}'
-    Analysis   = @({analyses})
-    ExportTo   = @({export_to})
-    PromptBehavior = 'SelectAccount'
-    IncludeEntraID = {include_entra_id}{collect_param}{scan_sites_param}{force_msal_desktop_param}{verbose_param}
-    OutDir     = '{safe_output}'
-    TenantId   = '{safe_tenant}'
-}}
-"""
-        if auth_method_value == AuthMethod.CLIENT_CREDENTIALS.value:
-            safe_secret = _escape_ps_string(active_config.client_secret)
-            safe_client_id = _escape_ps_string(active_config.client_id)
-            script += f"""
-$secret = ConvertTo-SecureString '{safe_secret}' -AsPlainText -Force
-$cred = New-Object System.Management.Automation.PSCredential('{safe_client_id}', $secret)
-$params['AppCredential'] = $cred
-$params['ConfidentialApp'] = $true
-"""
-        elif auth_method_value == AuthMethod.CERTIFICATE.value:
-            safe_client_id = _escape_ps_string(active_config.client_id)
-            safe_cert = _escape_ps_string(active_config.certificate_path or "")
-            script += f"""
-$params['ClientId'] = '{safe_client_id}'
-$params['CertificateThumbprint'] = '{safe_cert}'
+$param = @{{
+    Instance       = '{safe_provider}';{collect_param}
+    IncludeEntraID = {include_entra_id};
+    ExportTo       = @({export_to});
+    OutPath        = '{safe_output}';{scan_sites_param}{verbose_param}
 """
 
+        # ── CONDITIONAL: Add auth-specific parameters ────────────────────
+        if auth_mode_value == Monkey365AuthMode.INTERACTIVE.value:
+            # INTERACTIVE: ONLY PromptBehavior (NO credentials)
+            script += """    PromptBehavior = 'SelectAccount';
+"""
+            logger.info(f"Building INTERACTIVE auth script (no credentials required)")
+
+        elif auth_mode_value == Monkey365AuthMode.DEVICE_CODE.value:
+            # DEVICE CODE: ONLY DeviceCode flag (NO credentials)
+            script += """    DeviceCode     = $true;
+"""
+            logger.info(f"Building DEVICE_CODE auth script (no credentials required)")
+
+        elif auth_mode_value == Monkey365AuthMode.ROPC.value:
+            # ROPC: Username + Password + TenantId
+            safe_tenant = _escape_ps_string(active_config.tenant_id)
+            safe_username = _escape_ps_string(active_config.username)
+            safe_password = _escape_ps_string(active_config.password)
+            script += f"""    TenantId       = '{safe_tenant}';
+    Username       = '{safe_username}';
+    Password       = (ConvertTo-SecureString '{safe_password}' -AsPlainText -Force);
+"""
+            logger.info(
+                f"Building ROPC auth script (tenant={active_config.tenant_id}, "
+                f"username={active_config.username})"
+            )
+
+        elif auth_mode_value == Monkey365AuthMode.CLIENT_CREDENTIALS.value:
+            # CLIENT CREDENTIALS: ClientId + ClientSecret + TenantId
+            safe_tenant = _escape_ps_string(active_config.tenant_id)
+            safe_client_id = _escape_ps_string(active_config.client_id)
+            safe_secret = _escape_ps_string(active_config.client_secret)
+            script += f"""    TenantId       = '{safe_tenant}';
+    ClientId       = '{safe_client_id}';
+    ClientSecret   = (ConvertTo-SecureString '{safe_secret}' -AsPlainText -Force);
+"""
+            logger.info(
+                f"Building CLIENT_CREDENTIALS auth script (tenant={active_config.tenant_id}, "
+                f"client_id={active_config.client_id}, secret={_mask_password(active_config.client_secret)})"
+            )
+
+        # Close the parameter hashtable
+        script += "}\n"
+
+        # Optional rulesets
         if active_config.rulesets:
             ruleset_paths = ", ".join(
                 f"'{_escape_ps_string(str(self.monkey365_path.parent / 'rulesets' / r))}.json'"
                 for r in active_config.rulesets
             )
-            script += f"\n$params['RuleSets'] = @({ruleset_paths})\n"
+            script += f"\n$param['RuleSets'] = @({ruleset_paths})\n"
 
-        script += "\nInvoke-Monkey365 @params\n"
+        # Invoke Monkey365
+        script += "\nInvoke-Monkey365 @param\n"
         return script
 
     def run_scan(self, scan_id: str) -> dict[str, object]:

@@ -5,10 +5,12 @@ Task 5: Monkey365 Pydantic Schemas
 """
 import sys
 from datetime import datetime
+from pathlib import Path
 from pydantic import ValidationError
 
 # Add backend to path
-sys.path.insert(0, '/mnt/e/AssistantAudit/backend')
+backend_path = Path(__file__).resolve().parent / "backend"
+sys.path.insert(0, str(backend_path))
 
 from app.schemas.scan import (
     Monkey365ConfigSchema,
@@ -27,18 +29,16 @@ def test_scenario_1():
     try:
         config = Monkey365ConfigSchema(
             provider="Microsoft365",
-            auth_method="client_credentials",
+            auth_mode="client_credentials",
             tenant_id="12345678-1234-1234-1234-123456789abc",
             client_id="87654321-4321-4321-4321-cba987654321",
             client_secret="my_secret_key",
-            collect=["AzureAD", "M365"],
-            prompt_behavior="Auto",
+            collect=["ExchangeOnline", "SharePointOnline"],
             export_to=["CSV"],
             scan_sites=["https://example.com", "https://test.org/path"]
         )
         print(f"✓ Monkey365ConfigSchema created successfully")
         print(f"  - collect: {config.collect}")
-        print(f"  - prompt_behavior: {config.prompt_behavior}")
         print(f"  - export_to: {config.export_to} (JSON auto-appended: {'JSON' in config.export_to})")
         print(f"  - scan_sites: {config.scan_sites}")
         
@@ -110,17 +110,17 @@ def test_scenario_2():
     except ValidationError as e:
         print(f"  ✓ Correctly rejected: {e.errors()[0]['msg']}")
     
-    # Test 2: Invalid prompt_behavior value
-    print("\nTest 2.2: Invalid prompt_behavior value")
+    # Test 2: Invalid auth_mode value
+    print("\nTest 2.2: Invalid auth_mode value")
     try:
         config = Monkey365ConfigSchema(
+            auth_mode="invalid_mode",
             tenant_id="123",
             client_id="456",
             client_secret="secret",
-            prompt_behavior="InvalidValue"
         )
-        failures.append("Should reject invalid prompt_behavior")
-        print("  ❌ Did not reject invalid prompt_behavior")
+        failures.append("Should reject invalid auth_mode")
+        print("  ❌ Did not reject invalid auth_mode")
     except ValidationError as e:
         print(f"  ✓ Correctly rejected: {e.errors()[0]['msg']}")
     
@@ -272,3 +272,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+

@@ -2,9 +2,10 @@
 Schémas Pydantic pour les scans réseau (Nmap) et les outils intégrés.
 """
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from ..models.equipement import EQUIPEMENT_TYPE_VALUES
 
 
@@ -477,13 +478,36 @@ class PingCastleResultRead(BaseModel):
 
 # ─── Monkey365 Audit ─────────────────────────────────────────
 
+class Monkey365AuthMode(str, Enum):
+    INTERACTIVE = "interactive"
+    DEVICE_CODE = "device_code"
+    ROPC = "ropc"
+    CLIENT_CREDENTIALS = "client_credentials"
+
+
 class Monkey365ConfigSchema(BaseModel):
-    """Configuration pour un audit Monkey365."""
+    """
+    Configuration pour un audit Monkey365.
+    
+    CRITICAL: Credentials required depends on auth_mode:
+    - interactive: NO credentials required (browser popup)
+    - device_code: NO credentials required (device code flow)
+    - ropc: Requires username + password + tenant_id
+    - client_credentials: Requires client_id + client_secret + tenant_id
+    """
     provider: str = Field("Microsoft365", description="Fournisseur (Microsoft365, Azure)")
-    tenant_id: str = Field(..., description="ID du tenant Azure")
-    client_id: str = Field(..., description="ID de l'application")
-    client_secret: str = Field(..., description="Secret client")
-    certificate_path: Optional[str] = Field(None, description="Chemin du certificat (optionnel)")
+    auth_mode: Monkey365AuthMode = Field(
+        Monkey365AuthMode.INTERACTIVE,
+        description="Mode d'authentification: interactive, device_code, ropc, client_credentials"
+    )
+    
+    # Optional credentials (required based on auth_mode)
+    tenant_id: Optional[str] = Field(None, description="ID du tenant Azure (requis pour ropc et client_credentials)")
+    client_id: Optional[str] = Field(None, description="ID de l'application (requis pour client_credentials)")
+    client_secret: Optional[str] = Field(None, description="Secret client (requis pour client_credentials)")
+    username: Optional[str] = Field(None, description="Email utilisateur (requis pour ropc)")
+    password: Optional[str] = Field(None, description="Mot de passe (requis pour ropc)")
+    
     output_dir: str = Field("./monkey365_output", description="Répertoire de sortie")
     rulesets: list[str] = Field(default_factory=lambda: ["cis_m365_benchmark"], description="Ensembles de règles")
     plugins: list[str] = Field(default_factory=list, description="Plugins supplémentaires")
@@ -491,8 +515,70 @@ class Monkey365ConfigSchema(BaseModel):
     include_entra_id: bool = Field(True, description="Inclure Entra ID")
     export_to: list[str] = Field(default_factory=lambda: ["JSON", "HTML"], description="Formats d'export")
     scan_sites: list[str] = Field(default_factory=list, description="Sites SharePoint à scanner")
-    force_msal_desktop: bool = Field(False, description="Forcer authentification MSAL Desktop (nécessite navigateur)")
     verbose: bool = Field(False, description="Mode verbeux")
+
+    @model_validator(mode='after')
+    def validate_credentials_by_auth_mode(self) -> 'Monkey365ConfigSchema':
+        """
+        CRITICAL: Validate that required credentials are provided based on auth_mode.
+        
+        - CLIENT_CREDENTIALS: Requires tenant_id + client_id + client_secret
+        - ROPC: Requires tenant_id + username + password
+        - INTERACTIVE/DEVICE_CODE: No credentials required
+        """
+        import re
+        
+        auth_mode_value = self.auth_mode.value if isinstance(self.auth_mode, Monkey365AuthMode) else str(self.auth_mode)
+        auth_mode_value = auth_mode_value.lower()
+
+        if auth_mode_value == Monkey365AuthMode.CLIENT_CREDENTIALS.value:
+            if not self.tenant_id:
+                raise ValueError("client_credentials mode requires tenant_id")
+            if not self.client_id:
+                raise ValueError("client_credentials mode requires client_id")
+            if not self.client_secret:
+                raise ValueError("client_credentials mode requires client_secret")
+            
+            # Validate UUID format for tenant_id and client_id
+            uuid_pattern = re.compile(
+                r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            )
+            if not uuid_pattern.match(self.tenant_id):
+                raise ValueError("tenant_id must be a valid UUID format")
+            if not uuid_pattern.match(self.client_id):
+                raise ValueError("client_id must be a valid UUID format")
+        
+        elif auth_mode_value == Monkey365AuthMode.ROPC.value:
+            if not self.tenant_id:
+                raise ValueError("ropc mode requires tenant_id")
+            if not self.username:
+                raise ValueError("ropc mode requires username")
+            if not self.password:
+                raise ValueError("ropc mode requires password")
+            
+            # Validate UUID format for tenant_id
+            uuid_pattern = re.compile(
+                r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            )
+            if not uuid_pattern.match(self.tenant_id):
+                raise ValueError("tenant_id must be a valid UUID format")
+            
+            # Validate email format for username
+            email_pattern = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+            if not email_pattern.match(self.username):
+                raise ValueError("username must be a valid email format")
+        
+        elif auth_mode_value in [Monkey365AuthMode.INTERACTIVE.value, Monkey365AuthMode.DEVICE_CODE.value]:
+            # These modes require NO credentials
+            pass
+        
+        else:
+            raise ValueError(
+                f"Invalid auth_mode: {auth_mode_value}. Must be one of: "
+                f"interactive, device_code, ropc, client_credentials"
+            )
+        
+        return self
 
     @field_validator("collect")
     @classmethod

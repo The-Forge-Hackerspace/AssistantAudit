@@ -27,7 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 
 import { toolsApi, entreprisesApi } from "@/services/api";
-import type { Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail } from "@/types/api";
+import type { Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail, Monkey365AuthMode } from "@/types/api";
 
 export default function Monkey365Page() {
   const [activeTab, setActiveTab] = useState("launch");
@@ -41,10 +41,15 @@ export default function Monkey365Page() {
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [selectedEntrepriseId, setSelectedEntrepriseId] = useState<string>("");
 
+  // Auth mode
+  const [authMode, setAuthMode] = useState<Monkey365AuthMode>("interactive");
+
   // Auth fields
   const [tenantId, setTenantId] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   // Config fields
   const [collectModules, setCollectModules] = useState<string[]>([]);
@@ -175,19 +180,30 @@ export default function Monkey365Page() {
 
   // Generate PowerShell Preview
   const generatePSPreview = () => {
-    const params = [
-      `$param = @{`,
-      `    TenantID = "${tenantId}"`,
-      `    ClientID = "${clientId}"`,
-      `    ClientSecret = "***"`,
-    ];
+    const params = [`$param = @{`];
+
+    // Auth mode specific parameters
+    if (authMode === "interactive") {
+      params.push(`    # Interactive Browser Authentication`);
+      params.push(`    PromptBehavior = 'SelectAccount'`);
+    } else if (authMode === "device_code") {
+      params.push(`    # Device Code Authentication`);
+      params.push(`    UseDeviceCode = $true`);
+    } else if (authMode === "ropc") {
+      params.push(`    # Resource Owner Password Credentials`);
+      params.push(`    TenantID = "${tenantId}"`);
+      params.push(`    Username = "${username}"`);
+      params.push(`    Password = "***"`);
+    } else if (authMode === "client_credentials") {
+      params.push(`    # Client Credentials (App Registration)`);
+      params.push(`    TenantID = "${tenantId}"`);
+      params.push(`    ClientID = "${clientId}"`);
+      params.push(`    ClientSecret = "***"`);
+    }
 
     if (collectModules.length > 0) {
       params.push(`    Collect = "${collectModules.join(",")}"`);
     }
-
-    // PromptBehavior is always hardcoded to 'SelectAccount' in backend
-    params.push(`    PromptBehavior = 'SelectAccount'`);
 
     if (includeEntraId) {
       params.push(`    IncludeEntraID = $true`);
@@ -219,17 +235,28 @@ export default function Monkey365Page() {
 
   // Submit Handler
   const handleLaunch = async () => {
-    if (!selectedEntrepriseId || !tenantId || !clientId || !clientSecret) {
-      toast.error("Veuillez remplir les champs obligatoires (Entreprise, Tenant ID, Client ID, Client Secret)");
+    // Validate based on auth_mode
+    if (!selectedEntrepriseId) {
+      toast.error("Veuillez sélectionner une entreprise");
       return;
+    }
+
+    if (authMode === "ropc") {
+      if (!tenantId || !username || !password) {
+        toast.error("Veuillez remplir Tenant ID, Username et Password pour le mode ROPC");
+        return;
+      }
+    } else if (authMode === "client_credentials") {
+      if (!tenantId || !clientId || !clientSecret) {
+        toast.error("Veuillez remplir Tenant ID, Client ID et Client Secret pour le mode App Registration");
+        return;
+      }
     }
 
     setLaunching(true);
     try {
       const config: Monkey365Config = {
-        tenant_id: tenantId,
-        client_id: clientId,
-        client_secret: clientSecret,
+        auth_mode: authMode,
         collect: collectModules.length > 0 ? collectModules : undefined,
         include_entra_id: includeEntraId,
         export_to: exportFormats,
@@ -237,6 +264,17 @@ export default function Monkey365Page() {
         force_msal_desktop: forceMsalDesktop,
         verbose: verbose,
       };
+
+      // Add credentials based on auth_mode
+      if (authMode === "ropc") {
+        config.tenant_id = tenantId;
+        config.username = username;
+        config.password = password;
+      } else if (authMode === "client_credentials") {
+        config.tenant_id = tenantId;
+        config.client_id = clientId;
+        config.client_secret = clientSecret;
+      }
 
       const payload: Monkey365ScanCreate = {
         entreprise_id: parseInt(selectedEntrepriseId, 10),
@@ -248,6 +286,7 @@ export default function Monkey365Page() {
       
       // Clear sensitive fields
       setClientSecret("");
+      setPassword("");
       
       // Navigate to history tab
       setActiveTab("history");
@@ -318,38 +357,138 @@ export default function Monkey365Page() {
           <Card>
             <CardHeader>
               <CardTitle>Authentification</CardTitle>
+              <CardDescription>Sélectionnez le mode d'authentification pour Microsoft 365</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="tenantId">Tenant ID *</Label>
-                  <Input
-                    id="tenantId"
-                    value={tenantId}
-                    onChange={(e) => setTenantId(e.target.value)}
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clientId">Client ID *</Label>
-                  <Input
-                    id="clientId"
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clientSecret">Client Secret *</Label>
-                  <Input
-                    id="clientSecret"
-                    type="password"
-                    value={clientSecret}
-                    onChange={(e) => setClientSecret(e.target.value)}
-                    placeholder="••••••••••••••••••••••••"
-                  />
-                </div>
+            <CardContent className="space-y-4">
+              
+              {/* Auth Mode Selector */}
+              <div className="space-y-2">
+                <Label htmlFor="authMode">Mode d'authentification</Label>
+                <Select value={authMode} onValueChange={(value) => setAuthMode(value as Monkey365AuthMode)}>
+                  <SelectTrigger id="authMode">
+                    <SelectValue placeholder="Sélectionner un mode..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="interactive">
+                      <div className="flex items-center gap-2">
+                        <span>Interactive Browser</span>
+                        <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
+                          🟢 Recommandé
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="device_code">
+                      <div className="flex items-center gap-2">
+                        <span>Device Code</span>
+                        <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
+                          🟢 Safest
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ropc">
+                      <div className="flex items-center gap-2">
+                        <span>Username/Password (ROPC)</span>
+                        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20">
+                          🟡 Credentials
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="client_credentials">
+                      <div className="flex items-center gap-2">
+                        <span>App Registration</span>
+                        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20">
+                          🟡 App Secret
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Info badges for each auth mode */}
+              {authMode === "interactive" && (
+                <Alert>
+                  <AlertDescription className="flex items-center gap-2">
+                    🔐 <span>Une fenêtre de navigateur s'ouvrira pour la connexion Microsoft.</span>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {authMode === "device_code" && (
+                <Alert>
+                  <AlertDescription className="flex items-center gap-2">
+                    📱 <span>Un code d'appareil sera généré. Ouvrez un navigateur pour vous authentifier.</span>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Conditional Credential Fields */}
+              {authMode === "ropc" && (
+                <div className="grid gap-4 md:grid-cols-2 pt-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="tenantId">Tenant ID *</Label>
+                    <Input
+                      id="tenantId"
+                      value={tenantId}
+                      onChange={(e) => setTenantId(e.target.value)}
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username *</Label>
+                    <Input
+                      id="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="user@domain.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password *</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••••••••••••••••••"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {authMode === "client_credentials" && (
+                <div className="grid gap-4 md:grid-cols-2 pt-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="tenantId">Tenant ID *</Label>
+                    <Input
+                      id="tenantId"
+                      value={tenantId}
+                      onChange={(e) => setTenantId(e.target.value)}
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientId">Client ID *</Label>
+                    <Input
+                      id="clientId"
+                      value={clientId}
+                      onChange={(e) => setClientId(e.target.value)}
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientSecret">Client Secret *</Label>
+                    <Input
+                      id="clientSecret"
+                      type="password"
+                      value={clientSecret}
+                      onChange={(e) => setClientSecret(e.target.value)}
+                      placeholder="••••••••••••••••••••••••"
+                    />
+                  </div>
+                </div>
+              )}
+
             </CardContent>
           </Card>
 

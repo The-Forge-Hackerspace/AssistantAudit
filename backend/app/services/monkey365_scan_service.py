@@ -49,20 +49,19 @@ class Monkey365ScanService:
         entreprise_slug = slugify(entreprise.nom)
         output_path = ensure_scan_directory(entreprise.nom, scan_id, tool="M365")
 
+        auth_mode = config.auth_mode.value if hasattr(config.auth_mode, "value") else str(config.auth_mode)
         config_snapshot = {
             "provider": config.provider,
-            "auth_method": config.auth_method,
+            "auth_mode": auth_mode,
             "tenant_id": config.tenant_id,
             "client_id": config.client_id,
             "output_dir": str(output_path),
             "rulesets": config.rulesets,
             "plugins": config.plugins,
             "collect": config.collect,
-            "prompt_behavior": config.prompt_behavior,
             "include_entra_id": config.include_entra_id,
             "export_to": config.export_to,
             "scan_sites": config.scan_sites,
-            "force_msal_desktop": config.force_msal_desktop,
             "verbose": config.verbose,
         }
 
@@ -93,22 +92,22 @@ class Monkey365ScanService:
                 return
 
             config = Monkey365ConfigSchema(**config_data)
+            auth_mode = config.auth_mode.value if hasattr(config.auth_mode, "value") else str(config.auth_mode)
             executor_config = Monkey365Config(
                 provider=config.provider,
-                auth_method=config.auth_method,
+                auth_mode=auth_mode,
                 tenant_id=config.tenant_id,
                 client_id=config.client_id,
                 client_secret=config.client_secret,
-                certificate_path=config.certificate_path,
+                username=config.username,
+                password=config.password,
                 output_dir=result.output_path or config.output_dir,
                 rulesets=config.rulesets,
                 plugins=config.plugins,
                 collect=config.collect,
-                prompt_behavior=config.prompt_behavior,
                 include_entra_id=config.include_entra_id,
                 export_to=config.export_to,
                 scan_sites=config.scan_sites,
-                force_msal_desktop=config.force_msal_desktop,
                 verbose=config.verbose,
             )
 
@@ -130,7 +129,7 @@ class Monkey365ScanService:
                     "created_at": result.created_at.isoformat(),
                     "completed_at": completed_at.isoformat(),
                     "provider": config.provider,
-                    "auth_method": config.auth_method,
+                    "auth_mode": auth_mode,
                     "tenant_id": config.tenant_id,
                     "client_id": config.client_id,
                     "output_path": result.output_path,

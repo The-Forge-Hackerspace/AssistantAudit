@@ -385,6 +385,23 @@ Le bridge Monkey365 est déjà implémenté en Phase 2 :
 | **Compliance Center** | DLP, Retention, Audit logs |
 | **Azure** | NSG, Storage, Key Vault, VMs, RBAC |
 
+### Authentication Modes
+
+Monkey365 supports 4 authentication methods:
+
+| Mode | Credentials Required | Use Case | Security |
+|------|---------------------|----------|----------|
+| **Interactive Browser** (default) | None — browser popup | Interactive audits, manual testing | 🟢 Safest (no stored credentials) |
+| **Device Code** | None — device code flow | Headless servers, remote sessions | 🟢 Safest (no stored credentials) |
+| **Username/Password (ROPC)** | TenantId + Username + Password | Legacy systems, automation | 🟡 Requires credentials |
+| **Client Credentials** | TenantId + ClientId + ClientSecret | Service principal, daemon mode | 🟡 Requires app registration |
+
+**Implementation Details:**
+- Conditional PowerShell script generation based on auth_mode
+- Pydantic validation enforces required fields per mode
+- Passwords are never logged (masked as ***)
+- Frontend form dynamically shows/hides credential fields
+
 ---
 
 ### 🔜 Phase 5 — Rapports & Remédiation (PLANIFIÉE)

@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from ..models.assessment import Assessment
 from ..services.assessment_service import AssessmentService
-from ..tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor, M365Provider, AuthMethod
+from ..tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor, M365Provider
+from ..tools.monkey365_runner.config import Monkey365AuthMode
 from ..tools.monkey365_runner.parser import Monkey365Parser, Monkey365Finding
 from ..tools.monkey365_runner.mapper import Monkey365Mapper, MappingResult
 
@@ -85,7 +86,7 @@ class Monkey365Service:
         # 2. Configurer et lancer Monkey365
         config = Monkey365Config(
             provider=M365Provider(scan_request.provider),
-            auth_method=AuthMethod(scan_request.auth_method),
+            auth_mode=Monkey365AuthMode(scan_request.auth_method),
             tenant_id=scan_request.tenant_id,
             client_id=scan_request.client_id,
             client_secret=scan_request.client_secret,

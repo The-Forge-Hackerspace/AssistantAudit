@@ -24,3 +24,37 @@ Project started 2026-03-19.
 
 **Owner:** T0SAGA97
 **GitHub:** https://github.com/The-Forge-Hackerspace/AssistantAudit
+
+### 2026-03-19 — Monkey365 Authentication Mode Tests
+
+**Completed:** Full test suite for Monkey365 authentication modes (4 modes × comprehensive coverage).
+
+**File Created:** `backend/tests/test_monkey365_auth_modes.py` (23 tests, 100% pass rate)
+
+**Coverage:**
+1. **Interactive Mode:** Validates no credentials required, PowerShell script generation without credentials
+2. **Device Code Mode:** Validates no credentials required, correct PowerShell parameter generation
+3. **Client Credentials Mode:** 
+   - Tests all 3 fields required (tenant_id, client_id, client_secret)
+   - Tests missing field scenarios (each field individually)
+   - Tests UUID validation for tenant_id/client_id
+   - Tests PowerShell script generation with all credentials
+   - Tests password masking in logs (***) 
+4. **ROPC Mode:**
+   - Tests all 3 fields required (tenant_id, username, password)
+   - Tests missing field scenarios (each field individually)
+   - Tests email validation for username
+   - Tests empty password rejection
+   - Tests PowerShell script generation with username/password
+   - Tests password masking in logs (***)
+
+**Edge Cases Covered:**
+- Invalid auth_mode rejection
+- Invalid UUID format detection
+- Invalid email format detection
+- Empty password handling
+- Password masking for security (logs never show plaintext)
+
+**Key Learning:** The `Monkey365Config` dataclass in `executor.py` uses conditional validation logic in the `validate()` method. Each auth mode has different credential requirements enforced at validation time, not at instantiation. This allows the config object to be created with partial data and validated later.
+
+**Testing Pattern:** Used `Monkey365Executor.__new__()` to create mock executor instances without full initialization, allowing direct access to `build_script()` method for PowerShell generation testing without requiring the actual Monkey365 installation.
