@@ -2,6 +2,12 @@
 
 Project started 2026-03-19.
 
+**Renault DevSecOps Audit:** Completed 2026-03-19
+- Security audit completed across Docker, CI/CD, dependencies, secrets, and deployment
+- Report: .squad/decisions/inbox/renault-devsecops-report.md
+- Key findings: Strong code security, critical CI/CD gaps, 7 npm vulnerabilities requiring immediate fix
+- Recommendations: 1) Fix npm vulnerabilities, 2) Implement CI/CD security workflows, 3) Containerize app
+
 **Project:** AssistantAudit — Open-source IT infrastructure security auditing tool for pentesters and IT auditors.
 
 **Scope:** Firewalls, Switches, Active Directory, Microsoft 365, Linux/Windows servers, network mapping with VLAN visualization.
