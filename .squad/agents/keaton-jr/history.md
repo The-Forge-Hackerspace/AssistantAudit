@@ -51,3 +51,39 @@ Project started 2026-03-19.
 - Form validation tailored to each auth mode
 
 **Pattern:** Dynamic form rendering based on enum selection with conditional validation.
+
+---
+
+### 2026-03-19 — Real-Time Scan Logs Panel for Monkey365
+
+**Task:** Added live log panel to Monkey365 page showing real-time scan progress with polling and duration tracking.
+
+**Implementation:**
+- Added `elapsedSeconds` state to track scan duration in real-time
+- Implemented polling hook: fetches scan status every 2 seconds while scan is RUNNING, auto-stops when complete
+- Implemented ticker hook: increments elapsed time every second for running scans
+- Enhanced `loadScanDetail` to initialize elapsed time from `created_at` timestamp or `duration_seconds`
+- Replaced basic detail view with enhanced `ScanLogsPanel` component
+
+**UI Features:**
+- **Visual Status Indicators:**
+  - RUNNING: Animated blue spinner + blue border + "En cours" badge
+  - SUCCESS: Green checkmark + green border + "Succès" badge
+  - FAILED: Red X + red border + "Échec" badge
+- **Live Duration Display:** Shows elapsed time in human-readable format (e.g., "2min 15s"), updates every second
+- **Timeline Events:**
+  - ✅ Script generated (timestamp)
+  - ✅ PowerShell launched (timestamp)
+  - 📄 Output path (when available)
+  - 🔄 Scan in progress (while running)
+  - ✅ Scan completed with findings count (on success)
+  - ❌ Scan failed with timestamp (on failure)
+- **Error Alerts:** Red destructive alert showing error_message when scan fails
+- **Configuration Snapshot:** JSON view of scan config in collapsible section
+
+**Helper Functions Added:**
+- `formatElapsedTime(seconds)`: Formats duration as "Xmin Ys" for live display
+- `formatTimestamp(dateStr)`: Formats date as HH:MM:SS for timeline events
+- Updated `formatDuration` to use "min" instead of "m" for consistency
+
+**Pattern:** Real-time data polling with dual useEffect hooks (status poller + duration ticker) for live UX feedback during long-running operations.

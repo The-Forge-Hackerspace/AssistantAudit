@@ -4,11 +4,14 @@ Tests for Monkey365 executor and configuration.
 Covers Monkey365Config defaults, validation rules, and PowerShell script generation.
 """
 
+import json
 import pytest
+from unittest.mock import MagicMock, patch
 
 from app.tools.monkey365_runner.executor import (
     Monkey365Config,
     M365Provider,
+    Monkey365Executor,
 )
 from app.tools.monkey365_runner.config import Monkey365AuthMode
 
@@ -312,8 +315,6 @@ def test_build_script_verbose_present_when_true(tmp_path):
 
 def test_build_script_verbose_absent_when_false(tmp_path):
     """Test build_script omits Verbose when verbose=False."""
-    from app.tools.monkey365_runner.executor import Monkey365Executor
-    
     config = Monkey365Config(
         provider="Microsoft365",
         auth_mode="client_credentials",
@@ -334,5 +335,64 @@ def test_build_script_verbose_absent_when_false(tmp_path):
     # Verbose = $true should not be in the script
     # (checking for the full parameter line with $true)
     assert "Verbose         = $true" not in script, "Did not expect 'Verbose = $true' when False"
+
+
+def test_run_scan_captures_output_and_imports_module(tmp_path):
+    """Test stdout/stderr capture and module import in generated script."""
+    output_dir = tmp_path / "output"
+    config = Monkey365Config(
+        auth_mode=Monkey365AuthMode.INTERACTIVE,
+        output_dir=str(output_dir),
+    )
+
+    executor = Monkey365Executor(config, str(tmp_path))
+    executor.monkey365_path = tmp_path / "Invoke-Monkey365.ps1"
+    executor.output_dir = output_dir
+
+    script = executor.build_script("scan-1")
+    assert "Import-Module .\\monkey365.psm1" in script
+
+    with (
+        patch.object(executor, "ensure_monkey365_ready", return_value=executor.monkey365_path),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="Scan completed",
+            stderr="Warning: minor issue",
+        )
+        executor.run_scan("scan-1")
+
+    output_file = output_dir / "powershell_raw_output.json"
+    assert output_file.exists(), "Expected powershell_raw_output.json to be created"
+    output_data = json.loads(output_file.read_text(encoding="utf-8"))
+    assert output_data["stdout"] == "Scan completed"
+    assert output_data["stderr"] == "Warning: minor issue"
+
+
+def test_ensure_monkey365_ready_creates_directory(tmp_path):
+    """Test ensure_monkey365_ready creates missing Monkey365 directory."""
+    config = Monkey365Config(auth_mode=Monkey365AuthMode.INTERACTIVE)
+    monkey365_dir = tmp_path / "monkey365"
+    executor = Monkey365Executor.__new__(Monkey365Executor)
+    executor.config = config
+    executor.monkey365_path = monkey365_dir / "Invoke-Monkey365.ps1"
+    executor.output_dir = tmp_path
+
+    def run_side_effect(*args, **kwargs):
+        command = args[0]
+        if command[0] == "git":
+            monkey365_dir.mkdir()
+            (monkey365_dir / "monkey365.psm1").write_text("# Module", encoding="utf-8")
+            return MagicMock(returncode=0, stdout="", stderr="")
+        return MagicMock(returncode=0, stdout="Invoke-Monkey365", stderr="")
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = run_side_effect
+        result = executor.ensure_monkey365_ready()
+
+    assert monkey365_dir.exists(), "Monkey365 directory should be created"
+    assert (monkey365_dir / "monkey365.psm1").exists(), "Module file should exist"
+    assert result.exists(), "Invoke-Monkey365.ps1 should exist"
 
 

@@ -36,3 +36,11 @@ Project started 2026-03-19.
 - Notes implementation details: Pydantic validation, conditional PowerShell generation, password masking
 - No existing Known Issues found for Monkey365 auth (bug fix verified)
 - Decision: baer-monkey365-docs.md
+
+**2026-03-19 17:00 — Monkey365 Verified Workflow Documentation**
+- Added "Verified Workflow" subsection to CONCEPT.md § 🐒 Détail technique (after Installation)
+- Documents end-to-end scan flow: auto-install (--depth=1) → module verification → PowerShell generation → browser interactive mode
+- Real-time frontend logs (2s polling) + raw output capture (powershell_raw_output.json) + status updates (SUCCESS/FAILED)
+- Documents 3 critical bug fixes: timezone offset-aware, silent failures, module loading auto-recovery
+- Store location: D:\AssistantAudit\tools\monkey365 (verified)
+- Decision: baer-blocker-docs.md (verified workflow)

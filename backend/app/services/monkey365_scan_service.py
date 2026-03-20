@@ -153,7 +153,13 @@ class Monkey365ScanService:
                     result.status = final_status
                     result.completed_at = completed_at
 
-                    duration_seconds = int((completed_at - result.created_at).total_seconds())
+                    created_at = result.created_at
+                    if created_at is None:
+                        created_at = completed_at
+                    elif created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=timezone.utc)
+
+                    duration_seconds = int((completed_at - created_at).total_seconds())
                     result.duration_seconds = max(duration_seconds, 0)
 
                     if findings_count is not None:
@@ -165,6 +171,12 @@ class Monkey365ScanService:
                         result.error_message = None
 
                     db.commit()
+                    logger.info(
+                        "[MONKEY365] Scan #%s finalized: %s (duration: %ss)",
+                        result_id,
+                        final_status.value,
+                        duration_seconds,
+                    )
             except Exception:
                 logger.exception("[MONKEY365] Impossible de finaliser le scan #%s", result_id)
             finally:

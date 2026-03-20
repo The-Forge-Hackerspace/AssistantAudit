@@ -58,3 +58,7 @@ Project started 2026-03-19.
 **Key Learning:** The `Monkey365Config` dataclass in `executor.py` uses conditional validation logic in the `validate()` method. Each auth mode has different credential requirements enforced at validation time, not at instantiation. This allows the config object to be created with partial data and validated later.
 
 **Testing Pattern:** Used `Monkey365Executor.__new__()` to create mock executor instances without full initialization, allowing direct access to `build_script()` method for PowerShell generation testing without requiring the actual Monkey365 installation.
+
+### 2026-03-20 — Monkey365 Timezone & Executor Regression Tests
+
+**Completed:** Added regression coverage for timezone-aware duration handling, PowerShell output capture, auto-install directory creation, and module import checks.

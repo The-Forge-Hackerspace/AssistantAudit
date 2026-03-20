@@ -88,3 +88,14 @@ Project started 2026-03-19.
    - Logging now reports auth_mode and avoids password exposure
 
 **Testing Notes:** pytest run attempted; failures due to missing local API server (test_phase1/2) and duplicate test module name (test_monkey365_auth_modes.py).
+
+### 2026-03-19 — Monkey365 Interactive Browser Blocker Fixes
+
+**Problem:** Monkey365 scans hung in RUNNING due to a timezone mismatch during finalization, with no visibility into PowerShell output and brittle module loading.
+
+**Solution Implemented:**
+1. Normalized `created_at` timezone handling in scan finalization and logged scan durations.
+2. Added Monkey365 auto-install/module verification and ensured scripts set location/import the module before `Invoke-Monkey365`.
+3. Captured full PowerShell stdout/stderr to `powershell_raw_output.json` with duration metadata for debugging.
+
+**Testing Notes:** pytest still fails in `test_phase1.py` / `test_phase2.py` due to connection refused (API server not running).

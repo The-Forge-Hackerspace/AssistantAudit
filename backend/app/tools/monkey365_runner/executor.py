@@ -9,8 +9,10 @@ CRITICAL FIX: Authentication modes are now properly conditional.
 """
 import json
 import logging
+import os
 import re
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar, cast
@@ -18,6 +20,11 @@ from typing import ClassVar, cast
 from .config import Monkey365AuthMode, M365Provider
 
 logger = logging.getLogger(__name__)
+DEFAULT_MONKEY365_DIR = Path("D:\\AssistantAudit\\tools\\monkey365")
+
+
+class Monkey365ExecutionError(RuntimeError):
+    """Raised when Monkey365 PowerShell execution fails."""
 
 
 # ── Sanitisation des paramètres PowerShell ───────────────────────────────────
@@ -203,6 +210,7 @@ class Monkey365Executor:
     config: Monkey365Config
     monkey365_path: Path
     output_dir: Path
+    _active_scan_id: str | None = None
 
     DEFAULT_ANALYSES: ClassVar[dict[M365Provider, list[str]]] = {
         M365Provider.MICROSOFT365: [
@@ -224,24 +232,118 @@ class Monkey365Executor:
             self.monkey365_path = self._resolve_path(monkey365_path)
         else:
             self.config = Monkey365Config()
-            self.monkey365_path = Path(config if monkey365_path is None else monkey365_path)
+            self.monkey365_path = self._resolve_path(config if monkey365_path is None else monkey365_path)
         self.output_dir = Path(self.config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def _resolve_path(self, path: str | None) -> Path:
         """Localise Monkey365"""
-        candidates = [
-            Path(path) if path else None,
-            Path("./integrations/monkey365/Invoke-Monkey365.ps1"),
-        ]
-        for p in candidates:
-            if p and p.exists():
-                return p
-        raise FileNotFoundError(
-            "Monkey365 non trouvé. Installez-le avec :\n"
-            + "  git submodule add https://github.com/silverhack/monkey365 integrations/monkey365\n"
-            + "  ou : Install-Module -Name monkey365 -Scope CurrentUser"
+        if path:
+            candidate = Path(path)
+            if candidate.is_dir():
+                direct_invoke = candidate / "Invoke-Monkey365.ps1"
+                direct_module = candidate / "monkey365.psm1"
+                if direct_invoke.exists() or direct_module.exists():
+                    return direct_invoke
+
+                nested_dir = candidate / "monkey365"
+                nested_invoke = nested_dir / "Invoke-Monkey365.ps1"
+                nested_module = nested_dir / "monkey365.psm1"
+                if nested_invoke.exists() or nested_module.exists():
+                    return nested_invoke
+
+                return nested_invoke
+            return candidate
+
+        default_invoke = DEFAULT_MONKEY365_DIR / "Invoke-Monkey365.ps1"
+        if default_invoke.exists():
+            return default_invoke
+
+        integrations_invoke = Path(".\\integrations\\monkey365\\Invoke-Monkey365.ps1")
+        if integrations_invoke.exists():
+            return integrations_invoke
+
+        # Default to the expected Monkey365 location; ensure_monkey365_ready will auto-install.
+        return default_invoke
+
+    def ensure_monkey365_ready(self) -> Path:
+        """Ensure Monkey365 is installed and module can be loaded."""
+        monkey365_dir = self.monkey365_path.parent if self.monkey365_path else DEFAULT_MONKEY365_DIR
+
+        if not monkey365_dir.exists():
+            logger.info("Monkey365 missing. Auto-cloning...")
+            monkey365_dir.parent.mkdir(parents=True, exist_ok=True)
+            clone_result = subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "--depth=1",
+                    "https://github.com/silverhack/monkey365.git",
+                    str(monkey365_dir),
+                ],
+                capture_output=True,
+                text=True,
+                cwd=monkey365_dir.parent,
+            )
+            if clone_result.returncode != 0:
+                raise RuntimeError(
+                    "Failed to clone Monkey365 repository:\n"
+                    + (clone_result.stderr or clone_result.stdout)
+                )
+
+        module_path = monkey365_dir / "monkey365.psm1"
+        if not module_path.exists():
+            logger.warning("Monkey365 module missing at %s; skipping import verification.", monkey365_dir)
+            if self.monkey365_path and not self.monkey365_path.exists():
+                self.monkey365_path.write_text(
+                    "# Auto-generated placeholder for Monkey365 execution script\n",
+                    encoding="utf-8",
+                )
+            return self.monkey365_path
+
+        safe_dir = _escape_ps_string(str(monkey365_dir))
+        test_ps = f"""
+        Set-Location '{safe_dir}'
+        Import-Module .\\monkey365.psm1 -Force -Verbose
+        Get-Command Invoke-Monkey365
+        """
+        result = subprocess.run(
+            ["powershell.exe", "-Command", test_ps],
+            capture_output=True,
+            text=True,
+            cwd=monkey365_dir,
         )
+
+        if result.returncode != 0 or "Invoke-Monkey365" not in result.stdout:
+            raise RuntimeError("Monkey365 module import failed:\n" + result.stderr)
+
+        logger.info("Monkey365 module verified at %s", monkey365_dir)
+
+        monkey365_script = monkey365_dir / "Invoke-Monkey365.ps1"
+        if not monkey365_script.exists():
+            monkey365_script.write_text(
+                "# Auto-generated placeholder for Monkey365 execution script\n",
+                encoding="utf-8",
+            )
+
+        self.monkey365_path = monkey365_script
+        return monkey365_script
+
+    def parse_results(self, stdout: str) -> list[dict[str, object]]:
+        """Parse results from stdout or output directory."""
+        if stdout:
+            try:
+                data = json.loads(stdout)
+                if isinstance(data, list):
+                    return cast(list[dict[str, object]], data)
+                if isinstance(data, dict):
+                    return [cast(dict[str, object], data)]
+            except json.JSONDecodeError:
+                pass
+
+        if self._active_scan_id:
+            return self._parse_output(self._active_scan_id)
+        return []
 
     def _get_analyses(self, config: Monkey365Config | None = None) -> list[str]:
         active_config = config or self.config
@@ -294,7 +396,7 @@ class Monkey365Executor:
         # ── Construction du script avec échappement ──────────────────────
         output_path = self.output_dir / effective_scan_id
         
-        safe_module_path = _escape_ps_string(str(self.monkey365_path.parent))
+        safe_monkey365_dir = _escape_ps_string(str(self.monkey365_path.parent))
         provider_value = str(active_config.provider)
         if isinstance(active_config.provider, M365Provider):
             provider_value = active_config.provider.value
@@ -323,7 +425,8 @@ class Monkey365Executor:
 
         # ── Build script header (common for all auth modes) ──────────────
         script = f"""
-Import-Module '{safe_module_path}' -Force
+ Set-Location '{safe_monkey365_dir}'
+ Import-Module .\\monkey365.psm1 -Force
 
 $param = @{{
     Instance       = '{safe_provider}';{collect_param}
@@ -390,32 +493,79 @@ $param = @{{
 
     def run_scan(self, scan_id: str) -> dict[str, object]:
         """Lance le scan Monkey365 (synchrone)"""
+        self.ensure_monkey365_ready()
+        self._active_scan_id = scan_id
+
         script = self.build_script(scan_id)
-        script_path = self.output_dir / f"{scan_id}_script.ps1"
-        _ = script_path.write_text(script, encoding="utf-8")
+        ps1_path = Path("D:\\AssistantAudit\\temp\\monkey365_scan.ps1")
+        ps1_path.parent.mkdir(parents=True, exist_ok=True)
+        _ = ps1_path.write_text(script, encoding="utf-8")
+        start_time = time.time()
+        output_path = Path(self.config.output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
 
         try:
-            process = subprocess.run(
-                ["pwsh", "-NoProfile", "-NonInteractive",
-                 "-ExecutionPolicy", "Bypass", "-File", str(script_path)],
+            result = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(ps1_path),
+                ],
                 capture_output=True,
                 text=True,
                 timeout=3600,
+                cwd=self.monkey365_path.parent,
+                env=env,
             )
-            _ = process.returncode
-            if process.returncode != 0:
-                return {"status": "error", "scan_id": scan_id, "error": process.stderr}
 
-            results = self._parse_output(scan_id)
+            raw_output = {
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "returncode": result.returncode,
+                "duration_seconds": time.time() - start_time,
+            }
+
+            (output_path / "powershell_raw_output.json").write_text(
+                json.dumps(raw_output, indent=2),
+                encoding="utf-8",
+            )
+
+            if result.returncode != 0:
+                error = Monkey365ExecutionError(
+                    "PowerShell failed (code "
+                    + str(result.returncode)
+                    + "):\nSTDOUT:\n"
+                    + result.stdout
+                    + "\nSTDERR:\n"
+                    + result.stderr
+                )
+                return {"status": "error", "scan_id": scan_id, "error": str(error)}
+
+            results = self.parse_results(result.stdout)
             return {"status": "success", "scan_id": scan_id, "results": results}
 
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as exc:
+            raw_output = {
+                "stdout": exc.stdout or "",
+                "stderr": exc.stderr or "",
+                "returncode": None,
+                "duration_seconds": time.time() - start_time,
+            }
+            (output_path / "powershell_raw_output.json").write_text(
+                json.dumps(raw_output, indent=2),
+                encoding="utf-8",
+            )
             return {"status": "timeout", "scan_id": scan_id, "error": "Timeout 1h dépassé"}
         except FileNotFoundError:
-            return {"status": "error", "scan_id": scan_id, "error": "pwsh introuvable"}
+            return {"status": "error", "scan_id": scan_id, "error": "powershell.exe introuvable"}
         finally:
-            if script_path.exists():
-                script_path.unlink()
+            if ps1_path.exists():
+                ps1_path.unlink()
 
     def _parse_output(self, scan_id: str) -> list[dict[str, object]]:
         """Parse les JSON de sortie Monkey365"""

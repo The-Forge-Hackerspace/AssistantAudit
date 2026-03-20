@@ -65,6 +65,7 @@ export default function Monkey365Page() {
 
   const [scans, setScans] = useState<Monkey365ScanResultSummary[]>([]);
   const [selectedScan, setSelectedScan] = useState<Monkey365ScanResultDetail | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Helper functions
   function formatDuration(seconds: number | null | undefined): string {
@@ -72,7 +73,23 @@ export default function Monkey365Page() {
     if (seconds < 60) return `${seconds}s`;
     const min = Math.floor(seconds / 60);
     const sec = seconds % 60;
-    return `${min}m ${sec}s`;
+    return `${min}min ${sec}s`;
+  }
+
+  function formatElapsedTime(seconds: number): string {
+    if (seconds < 60) return `${seconds}s`;
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+    return `${min}min ${sec}s`;
+  }
+
+  function formatTimestamp(dateStr: string | null): string {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
   }
 
   function formatDate(dateStr: string | null): string {
@@ -117,11 +134,51 @@ export default function Monkey365Page() {
     try {
       const detail = await toolsApi.getMonkey365ScanDetail(scanId);
       setSelectedScan(detail);
+      // Initialize elapsed time from existing duration or from created_at
+      if (detail.status === "running") {
+        const created = new Date(detail.created_at).getTime();
+        const now = Date.now();
+        setElapsedSeconds(Math.floor((now - created) / 1000));
+      } else {
+        setElapsedSeconds(detail.duration_seconds || 0);
+      }
     } catch (err) {
       console.error("Failed to load scan detail:", err);
       toast.error("Erreur lors du chargement des détails");
     }
   };
+
+  // Poll scan detail every 2 seconds while RUNNING
+  useEffect(() => {
+    if (selectedScan && selectedScan.status === "running") {
+      const interval = setInterval(async () => {
+        try {
+          const updated = await toolsApi.getMonkey365ScanDetail(selectedScan.id);
+          setSelectedScan(updated);
+          
+          if (updated.status !== "running") {
+            clearInterval(interval);
+            setElapsedSeconds(updated.duration_seconds || 0);
+          }
+        } catch (err) {
+          console.error("Failed to poll scan status:", err);
+        }
+      }, 2000); // Poll every 2 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [selectedScan]);
+
+  // Ticker: increment elapsed time every second while RUNNING
+  useEffect(() => {
+    if (selectedScan && selectedScan.status === "running") {
+      const ticker = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+      
+      return () => clearInterval(ticker);
+    }
+  }, [selectedScan]);
 
   // Poll every 5 seconds when any scan is "running"
   useEffect(() => {
@@ -686,39 +743,118 @@ export default function Monkey365Page() {
             </CardContent>
           </Card>
 
-          {/* Detail view */}
+          {/* Scan Logs Panel */}
           {selectedScan && (
-            <Card>
+            <Card className={`border-2 ${
+              selectedScan.status === "running" ? "border-blue-500" : 
+              selectedScan.status === "success" ? "border-green-500" : 
+              selectedScan.status === "failed" ? "border-red-500" : ""
+            }`}>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Détails du scan</CardTitle>
+                  <div className="flex items-center gap-3">
+                    <CardTitle>
+                      {selectedScan.status === "running" && <Loader2 className="h-5 w-5 animate-spin inline-block mr-2 text-blue-500" />}
+                      {selectedScan.status === "success" && <span className="text-green-500 mr-2">✅</span>}
+                      {selectedScan.status === "failed" && <span className="text-red-500 mr-2">❌</span>}
+                      Scan #{selectedScan.id}
+                    </CardTitle>
+                    {getStatusBadge(selectedScan.status)}
+                  </div>
                   <Button variant="ghost" size="sm" onClick={() => setSelectedScan(null)}>
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
+                <CardDescription>
+                  {selectedScan.config_snapshot?.auth_mode ? (
+                    <span className="uppercase font-mono text-xs">
+                      {String(selectedScan.config_snapshot.auth_mode)} — {formatElapsedTime(elapsedSeconds)}
+                    </span>
+                  ) : null}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* Error message */}
                 {selectedScan.error_message && (
-                  <Alert variant="destructive" className="mb-4">
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>{selectedScan.error_message}</AlertDescription>
                   </Alert>
                 )}
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold mb-2">Configuration</h4>
-                    <pre className="bg-muted p-4 rounded text-xs overflow-auto">
-                      {JSON.stringify(selectedScan.config_snapshot, null, 2)}
-                    </pre>
+
+                {/* Timeline */}
+                <div className="space-y-2 pl-4 border-l-2 border-muted">
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-500">✅</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Script generated</p>
+                      <p className="text-xs text-muted-foreground">{formatTimestamp(selectedScan.created_at)}</p>
+                    </div>
                   </div>
+
+                  <div className="flex items-start gap-2">
+                    <span className="text-green-500">✅</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">PowerShell launched</p>
+                      <p className="text-xs text-muted-foreground">{formatTimestamp(selectedScan.created_at)}</p>
+                    </div>
+                  </div>
+
                   {selectedScan.output_path && (
-                    <div>
-                      <h4 className="font-semibold mb-2">Chemin de sortie</h4>
-                      <code className="bg-muted p-2 rounded text-xs block">
-                        {selectedScan.output_path}
-                      </code>
+                    <div className="flex items-start gap-2">
+                      <span>📄</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Output path</p>
+                        <code className="text-xs text-muted-foreground break-all">{selectedScan.output_path}</code>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedScan.status === "running" && (
+                    <div className="flex items-start gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-blue-500">Scan in progress...</p>
+                        <p className="text-xs text-muted-foreground">Waiting for results</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedScan.status === "success" && selectedScan.findings_count !== null && (
+                    <div className="flex items-start gap-2">
+                      <span className="text-green-500">✅</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Scan completed</p>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedScan.findings_count} finding{selectedScan.findings_count !== 1 ? "s" : ""} detected
+                          {selectedScan.completed_at && ` — ${formatTimestamp(selectedScan.completed_at)}`}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedScan.status === "failed" && (
+                    <div className="flex items-start gap-2">
+                      <span className="text-red-500">❌</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-500">Scan failed</p>
+                        {selectedScan.completed_at && (
+                          <p className="text-xs text-muted-foreground">{formatTimestamp(selectedScan.completed_at)}</p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
+
+                {/* Configuration snapshot */}
+                {selectedScan.config_snapshot && (
+                  <div>
+                    <h4 className="font-semibold mb-2 text-sm">Configuration</h4>
+                    <pre className="bg-muted p-3 rounded text-xs overflow-auto max-h-60">
+                      {JSON.stringify(selectedScan.config_snapshot, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

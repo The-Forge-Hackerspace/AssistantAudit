@@ -66,3 +66,46 @@ Project started 2026-03-19.
 - Defense-in-depth validation (schema + executor) is good practice but creates DRY risk — document clearly
 - PowerShell single-quote escaping (`'` → `''`) is correct for single-quoted strings (verified secure)
 - Masking credentials in logs is not enough — also sanitize subprocess error output
+
+---
+
+### **2026-03-20 — Monkey365 Critical Fixes Hotfix Review**
+
+**Trigger:** Requested by T0SAGA97 — Quick security review of 3 critical Redfoot fixes
+
+**Scope:**
+- Timezone bug fix (monkey365_scan_service.py:156-163)
+- PowerShell output capture to JSON (executor.py:526-536, 553-562)
+- Monkey365 auto-install + module loading (executor.py:269-330)
+
+**Findings:** 5 findings total (0 BLOCKING, 0 HIGH, 2 MEDIUM, 3 LOW)
+
+**Critical Security Assessment:**
+1. ✅ **Timezone fix is correct** — Conditional conversion only if naive, uses `timezone.utc`, fallback logic sound
+2. ✅ **PowerShell output capture is safe** — stdout/stderr don't contain credentials (Monkey365 outputs audit data), no injection, JSON properly encoded
+3. ✅ **Git clone is secure** — HTTPS only, `--depth=1` shallow clone, hardcoded URL (no user input), proper error handling, no shell=True
+4. ✅ **Script file handling unchanged** — Still deleted in `finally` block (known limitation from S2 in previous review)
+5. ✅ **Input validation before script gen** — All auth parameters validated and escaped
+
+**Positive Observations:**
+- 21 comprehensive test cases covering all three fixes (9 timezone + 5 output + 7 module)
+- Test coverage excellent (all path: success, failure, edge cases)
+- Conditional PowerShell parameters still working (no credentials for INTERACTIVE/DEVICE_CODE)
+- Subprocess timeout remains 3600s
+- Array-based subprocess calls (no shell=True)
+
+**Approval:** ✅ **APPROVED — No blockers**
+
+**Conditions for production:**
+1. Document `powershell_raw_output.json` is internal diagnostics (not user-facing)
+2. Preventive: Ensure all `Monkey365ScanResult.created_at` uses `datetime.now(timezone.utc)` by default
+3. Future optimization: Consider `-Command` for credential-free modes
+
+**Report Location:** `.squad/decisions/inbox/kujan-blocker-review.md`
+
+**Key Insight:**
+- Redfoot's fixes are production-ready — all three address real bugs without introducing new security risks
+- PowerShell output capture is safe because Monkey365 doesn't output credentials
+- Timezone fix prevents silent duration calculation failures
+- Auto-install pattern is standard and secure (GitHub HTTPS clone + local verification)
+- Previous HIGH findings (S1, S2) remain acknowledged but outside scope of this hotfix review

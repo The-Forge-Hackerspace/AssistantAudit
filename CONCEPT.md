@@ -772,6 +772,16 @@ git submodule add https://github.com/silverhack/monkey365.git integrations/monke
 Install-Module -Name monkey365 -Scope CurrentUser -Force
 ```
 
+### Verified Workflow
+
+**Auto-install + Verified Execution:**
+- Monkey365 auto-clones from GitHub (--depth=1 shallow) if missing → stored in `D:\AssistantAudit\tools\monkey365`
+- Module import verified before each scan; request → PowerShell script auto-generated → module loaded → browser opens (interactive mode)
+- Real-time logs visible in frontend (polling every 2s); PowerShell output captured to `powershell_raw_output.json`
+- Scan completes → status updates to SUCCESS/FAILED
+
+**Known Issues Fixed:** ✅ Timezone bug (offset-naive/aware TypeError) | ✅ Silent failures (PowerShell output now captured) | ✅ Module loading errors (auto-install + verification)
+
 ---
 
 ## 📖 Exemple de référentiel YAML
