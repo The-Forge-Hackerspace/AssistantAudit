@@ -21,11 +21,28 @@ def _escape_ps_string(value: str) -> str:
     return value.replace("'", "''")
 
 
+def _to_ps_value(value: object) -> str:
+    """Convert a Python value to a PowerShell literal."""
+    if value is None:
+        return "$null"
+    if isinstance(value, bool):
+        return "$true" if value else "$false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, list):
+        items = ", ".join(f"'{_escape_ps_string(str(v))}'" for v in value)
+        return f"@({items})"
+    return f"'{_escape_ps_string(str(value))}'"
+
+
 @dataclass
 class Monkey365Config:
     output_dir: str = "./monkey365_output"
     spo_sites: list[str] = field(default_factory=list)
     export_to: list[str] = field(default_factory=lambda: ["JSON", "HTML"])
+    auth_mode: str | None = None
+    force_msal_desktop: bool = False
+    powershell_config: dict | None = None
 
 
 class Monkey365Executor:
@@ -147,34 +164,46 @@ class Monkey365Executor:
         self.monkey365_path = monkey365_script
         return monkey365_script
 
+    # Maps Python auth_mode values to Monkey365 PromptBehavior values
+    _PROMPT_BEHAVIOR_MAP = {
+        "interactive": "SelectAccount",
+        "device_code": "DeviceCode",
+        "ropc": "UserPasswordCredential",
+        "client_credentials": "ClientCredentials",
+    }
+
     def build_script(self, scan_id: str) -> str:
-        output_path = self.output_dir
         safe_monkey365_dir = _escape_ps_string(str(self.monkey365_path.parent))
-        safe_output = _escape_ps_string(str(output_path))
-        
+
         export_to = ", ".join(f"'{_escape_ps_string(fmt)}'" for fmt in self.config.export_to)
         collect_items = ", ".join(f"'{module}'" for module in self.COLLECT_MODULES)
-        
-        spo_sites_param = ""
-        if self.config.spo_sites:
-            scan_sites_items = ", ".join(
-                f"'{_escape_ps_string(site)}'" for site in self.config.spo_sites
-            )
-            spo_sites_param = f"\n    SpoSites        = @({scan_sites_items});"
 
+        auth_mode = self.config.auth_mode or "interactive"
+        prompt_behavior = self._PROMPT_BEHAVIOR_MAP.get(auth_mode, "SelectAccount")
+
+        param_lines = [
+            f"    Instance        = 'Microsoft365';",
+            f"    Collect         = @({collect_items});",
+            f"    PromptBehavior  = '{prompt_behavior}';",
+            f"    IncludeEntraID  = $true;",
+            f"    ExportTo        = @({export_to});",
+        ]
+
+        if self.config.force_msal_desktop:
+            param_lines.append("    ForceMSALDesktop = $true;")
+
+        # Merge any extra PowerShell params from powershell_config (e.g. TenantId, ClientId, …)
+        if self.config.powershell_config:
+            for key, value in self.config.powershell_config.items():
+                param_lines.append(f"    {key} = {_to_ps_value(value)};")
+
+        param_block = "\n".join(param_lines)
         script = f"""
- Set-Location '{safe_monkey365_dir}'
- Import-Module .\\monkey365.psm1 -Force
+Set-Location '{safe_monkey365_dir}'
+Import-Module .\\monkey365.psm1 -Force
 
 $param = @{{
-    Instance        = 'Microsoft365';
-    OutDir          = '{safe_output}';
-    Collect         = @({collect_items});
-    PromptBehavior  = 'SelectAccount';
-    IncludeEntraID  = $true;
-    ExportTo        = @({export_to});
-    SaveProject     = $true;{spo_sites_param}
-    ForceMSALDesktop = $true
+{param_block}
 }}
 
 Invoke-Monkey365 @param
@@ -230,29 +259,58 @@ Invoke-Monkey365 @param
                 str(ps1_path),
             ]
             logger.info("[MONKEY365] Running PowerShell with args: %s", powershell_command)
-            result = subprocess.run(
-                powershell_command,
-                capture_output=True,
-                text=True,
-                timeout=3600,
-                cwd=self.monkey365_path.parent,
-                env=env,
-            )
 
-            stderr = result.stderr or ""
+            # Interactive and device_code modes need a live terminal:
+            # - interactive: browser popup must be able to open
+            # - device_code: auth code must be printed to the user's console
+            # For these modes we do NOT capture stdout/stderr so the prompt is visible;
+            # results are read back from the output files written by Monkey365.
+            non_interactive_modes = {"ropc", "client_credentials"}
+            auth_mode = self.config.auth_mode or "interactive"
+            is_automated = auth_mode in non_interactive_modes
+
+            if is_automated:
+                result = subprocess.run(
+                    powershell_command,
+                    capture_output=True,
+                    text=True,
+                    timeout=3600,
+                    cwd=self.monkey365_path.parent,
+                    env=env,
+                )
+                ps_stdout = result.stdout
+                ps_stderr = result.stderr
+                returncode = result.returncode
+            else:
+                # Let stdin/stdout/stderr inherit from the parent process so the
+                # user sees log output and any auth prompt in the server terminal.
+                result = subprocess.run(
+                    powershell_command,
+                    stdin=None,
+                    stdout=None,
+                    stderr=None,
+                    timeout=3600,
+                    cwd=self.monkey365_path.parent,
+                    env=env,
+                )
+                ps_stdout = ""
+                ps_stderr = ""
+                returncode = result.returncode
+
+            stderr = ps_stderr
             if (
                 "exécution de scripts est désactivée" in stderr.lower()
                 or "execution of scripts is disabled" in stderr.lower()
             ):
                 logger.error(
                     "[MONKEY365] Execution policy blocked. STDERR:\n%s",
-                    result.stderr,
+                    ps_stderr,
                 )
 
             raw_output = {
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "returncode": result.returncode,
+                "stdout": ps_stdout,
+                "stderr": ps_stderr,
+                "returncode": returncode,
                 "duration_seconds": time.time() - start_time,
             }
 
@@ -261,24 +319,24 @@ Invoke-Monkey365 @param
                 encoding="utf-8",
             )
 
-            if result.returncode != 0:
+            if returncode != 0:
                 error = Monkey365ExecutionError(
                     "PowerShell failed (code "
-                    + str(result.returncode)
+                    + str(returncode)
                     + "):\nSTDOUT:\n"
-                    + result.stdout
+                    + ps_stdout
                     + "\nSTDERR:\n"
-                    + result.stderr
+                    + ps_stderr
                 )
                 return {"status": "error", "scan_id": scan_id, "error": str(error)}
 
-            results = self.parse_results(result.stdout, scan_id)
+            results = self.parse_results(ps_stdout, scan_id)
             return {"status": "success", "scan_id": scan_id, "results": results}
 
         except subprocess.TimeoutExpired as exc:
             raw_output = {
-                "stdout": exc.stdout or "",
-                "stderr": exc.stderr or "",
+                "stdout": (exc.stdout or b"").decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or ""),
+                "stderr": (exc.stderr or b"").decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or ""),
                 "returncode": None,
                 "duration_seconds": time.time() - start_time,
             }

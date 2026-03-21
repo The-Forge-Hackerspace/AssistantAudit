@@ -122,6 +122,9 @@ class Monkey365ScanService:
                 output_dir=result.output_path or config.output_dir,
                 spo_sites=config.spo_sites,
                 export_to=config.export_to,
+                auth_mode=config.auth_mode,
+                force_msal_desktop=config.force_msal_desktop,
+                powershell_config=config.powershell_config,
             )
 
             executor = Monkey365Executor(executor_config, settings.MONKEY365_PATH or None)
