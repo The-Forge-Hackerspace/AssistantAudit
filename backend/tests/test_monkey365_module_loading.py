@@ -162,3 +162,22 @@ def test_git_clone_failure_raises_error(tmp_path):
         
         with pytest.raises(RuntimeError, match="Failed to clone Monkey365 repository"):
             executor.ensure_monkey365_ready()
+
+
+def test_ensure_monkey365_ready_uses_execution_policy_bypass(tmp_path):
+    """Module verification should force process-scoped bypass in child PowerShell."""
+    config = Monkey365Config(auth_mode=Monkey365AuthMode.INTERACTIVE)
+
+    monkey365_dir = tmp_path / "monkey365"
+    monkey365_dir.mkdir()
+    (monkey365_dir / "monkey365.psm1").write_text("# Mock module", encoding="utf-8")
+
+    executor = Monkey365Executor(config, str(monkey365_dir))
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="Invoke-Monkey365", stderr="")
+        executor.ensure_monkey365_ready()
+
+    command_args = mock_run.call_args.args[0]
+    assert "-ExecutionPolicy" in command_args
+    assert "Bypass" in command_args

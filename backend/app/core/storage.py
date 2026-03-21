@@ -101,7 +101,7 @@ def get_scan_output_path(
         data_dir = project_root / settings.DATA_DIR
     
     # Build path: data_dir/slug/Cloud/tool/scan_id
-    slug = slugify(entreprise_name)
+    slug = slugify(entreprise_name) or "enterprise"
     output_path = data_dir / slug / "Cloud" / tool / scan_id
     
     return output_path

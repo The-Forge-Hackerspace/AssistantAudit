@@ -712,4 +712,9 @@ export const toolsApi = {
     const response = await api.get(`/tools/monkey365/scans/result/${resultId}`);
     return response.data;
   },
+
+  async deleteMonkey365Scan(resultId: number): Promise<{ message: string }> {
+    const response = await api.delete(`/tools/monkey365/scans/${resultId}`);
+    return response.data;
+  },
 };

@@ -152,3 +152,61 @@ def test_powershell_output_json_format_valid(tmp_path):
         assert '"quotes"' in output_data["stdout"]
         assert '\n' in output_data["stdout"]
         assert "'apostrophes'" in output_data["stderr"]
+
+
+def test_run_scan_uses_execution_policy_bypass(tmp_path):
+    """Scan execution should force process-scoped bypass in child PowerShell."""
+    output_dir = tmp_path / "scan_policy"
+    output_dir.mkdir(parents=True)
+
+    config = Monkey365Config(
+        auth_mode=Monkey365AuthMode.INTERACTIVE,
+        output_dir=str(output_dir),
+    )
+
+    monkey365_path = tmp_path / "Invoke-Monkey365.ps1"
+    monkey365_path.write_text("# Mock PowerShell script", encoding="utf-8")
+
+    executor = Monkey365Executor(config, str(monkey365_path.parent))
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="[]", stderr="")
+        executor.run_scan("scan_policy")
+
+    command_args = mock_run.call_args.args[0]
+    assert "-ExecutionPolicy" in command_args
+    assert "Bypass" in command_args
+
+
+def test_powershell_raw_output_not_copied_to_archive(tmp_path):
+    """Ensure powershell_raw_output.json is excluded from the archive."""
+    from unittest.mock import patch as _patch
+    from app.services.monkey365_scan_service import Monkey365ScanService
+
+    scan_id = "test-archive-scan"
+    scan_output_dir = tmp_path / "scan_output"
+    scan_output_dir.mkdir(parents=True)
+
+    raw_output_file = scan_output_dir / "powershell_raw_output.json"
+    other_result_file = scan_output_dir / "result.json"
+    nested_dir = scan_output_dir / "nested"
+    nested_dir.mkdir()
+    nested_file = nested_dir / "nested_result.json"
+
+    raw_output_file.write_text(json.dumps({"stdout": "data", "stderr": "", "returncode": 0}))
+    other_result_file.write_text('{"status": "ok"}')
+    nested_file.write_text('{"nested": true}')
+
+    archive_base = tmp_path / "archive"
+    archive_base.mkdir(parents=True)
+
+    with _patch("app.services.monkey365_scan_service.settings") as mock_settings:
+        mock_settings.MONKEY365_ARCHIVE_PATH = str(archive_base)
+        result_path = Monkey365ScanService.move_results_to_archive(scan_id, scan_output_dir)
+
+    assert not (result_path / "powershell_raw_output.json").exists(), \
+        "powershell_raw_output.json must not be copied to the archive"
+    assert (result_path / "result.json").exists(), \
+        "result.json should be present in the archive"
+    assert (result_path / "nested" / "nested_result.json").exists(), \
+        "nested files should be preserved in the archive"

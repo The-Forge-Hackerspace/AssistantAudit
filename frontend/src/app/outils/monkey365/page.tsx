@@ -21,62 +21,34 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 
 import { toolsApi, entreprisesApi } from "@/services/api";
-import type { Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail, Monkey365AuthMode } from "@/types/api";
+import type { Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail } from "@/types/api";
 
 export default function Monkey365Page() {
   const [activeTab, setActiveTab] = useState("launch");
   const [loading, setLoading] = useState(false);
   const [launching, setLaunching] = useState(false);
 
-
-
-
   // Entreprises state
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [selectedEntrepriseId, setSelectedEntrepriseId] = useState<string>("");
 
-  // Auth mode
-  const [authMode, setAuthMode] = useState<Monkey365AuthMode>("interactive");
-
-  // Auth fields
-  const [tenantId, setTenantId] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-
-  // Config fields
-  const [collectModules, setCollectModules] = useState<string[]>([]);
-  const [includeEntraId, setIncludeEntraId] = useState(true);
-  const [exportFormats, setExportFormats] = useState<string[]>(["JSON"]);
-  const [scanSites, setScanSites] = useState<string[]>([]);
-  const [forceMsalDesktop, setForceMsalDesktop] = useState(false);
-  const [verbose, setVerbose] = useState(false);
-
-  // Tag inputs state
-  const [collectInput, setCollectInput] = useState("");
+  // Simplified config - only 2 fields
+  const [spoSites, setSpoSites] = useState<string[]>([]);
+  const [exportFormats, setExportFormats] = useState<string[]>(["JSON", "HTML"]);
   const [siteInput, setSiteInput] = useState("");
 
   const [scans, setScans] = useState<Monkey365ScanResultSummary[]>([]);
   const [selectedScan, setSelectedScan] = useState<Monkey365ScanResultDetail | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  // Helper functions
   function formatDuration(seconds: number | null | undefined): string {
     if (!seconds) return "-";
-    if (seconds < 60) return `${seconds}s`;
-    const min = Math.floor(seconds / 60);
-    const sec = seconds % 60;
-    return `${min}min ${sec}s`;
-  }
-
-  function formatElapsedTime(seconds: number): string {
     if (seconds < 60) return `${seconds}s`;
     const min = Math.floor(seconds / 60);
     const sec = seconds % 60;
@@ -134,7 +106,6 @@ export default function Monkey365Page() {
     try {
       const detail = await toolsApi.getMonkey365ScanDetail(scanId);
       setSelectedScan(detail);
-      // Initialize elapsed time from existing duration or from created_at
       if (detail.status === "running") {
         const created = new Date(detail.created_at).getTime();
         const now = Date.now();
@@ -148,7 +119,6 @@ export default function Monkey365Page() {
     }
   };
 
-  // Poll scan detail every 2 seconds while RUNNING
   useEffect(() => {
     if (selectedScan && selectedScan.status === "running") {
       const interval = setInterval(async () => {
@@ -163,13 +133,12 @@ export default function Monkey365Page() {
         } catch (err) {
           console.error("Failed to poll scan status:", err);
         }
-      }, 2000); // Poll every 2 seconds
+      }, 2000);
       
       return () => clearInterval(interval);
     }
   }, [selectedScan]);
 
-  // Ticker: increment elapsed time every second while RUNNING
   useEffect(() => {
     if (selectedScan && selectedScan.status === "running") {
       const ticker = setInterval(() => {
@@ -180,7 +149,6 @@ export default function Monkey365Page() {
     }
   }, [selectedScan]);
 
-  // Poll every 5 seconds when any scan is "running"
   useEffect(() => {
     if (scans.some(s => s.status === "running")) {
       const interval = setInterval(loadScans, 5000);
@@ -188,7 +156,6 @@ export default function Monkey365Page() {
     }
   }, [scans, loadScans]);
 
-  // Load entreprises
   useEffect(() => {
     const loadEntreprises = async () => {
       try {
@@ -201,33 +168,20 @@ export default function Monkey365Page() {
     loadEntreprises();
   }, []);
 
-  // Tag Input Handlers
-  const handleAddCollect = () => {
-    if (!collectInput.trim()) return;
-    if (!collectModules.includes(collectInput.trim())) {
-      setCollectModules([...collectModules, collectInput.trim()]);
-    }
-    setCollectInput("");
-  };
-
-  const handleRemoveCollect = (tag: string) => {
-    setCollectModules(collectModules.filter((t) => t !== tag));
-  };
-
   const handleAddSite = () => {
     if (!siteInput.trim()) return;
-    if (!scanSites.includes(siteInput.trim())) {
-      setScanSites([...scanSites, siteInput.trim()]);
+    if (!spoSites.includes(siteInput.trim())) {
+      setSpoSites([...spoSites, siteInput.trim()]);
     }
     setSiteInput("");
   };
 
   const handleRemoveSite = (tag: string) => {
-    setScanSites(scanSites.filter((t) => t !== tag));
+    setSpoSites(spoSites.filter((t) => t !== tag));
   };
 
   const handleToggleExportFormat = (format: string, checked: boolean) => {
-    if (format === "JSON") return; // JSON always checked
+    if (format === "JSON") return;
     if (checked) {
       setExportFormats([...exportFormats, format]);
     } else {
@@ -235,53 +189,19 @@ export default function Monkey365Page() {
     }
   };
 
-  // Generate PowerShell Preview
   const generatePSPreview = () => {
-    const params = [`$param = @{`];
+    const params = [
+      `$param = @{`,
+      `    Instance        = 'Microsoft365';`,
+      `    Collect         = @('ExchangeOnline', 'MicrosoftTeams', 'Purview', 'SharePointOnline', 'AdminPortal');`,
+      `    PromptBehavior  = 'SelectAccount';`,
+      `    IncludeEntraID  = $true;`,
+      `    ForceMSALDesktop = $true;`,
+      `    ExportTo        = @('${exportFormats.join("', '")}');`,
+    ];
 
-    // Auth mode specific parameters
-    if (authMode === "interactive") {
-      params.push(`    # Interactive Browser Authentication`);
-      params.push(`    PromptBehavior = 'SelectAccount'`);
-    } else if (authMode === "device_code") {
-      params.push(`    # Device Code Authentication`);
-      params.push(`    UseDeviceCode = $true`);
-    } else if (authMode === "ropc") {
-      params.push(`    # Resource Owner Password Credentials`);
-      params.push(`    TenantID = "${tenantId}"`);
-      params.push(`    Username = "${username}"`);
-      params.push(`    Password = "***"`);
-    } else if (authMode === "client_credentials") {
-      params.push(`    # Client Credentials (App Registration)`);
-      params.push(`    TenantID = "${tenantId}"`);
-      params.push(`    ClientID = "${clientId}"`);
-      params.push(`    ClientSecret = "***"`);
-    }
-
-    if (collectModules.length > 0) {
-      params.push(`    Collect = "${collectModules.join(",")}"`);
-    }
-
-    if (includeEntraId) {
-      params.push(`    IncludeEntraID = $true`);
-    } else {
-      params.push(`    IncludeEntraID = $false`);
-    }
-
-    if (exportFormats.length > 0) {
-      params.push(`    ExportTo = "${exportFormats.join(",")}"`);
-    }
-
-    if (scanSites.length > 0) {
-      params.push(`    ScanSites = @("${scanSites.join('","')}")`);
-    }
-
-    if (forceMsalDesktop) {
-      params.push(`    ForceMSALDesktop = $true`);
-    }
-
-    if (verbose) {
-      params.push(`    Verbose = $true`);
+    if (spoSites.length > 0) {
+      params.push(`    SpoSites        = @('${spoSites.join("', '")}')`);
     }
 
     params.push(`}`);
@@ -290,48 +210,18 @@ export default function Monkey365Page() {
     return params.join("\n");
   };
 
-  // Submit Handler
   const handleLaunch = async () => {
-    // Validate based on auth_mode
     if (!selectedEntrepriseId) {
       toast.error("Veuillez sélectionner une entreprise");
       return;
     }
 
-    if (authMode === "ropc") {
-      if (!tenantId || !username || !password) {
-        toast.error("Veuillez remplir Tenant ID, Username et Password pour le mode ROPC");
-        return;
-      }
-    } else if (authMode === "client_credentials") {
-      if (!tenantId || !clientId || !clientSecret) {
-        toast.error("Veuillez remplir Tenant ID, Client ID et Client Secret pour le mode App Registration");
-        return;
-      }
-    }
-
     setLaunching(true);
     try {
       const config: Monkey365Config = {
-        auth_mode: authMode,
-        collect: collectModules.length > 0 ? collectModules : undefined,
-        include_entra_id: includeEntraId,
+        spo_sites: spoSites.length > 0 ? spoSites : undefined,
         export_to: exportFormats,
-        scan_sites: scanSites.length > 0 ? scanSites : undefined,
-        force_msal_desktop: forceMsalDesktop,
-        verbose: verbose,
       };
-
-      // Add credentials based on auth_mode
-      if (authMode === "ropc") {
-        config.tenant_id = tenantId;
-        config.username = username;
-        config.password = password;
-      } else if (authMode === "client_credentials") {
-        config.tenant_id = tenantId;
-        config.client_id = clientId;
-        config.client_secret = clientSecret;
-      }
 
       const payload: Monkey365ScanCreate = {
         entreprise_id: parseInt(selectedEntrepriseId, 10),
@@ -341,525 +231,360 @@ export default function Monkey365Page() {
       await toolsApi.launchMonkey365Scan(payload);
       toast.success("Scan Monkey365 lancé en arrière-plan");
       
-      // Clear sensitive fields
-      setClientSecret("");
-      setPassword("");
-      
-      // Navigate to history tab
       setActiveTab("history");
-      loadScans();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erreur lors du lancement";
-      toast.error(msg);
+      await loadScans();
+    } catch (err) {
+      console.error("Failed to launch scan:", err);
+      toast.error("Erreur lors du lancement du scan");
     } finally {
       setLaunching(false);
     }
   };
 
+  const handleDeleteScan = async (scanId: number) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce scan ?")) return;
+    
+    setDeletingId(scanId);
+    try {
+      await toolsApi.deleteMonkey365Scan(scanId);
+      toast.success("Scan supprimé avec succès");
+      setSelectedScan(null);
+      await loadScans();
+    } catch (err) {
+      console.error("Failed to delete scan:", err);
+      toast.error("Erreur lors de la suppression du scan");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/outils">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Outils
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">Monkey365 — Audit Microsoft 365</h1>
-          <p className="text-muted-foreground">
-            Lancer un audit complet de la configuration Microsoft 365 et Azure AD
-          </p>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Link href="/outils">
+              <Button variant="outline" size="icon">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <h1 className="text-3xl font-bold">Monkey365 — Audit Microsoft 365</h1>
+          </div>
         </div>
-      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="launch" className="flex items-center gap-1">
-            <Play className="h-4 w-4" />
-            Lancer un scan
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-1">
-            Scans passés
-          </TabsTrigger>
-        </TabsList>
+        <Alert className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+          <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="text-blue-800 dark:text-blue-300">
+            Mode simplifié : INTERACTIVE auth (navigateur), collecte des 5 modules M365 standard, export JSON + HTML.
+          </AlertDescription>
+        </Alert>
 
-        <TabsContent value="launch" className="space-y-6">
-          
-          {/* Entreprise Selector */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Cible</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 max-w-md">
-                <Label htmlFor="entreprise">Entreprise *</Label>
-                <Select value={selectedEntrepriseId} onValueChange={setSelectedEntrepriseId}>
-                  <SelectTrigger id="entreprise">
-                    <SelectValue placeholder="Sélectionner une entreprise..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {entreprises.map((ent) => (
-                      <SelectItem key={ent.id} value={ent.id.toString()}>
-                        {ent.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="launch">Lancer un scan</TabsTrigger>
+            <TabsTrigger value="history">Historique</TabsTrigger>
+            <TabsTrigger value="details">Détails</TabsTrigger>
+          </TabsList>
 
-          {/* Authentication */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Authentification</CardTitle>
-              <CardDescription>Sélectionnez le mode d'authentification pour Microsoft 365</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              
-              {/* Auth Mode Selector */}
-              <div className="space-y-2">
-                <Label htmlFor="authMode">Mode d'authentification</Label>
-                <Select value={authMode} onValueChange={(value) => setAuthMode(value as Monkey365AuthMode)}>
-                  <SelectTrigger id="authMode">
-                    <SelectValue placeholder="Sélectionner un mode..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="interactive">
-                      <div className="flex items-center gap-2">
-                        <span>Interactive Browser</span>
-                        <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
-                          🟢 Recommandé
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="device_code">
-                      <div className="flex items-center gap-2">
-                        <span>Device Code</span>
-                        <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
-                          🟢 Safest
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="ropc">
-                      <div className="flex items-center gap-2">
-                        <span>Username/Password (ROPC)</span>
-                        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20">
-                          🟡 Credentials
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="client_credentials">
-                      <div className="flex items-center gap-2">
-                        <span>App Registration</span>
-                        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20">
-                          🟡 App Secret
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Info badges for each auth mode */}
-              {authMode === "interactive" && (
-                <Alert>
-                  <AlertDescription className="flex items-center gap-2">
-                    🔐 <span>Une fenêtre de navigateur s'ouvrira pour la connexion Microsoft.</span>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {authMode === "device_code" && (
-                <Alert>
-                  <AlertDescription className="flex items-center gap-2">
-                    📱 <span>Un code d'appareil sera généré. Ouvrez un navigateur pour vous authentifier.</span>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Conditional Credential Fields */}
-              {authMode === "ropc" && (
-                <div className="grid gap-4 md:grid-cols-2 pt-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="tenantId">Tenant ID *</Label>
-                    <Input
-                      id="tenantId"
-                      value={tenantId}
-                      onChange={(e) => setTenantId(e.target.value)}
-                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username *</Label>
-                    <Input
-                      id="username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="user@domain.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password *</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••••••••••••••••••"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {authMode === "client_credentials" && (
-                <div className="grid gap-4 md:grid-cols-2 pt-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="tenantId">Tenant ID *</Label>
-                    <Input
-                      id="tenantId"
-                      value={tenantId}
-                      onChange={(e) => setTenantId(e.target.value)}
-                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="clientId">Client ID *</Label>
-                    <Input
-                      id="clientId"
-                      value={clientId}
-                      onChange={(e) => setClientId(e.target.value)}
-                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="clientSecret">Client Secret *</Label>
-                    <Input
-                      id="clientSecret"
-                      type="password"
-                      value={clientSecret}
-                      onChange={(e) => setClientSecret(e.target.value)}
-                      placeholder="••••••••••••••••••••••••"
-                    />
-                  </div>
-                </div>
-              )}
-
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {/* Scan Configuration */}
-            <Card className="lg:col-span-2">
+          <TabsContent value="launch" className="space-y-6">
+            <Card>
               <CardHeader>
                 <CardTitle>Configuration du scan</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                
-                {/* Collect Modules */}
-                <div className="space-y-2">
-                  <Label>Modules à collecter (Collect)</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={collectInput}
-                      onChange={(e) => setCollectInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAddCollect()}
-                      placeholder="Ex: AzureAD, ExchangeOnline..."
-                    />
-                    <Button type="button" variant="secondary" onClick={handleAddCollect}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {collectModules.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                        {tag}
-                        <X className="h-3 w-3 cursor-pointer" onClick={() => handleRemoveCollect(tag)} />
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Scan Sites */}
-                <div className="space-y-2">
-                  <Label>Sites SharePoint (ScanSites)</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={siteInput}
-                      onChange={(e) => setSiteInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAddSite()}
-                      placeholder="Ex: https://contoso.sharepoint.com"
-                    />
-                    <Button type="button" variant="secondary" onClick={handleAddSite}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {scanSites.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                        {tag}
-                        <X className="h-3 w-3 cursor-pointer" onClick={() => handleRemoveSite(tag)} />
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  {/* Export Formats */}
-                  <div className="space-y-3">
-                    <Label>Formats d'export (ExportTo)</Label>
-                    <div className="flex flex-wrap gap-4">
-                      {["JSON", "HTML", "CSV", "CLIXML"].map((format) => (
-                        <div key={format} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`export-${format}`}
-                            checked={exportFormats.includes(format)}
-                            disabled={format === "JSON"}
-                            onCheckedChange={(checked: boolean) => handleToggleExportFormat(format, checked)}
-                          />
-                          <Label htmlFor={`export-${format}`} className="text-sm font-normal cursor-pointer">
-                            {format}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  {/* Toggles */}
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="space-y-0.5">
-                      <Label>Include Entra ID</Label>
-                      <div className="text-xs text-muted-foreground">Inclure les données Entra ID</div>
-                    </div>
-                    <Switch checked={includeEntraId} onCheckedChange={setIncludeEntraId} />
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="space-y-0.5">
-                      <Label>Verbose</Label>
-                      <div className="text-xs text-muted-foreground">Activer les logs détaillés</div>
-                    </div>
-                    <Switch checked={verbose} onCheckedChange={setVerbose} />
-                  </div>
-                </div>
-
-                {/* ForceMSALDesktop */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="space-y-0.5">
-                      <Label>Force MSAL Desktop</Label>
-                      <div className="text-xs text-muted-foreground">Forcer l'authentification MSAL Desktop</div>
-                    </div>
-                    <Switch checked={forceMsalDesktop} onCheckedChange={setForceMsalDesktop} />
-                  </div>
-                  {forceMsalDesktop && (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        Attention: Activer ForceMSALDesktop peut nécessiter une interaction utilisateur sur le serveur d'exécution !
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-
-              </CardContent>
-            </Card>
-
-            {/* PowerShell Preview */}
-            <Card className="flex flex-col">
-              <CardHeader>
-                <CardTitle>Aperçu PowerShell</CardTitle>
-                <CardDescription>Commande générée (lecture seule)</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col">
-                <div className="flex-1 bg-muted p-4 rounded-md overflow-x-auto text-xs font-mono whitespace-pre text-muted-foreground">
-                  {generatePSPreview()}
-                </div>
-                <div className="mt-4 pt-4 border-t flex justify-end">
-                  <Button onClick={handleLaunch} disabled={launching} className="w-full">
-                    {launching ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4 mr-2" />
-                    )}
-                    {launching ? "Lancement..." : "Lancer le scan"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-                <TabsContent value="history" className="space-y-6">
-          {/* Scan history table */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Historique des scans</CardTitle>
-                <Button variant="outline" size="sm" onClick={loadScans} disabled={loading}>
-                  <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-                  Actualiser
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {scans.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  Aucun scan Monkey365 pour cette entreprise. Lancez un scan depuis l&apos;onglet "Lancer un scan".
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID Scan</TableHead>
-                      <TableHead>Statut</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Durée</TableHead>
-                      <TableHead>Findings</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {scans.map((scan) => (
-                      <TableRow
-                        key={scan.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => loadScanDetail(scan.id)}
-                      >
-                        <TableCell className="font-mono text-xs">
-                          {scan.id.toString().substring(0, 8)}...
-                        </TableCell>
-                        <TableCell>{getStatusBadge(scan.status)}</TableCell>
-                        <TableCell>{formatDate(scan.created_at)}</TableCell>
-                        <TableCell>{formatDuration(scan.duration_seconds)}</TableCell>
-                        <TableCell>{scan.findings_count ?? "-"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Scan Logs Panel */}
-          {selectedScan && (
-            <Card className={`border-2 ${
-              selectedScan.status === "running" ? "border-blue-500" : 
-              selectedScan.status === "success" ? "border-green-500" : 
-              selectedScan.status === "failed" ? "border-red-500" : ""
-            }`}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <CardTitle>
-                      {selectedScan.status === "running" && <Loader2 className="h-5 w-5 animate-spin inline-block mr-2 text-blue-500" />}
-                      {selectedScan.status === "success" && <span className="text-green-500 mr-2">✅</span>}
-                      {selectedScan.status === "failed" && <span className="text-red-500 mr-2">❌</span>}
-                      Scan #{selectedScan.id}
-                    </CardTitle>
-                    {getStatusBadge(selectedScan.status)}
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedScan(null)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
                 <CardDescription>
-                  {selectedScan.config_snapshot?.auth_mode ? (
-                    <span className="uppercase font-mono text-xs">
-                      {String(selectedScan.config_snapshot.auth_mode)} — {formatElapsedTime(elapsedSeconds)}
-                    </span>
-                  ) : null}
+                  Les paramètres sont fixés pour le cas d'usage standard (99% du temps)
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Error message */}
-                {selectedScan.error_message && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>{selectedScan.error_message}</AlertDescription>
-                  </Alert>
+              <CardContent className="space-y-6">
+                {/* Entreprise Selection */}
+                <div className="space-y-2">
+                  <Label>Entreprise *</Label>
+                  <Select value={selectedEntrepriseId} onValueChange={setSelectedEntrepriseId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner une entreprise" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {entreprises.map((ent) => (
+                        <SelectItem key={ent.id} value={ent.id.toString()}>
+                          {ent.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* SharePoint Sites */}
+                <div className="space-y-2">
+                  <Label>Sites SharePoint (optionnel)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="https://domain.sharepoint.com"
+                      value={siteInput}
+                      onChange={(e) => setSiteInput(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && handleAddSite()}
+                    />
+                    <Button onClick={handleAddSite} size="sm" variant="outline">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {spoSites.map((site) => (
+                      <Badge key={site} variant="secondary" className="cursor-pointer">
+                        {site}
+                        <X
+                          className="h-3 w-3 ml-1 hover:text-destructive"
+                          onClick={() => handleRemoveSite(site)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Export Formats */}
+                <div className="space-y-3">
+                  <Label>Formats d'export</Label>
+                  <div className="space-y-2">
+                    {["JSON", "HTML", "CSV"].map((format) => (
+                      <div key={format} className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={exportFormats.includes(format)}
+                          disabled={format === "JSON"}
+                          onCheckedChange={(checked) =>
+                            handleToggleExportFormat(format, checked as boolean)
+                          }
+                        />
+                        <label className="text-sm">
+                          {format}
+                          {format === "JSON" && <span className="text-xs text-gray-500"> (toujours inclus)</span>}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fixed Parameters Info */}
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-800 space-y-2 text-sm">
+                  <p className="font-semibold">Paramètres fixés :</p>
+                  <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300">
+                    <li>Instance: Microsoft365</li>
+                    <li>Authentification: INTERACTIVE (navigateur)</li>
+                    <li>Modules: ExchangeOnline, MicrosoftTeams, Purview, SharePointOnline, AdminPortal</li>
+                    <li>IncludeEntraID: $true</li>
+                    <li>ForceMSALDesktop: $true (MSAL interactive desktop auth)</li>
+                  </ul>
+                </div>
+
+                {/* PowerShell Preview */}
+                <div className="space-y-2">
+                  <Label>Aperçu PowerShell</Label>
+                  <pre className="bg-gray-900 text-gray-100 p-4 rounded overflow-auto text-xs max-h-48">
+                    {generatePSPreview()}
+                  </pre>
+                </div>
+
+                {/* Launch Button */}
+                <Button
+                  onClick={handleLaunch}
+                  disabled={launching || !selectedEntrepriseId}
+                  className="w-full"
+                  size="lg"
+                >
+                  {launching ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Lancement en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Lancer le scan
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Historique des scans</CardTitle>
+                  </div>
+                  <Button
+                    onClick={() => loadScans()}
+                    disabled={loading || !selectedEntrepriseId}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!selectedEntrepriseId ? (
+                  <p className="text-gray-500 text-center py-8">Sélectionnez une entreprise pour voir l'historique</p>
+                ) : scans.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">Aucun scan pour cette entreprise</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID Scan</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead>Findings</TableHead>
+                        <TableHead>Créé</TableHead>
+                        <TableHead>Durée</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {scans.map((scan) => (
+                        <TableRow
+                          key={scan.id}
+                          onClick={() => loadScanDetail(scan.id)}
+                          className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900"
+                        >
+                          <TableCell className="font-mono text-xs">{scan.scan_id.slice(0, 8)}</TableCell>
+                          <TableCell>{getStatusBadge(scan.status)}</TableCell>
+                          <TableCell>{scan.findings_count ?? "-"}</TableCell>
+                          <TableCell>{formatDate(scan.created_at)}</TableCell>
+                          <TableCell>{formatDuration(scan.duration_seconds)}</TableCell>
+                          <TableCell>
+                             <div className="flex gap-2">
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); loadScanDetail(scan.id); }}>
+                              Détails
+                            </Button>
+                               <Button
+                                 size="sm"
+                                 variant="ghost"
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   handleDeleteScan(scan.id);
+                                 }}
+                                 disabled={deletingId === scan.id}
+                                 className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                               >
+                                 {deletingId === scan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                               </Button>
+                             </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                {/* Timeline */}
-                <div className="space-y-2 pl-4 border-l-2 border-muted">
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-500">✅</span>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Script generated</p>
-                      <p className="text-xs text-muted-foreground">{formatTimestamp(selectedScan.created_at)}</p>
+          <TabsContent value="details" className="space-y-4">
+            {!selectedScan ? (
+              <Card>
+                <CardContent className="py-8">
+                  <p className="text-gray-500 text-center">Sélectionnez un scan dans l'historique</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Détails du scan</CardTitle>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteScan(selectedScan.id)}
+                        disabled={deletingId === selectedScan.id}
+                      >
+                        {deletingId === selectedScan.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Suppression...
+                          </>
+                        ) : (
+                          <>
+                            <X className="h-4 w-4 mr-2" />
+                            Supprimer
+                          </>
+                        )}
+                      </Button>
                     </div>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-500">✅</span>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">PowerShell launched</p>
-                      <p className="text-xs text-muted-foreground">{formatTimestamp(selectedScan.created_at)}</p>
-                    </div>
-                  </div>
-
-                  {selectedScan.output_path && (
-                    <div className="flex items-start gap-2">
-                      <span>📄</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Output path</p>
-                        <code className="text-xs text-muted-foreground break-all">{selectedScan.output_path}</code>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">ID Scan</p>
+                        <p className="font-mono text-sm">{selectedScan.scan_id}</p>
                       </div>
-                    </div>
-                  )}
-
-                  {selectedScan.status === "running" && (
-                    <div className="flex items-start gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-blue-500">Scan in progress...</p>
-                        <p className="text-xs text-muted-foreground">Waiting for results</p>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Statut</p>
+                        <div>{getStatusBadge(selectedScan.status)}</div>
                       </div>
-                    </div>
-                  )}
-
-                  {selectedScan.status === "success" && selectedScan.findings_count !== null && (
-                    <div className="flex items-start gap-2">
-                      <span className="text-green-500">✅</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Scan completed</p>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedScan.findings_count} finding{selectedScan.findings_count !== 1 ? "s" : ""} detected
-                          {selectedScan.completed_at && ` — ${formatTimestamp(selectedScan.completed_at)}`}
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Créé</p>
+                        <p className="text-sm">{formatDate(selectedScan.created_at)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Durée</p>
+                        <p className="text-sm">
+                          {selectedScan.status === "running"
+                            ? `${formatDuration(elapsedSeconds)} (en cours...)`
+                            : formatDuration(selectedScan.duration_seconds)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Findings</p>
+                        <p className="text-sm">{selectedScan.findings_count ?? "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Chemin de sortie</p>
+                        <p className="text-xs font-mono text-gray-600 dark:text-gray-400 break-all">
+                          {selectedScan.output_path || "-"}
                         </p>
                       </div>
                     </div>
-                  )}
 
-                  {selectedScan.status === "failed" && (
-                    <div className="flex items-start gap-2">
-                      <span className="text-red-500">❌</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-red-500">Scan failed</p>
-                        {selectedScan.completed_at && (
-                          <p className="text-xs text-muted-foreground">{formatTimestamp(selectedScan.completed_at)}</p>
-                        )}
+
+                    {selectedScan.auth_mode && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Mode d'authentification</p>
+                          <p className="text-sm">{selectedScan.auth_mode}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">MSAL Desktop Auth</p>
+                          <p className="text-sm flex items-center gap-2">
+                            <span className={selectedScan.force_msal_desktop ? "text-green-600" : "text-gray-500"}>
+                              {selectedScan.force_msal_desktop ? "✓ Activé" : "✗ Désactivé"}
+                            </span>
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
 
-                {/* Configuration snapshot */}
-                {selectedScan.config_snapshot && (
-                  <div>
-                    <h4 className="font-semibold mb-2 text-sm">Configuration</h4>
-                    <pre className="bg-muted p-3 rounded text-xs overflow-auto max-h-60">
-                      {JSON.stringify(selectedScan.config_snapshot, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+                    {selectedScan.error_message && (
+                      <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>{selectedScan.error_message}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {selectedScan.config_snapshot && (
+                      <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded">
+                        <p className="font-semibold text-sm mb-2">Configuration</p>
+                        <pre className="text-xs overflow-auto max-h-32 text-gray-700 dark:text-gray-300">
+                          {JSON.stringify(selectedScan.config_snapshot, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

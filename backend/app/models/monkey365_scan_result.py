@@ -49,6 +49,18 @@ class Monkey365ScanResult(Base):
     # Slug de l'entreprise pour référence rapide
     entreprise_slug: Mapped[str | None] = mapped_column(String(200))
 
+    # Authentication method used (e.g., interactive, device_code, ropc, client_credentials)
+    auth_mode: Mapped[str | None] = mapped_column(String(50))
+
+    # Whether MSAL interactive desktop auth was used (for Windows auth flows)
+    force_msal_desktop: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    # All PowerShell configuration parameters that ran (stored as JSON dict)
+    powershell_config: Mapped[dict | None] = mapped_column(JSON)
+
+    # Archive path where results were stored (e.g., /data/enterprise/Cloud/M365/{scan_id})
+    archive_path: Mapped[str | None] = mapped_column(String(500))
+
     # Nombre total de findings
     findings_count: Mapped[int | None] = mapped_column(Integer)
 

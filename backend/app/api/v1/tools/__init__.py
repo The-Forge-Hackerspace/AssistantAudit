@@ -10,6 +10,7 @@ from .monkey365 import (
     launch_monkey365_scan,
     list_monkey365_scans,
     get_monkey365_scan_result,
+    delete_monkey365_scan,
 )
 
 router = APIRouter(prefix="/tools", tags=["tools"])

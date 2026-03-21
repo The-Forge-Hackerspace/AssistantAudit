@@ -14,8 +14,8 @@ def test_timezone_aware_duration_calculation():
     # Simulate timezone-aware completed_at (from datetime.now(timezone.utc))
     completed_at = datetime.now(timezone.utc)
     
-    # Simulate timezone-naive created_at (SQLite default — no timezone)
-    created_at_naive = datetime.now()
+    # Simulate timezone-naive created_at stored as UTC (SQLite default — no timezone)
+    created_at_naive = completed_at.replace(tzinfo=None)
     
     # Test that created_at gets timezone added (mimics the fix)
     if created_at_naive.tzinfo is None:

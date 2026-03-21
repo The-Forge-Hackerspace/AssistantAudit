@@ -941,26 +941,10 @@ export interface PingCastleResultRead extends PingCastleResultSummary {
 }
 
 // ── Monkey365 ──
-export type Monkey365AuthMode = "interactive" | "device_code" | "ropc" | "client_credentials";
-
 export interface Monkey365Config {
-  auth_mode: Monkey365AuthMode;
-  provider?: string;
-  tenant_id?: string;
-  client_id?: string;
-  client_secret?: string;
-  username?: string;
-  password?: string;
-  certificate_path?: string | null;
-  output_dir?: string;
-  rulesets?: string[];
-  plugins?: string[];
-  collect?: string[];
-  include_entra_id?: boolean;
+  spo_sites?: string[];
   export_to?: string[];
-  scan_sites?: string[];
-  force_msal_desktop?: boolean;
-  verbose?: boolean;
+  output_dir?: string;
 }
 
 export interface Monkey365ScanCreate {
@@ -984,4 +968,7 @@ export interface Monkey365ScanResultDetail extends Monkey365ScanResultSummary {
   config_snapshot?: Record<string, unknown> | null;
   output_path?: string | null;
   error_message?: string | null;
+  auth_mode?: string | null;
+  force_msal_desktop?: boolean;
+  powershell_config?: Record<string, unknown> | null;
 }

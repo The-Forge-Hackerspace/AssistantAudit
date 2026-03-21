@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 
 from ..models.assessment import Assessment
 from ..services.assessment_service import AssessmentService
-from ..tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor, M365Provider
-from ..tools.monkey365_runner.config import Monkey365AuthMode
+from ..tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor
+from ..tools.monkey365_runner.config import Monkey365AuthMode, M365Provider
 from ..tools.monkey365_runner.parser import Monkey365Parser, Monkey365Finding
 from ..tools.monkey365_runner.mapper import Monkey365Mapper, MappingResult
 

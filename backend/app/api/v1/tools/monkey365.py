@@ -12,6 +12,7 @@ from ....schemas.scan import (
     Monkey365ScanResultRead,
     Monkey365ScanResultSummary,
 )
+from ....schemas.common import MessageResponse
 from ....services.monkey365_scan_service import Monkey365ScanService
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ async def launch_monkey365_scan(
 
     logger.info(
         f"Monkey365 scan #{result.id} lancé en background "
-        f"(tenant={request.config.tenant_id}, entreprise={request.entreprise_id})"
+        f"(entreprise={request.entreprise_id})"
     )
     return result
 
@@ -66,3 +67,16 @@ async def get_monkey365_scan_result(
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
     return result
+
+
+@router.delete("/monkey365/scans/{result_id}", response_model=MessageResponse)
+async def delete_monkey365_scan(
+    result_id: int,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_auditeur),
+):
+    """Supprime un audit Monkey365 et nettoie les fichiers associés."""
+    if not Monkey365ScanService.delete_scan(db, result_id):
+        raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
+    return MessageResponse(message=f"Audit Monkey365 #{result_id} supprimé")
+

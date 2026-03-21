@@ -1,6 +1,7 @@
 import logging
 import threading
 import uuid
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol, cast
@@ -49,20 +50,13 @@ class Monkey365ScanService:
         entreprise_slug = slugify(entreprise.nom)
         output_path = ensure_scan_directory(entreprise.nom, scan_id, tool="M365")
 
-        auth_mode = config.auth_mode.value if hasattr(config.auth_mode, "value") else str(config.auth_mode)
         config_snapshot = {
-            "provider": config.provider,
-            "auth_mode": auth_mode,
-            "tenant_id": config.tenant_id,
-            "client_id": config.client_id,
-            "output_dir": str(output_path),
-            "rulesets": config.rulesets,
-            "plugins": config.plugins,
-            "collect": config.collect,
-            "include_entra_id": config.include_entra_id,
+            "spo_sites": config.spo_sites,
             "export_to": config.export_to,
-            "scan_sites": config.scan_sites,
-            "verbose": config.verbose,
+            "output_dir": str(output_path),
+            "auth_mode": config.auth_mode,
+            "force_msal_desktop": config.force_msal_desktop,
+            "powershell_config": config.powershell_config,
         }
 
         result = Monkey365ScanResult(
@@ -72,11 +66,43 @@ class Monkey365ScanService:
             config_snapshot=config_snapshot,
             output_path=str(output_path),
             entreprise_slug=entreprise_slug,
+            auth_mode=config.auth_mode,
+            force_msal_desktop=config.force_msal_desktop or False,
+            powershell_config=config.powershell_config,
         )
         db.add(result)
         db.commit()
         db.refresh(result)
         return result
+
+    @staticmethod
+    def move_results_to_archive(scan_id: str, source_path: Path) -> Path:
+        """
+        Move Monkey365 results from monkey-reports/{GUID}/ to configured archive path.
+        Preserves JSON and HTML files, removing duplicate JSON from powershell_raw_output.json
+        """
+        archive_base = Path(settings.MONKEY365_ARCHIVE_PATH)
+        archive_base.mkdir(parents=True, exist_ok=True)
+        archive_path = archive_base / scan_id
+        
+        if archive_path.exists():
+            shutil.rmtree(archive_path)
+        
+        archive_path.mkdir(parents=True, exist_ok=True)
+        
+        for item in source_path.rglob("*"):
+            if item.is_file():
+                if item.name == "powershell_raw_output.json":
+                    continue
+                
+                rel_path = item.relative_to(source_path)
+                target_file = archive_path / rel_path
+                target_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(item, target_file)
+                logger.info(f"[MONKEY365] Copied {item.name} to {target_file}")
+        
+        logger.info(f"[MONKEY365] Results archived to {archive_path}")
+        return archive_path
 
     @staticmethod
     def execute_scan_background(result_id: int, config_data: dict[str, object]) -> None:
@@ -92,23 +118,10 @@ class Monkey365ScanService:
                 return
 
             config = Monkey365ConfigSchema(**config_data)
-            auth_mode = config.auth_mode.value if hasattr(config.auth_mode, "value") else str(config.auth_mode)
             executor_config = Monkey365Config(
-                provider=config.provider,
-                auth_mode=auth_mode,
-                tenant_id=config.tenant_id,
-                client_id=config.client_id,
-                client_secret=config.client_secret,
-                username=config.username,
-                password=config.password,
                 output_dir=result.output_path or config.output_dir,
-                rulesets=config.rulesets,
-                plugins=config.plugins,
-                collect=config.collect,
-                include_entra_id=config.include_entra_id,
+                spo_sites=config.spo_sites,
                 export_to=config.export_to,
-                scan_sites=config.scan_sites,
-                verbose=config.verbose,
             )
 
             executor = Monkey365Executor(executor_config, settings.MONKEY365_PATH or None)
@@ -128,15 +141,18 @@ class Monkey365ScanService:
                     "status": Monkey365ScanStatus.SUCCESS.value,
                     "created_at": result.created_at.isoformat(),
                     "completed_at": completed_at.isoformat(),
-                    "provider": config.provider,
-                    "auth_mode": auth_mode,
-                    "tenant_id": config.tenant_id,
-                    "client_id": config.client_id,
                     "output_path": result.output_path,
                     "findings_count": findings_count,
                 }
                 if result.output_path:
-                    _ = write_meta_json(Path(result.output_path), meta)
+                    write_meta_json(Path(result.output_path), meta)
+                    
+                    archive_path = Monkey365ScanService.move_results_to_archive(
+                        result.scan_id, 
+                        Path(result.output_path)
+                    )
+                    result.archive_path = str(archive_path)
+                    logger.info(f"[MONKEY365] Scan #{result_id} archived to {archive_path}")
             else:
                 error = run_result.get("error", "Erreur inconnue")
                 final_error = str(error)[:500]
@@ -158,6 +174,8 @@ class Monkey365ScanService:
                         created_at = completed_at
                     elif created_at.tzinfo is None:
                         created_at = created_at.replace(tzinfo=timezone.utc)
+                    else:
+                        created_at = created_at.astimezone(timezone.utc)
 
                     duration_seconds = int((completed_at - created_at).total_seconds())
                     result.duration_seconds = max(duration_seconds, 0)
@@ -223,3 +241,36 @@ class Monkey365ScanService:
     @staticmethod
     def get_scan(db: DBSession, scan_id: int) -> Monkey365ScanResult | None:
         return cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, scan_id))
+
+    @staticmethod
+    def delete_scan(db: DBSession, scan_id: int) -> bool:
+        """Delete a Monkey365 scan and clean up associated files."""
+        result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, scan_id))
+        if not result:
+            return False
+
+        # Clean up output directory
+        if result.output_path:
+            try:
+                output_path = Path(result.output_path)
+                if output_path.exists():
+                    shutil.rmtree(output_path)
+                    logger.info(f"[MONKEY365] Cleaned up output directory: {result.output_path}")
+            except Exception as exc:
+                logger.warning(f"[MONKEY365] Could not delete output directory {result.output_path}: {exc}")
+
+        # Clean up archive path
+        if result.archive_path:
+            try:
+                archive_path = Path(result.archive_path)
+                if archive_path.exists():
+                    shutil.rmtree(archive_path)
+                    logger.info(f"[MONKEY365] Cleaned up archive directory: {result.archive_path}")
+            except Exception as exc:
+                logger.warning(f"[MONKEY365] Could not delete archive directory {result.archive_path}: {exc}")
+
+        # Delete from database
+        db.delete(result)
+        db.commit()
+        logger.info(f"[MONKEY365] Scan #{scan_id} deleted from database")
+        return True
