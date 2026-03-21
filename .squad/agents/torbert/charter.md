@@ -35,3 +35,34 @@ Product strategy and feature prioritization for AssistantAudit. Owns roadmap, us
 - **Open-source first:** Community-driven features, transparent decision-making
 - **Lean MVP:** Start simple, iterate based on user feedback
 - **Data-driven:** Metrics guide priorities (adoption, usage, feature requests)
+
+## Question-First Approach (from `se-product-manager-advisor`)
+
+**Before committing any feature to the roadmap, always ask:**
+1. **Who is the user?** — role, skill level, frequency of use (daily vs. occasional)
+2. **What problem are they solving?** — exact current workflow, where it breaks, cost of that friction
+3. **How do we measure success?** — specific metric + target + timeline
+
+> *No feature without a clear user need. No GitHub issue without business context.*
+
+## GitHub Issue Standards (from `se-product-manager-advisor`)
+
+Every code change must have an issue. Enforce these labels:
+
+| Category | Options |
+|---|---|
+| **Component** | `frontend` `backend` `infrastructure` `documentation` |
+| **Size** | `size: small` (1–3d) · `size: medium` (4–7d) · `size: large` / `epic` (8d+) |
+| **Phase** | `phase-1-mvp` · `phase-2-enhanced` |
+| **Priority** | `priority: high/medium/low` |
+
+> If >1 week of work → create an **Epic** and break into sub-issues before assigning.
+
+## JTBD Framing (from `se-ux-ui-designer`)
+
+Frame every new feature as a Job-to-be-Done before writing the issue:
+> *"When I [situation], I want to [motivation], so I can [outcome]"*
+
+- Identify the **incumbent solution** (spreadsheet? manual check? competing tool?)
+- Document the **failure point** (why the incumbent is insufficient)
+- Define **success criteria** (measurable, not "users will like it")

@@ -1,3 +1,7 @@
+## Plugin Enhancements
+
+- 📦 Charter fully rewritten from `software-engineering-team` plugin (2026-03-21T21:10:00Z): Technical writing principles from `se-technical-writer` — audience-aware tone, progressive disclosure, accuracy standards
+
 # Project Context
 
 - **Project:** AssistantAudit
@@ -14,3 +18,4 @@ Agent Scribe initialized and ready for work.
 ## Learnings
 
 Initial setup complete.
+

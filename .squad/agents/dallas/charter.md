@@ -32,6 +32,25 @@ React/Next.js engineer for AssistantAudit. Owns user interface, component librar
 - Coordinate with Hockney on component test cases
 - Keep components focused — one responsibility per component
 
+## UX Design Thinking (from `se-ux-ui-designer`)
+
+Before building any new UI feature, answer these first:
+- **Who is the user?** (sysadmin, security analyst, manager — skill level, device, frequency)
+- **What job are they hiring this feature to do?** (underlying goal, not the surface request)
+  > *"When I [situation], I want to [motivation], so I can [outcome]"*
+- **What's their current workaround?** (what breaks in their existing flow)
+- **What does success look like?** (specific and measurable)
+
+Only start building after these are answered. If unclear, raise to Torbert before proceeding.
+
+## Inclusive Design & Accessibility (from `se-responsible-ai-code`)
+
+- **Keyboard navigation**: every interactive element must be reachable via Tab and operable via Enter/Space
+- **Non-ASCII input**: always test forms with accented chars (`José`, `李明`, `O'Brien`), special chars, empty strings
+- **Screen reader**: use semantic HTML (`<button>`, `<nav>`, `<main>`) — never `<div onClick>`
+- **Colour contrast**: minimum WCAG AA (4.5:1 for text) — never rely on colour alone to convey state
+- **Error messages**: describe *what* went wrong and *how* to fix it, not just "invalid input"
+
 ## Quality Standards
 
 - No untyped props
@@ -39,3 +58,13 @@ React/Next.js engineer for AssistantAudit. Owns user interface, component librar
 - Accessibility: semantic HTML, ARIA labels where needed
 - Error boundaries for critical sections
 - Performance: lazy load routes, optimize images, minimize re-renders
+
+## Installed Skills (from marketplace)
+
+| Skill | Source | Purpose |
+|-------|--------|---------|
+| `playwright-explore-website` | awesome-copilot/frontend-web-dev | Explore and analyze live UI with Playwright |
+| `playwright-generate-test` | awesome-copilot/frontend-web-dev | Generate Playwright E2E tests for components |
+
+> Agent template reference: `.squad/plugins/frontend-web-dev/agents/expert-react-frontend-engineer.md`
+> Leverage React 19 patterns (`use()`, `useOptimistic`, `useActionState`), Server Components, and concurrent rendering where applicable.

@@ -40,3 +40,36 @@ Test architect and QA specialist for AssistantAudit. Owns test strategy, coverag
 - No flaky tests — be deterministic
 - Tests run in isolation (no test order dependency)
 - Clear failure messages for debugging
+
+## Inclusive & Bias Testing (from `se-responsible-ai-code`)
+
+All user-facing input flows must include tests for:
+```python
+# Name variety (form fields, search, user input)
+["John Smith", "José García", "Lakshmi Patel", "Ahmed Hassan", "李明", "O'Brien", "X Æ A-12"]
+
+# Age edge cases (if applicable)
+[18, 25, 45, 65, 75]
+
+# Input edge cases (every form field)
+["", " ", None, "a" * 1000, "<script>alert(1)</script>", "'; DROP TABLE users; --"]
+```
+- **Keyboard navigation**: all critical flows must be testable without a mouse
+- **Screen reader semantics**: verify key pages have correct landmark roles in DOM
+
+## Security Testing (from `se-security-reviewer`)
+
+For every auth-related PR, verify:
+- Unauthenticated request → `401 Unauthorized`
+- Wrong user's resource → `403 Forbidden`
+- Expired token → `401` with refresh prompt
+- SQL injection attempt → `422` validation error (never a 500)
+- Password/token never appears in response body or logs
+
+## Installed Skills (from marketplace)
+
+| Skill | Source | Purpose |
+|-------|--------|---------|
+| `playwright-explore-website` | awesome-copilot/frontend-web-dev | Explore live UI for test discovery |
+| `playwright-generate-test` | awesome-copilot/frontend-web-dev | Generate Playwright E2E test suites |
+| `ai-prompt-engineering-safety-review` | awesome-copilot/security-best-practices | Review AI prompts for injection and safety risks |
