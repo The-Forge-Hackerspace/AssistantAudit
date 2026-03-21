@@ -1,139 +1,59 @@
 {
-  "agents": [
+  "registry": [
     {
       "persistent_name": "Keaton",
       "universe": "The Usual Suspects",
-      "role": "Product Owner",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Verbal",
-      "universe": "The Usual Suspects",
-      "role": "Scrum Master",
-      "created_at": "2026-03-19T10:50:53.486Z",
+      "role": "Lead & Architect",
+      "created_at": "2026-03-21T17:46:48Z",
       "legacy_named": false,
       "status": "active"
     },
     {
       "persistent_name": "Fenster",
       "universe": "The Usual Suspects",
-      "role": "Backend Lead Developer",
-      "created_at": "2026-03-19T10:50:53.486Z",
+      "role": "Backend Dev",
+      "created_at": "2026-03-21T17:46:48Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Dallas",
+      "universe": "The Usual Suspects",
+      "role": "Frontend Dev",
+      "created_at": "2026-03-21T17:46:48Z",
       "legacy_named": false,
       "status": "active"
     },
     {
       "persistent_name": "Hockney",
       "universe": "The Usual Suspects",
-      "role": "Backend Architect",
-      "created_at": "2026-03-19T10:50:53.486Z",
+      "role": "Tester & QA",
+      "created_at": "2026-03-21T17:46:48Z",
       "legacy_named": false,
       "status": "active"
     },
     {
-      "persistent_name": "McManus",
+      "persistent_name": "Torbert",
       "universe": "The Usual Suspects",
-      "role": "Backend Unit Tester",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Redfoot",
-      "universe": "The Usual Suspects",
-      "role": "Integration Engineer",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Kobayashi",
-      "universe": "The Usual Suspects",
-      "role": "Database Administrator",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Keaton-Jr",
-      "universe": "The Usual Suspects",
-      "role": "Frontend Lead Developer",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Arturro",
-      "universe": "The Usual Suspects",
-      "role": "Frontend Architect",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Strausz",
-      "universe": "The Usual Suspects",
-      "role": "Frontend Unit Tester",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Rabin",
-      "universe": "The Usual Suspects",
-      "role": "UX Designer",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Baer",
-      "universe": "The Usual Suspects",
-      "role": "Documentalist & Release Manager",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Fortier",
-      "universe": "The Usual Suspects",
-      "role": "Infrastructure Architect",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Kujan",
-      "universe": "The Usual Suspects",
-      "role": "Security Auditor",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
-      "status": "active"
-    },
-    {
-      "persistent_name": "Renault",
-      "universe": "The Usual Suspects",
-      "role": "DevSecOps Engineer",
-      "created_at": "2026-03-19T10:50:53.486Z",
+      "role": "Product Manager",
+      "created_at": "2026-03-21T17:46:48Z",
       "legacy_named": false,
       "status": "active"
     },
     {
       "persistent_name": "Scribe",
-      "universe": "N/A",
+      "universe": "system",
       "role": "Session Logger",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
+      "created_at": "2026-03-21T13:15:00Z",
+      "legacy_named": true,
       "status": "active"
     },
     {
       "persistent_name": "Ralph",
-      "universe": "N/A",
+      "universe": "system",
       "role": "Work Monitor",
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "legacy_named": false,
+      "created_at": "2026-03-21T13:15:00Z",
+      "legacy_named": true,
       "status": "active"
     }
   ]

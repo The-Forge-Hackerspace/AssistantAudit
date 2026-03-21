@@ -6,37 +6,40 @@ How to decide who handles what.
 
 | Work Type | Route To | Examples |
 |-----------|----------|----------|
-| **Governance & Scope** | Keaton (PO) | Feature priorities, scope changes, deliverable validation, business alignment |
-| **Sprint Coordination** | Verbal (SM) | Task routing, DoD enforcement, conflict resolution, blocker escalation |
-| **Backend API/Services** | Fenster | API endpoints in backend/app/api/v1/, business logic in backend/app/services/ |
-| **Backend Architecture** | Hockney | Data model design, API patterns, architectural review, breaking changes |
-| **Backend Testing** | McManus | pytest tests, fixtures, mocks, backend test coverage |
-| **Tool Integration** | Redfoot | backend/app/tools/ ONLY — Monkey365, ORADAD, PingCastle, Nmap bridges |
-| **Database** | Kobayashi | Alembic migrations, SQLAlchemy queries, data model optimization |
-| **Frontend Implementation** | Keaton-Jr | React pages, components in frontend/src/app/, API integration |
-| **Frontend Architecture** | Arturro | Component structure, state management, routing patterns |
-| **Frontend Testing** | Strausz | Jest/React Testing Library tests, UI validation |
-| **UX Design** | Rabin | Wireframes, UX flows, interaction patterns (approval required before frontend implementation) |
-| **Documentation** | Baer | CONCEPT.md, API.md, ARCHITECTURE.md, GitHub releases, version management |
-| **Infrastructure** | Fortier | Docker, docker-compose, .env.example, deployment configuration |
-| **Security Review** | Kujan | Auth code, file I/O, subprocess calls, external tools (AUTO-TRIGGERED) |
-| **CI/CD & Security Automation** | Renault | GitHub Actions, pip/npm audit, SAST, secret scanning, Docker security |
-| **Session logging** | Scribe | Automatic — never needs routing |
-| **Work monitoring** | Ralph | "Ralph, go" → continuous work scanning until board is clear |
+| Backend API, FastAPI endpoints, auth, database models | Fenster | Implement audit endpoints, JWT refresh, framework sync |
+| Frontend pages, React components, TypeScript, Tailwind | Dallas | Build findings dashboard, framework selector, login page |
+| Architecture decisions, code reviews, system design | Keaton | API structure, schema design, tech choices, PR reviews |
+| Test strategy, unit/integration tests, QA | Hockney | Framework audit tests, auth flows, edge cases |
+| Feature prioritization, roadmap, user research | Torbert | PRD intake, scope decisions, user stories |
+| Async issue work (bugs, tests, small features) | @copilot 🤖 | Well-defined tasks matching capability profile |
+| Session logging, decisions, memory | Scribe | Automatic — never needs routing |
 
 ## Issue Routing
 
 | Label | Action | Who |
 |-------|--------|-----|
-| `squad` | Triage: analyze issue, assign `squad:{member}` label | Verbal (SM) |
-| `squad:{member}` | Pick up issue and complete the work | Named member |
+| `squad` | Triage: analyze issue, evaluate @copilot fit, assign `squad:{member}` label | Lead |
+| `squad:{name}` | Pick up issue and complete the work | Named member |
+| `squad:copilot` | Assign to @copilot for autonomous work (if enabled) | @copilot 🤖 |
 
 ### How Issue Assignment Works
 
-1. When a GitHub issue gets the `squad` label, **Verbal (Scrum Master)** triages it — analyzing content, assigning the right `squad:{member}` label based on domain routing, and commenting with triage notes.
-2. When a `squad:{member}` label is applied, that member picks up the issue in their next session.
-3. Members can reassign by removing their label and adding another member's label (with SM approval).
-4. The `squad` label is the "inbox" — untriaged issues waiting for Scrum Master routing.
+1. When a GitHub issue gets the `squad` label, the **Lead** triages it — analyzing content, evaluating @copilot's capability profile, assigning the right `squad:{member}` label, and commenting with triage notes.
+2. **@copilot evaluation:** The Lead checks if the issue matches @copilot's capability profile (🟢 good fit / 🟡 needs review / 🔴 not suitable). If it's a good fit, the Lead may route to `squad:copilot` instead of a squad member.
+3. When a `squad:{member}` label is applied, that member picks up the issue in their next session.
+4. When `squad:copilot` is applied and auto-assign is enabled, `@copilot` is assigned on the issue and picks it up autonomously.
+5. Members can reassign by removing their label and adding another member's label.
+6. The `squad` label is the "inbox" — untriaged issues waiting for Lead review.
+
+### Lead Triage Guidance for @copilot
+
+When triaging, the Lead should ask:
+
+1. **Is this well-defined?** Clear title, reproduction steps or acceptance criteria, bounded scope → likely 🟢
+2. **Does it follow existing patterns?** Adding a test, fixing a known bug, updating a dependency → likely 🟢
+3. **Does it need design judgment?** Architecture, API design, UX decisions → likely 🔴
+4. **Is it security-sensitive?** Auth, encryption, access control → always 🔴
+5. **Is it medium complexity with specs?** Feature with clear requirements, refactoring with tests → likely 🟡
 
 ## Rules
 
@@ -46,7 +49,5 @@ How to decide who handles what.
 4. **When two agents could handle it**, pick the one whose domain is the primary concern.
 5. **"Team, ..." → fan-out.** Spawn all relevant agents in parallel as `mode: "background"`.
 6. **Anticipate downstream work.** If a feature is being built, spawn the tester to write test cases from requirements simultaneously.
-7. **Issue-labeled work** — when a `squad:{member}` label is applied to an issue, route to that member. Verbal handles all `squad` (base label) triage.
-8. **Communication chain enforced** — All agents → Verbal → Keaton. No agent makes structural/security/architectural decisions without routing through this chain.
-9. **Auto-triggered reviews** — Kujan (Security Auditor) is AUTOMATICALLY spawned when code touches: auth, file I/O, subprocess, external tools, or dependencies.
-10. **Definition of Done enforced** — Verbal blocks any task from "done" status until all 7 DoD criteria are met.
+7. **Issue-labeled work** — when a `squad:{member}` label is applied to an issue, route to that member. The Lead handles all `squad` (base label) triage.
+8. **@copilot routing** — when evaluating issues, check @copilot's capability profile in `team.md`. Route 🟢 good-fit tasks to `squad:copilot`. Flag 🟡 needs-review tasks for PR review. Keep 🔴 not-suitable tasks with squad members.

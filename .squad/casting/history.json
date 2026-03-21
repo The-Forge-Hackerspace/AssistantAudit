@@ -1,27 +1,15 @@
-{
-  "assignments": [
-    {
-      "assignment_id": "init-2026-03-19",
-      "universe": "The Usual Suspects",
-      "agent_count": 15,
-      "created_at": "2026-03-19T10:50:53.486Z",
-      "agents": [
-        "Keaton",
-        "Verbal",
-        "Fenster",
-        "Hockney",
-        "McManus",
-        "Redfoot",
-        "Kobayashi",
-        "Keaton-Jr",
-        "Arturro",
-        "Strausz",
-        "Rabin",
-        "Baer",
-        "Fortier",
-        "Kujan",
-        "Renault"
-      ]
-    }
-  ]
-}
+[
+  {
+    "assignment_id": "initial-squad-2026-03-21",
+    "timestamp": "2026-03-21T17:46:48Z",
+    "universe": "The Usual Suspects",
+    "agents": [
+      { "persistent_name": "Keaton", "role": "Lead & Architect" },
+      { "persistent_name": "Fenster", "role": "Backend Dev" },
+      { "persistent_name": "Dallas", "role": "Frontend Dev" },
+      { "persistent_name": "Hockney", "role": "Tester & QA" },
+      { "persistent_name": "Torbert", "role": "Product Manager" }
+    ],
+    "system_agents": ["Scribe", "Ralph"]
+  }
+]
