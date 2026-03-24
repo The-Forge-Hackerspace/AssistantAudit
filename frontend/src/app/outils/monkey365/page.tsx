@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -26,16 +26,26 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 
 import { toolsApi, entreprisesApi } from "@/services/api";
-import type { Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail } from "@/types/api";
+import type { Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail, Monkey365ScanLogs } from "@/types/api";
 
 export default function Monkey365Page() {
   const [activeTab, setActiveTab] = useState("launch");
   const [loading, setLoading] = useState(false);
   const [launching, setLaunching] = useState(false);
 
-  // Entreprises state
+  // Entreprises state — persisted in sessionStorage so selection survives navigation
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
-  const [selectedEntrepriseId, setSelectedEntrepriseId] = useState<string>("");
+  const [selectedEntrepriseId, setSelectedEntrepriseIdState] = useState<string>(() =>
+    typeof window !== "undefined" ? sessionStorage.getItem("monkey365_entreprise") ?? "" : ""
+  );
+  const setSelectedEntrepriseId = (id: string) => {
+    setSelectedEntrepriseIdState(id);
+    if (typeof window !== "undefined") sessionStorage.setItem("monkey365_entreprise", id);
+  };
+
+  // PowerShell logs state
+  const [scanLogs, setScanLogs] = useState<Monkey365ScanLogs | null>(null);
+  const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Simplified config - only 2 fields
   const [spoSites, setSpoSites] = useState<string[]>([]);
@@ -55,9 +65,20 @@ export default function Monkey365Page() {
     return `${min}min ${sec}s`;
   }
 
+  // SQLite returns naive datetimes (no Z suffix). JS treats those as local time
+  // instead of UTC, causing a -1h offset in UTC+1. Force UTC interpretation.
+  function parseDate(dateStr: string | null): Date | null {
+    if (!dateStr) return null;
+    const iso = dateStr.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(dateStr)
+      ? dateStr
+      : dateStr + "Z";
+    return new Date(iso);
+  }
+
   function formatTimestamp(dateStr: string | null): string {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleTimeString("fr-FR", {
+    const d = parseDate(dateStr);
+    if (!d) return "-";
+    return d.toLocaleTimeString("fr-FR", {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
@@ -65,8 +86,9 @@ export default function Monkey365Page() {
   }
 
   function formatDate(dateStr: string | null): string {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleString("fr-FR", {
+    const d = parseDate(dateStr);
+    if (!d) return "-";
+    return d.toLocaleString("fr-FR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -107,9 +129,9 @@ export default function Monkey365Page() {
       const detail = await toolsApi.getMonkey365ScanDetail(scanId);
       setSelectedScan(detail);
       if (detail.status === "running") {
-        const created = new Date(detail.created_at).getTime();
-        const now = Date.now();
-        setElapsedSeconds(Math.floor((now - created) / 1000));
+        // parseDate appends Z so naive UTC timestamps are correctly interpreted
+        const created = (parseDate(detail.created_at) ?? new Date()).getTime();
+        setElapsedSeconds(Math.floor((Date.now() - created) / 1000));
       } else {
         setElapsedSeconds(detail.duration_seconds || 0);
       }
@@ -119,35 +141,38 @@ export default function Monkey365Page() {
     }
   };
 
+  // Auto-load scans when the selected enterprise changes
   useEffect(() => {
-    if (selectedScan && selectedScan.status === "running") {
-      const interval = setInterval(async () => {
-        try {
-          const updated = await toolsApi.getMonkey365ScanDetail(selectedScan.id);
-          setSelectedScan(updated);
-          
-          if (updated.status !== "running") {
-            clearInterval(interval);
-            setElapsedSeconds(updated.duration_seconds || 0);
-          }
-        } catch (err) {
-          console.error("Failed to poll scan status:", err);
-        }
-      }, 2000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [selectedScan]);
+    loadScans();
+  }, [loadScans]);
 
+  // Poll the running scan detail every 2s — recreate only when id or status changes
   useEffect(() => {
-    if (selectedScan && selectedScan.status === "running") {
-      const ticker = setInterval(() => {
-        setElapsedSeconds(prev => prev + 1);
-      }, 1000);
-      
-      return () => clearInterval(ticker);
-    }
-  }, [selectedScan]);
+    if (!selectedScan || selectedScan.status !== "running") return;
+    const scanId = selectedScan.id;
+    const interval = setInterval(async () => {
+      try {
+        const updated = await toolsApi.getMonkey365ScanDetail(scanId);
+        setSelectedScan(updated);
+        if (updated.status !== "running") {
+          clearInterval(interval);
+          setElapsedSeconds(updated.duration_seconds || 0);
+        }
+      } catch (err) {
+        console.error("Failed to poll scan status:", err);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [selectedScan?.id, selectedScan?.status]);
+
+  // Elapsed-seconds ticker — recreate only when id or status changes (not every poll)
+  useEffect(() => {
+    if (!selectedScan || selectedScan.status !== "running") return;
+    const ticker = setInterval(() => {
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(ticker);
+  }, [selectedScan?.id, selectedScan?.status]);
 
   useEffect(() => {
     if (scans.some(s => s.status === "running")) {
@@ -155,6 +180,25 @@ export default function Monkey365Page() {
       return () => clearInterval(interval);
     }
   }, [scans, loadScans]);
+
+  // Poll PowerShell logs while scan is running, clear them when scan changes
+  useEffect(() => {
+    if (!selectedScan) { setScanLogs(null); return; }
+    const fetchLogs = async () => {
+      try {
+        const logs = await toolsApi.getMonkey365ScanLogs(selectedScan.id);
+        setScanLogs(logs);
+        // Auto-scroll to bottom
+        logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      } catch {
+        // ignore — log file may not exist yet
+      }
+    };
+    fetchLogs();
+    if (selectedScan.status !== "running") return;
+    const interval = setInterval(fetchLogs, 3000);
+    return () => clearInterval(interval);
+  }, [selectedScan?.id, selectedScan?.status]);
 
   useEffect(() => {
     const loadEntreprises = async () => {
@@ -241,6 +285,17 @@ export default function Monkey365Page() {
     }
   };
 
+  const handleCancelScan = async (scanId: number) => {
+    try {
+      const updated = await toolsApi.cancelMonkey365Scan(scanId);
+      setSelectedScan(prev => prev?.id === scanId ? { ...prev, ...updated } : prev);
+      setScans(prev => prev.map(s => s.id === scanId ? { ...s, status: updated.status } : s));
+      toast.success("Scan annulé");
+    } catch {
+      toast.error("Impossible d'annuler le scan");
+    }
+  };
+
   const handleDeleteScan = async (scanId: number) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce scan ?")) return;
     
@@ -279,6 +334,27 @@ export default function Monkey365Page() {
           </AlertDescription>
         </Alert>
 
+        {/* Enterprise selector — always visible, persisted across navigation */}
+        <Card className="mb-4">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-4">
+              <Label className="whitespace-nowrap">Entreprise *</Label>
+              <Select value={selectedEntrepriseId} onValueChange={setSelectedEntrepriseId}>
+                <SelectTrigger className="max-w-sm">
+                  <SelectValue placeholder="Sélectionner une entreprise" />
+                </SelectTrigger>
+                <SelectContent>
+                  {entreprises.map((ent) => (
+                    <SelectItem key={ent.id} value={ent.id.toString()}>
+                      {ent.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="launch">Lancer un scan</TabsTrigger>
@@ -295,23 +371,6 @@ export default function Monkey365Page() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Entreprise Selection */}
-                <div className="space-y-2">
-                  <Label>Entreprise *</Label>
-                  <Select value={selectedEntrepriseId} onValueChange={setSelectedEntrepriseId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une entreprise" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {entreprises.map((ent) => (
-                        <SelectItem key={ent.id} value={ent.id.toString()}>
-                          {ent.nom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 {/* SharePoint Sites */}
                 <div className="space-y-2">
                   <Label>Sites SharePoint (optionnel)</Label>
@@ -442,7 +501,7 @@ export default function Monkey365Page() {
                       {scans.map((scan) => (
                         <TableRow
                           key={scan.id}
-                          onClick={() => loadScanDetail(scan.id)}
+                          onClick={() => { loadScanDetail(scan.id); setActiveTab("details"); }}
                           className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900"
                         >
                           <TableCell className="font-mono text-xs">{scan.scan_id.slice(0, 8)}</TableCell>
@@ -452,7 +511,7 @@ export default function Monkey365Page() {
                           <TableCell>{formatDuration(scan.duration_seconds)}</TableCell>
                           <TableCell>
                              <div className="flex gap-2">
-                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); loadScanDetail(scan.id); }}>
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); loadScanDetail(scan.id); setActiveTab("details"); }}>
                               Détails
                             </Button>
                                <Button
@@ -491,6 +550,17 @@ export default function Monkey365Page() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Détails du scan</CardTitle>
+                      <div className="flex gap-2">
+                        {selectedScan.status === "running" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCancelScan(selectedScan.id)}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Forcer l'arrêt
+                          </Button>
+                        )}
                       <Button
                         variant="destructive"
                         size="sm"
@@ -509,6 +579,7 @@ export default function Monkey365Page() {
                           </>
                         )}
                       </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -546,23 +617,6 @@ export default function Monkey365Page() {
                     </div>
 
 
-                    {selectedScan.auth_mode && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Mode d'authentification</p>
-                          <p className="text-sm">{selectedScan.auth_mode}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">MSAL Desktop Auth</p>
-                          <p className="text-sm flex items-center gap-2">
-                            <span className={selectedScan.force_msal_desktop ? "text-green-600" : "text-gray-500"}>
-                              {selectedScan.force_msal_desktop ? "✓ Activé" : "✗ Désactivé"}
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
                     {selectedScan.error_message && (
                       <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />
@@ -576,6 +630,44 @@ export default function Monkey365Page() {
                         <pre className="text-xs overflow-auto max-h-32 text-gray-700 dark:text-gray-300">
                           {JSON.stringify(selectedScan.config_snapshot, null, 2)}
                         </pre>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* PowerShell logs */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">Logs PowerShell</CardTitle>
+                      {selectedScan.status === "running" && (
+                        <Badge className="bg-blue-500">
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          En direct
+                        </Badge>
+                      )}
+                      {scanLogs && scanLogs.total_lines > 500 && (
+                        <span className="text-xs text-gray-500">
+                          Affichage des 500 dernières lignes sur {scanLogs.total_lines}
+                        </span>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {!scanLogs || scanLogs.lines.length === 0 ? (
+                      <p className="text-xs text-gray-500 py-4 text-center">
+                        {selectedScan.status === "running"
+                          ? "En attente des premiers logs PowerShell…"
+                          : "Aucun log disponible"}
+                      </p>
+                    ) : (
+                      <div className="bg-gray-950 rounded p-3 max-h-96 overflow-y-auto font-mono text-xs">
+                        {scanLogs.lines.map((line, i) => (
+                          <div key={i} className="text-gray-200 leading-5 whitespace-pre-wrap break-all">
+                            {line || "\u00a0"}
+                          </div>
+                        ))}
+                        <div ref={logsEndRef} />
                       </div>
                     )}
                   </CardContent>

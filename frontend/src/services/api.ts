@@ -48,6 +48,7 @@ import type {
    Monkey365ScanCreate,
    Monkey365ScanResultSummary,
    Monkey365ScanResultDetail,
+   Monkey365ScanLogs,
    NetworkLink,
   NetworkLinkCreate,
   NetworkMap,
@@ -715,6 +716,16 @@ export const toolsApi = {
 
   async deleteMonkey365Scan(resultId: number): Promise<{ message: string }> {
     const response = await api.delete(`/tools/monkey365/scans/${resultId}`);
+    return response.data;
+  },
+
+  async getMonkey365ScanLogs(resultId: number): Promise<Monkey365ScanLogs> {
+    const response = await api.get(`/tools/monkey365/scans/result/${resultId}/logs`);
+    return response.data;
+  },
+
+  async cancelMonkey365Scan(resultId: number): Promise<Monkey365ScanResultSummary> {
+    const response = await api.post(`/tools/monkey365/scans/${resultId}/cancel`);
     return response.data;
   },
 };

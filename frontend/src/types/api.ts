@@ -944,7 +944,6 @@ export interface PingCastleResultRead extends PingCastleResultSummary {
 export interface Monkey365Config {
   spo_sites?: string[];
   export_to?: string[];
-  output_dir?: string;
 }
 
 export interface Monkey365ScanCreate {
@@ -968,7 +967,9 @@ export interface Monkey365ScanResultDetail extends Monkey365ScanResultSummary {
   config_snapshot?: Record<string, unknown> | null;
   output_path?: string | null;
   error_message?: string | null;
-  auth_mode?: string | null;
-  force_msal_desktop?: boolean;
-  powershell_config?: Record<string, unknown> | null;
+}
+
+export interface Monkey365ScanLogs {
+  lines: string[];
+  total_lines: number;
 }

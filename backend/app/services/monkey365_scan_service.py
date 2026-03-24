@@ -21,6 +21,7 @@ settings = get_settings()
 class DBSession(Protocol):
     def get(self, entity: object, ident: object) -> object | None: ...
     def add(self, instance: object) -> None: ...
+    def delete(self, instance: object) -> None: ...
     def commit(self) -> None: ...
     def refresh(self, instance: object) -> None: ...
     def query(self, entity: object) -> "QueryChain": ...
@@ -54,9 +55,6 @@ class Monkey365ScanService:
             "spo_sites": config.spo_sites,
             "export_to": config.export_to,
             "output_dir": str(output_path),
-            "auth_mode": config.auth_mode,
-            "force_msal_desktop": config.force_msal_desktop,
-            "powershell_config": config.powershell_config,
         }
 
         result = Monkey365ScanResult(
@@ -66,9 +64,6 @@ class Monkey365ScanService:
             config_snapshot=config_snapshot,
             output_path=str(output_path),
             entreprise_slug=entreprise_slug,
-            auth_mode=config.auth_mode,
-            force_msal_desktop=config.force_msal_desktop or False,
-            powershell_config=config.powershell_config,
         )
         db.add(result)
         db.commit()
@@ -76,33 +71,64 @@ class Monkey365ScanService:
         return result
 
     @staticmethod
-    def move_results_to_archive(scan_id: str, source_path: Path) -> Path:
+    def _snapshot_report_dirs(monkey365_base: Path) -> set[str]:
+        """Return names of existing subdirs in monkey-reports/ before a scan."""
+        reports_dir = monkey365_base / "monkey-reports"
+        if not reports_dir.exists():
+            return set()
+        return {d.name for d in reports_dir.iterdir() if d.is_dir()}
+
+    @staticmethod
+    def _find_new_report_dir(
+        monkey365_base: Path, before_snapshot: set[str]
+    ) -> Path | None:
+        """Find the new directory Monkey365 created during the scan."""
+        reports_dir = monkey365_base / "monkey-reports"
+        if not reports_dir.exists():
+            return None
+        for d in reports_dir.iterdir():
+            if d.is_dir() and d.name not in before_snapshot:
+                return d
+        return None
+
+    @staticmethod
+    def move_results_to_archive(
+        source_path: Path,
+        dest_path: Path,
+    ) -> Path:
         """
-        Move Monkey365 results from monkey-reports/{GUID}/ to configured archive path.
-        Preserves JSON and HTML files, removing duplicate JSON from powershell_raw_output.json
+        Move Monkey365 report files from source_path into dest_path.
+
+        source_path : monkey-reports/{MONKEY_GUID}/ directory created by Monkey365.
+        dest_path   : pre-computed scan output directory,
+                      e.g. data/{slug}/Cloud/M365/{scan_id}/
+                      Files are moved preserving their relative structure ({FORMAT}/{FILE}).
+
+        Skips powershell_raw_output.json.
         """
-        archive_base = Path(settings.MONKEY365_ARCHIVE_PATH)
-        archive_base.mkdir(parents=True, exist_ok=True)
-        archive_path = archive_base / scan_id
-        
-        if archive_path.exists():
-            shutil.rmtree(archive_path)
-        
-        archive_path.mkdir(parents=True, exist_ok=True)
-        
-        for item in source_path.rglob("*"):
-            if item.is_file():
-                if item.name == "powershell_raw_output.json":
-                    continue
-                
-                rel_path = item.relative_to(source_path)
-                target_file = archive_path / rel_path
-                target_file.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(item, target_file)
-                logger.info(f"[MONKEY365] Copied {item.name} to {target_file}")
-        
-        logger.info(f"[MONKEY365] Results archived to {archive_path}")
-        return archive_path
+        if dest_path.exists():
+            shutil.rmtree(dest_path)
+        dest_path.mkdir(parents=True, exist_ok=True)
+
+        if source_path.exists():
+            for item in source_path.rglob("*"):
+                if item.is_file() and item.name != "powershell_raw_output.json":
+                    rel_path = item.relative_to(source_path)
+                    target_file = dest_path / rel_path
+                    target_file.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(item), str(target_file))
+                    logger.info("[MONKEY365] Moved %s → %s", item.name, target_file)
+
+            try:
+                shutil.rmtree(source_path)
+                logger.info("[MONKEY365] Cleaned up source: %s", source_path)
+            except Exception:
+                logger.warning("[MONKEY365] Could not remove source: %s", source_path)
+        else:
+            logger.warning("[MONKEY365] Source not found: %s", source_path)
+
+        logger.info("[MONKEY365] Results archived to %s", dest_path)
+        return dest_path
 
     @staticmethod
     def execute_scan_background(result_id: int, config_data: dict[str, object]) -> None:
@@ -119,15 +145,16 @@ class Monkey365ScanService:
 
             config = Monkey365ConfigSchema(**config_data)
             executor_config = Monkey365Config(
-                output_dir=result.output_path or config.output_dir,
+                output_dir=result.output_path or "./monkey365_output",
                 spo_sites=config.spo_sites,
                 export_to=config.export_to,
-                auth_mode=config.auth_mode,
-                force_msal_desktop=config.force_msal_desktop,
-                powershell_config=config.powershell_config,
             )
 
             executor = Monkey365Executor(executor_config, settings.MONKEY365_PATH or None)
+
+            monkey365_base = executor.monkey365_base_dir
+            dirs_before = Monkey365ScanService._snapshot_report_dirs(monkey365_base)
+
             run_result = executor.run_scan(result.scan_id)
 
             if run_result.get("status") == "success":
@@ -149,13 +176,22 @@ class Monkey365ScanService:
                 }
                 if result.output_path:
                     write_meta_json(Path(result.output_path), meta)
-                    
+
+                new_report_dir = Monkey365ScanService._find_new_report_dir(
+                    monkey365_base, dirs_before
+                )
+                if new_report_dir:
+                    dest_path = Path(result.output_path)
                     archive_path = Monkey365ScanService.move_results_to_archive(
-                        result.scan_id, 
-                        Path(result.output_path)
+                        new_report_dir, dest_path
                     )
                     result.archive_path = str(archive_path)
-                    logger.info(f"[MONKEY365] Scan #{result_id} archived to {archive_path}")
+                    logger.info("[MONKEY365] Scan #%s archived to %s", result_id, archive_path)
+                else:
+                    logger.warning(
+                        "[MONKEY365] Scan #%s succeeded but no new report dir found in %s/monkey-reports/",
+                        result_id, monkey365_base,
+                    )
             else:
                 error = run_result.get("error", "Erreur inconnue")
                 final_error = str(error)[:500]

@@ -481,10 +481,6 @@ class PingCastleResultRead(BaseModel):
 class Monkey365ConfigSchema(BaseModel):
     spo_sites: list[str] = Field(default_factory=list, description="SharePoint sites to scan (e.g., https://domain.sharepoint.com)")
     export_to: list[str] = Field(default_factory=lambda: ["JSON", "HTML"], description="Export formats: JSON, HTML")
-    output_dir: str = Field("./monkey365_output", description="Output directory")
-    auth_mode: Optional[Literal["interactive", "device_code", "ropc", "client_credentials"]] = Field(None, description="Authentication mode: interactive, device_code, ropc, client_credentials")
-    force_msal_desktop: bool = Field(False, description="Whether to force MSAL interactive desktop authentication")
-    powershell_config: Optional[dict[str, Any]] = Field(None, description="All PowerShell configuration parameters")
 
 
 class Monkey365ScanCreate(BaseModel):
@@ -518,9 +514,6 @@ class Monkey365ScanResultRead(BaseModel):
     output_path: Optional[str] = None
     archive_path: Optional[str] = None
     entreprise_slug: Optional[str] = None
-    auth_mode: Optional[str] = None
-    force_msal_desktop: bool = False
-    powershell_config: Optional[dict] = None
     findings_count: Optional[int] = None
     error_message: Optional[str] = None
     created_at: datetime
@@ -528,3 +521,9 @@ class Monkey365ScanResultRead(BaseModel):
     duration_seconds: Optional[int] = None
 
     model_config = {"from_attributes": True}
+
+
+class Monkey365ScanLogs(BaseModel):
+    """Logs PowerShell d'un scan Monkey365 (lecture en direct du fichier log)."""
+    lines: list[str]
+    total_lines: int
