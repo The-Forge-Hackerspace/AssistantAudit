@@ -22,7 +22,7 @@ from ...schemas.assessment import (
 )
 from ...schemas.common import PaginatedResponse, MessageResponse, ScoreResponse
 from ...services.assessment_service import AssessmentService
-from ...services.monkey365_service import Monkey365Service, ScanRequest
+from ...services.monkey365_service import Monkey365Service
 
 router = APIRouter()
 
@@ -279,16 +279,9 @@ async def run_m365_scan(
     from ...core.config import get_settings
     settings = get_settings()
 
-    scan_req = ScanRequest(
-        tenant_id=body.tenant_id,
-        client_id=body.client_id,
-        client_secret=body.client_secret,
-        auth_method=body.auth_method,
-        provider=body.provider,
-        plugins=body.plugins,
-    )
     result = Monkey365Service.run_scan_and_map(
-        db, assessment_id, scan_req,
+        db, assessment_id,
+        spo_sites=body.spo_sites or None,
         monkey365_path=settings.MONKEY365_PATH or None,
     )
     return M365ScanResponse(

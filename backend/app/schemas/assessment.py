@@ -121,12 +121,7 @@ class CampaignSummary(BaseModel):
 # --- M365 Scan ---
 class M365ScanRequest(BaseModel):
     """Paramètres pour lancer un scan Monkey365 sur un assessment"""
-    tenant_id: str = Field(..., description="Azure tenant ID")
-    client_id: str = Field(..., description="App registration client ID")
-    client_secret: str = Field(..., description="App registration client secret")
-    auth_method: str = Field(default="client_credentials", pattern=r"^(client_credentials|certificate|interactive)$")
-    provider: str = Field(default="Microsoft365", pattern=r"^(Microsoft365|Azure|EntraID)$")
-    plugins: list[str] = Field(default_factory=list, description="Plugins spécifiques (vide = tous)")
+    spo_sites: list[str] = Field(default_factory=list, description="SharePoint sites to scan (e.g., https://domain.sharepoint.com)")
 
 
 class M365ScanSimulateRequest(BaseModel):

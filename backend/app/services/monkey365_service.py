@@ -14,22 +14,10 @@ from sqlalchemy.orm import Session
 from ..models.assessment import Assessment
 from ..services.assessment_service import AssessmentService
 from ..tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor
-from ..tools.monkey365_runner.config import Monkey365AuthMode, M365Provider
 from ..tools.monkey365_runner.parser import Monkey365Parser, Monkey365Finding
 from ..tools.monkey365_runner.mapper import Monkey365Mapper, MappingResult
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ScanRequest:
-    """Paramètres d'un scan M365"""
-    tenant_id: str
-    client_id: str
-    client_secret: str
-    auth_method: str = "client_credentials"
-    provider: str = "Microsoft365"
-    plugins: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -55,7 +43,7 @@ class Monkey365Service:
     def run_scan_and_map(
         db: Session,
         assessment_id: int,
-        scan_request: ScanRequest,
+        spo_sites: list[str] | None = None,
         monkey365_path: Optional[str] = None,
     ) -> ScanResult:
         """
@@ -67,7 +55,6 @@ class Monkey365Service:
         """
         scan_id = f"m365_{uuid.uuid4().hex[:8]}"
 
-        # 1. Valider l'assessment
         assessment = AssessmentService.get_assessment(db, assessment_id)
         if not assessment:
             return ScanResult(
@@ -83,14 +70,8 @@ class Monkey365Service:
                       f"n'utilise pas le moteur monkey365"
             )
 
-        # 2. Configurer et lancer Monkey365
         config = Monkey365Config(
-            provider=M365Provider(scan_request.provider),
-            auth_mode=Monkey365AuthMode(scan_request.auth_method),
-            tenant_id=scan_request.tenant_id,
-            client_id=scan_request.client_id,
-            client_secret=scan_request.client_secret,
-            plugins=scan_request.plugins,
+            spo_sites=spo_sites or [],
         )
 
         try:
@@ -111,16 +92,13 @@ class Monkey365Service:
                 error=raw_result.get("error", "Erreur inconnue"),
             )
 
-        # 3. Parser les résultats
         raw_findings = raw_result.get("results", [])
         findings: list[Monkey365Finding] = Monkey365Parser.parse_raw_results(raw_findings)
 
-        # 4. Mapper vers l'assessment
         mapping_results: list[MappingResult] = Monkey365Mapper.map_findings_to_assessment(
             db, assessment, findings, assessed_by="monkey365"
         )
 
-        # 5. Identifier les contrôles manuels restants
         manual_controls = Monkey365Mapper.get_unmapped_controls(assessment)
 
         logger.info(
@@ -165,10 +143,8 @@ class Monkey365Service:
                 error=f"Assessment {assessment_id} introuvable"
             )
 
-        # Parser les findings simulés
         findings = Monkey365Parser.parse_raw_results(simulated_findings)
 
-        # Mapper
         mapping_results = Monkey365Mapper.map_findings_to_assessment(
             db, assessment, findings, assessed_by="simulation"
         )
