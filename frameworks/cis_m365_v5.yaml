@@ -1,0 +1,2045 @@
+ref_id: "CIS-M365-V5"
+name: "CIS Microsoft 365 Foundations Benchmark v5"
+version: "5.0.0"
+description: >
+  Référentiel d'audit Microsoft 365 basé sur le CIS Microsoft 365 Foundations Benchmark version 5.0.0.
+  Couvre l'ensemble des services M365 : Entra ID, Exchange Online, SharePoint Online, OneDrive,
+  Microsoft Teams, Microsoft Purview, Intune et Microsoft Fabric.
+  Les contrôles avec monkey365_rule sont évalués automatiquement via Monkey365.
+engine: monkey365
+source: "CIS Microsoft 365 Foundations Benchmark v5.0.0 — https://www.cisecurity.org/benchmark/microsoft_365"
+author: "Center for Internet Security (CIS) — adapté par AssistantAudit"
+
+categories:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 1 — Paramètres généraux Microsoft 365
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: general-m365
+    name: "Paramètres généraux Microsoft 365"
+    description: "Configuration de base du tenant M365 : comptes administratifs, groupes, sessions et applications."
+    controls:
+
+      - id: cis5-1.1.1
+        title: "Comptes administratifs cloud uniquement (sans synchronisation)"
+        description: >
+          Les comptes d'administration globale doivent être des comptes cloud natifs (non synchronisés
+          depuis un annuaire on-premises). Cela limite l'impact d'une compromission de l'AD on-prem
+          sur le tenant M365.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "entra-id-missing-cloud-only-administrative-account"
+        cis_reference: "1.1.1"
+        remediation: |
+          1. Créer des comptes dédiés à l'administration dans Entra ID (non synchronisés depuis AD on-prem).
+          2. Attribuer les rôles administratifs à ces comptes cloud uniquement.
+          3. Les comptes de travail courant des administrateurs doivent rester distincts des comptes admin.
+
+      - id: cis5-1.1.2
+        title: "Comptes d'accès d'urgence (break-glass) configurés"
+        description: >
+          Au moins deux comptes d'accès d'urgence (break-glass) doivent être configurés dans le tenant.
+          Ces comptes permettent de récupérer l'accès administrateur en cas de panne ou de verrouillage.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-emergency-accounts"
+        cis_reference: "1.1.2"
+        remediation: |
+          1. Créer au minimum deux comptes break-glass dans Entra ID, exclus de toutes politiques d'accès conditionnel.
+          2. Stocker les credentials de manière sécurisée (coffre-fort physique ou HSM).
+          3. Activer les alertes sur toute utilisation de ces comptes.
+          4. Tester la procédure de récupération périodiquement.
+
+      - id: cis5-1.1.3
+        title: "Nombre de Global Administrators limité (≤ 4)"
+        description: >
+          Le nombre de Global Administrators doit être limité à 4 au maximum.
+          Un nombre excessif d'administrateurs globaux augmente la surface d'attaque privilégiée.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-iam-excessive-global-admins"
+        cis_reference: "1.1.3"
+        remediation: |
+          1. Inventorier tous les Global Administrators dans Entra ID > Rôles > Global Administrator.
+          2. Réduire le nombre à 2-4 administrateurs globaux maximum.
+          3. Remplacer les attributions permanentes par PIM (Privileged Identity Management) pour une activation just-in-time.
+          4. Déléguer les responsabilités via des rôles moins privilégiés (Exchange Admin, Security Admin, etc.).
+
+      - id: cis5-1.1.4
+        title: "Licences à empreinte réduite pour les utilisateurs PIM privilégiés"
+        description: >
+          Les utilisateurs disposant de rôles privilégiés via PIM doivent utiliser des licences
+          à empreinte applicative réduite afin de limiter l'exposition des applications cloud associées.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "entra-iam-pim-privileged-users-use-licenses-with-reduced-application-footprint"
+        cis_reference: "1.1.4"
+        remediation: |
+          1. Identifier les comptes d'administration PIM.
+          2. Attribuer des licences dédiées à l'administration (sans services bureautique comme Teams, Exchange, etc.).
+          3. Séparer les comptes admin (licences réduites) des comptes utilisateurs courants.
+
+      - id: cis5-1.2.1
+        title: "Absence de groupes M365 publics non contrôlés"
+        description: >
+          Les groupes Microsoft 365 configurés comme publics permettent à n'importe quel utilisateur
+          du tenant d'accéder à leur contenu. Leur existence doit être justifiée et contrôlée.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-public-group-detected"
+        cis_reference: "1.2.1"
+        remediation: |
+          1. Inventorier les groupes publics dans Entra ID > Groupes.
+          2. Évaluer la nécessité de chaque groupe public.
+          3. Convertir les groupes non justifiés en groupes privés.
+          4. Mettre en place une politique de gouvernance des groupes.
+
+      - id: cis5-1.2.2
+        title: "Connexion directe aux boîtes aux lettres partagées désactivée"
+        description: >
+          La connexion interactive (sign-in) directe aux boîtes aux lettres partagées doit être
+          désactivée. Ces boîtes doivent être accessibles uniquement via délégation depuis un compte
+          utilisateur authentifié.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exo-sign-in-shared-mailbox-enabled"
+        cis_reference: "1.2.2"
+        remediation: |
+          1. Dans Exchange Online, vérifier que le compte associé à chaque boîte partagée est bloqué (BlockSignIn = True).
+          2. Exécuter : Get-Mailbox -RecipientTypeDetails SharedMailbox | Set-MsolUser -BlockCredential $true
+          3. S'assurer que l'accès aux boîtes partagées se fait uniquement via permissions de délégation.
+
+      - id: cis5-1.3.1
+        title: "Expiration des mots de passe désactivée (politique recommandée)"
+        description: >
+          Selon les recommandations NIST et CIS, les mots de passe ne doivent pas expirer
+          périodiquement si une détection de compromission est en place. L'expiration forcée
+          encourage les utilisateurs à utiliser des mots de passe prévisibles.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-password-expiring-enabled"
+        cis_reference: "1.3.1"
+        remediation: |
+          1. Dans le Centre d'administration M365 > Paramètres > Sécurité > Stratégie de mot de passe,
+             désactiver l'expiration des mots de passe.
+          2. Activer la protection par mot de passe Entra ID et la liste de mots de passe interdits.
+          3. S'appuyer sur Identity Protection pour détecter les compromissions plutôt que sur l'expiration.
+
+      - id: cis5-1.3.2
+        title: "Politique de session inactive configurée"
+        description: >
+          Une politique de délai d'inactivité de session doit être configurée pour déconnecter
+          automatiquement les sessions Web M365 inactives.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "entra-idle-session-exists"
+        cis_reference: "1.3.2"
+        remediation: |
+          1. Dans le Centre d'administration M365 > Paramètres > Sécurité & Confidentialité,
+             configurer le délai d'inactivité de session (recommandé : 1 heure).
+          2. Compléter avec des politiques d'accès conditionnel limitant la durée des sessions navigateur.
+
+      - id: cis5-1.3.3
+        title: "Partage du calendrier avec des utilisateurs externes limité"
+        description: >
+          Le partage des informations de calendrier avec des utilisateurs externes doit être
+          limité aux informations de disponibilité (libre/occupé) uniquement.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-calendar-sharing-external-user-enabled"
+        cis_reference: "1.3.3"
+        remediation: |
+          1. Dans le Centre d'administration Exchange > Paramètres de l'organisation > Partage,
+             restreindre le partage externe au niveau de disponibilité uniquement.
+          2. Supprimer les politiques autorisant le partage des détails des rendez-vous avec des externes.
+
+      - id: cis5-1.3.4
+        title: "Applications et services utilisateur non autorisés bloqués"
+        description: >
+          Les utilisateurs ne doivent pas pouvoir installer des applications M365 tierces
+          ou accéder à des services non gérés par l'organisation.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "m365-user-owned-apps-and-services-allowed"
+        cis_reference: "1.3.4"
+        remediation: |
+          1. Dans le Centre d'administration M365 > Paramètres > Services > Applications intégrées,
+             désactiver la possibilité pour les utilisateurs d'installer des applications tierces.
+          2. Mettre en place un catalogue d'applications approuvées via le portail des applications.
+
+      - id: cis5-1.3.5
+        title: "Protection anti-hameçonnage interne dans Microsoft Forms activée"
+        description: >
+          La protection contre l'hameçonnage interne dans Microsoft Forms détecte
+          et bloque les formulaires utilisés à des fins de phishing au sein du tenant.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "forms-internal-phishing-protection-disabled"
+        cis_reference: "1.3.5"
+        remediation: |
+          1. Dans le Centre d'administration M365 > Paramètres > Services > Microsoft Forms,
+             activer la protection contre l'hameçonnage interne.
+          2. Activer les notifications aux utilisateurs signalés pour hameçonnage.
+
+      - id: cis5-1.3.6
+        title: "Fonctionnalité Customer Lockbox activée"
+        description: >
+          Customer Lockbox exige l'approbation d'un administrateur client avant que les ingénieurs
+          Microsoft puissent accéder aux données du tenant pour résoudre un incident de support.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-customer-lockout-feature-enabled"
+        cis_reference: "1.3.6"
+        remediation: |
+          1. Dans le Centre d'administration M365 > Paramètres > Sécurité & Confidentialité,
+             activer Customer Lockbox (nécessite une licence E5 ou add-on).
+          2. Configurer les notifications et le processus d'approbation interne.
+
+      - id: cis5-1.3.7
+        title: "Stockage tiers dans M365 désactivé"
+        description: >
+          L'intégration de services de stockage tiers (Dropbox, Box, Google Drive) dans
+          les applications M365 doit être désactivée pour éviter les fuites de données.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "third-party-storage-allowed-microsoft365"
+        cis_reference: "1.3.7"
+        remediation: |
+          1. Dans le Centre d'administration M365 > Paramètres > Services > Office sur le Web,
+             désactiver l'accès aux services de stockage tiers.
+
+      - id: cis5-1.3.8
+        title: "Partage externe dans Microsoft Sway désactivé"
+        description: >
+          Le partage externe de présentations Sway doit être désactivé pour éviter
+          la divulgation non contrôlée de contenu organisationnel.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sway-external-sharing-enabled"
+        cis_reference: "1.3.8"
+        remediation: |
+          1. Dans le Centre d'administration M365 > Paramètres > Services > Sway,
+             désactiver le partage externe.
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 2 — Microsoft Defender pour M365
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: defender-m365
+    name: "Microsoft Defender pour M365"
+    description: "Politiques de sécurité avancée : pièces jointes, liens, anti-phishing, anti-spam et surveillance."
+    controls:
+
+      - id: cis5-2.1.1
+        title: "Safe Links activé pour les applications Office"
+        description: >
+          La politique Safe Links de Microsoft Defender doit être activée pour les applications
+          Office afin de vérifier les URL au moment du clic.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-atp-safe-links-office-disabled"
+        cis_reference: "2.1.1"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques & règles > Politiques contre les menaces > Safe Links,
+             créer ou modifier une politique pour couvrir tous les utilisateurs.
+          2. Activer la vérification des URL dans les applications Office 365.
+          3. Activer le suivi des clics et les alertes en temps réel.
+
+      - id: cis5-2.1.2
+        title: "Filtre de types de pièces jointes communes activé"
+        description: >
+          Le filtre commun de types de fichiers dans les politiques anti-malware d'Exchange Online
+          doit être activé pour bloquer les extensions de fichiers exécutables couramment utilisés.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-common-attachment-type-filter-enabled"
+        cis_reference: "2.1.2"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques & règles > Politiques contre les menaces > Anti-malware,
+             activer le filtre de types de fichiers communs.
+          2. Ajouter les extensions dangereuses supplémentaires selon les besoins métier.
+
+      - id: cis5-2.1.3
+        title: "Notifications administrateur pour malware envoyé par des utilisateurs internes"
+        description: >
+          Des notifications doivent être envoyées à l'administrateur lorsqu'un malware est détecté
+          dans un message envoyé par un utilisateur interne.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-notifications-for-internal-users-sending-malware-disabled"
+        cis_reference: "2.1.3"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques anti-malware,
+             activer les notifications administrateur pour les malwares internes.
+          2. Configurer l'adresse de notification vers l'équipe de sécurité.
+
+      - id: cis5-2.1.4
+        title: "Politique Safe Attachments activée"
+        description: >
+          La politique Safe Attachments doit être configurée pour analyser les pièces jointes
+          dans un environnement sandbox avant leur livraison aux utilisateurs.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-atp-safe-attachments-policy-disabled"
+        cis_reference: "2.1.4"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques & règles > Safe Attachments,
+             créer une politique couvrant tous les utilisateurs.
+          2. Configurer l'action en cas de détection (bloquer ou remplacer).
+          3. Activer la livraison dynamique pour réduire la latence.
+
+      - id: cis5-2.1.5
+        title: "Safe Attachments activé pour SharePoint, OneDrive et Teams"
+        description: >
+          Safe Attachments doit être activé pour SharePoint Online, OneDrive et Teams
+          afin de détecter les fichiers malveillants stockés dans ces services.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-atp-safe-attachments-for-sharepoint-onedrive-and-teams-disabled"
+        cis_reference: "2.1.5"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques & règles > Safe Attachments,
+             activer Safe Attachments pour SharePoint, OneDrive et Microsoft Teams.
+          2. Cette configuration s'applique globalement via la commande PowerShell :
+             Set-AtpPolicyForO365 -EnableATPForSPOTeamsODB $true
+
+      - id: cis5-2.1.6
+        title: "Notification administrateur activée dans les politiques anti-spam"
+        description: >
+          Les politiques anti-spam doivent être configurées pour notifier l'administrateur
+          lorsqu'un utilisateur est bloqué pour envoi de spam.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-spam-policies-notify-admin-disabled"
+        cis_reference: "2.1.6"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques anti-spam (sortant),
+             configurer les notifications administrateur lors du blocage d'un utilisateur.
+          2. Définir l'adresse de notification vers l'équipe de sécurité.
+
+      - id: cis5-2.1.7
+        title: "Politique anti-hameçonnage configurée"
+        description: >
+          Une politique anti-hameçonnage Defender doit être activée avec la protection
+          contre l'usurpation d'identité (impersonation) et les domaines de confiance configurés.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-anti-phishing-policy-disabled"
+        cis_reference: "2.1.7"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques anti-hameçonnage,
+             activer la protection contre l'usurpation d'identité des utilisateurs et domaines.
+          2. Configurer les expéditeurs de confiance et les domaines protégés.
+          3. Activer la protection contre l'usurpation (spoof intelligence).
+
+      - id: cis5-2.1.8
+        title: "Enregistrements SPF publiés pour tous les domaines Exchange"
+        description: >
+          Un enregistrement SPF (Sender Policy Framework) valide doit être publié pour chaque
+          domaine utilisé dans Exchange Online afin de prévenir l'usurpation d'expéditeur.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-spf-records-are-published-for-all-exchange-domains"
+        cis_reference: "2.1.8"
+        remediation: |
+          1. Pour chaque domaine Exchange Online, ajouter dans le DNS :
+             v=spf1 include:spf.protection.outlook.com -all
+          2. Vérifier via : nslookup -type=TXT votre-domaine.com
+          3. Utiliser -all (rejet strict) plutôt que ~all.
+
+      - id: cis5-2.1.9
+        title: "DKIM activé pour tous les domaines"
+        description: >
+          DKIM (DomainKeys Identified Mail) doit être activé pour chaque domaine Exchange Online
+          afin de garantir l'intégrité et l'authenticité des emails sortants.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-dkim-disabled-for-domain"
+        cis_reference: "2.1.9"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques & règles > Paramètres d'authentification des e-mails,
+             activer DKIM pour chaque domaine.
+          2. Publier les enregistrements CNAME générés dans le DNS.
+          3. Attendre la propagation DNS et vérifier l'état dans le portail.
+
+      - id: cis5-2.1.10
+        title: "Enregistrements DMARC configurés pour tous les domaines"
+        description: >
+          Un enregistrement DMARC (Domain-based Message Authentication, Reporting and Conformance)
+          avec politique de rejet ou de quarantaine doit être publié pour chaque domaine.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-missing-dmarc-records"
+        cis_reference: "2.1.10"
+        remediation: |
+          1. Publier un enregistrement DMARC dans le DNS : _dmarc.votre-domaine.com
+          2. Valeur recommandée : v=DMARC1; p=reject; rua=mailto:dmarc@votre-domaine.com; ruf=mailto:dmarc@votre-domaine.com
+          3. Commencer par p=none pour la surveillance, puis passer à p=quarantine et p=reject progressivement.
+
+      - id: cis5-2.1.11
+        title: "Filtrage étendu des pièces jointes configuré"
+        description: >
+          Un filtrage complet des pièces jointes doit couvrir les types de fichiers exécutables,
+          scripts et archives couramment utilisés dans les attaques par email.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-lack-of-comprehensive-attachment-filtering"
+        cis_reference: "2.1.11"
+        remediation: |
+          1. Dans les politiques anti-malware Exchange Online, étendre la liste des extensions bloquées :
+             .exe, .bat, .cmd, .vbs, .js, .ps1, .jar, .msi, .reg, .hta, etc.
+          2. Évaluer l'ajout des archives (.zip, .7z, .rar) selon la politique de l'organisation.
+
+      - id: cis5-2.1.12
+        title: "Liste d'autorisation IP du filtre de connexion non configurée"
+        description: >
+          La liste blanche d'adresses IP dans le filtre de connexion Exchange Online ne doit pas
+          être configurée sauf nécessité absolue documentée, car elle contourne les protections anti-spam.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-connection-filter-ip-allow-list-enabled"
+        cis_reference: "2.1.12"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques anti-spam > Filtre de connexion,
+             vider ou supprimer les entrées de la liste d'autorisation IP.
+          2. Utiliser des règles de flux de courrier (transport rules) à la place si des exemptions sont nécessaires.
+
+      - id: cis5-2.1.13
+        title: "Liste de sécurité du filtre de connexion désactivée"
+        description: >
+          La liste de sécurité sûre (Safe List) du filtre de connexion ne doit pas être activée,
+          car elle autorise automatiquement les emails de certaines sources reconnues sans vérification.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-connection-filter-safe-list-enabled"
+        cis_reference: "2.1.13"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques anti-spam > Filtre de connexion,
+             désactiver la liste de sécurité sûre (Turn on safe list).
+
+      - id: cis5-2.1.14
+        title: "Domaines autorisés dans les politiques anti-spam entrant supprimés"
+        description: >
+          Les politiques anti-spam ne doivent pas contenir de domaines dans la liste des expéditeurs
+          ou domaines autorisés, car cela contourne tous les filtres de sécurité.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exhange-inbound-anti-spam-policies-allowed-domains"
+        cis_reference: "2.1.14"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques anti-spam (entrant),
+             supprimer tous les domaines de la liste des expéditeurs/domaines autorisés.
+          2. Si des exceptions sont nécessaires, utiliser des règles de flux de courrier avec conditions précises.
+
+      - id: cis5-2.2.1
+        title: "Surveillance des comptes d'accès d'urgence configurée"
+        description: >
+          Des alertes doivent être configurées pour notifier immédiatement l'équipe de sécurité
+          lors de toute utilisation des comptes d'accès d'urgence (break-glass).
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "emergency-access-account-not-monitored"
+        cis_reference: "2.2.1"
+        remediation: |
+          1. Dans le portail Microsoft Defender ou Microsoft Sentinel,
+             créer une alerte déclenchée par toute connexion des comptes break-glass.
+          2. Configurer des notifications immédiates vers l'équipe de sécurité (email, SMS, Teams).
+          3. Activer le logging dans Microsoft Sentinel pour corréler avec d'autres événements.
+
+      - id: cis5-2.4.1
+        title: "Protection des comptes prioritaires activée"
+        description: >
+          La fonctionnalité de protection des comptes prioritaires (Priority Account Protection)
+          dans Microsoft Defender doit être activée pour les utilisateurs à fort risque.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-priority-account-protection-not-enabled"
+        cis_reference: "2.4.1"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Paramètres > Comptes prioritaires,
+             identifier et marquer les comptes à fort risque (dirigeants, finance, IT).
+          2. Activer la protection renforcée pour ces comptes.
+
+      - id: cis5-2.4.2
+        title: "Protection stricte appliquée aux comptes prioritaires"
+        description: >
+          Les comptes prioritaires doivent bénéficier de la politique de protection stricte (Strict)
+          dans Microsoft Defender pour une protection maximale contre les menaces avancées.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-priority-accounts-lacks-strict-protection"
+        cis_reference: "2.4.2"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Politiques de protection,
+             appliquer les profils de protection Strict aux comptes prioritaires identifiés.
+
+      - id: cis5-2.4.3
+        title: "Microsoft Defender for Cloud Apps activé"
+        description: >
+          Microsoft Defender for Cloud Apps (anciennement MCAS) doit être activé pour
+          surveiller et contrôler l'utilisation des applications cloud dans l'organisation.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-defender-for-cloud-apps-not-enabled"
+        cis_reference: "2.4.3"
+        remediation: |
+          1. Activer Microsoft Defender for Cloud Apps (licence requise : M365 E5 Security ou add-on).
+          2. Configurer les connecteurs d'applications pour Microsoft 365, Azure, etc.
+          3. Définir des politiques de surveillance et d'alerte adaptées au contexte.
+
+      - id: cis5-2.4.4
+        title: "Zero-Hour Auto Purge (ZAP) pour Teams activé"
+        description: >
+          Le purge automatique à zéro heure (ZAP) pour Microsoft Teams doit être activé
+          pour supprimer rétroactivement les messages malveillants dans Teams.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-zero-hour-auto-purge-for-teams-disabled"
+        cis_reference: "2.4.4"
+        remediation: |
+          1. Dans le portail Microsoft Defender, activer ZAP pour Microsoft Teams.
+          2. S'assurer que la politique Safe Attachments pour Teams est activée (prérequis).
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 3 — Microsoft Purview — Conformité et protection des informations
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: purview-compliance
+    name: "Microsoft Purview — Conformité et protection des informations"
+    description: "Journalisation d'audit, prévention des pertes de données (DLP) et étiquettes de sensibilité."
+    controls:
+
+      - id: cis5-3.1.1
+        title: "Recherche dans le journal d'audit activée (Purview)"
+        description: >
+          La recherche dans le journal d'audit unifié doit être activée dans Microsoft Purview
+          pour permettre l'investigation des incidents de sécurité.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "purview-audit-log-search-disabled"
+        cis_reference: "3.1.1"
+        remediation: |
+          1. Dans le portail Microsoft Purview > Audit, activer la recherche dans le journal d'audit.
+          2. Alternative PowerShell : Set-AdminAuditLogConfig -UnifiedAuditLogIngestionEnabled $true
+          3. Vérifier la rétention des logs (90 jours minimum pour E3, 1 an pour E5).
+
+      - id: cis5-3.2.1
+        title: "Politiques DLP configurées pour Exchange, SharePoint et OneDrive"
+        description: >
+          Des politiques de prévention des pertes de données (DLP) doivent être actives
+          pour protéger les données sensibles dans Exchange, SharePoint et OneDrive.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "purview-dlp-policies-disabled"
+        cis_reference: "3.2.1"
+        remediation: |
+          1. Dans le portail Microsoft Purview > Prévention des pertes de données > Politiques,
+             créer des politiques DLP pour les types d'informations sensibles pertinents.
+          2. Couvrir les emplacements : Exchange Email, SharePoint Sites, OneDrive Accounts.
+          3. Configurer les actions (bloquer, alerter, notifier) selon la criticité.
+
+      - id: cis5-3.2.2
+        title: "Politiques DLP configurées pour Microsoft Teams"
+        description: >
+          Des politiques DLP spécifiques à Microsoft Teams doivent être activées
+          pour prévenir le partage de données sensibles dans les chats et canaux Teams.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "purview-dlp-policies-Teams-disabled"
+        cis_reference: "3.2.2"
+        remediation: |
+          1. Dans le portail Microsoft Purview > Prévention des pertes de données > Politiques,
+             créer ou étendre des politiques DLP pour couvrir Microsoft Teams.
+          2. Inclure les chats Teams et les messages de canal dans la portée.
+
+      - id: cis5-3.3.1
+        title: "Étiquettes de sensibilité et politiques de publication configurées"
+        description: >
+          Des étiquettes de sensibilité (Sensitivity Labels) doivent être créées et publiées
+          pour classifier et protéger les informations selon leur sensibilité.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "purview-lack-of-information-protection-label-policies"
+        cis_reference: "3.3.1"
+        remediation: |
+          1. Dans le portail Microsoft Purview > Protection des informations > Étiquettes,
+             créer une hiérarchie d'étiquettes (Public, Interne, Confidentiel, Très Confidentiel).
+          2. Configurer le chiffrement et les marquages visuels pour les étiquettes sensibles.
+          3. Publier les étiquettes via des politiques d'étiquetage ciblant les utilisateurs appropriés.
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 4 — Gestion des appareils (Microsoft Intune)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: intune-devices
+    name: "Gestion des appareils Microsoft Intune"
+    description: "Politiques de conformité des appareils et restrictions d'inscription."
+    controls:
+
+      - id: cis5-4.1
+        title: "Politique de conformité des appareils configurée"
+        description: >
+          Une politique de conformité Intune doit être configurée pour marquer comme non conformes
+          les appareils ne respectant pas les exigences de sécurité minimales.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "devices-without-compliance-policy-not-compliance"
+        cis_reference: "4.1"
+        remediation: |
+          1. Dans le Centre d'administration Microsoft Endpoint Manager > Appareils > Politiques de conformité,
+             créer des politiques pour Windows, iOS/iPadOS et Android.
+          2. Exiger : chiffrement, code PIN, protection antivirus, version OS minimale.
+          3. Configurer les actions en cas de non-conformité (email, mise en quarantaine, blocage).
+
+      - id: cis5-4.2
+        title: "Inscription des appareils personnels bloquée"
+        description: >
+          Les restrictions d'inscription Intune doivent bloquer l'enregistrement des appareils
+          personnels (BYOD) qui ne sont pas gérés par l'organisation.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "devices-enrollment-personal-devices-not-blocked"
+        cis_reference: "4.2"
+        remediation: |
+          1. Dans le Centre d'administration Microsoft Endpoint Manager > Appareils > Restrictions d'inscription,
+             créer une restriction bloquant les appareils de propriété personnelle.
+          2. Exiger que tous les appareils accédant aux ressources soient inscrits et conformes.
+          3. Définir une politique d'accès conditionnel exigeant la conformité des appareils.
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 5.1 — Entra ID — Gestion des utilisateurs et paramètres
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: entra-id-users
+    name: "Entra ID — Gestion des utilisateurs et paramètres"
+    description: "Configuration des utilisateurs, groupes, consentement des applications et invités dans Entra ID."
+    controls:
+
+      - id: cis5-5.1.2.1
+        title: "MFA par utilisateur (héritage) désactivé au profit de l'accès conditionnel"
+        description: >
+          Le MFA de type « par utilisateur » (méthode héritée) doit être désactivé.
+          La MFA doit être appliquée uniquement via des politiques d'accès conditionnel
+          pour une gestion centralisée et cohérente.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-per-user-mfa-disabled"
+        cis_reference: "5.1.2.1"
+        remediation: |
+          1. Vérifier que des politiques d'accès conditionnel exigeant le MFA sont en place.
+          2. Dans le portail Entra ID > Utilisateurs > Authentification multifacteur (héritage),
+             désactiver le MFA par utilisateur pour tous les comptes.
+          3. Migrer vers les politiques d'accès conditionnel si ce n'est pas encore fait.
+
+      - id: cis5-5.1.2.2
+        title: "Inscription d'applications par les utilisateurs restreinte"
+        description: >
+          Les utilisateurs standard ne doivent pas pouvoir enregistrer des applications dans Entra ID.
+          Cette capacité doit être réservée aux administrateurs.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-users-can-register-apps-enabled"
+        cis_reference: "5.1.2.2"
+        remediation: |
+          1. Dans le portail Entra ID > Paramètres utilisateur,
+             définir « Les utilisateurs peuvent enregistrer des applications » sur Non.
+
+      - id: cis5-5.1.2.3
+        title: "Création de tenants par les utilisateurs non-administrateurs bloquée"
+        description: >
+          Les utilisateurs standard ne doivent pas pouvoir créer de nouveaux tenants Entra ID,
+          ce qui pourrait contourner les contrôles de gouvernance de l'organisation.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-non-admin-users-allowedto-create-tenants"
+        cis_reference: "5.1.2.3"
+        remediation: |
+          1. Dans le portail Entra ID > Paramètres utilisateur,
+             définir « Les utilisateurs peuvent créer des tenants Azure AD » sur Non.
+
+      - id: cis5-5.1.2.4
+        title: "Accès au portail d'administration Entra restreint aux administrateurs"
+        description: >
+          L'accès au portail d'administration Entra ID doit être restreint aux administrateurs.
+          Les utilisateurs standard ne doivent pas pouvoir consulter les informations du répertoire.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-restrict-users-entra-portal"
+        cis_reference: "5.1.2.4"
+        remediation: |
+          1. Dans le portail Entra ID > Paramètres utilisateur,
+             définir « Restreindre l'accès au portail d'administration Azure AD » sur Oui.
+
+      - id: cis5-5.1.2.5
+        title: "Politique « Rester connecté » désactivée"
+        description: >
+          La fonctionnalité « Rester connecté ? » doit être désactivée pour éviter
+          la persistance de sessions sur des appareils non gérés.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-stay-signed-policy-disabled"
+        cis_reference: "5.1.2.5"
+        remediation: |
+          1. Dans le portail Entra ID > Marque de l'entreprise,
+             désactiver l'option « Afficher l'option pour rester connecté ».
+
+      - id: cis5-5.1.2.6
+        title: "Synchronisation LinkedIn désactivée"
+        description: >
+          La synchronisation des données de profil LinkedIn doit être désactivée
+          pour éviter le partage de données organisationnelles avec LinkedIn.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-linkedin-sync-enabled"
+        cis_reference: "5.1.2.6"
+        remediation: |
+          1. Dans le portail Entra ID > Paramètres utilisateur > Intégrations LinkedIn,
+             désactiver l'intégration LinkedIn pour tous les utilisateurs.
+
+      - id: cis5-5.1.3.1
+        title: "Groupe dynamique pour les utilisateurs invités configuré"
+        description: >
+          Un groupe dynamique incluant automatiquement tous les utilisateurs invités
+          doit être configuré pour faciliter la gestion et la gouvernance des invités.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-dynamic-group-for-guest-users-not-present"
+        cis_reference: "5.1.3.1"
+        remediation: |
+          1. Dans le portail Entra ID > Groupes > Nouveau groupe,
+             créer un groupe dynamique avec la règle : (user.userType -eq "Guest")
+          2. Utiliser ce groupe pour appliquer des politiques d'accès spécifiques aux invités.
+
+      - id: cis5-5.1.5.1
+        title: "Consentement utilisateur aux applications restreint"
+        description: >
+          Les utilisateurs ne doivent pas pouvoir consentir à des applications tierces
+          accédant aux données de l'organisation sans approbation administrateur.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-users-can-consent-apps-data-access"
+        cis_reference: "5.1.5.1"
+        remediation: |
+          1. Dans le portail Entra ID > Applications d'entreprise > Paramètres du consentement utilisateur,
+             désactiver le consentement utilisateur ou le restreindre aux applications vérifiées.
+          2. Activer le workflow d'approbation du consentement d'application.
+
+      - id: cis5-5.1.5.2
+        title: "Workflow d'approbation du consentement d'application activé"
+        description: >
+          Le workflow d'approbation administrateur pour le consentement d'application
+          doit être activé afin que les demandes d'accès aux données soient examinées.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-admin-consent-workflow-not-enabled"
+        cis_reference: "5.1.5.2"
+        remediation: |
+          1. Dans le portail Entra ID > Applications d'entreprise > Consentement et autorisations,
+             activer le workflow d'approbation du consentement d'application administrateur.
+          2. Désigner les réviseurs (administrateurs) qui examineront les demandes.
+
+      - id: cis5-5.1.6.1
+        title: "Collaboration externe restreinte à des domaines spécifiques"
+        description: >
+          La collaboration externe via Entra ID B2B doit être limitée à une liste de domaines
+          autorisés pour contrôler l'exposition des ressources organisationnelles.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-restrict-collaboration-specific-domains-disabled"
+        cis_reference: "5.1.6.1"
+        remediation: |
+          1. Dans le portail Entra ID > Identités externes > Paramètres de collaboration externe,
+             configurer la liste des domaines autorisés ou bloqués pour les invités B2B.
+
+      - id: cis5-5.1.6.2
+        title: "Restrictions d'accès aux objets pour les invités activées"
+        description: >
+          Les utilisateurs invités doivent avoir des restrictions sur leur accès aux objets
+          du répertoire (utilisateurs, groupes, applications) pour limiter la reconnaissance interne.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-guest-object-restriction-disabled"
+        cis_reference: "5.1.6.2"
+        remediation: |
+          1. Dans le portail Entra ID > Identités externes > Paramètres de collaboration externe,
+             définir les autorisations des invités sur le niveau le plus restrictif
+             (les invités ne peuvent accéder qu'à leurs propres objets de répertoire).
+
+      - id: cis5-5.1.6.3
+        title: "Invitation d'invités restreinte aux administrateurs"
+        description: >
+          Seuls les administrateurs doivent pouvoir inviter des utilisateurs externes dans le tenant.
+          Cette restriction limite les risques d'ajout non contrôlé d'identités externes.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-guest-invite-restriction-disabled"
+        cis_reference: "5.1.6.3"
+        remediation: |
+          1. Dans le portail Entra ID > Identités externes > Paramètres de collaboration externe,
+             définir « Qui peut inviter des invités ? » sur « Uniquement les administrateurs ».
+
+      - id: cis5-5.1.8.1
+        title: "Synchronisation du hachage de mot de passe (PHS) activée"
+        description: >
+          La synchronisation du hachage de mot de passe doit être activée comme méthode
+          de résilience pour les environnements hybrides, permettant la détection des fuites
+          de credentials via Microsoft Entra ID Protection.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-password-hash-sync-disabled"
+        cis_reference: "5.1.8.1"
+        remediation: |
+          1. Dans Azure AD Connect, activer la synchronisation du hachage de mot de passe (PHS).
+          2. PHS permet également à Identity Protection de détecter des credentials compromis.
+          3. Vérifier que la synchronisation fonctionne correctement après activation.
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 5.2 — Entra ID — Accès conditionnel
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: entra-id-conditional-access
+    name: "Entra ID — Accès conditionnel"
+    description: "Politiques d'accès conditionnel pour le MFA, l'authentification legacy, les risques et la conformité des appareils."
+    controls:
+
+      - id: cis5-5.2.2.1
+        title: "MFA exigé pour les utilisateurs hautement privilégiés via l'accès conditionnel"
+        description: >
+          Une politique d'accès conditionnel doit exiger le MFA pour tous les utilisateurs
+          disposant de rôles administratifs sensibles (Global Admin, Security Admin, etc.).
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-ensure-mfa-for-high-privileged-users-missing-cap"
+        cis_reference: "5.2.2.1"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique ciblant les rôles administratifs sensibles.
+          2. Exiger l'authentification multifacteur (MFA) pour l'accès à toutes les applications.
+          3. Exclure uniquement les comptes break-glass de cette politique.
+
+      - id: cis5-5.2.2.2
+        title: "MFA exigé pour tous les utilisateurs via l'accès conditionnel"
+        description: >
+          Une politique d'accès conditionnel doit exiger le MFA pour l'ensemble des utilisateurs
+          lors de l'accès à toutes les applications cloud de l'organisation.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-ensure-mfa-for-users-missing-cap"
+        cis_reference: "5.2.2.2"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique ciblant Tous les utilisateurs > Toutes les applications cloud.
+          2. Accorder l'accès avec l'exigence : Authentification multifacteur.
+          3. Exclure uniquement les comptes break-glass.
+
+      - id: cis5-5.2.2.3
+        title: "Authentification legacy bloquée via l'accès conditionnel"
+        description: >
+          Une politique d'accès conditionnel doit bloquer les protocoles d'authentification
+          hérités (Basic Auth, POP, IMAP, SMTP Auth) qui ne supportent pas le MFA.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-cap-block-legacy-authentication-not-enabled"
+        cis_reference: "5.2.2.3"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique ciblant les clients Exchange ActiveSync et « autres clients ».
+          2. Bloquer l'accès pour ces méthodes d'authentification.
+          3. Surveiller les journaux de connexion pour identifier les impacts avant d'activer.
+
+      - id: cis5-5.2.2.4
+        title: "Fréquence de connexion et session de navigateur sans persistance configurées"
+        description: >
+          Des politiques de fréquence de connexion et de session de navigateur non persistante
+          doivent être configurées pour les utilisateurs privilégiés.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-cap-lack-sign-in-frequency-browser-persistent-session"
+        cis_reference: "5.2.2.4"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique de contrôle de session pour les rôles administratifs.
+          2. Configurer la fréquence de connexion (ex. : 4 heures).
+          3. Désactiver la session de navigateur persistante pour les administrateurs.
+
+      - id: cis5-5.2.2.5
+        title: "MFA résistant au hameçonnage exigé pour les utilisateurs privilégiés"
+        description: >
+          Les utilisateurs hautement privilégiés doivent utiliser une méthode MFA résistante
+          au hameçonnage (clés FIDO2, Windows Hello, certificats) via une politique d'accès conditionnel.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-ensure-phishing-resistant-mfa-for-high-privileged-users-missing-cap"
+        cis_reference: "5.2.2.5"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique pour les rôles administratifs exigeant la force d'authentification
+             « Authentification résistante au hameçonnage ».
+          2. Distribuer des clés FIDO2 ou utiliser Windows Hello for Business pour ces comptes.
+
+      - id: cis5-5.2.2.6
+        title: "Politique de risque utilisateur exigeant le changement de mot de passe"
+        description: >
+          Une politique d'accès conditionnel basée sur le risque utilisateur doit exiger
+          un changement de mot de passe sécurisé lorsque le risque est élevé ou moyen.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-cap-user-risk-policy-require-password-change"
+        cis_reference: "5.2.2.6"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique ciblant les utilisateurs à risque moyen ou élevé.
+          2. Exiger un changement de mot de passe sécurisé (nécessite Azure AD Premium P2).
+
+      - id: cis5-5.2.2.7
+        title: "Politique de risque de connexion exigeant le MFA"
+        description: >
+          Une politique d'accès conditionnel doit exiger le MFA lorsque le risque
+          de connexion est moyen ou élevé (connexions suspectes détectées par Identity Protection).
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-cap-sign-in-risk-policy-require-mfa"
+        cis_reference: "5.2.2.7"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique pour les connexions à risque moyen/élevé exigeant le MFA.
+          2. Cette politique nécessite Azure AD Identity Protection (Premium P2).
+
+      - id: cis5-5.2.2.8
+        title: "Blocage des connexions à risque élevé configuré"
+        description: >
+          Les connexions identifiées comme présentant un risque élevé doivent être
+          bloquées automatiquement par une politique d'accès conditionnel.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-cap-block-sign-in-risk-not-enabled"
+        cis_reference: "5.2.2.8"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique bloquant l'accès pour les connexions à risque élevé.
+          2. Vérifier les faux positifs dans les journaux Identity Protection avant d'activer.
+
+      - id: cis5-5.2.2.9
+        title: "Conformité de l'appareil exigée pour toutes les applications"
+        description: >
+          Une politique d'accès conditionnel doit exiger que les appareils accédant
+          aux applications cloud soient conformes aux politiques Intune de l'organisation.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-require-device-compliant-all-apps-missing-cap"
+        cis_reference: "5.2.2.9"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique exigeant « Appareil marqué comme conforme » pour toutes les applications.
+          2. Vérifier que les politiques de conformité Intune sont configurées en préalable.
+
+      - id: cis5-5.2.2.10
+        title: "Appareil conforme requis pour l'inscription des informations de sécurité"
+        description: >
+          Les utilisateurs ne doivent pouvoir enregistrer leurs informations de sécurité MFA
+          que depuis des appareils conformes aux politiques de l'organisation.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-require-device-compliant-to-register-security-info-missing-cap"
+        cis_reference: "5.2.2.10"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique ciblant l'action d'inscription « Enregistrer des informations de sécurité »
+             exigeant un appareil conforme.
+
+      - id: cis5-5.2.2.11
+        title: "Fréquence de connexion configurée pour l'inscription Intune"
+        description: >
+          Une politique de fréquence de connexion doit être configurée pour l'action
+          d'inscription dans Microsoft Intune afin de limiter les sessions prolongées.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-sign-in-frequency-intune-enrollment-missing-cap"
+        cis_reference: "5.2.2.11"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique de contrôle de session pour l'inscription Intune
+             configurant une fréquence de connexion raisonnable (ex. : 1 jour).
+
+      - id: cis5-5.2.2.12
+        title: "Flux de connexion par code d'appareil bloqué"
+        description: >
+          Le flux d'authentification par code d'appareil (device code flow) doit être bloqué
+          via une politique d'accès conditionnel pour prévenir les attaques de hameçonnage
+          utilisant ce flux.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-device-code-sign-in-flow-not-enabled"
+        cis_reference: "5.2.2.12"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Accès conditionnel,
+             créer une politique ciblant le flux d'authentification « Device code flow »
+             et bloquer l'accès.
+          2. Cette restriction protège contre les attaques de type « illicit consent grant ».
+
+      - id: cis5-5.2.3.1
+        title: "Protection contre la fatigue MFA activée dans Microsoft Authenticator"
+        description: >
+          La protection contre la fatigue MFA (Number Matching + Additional Context)
+          doit être activée dans Microsoft Authenticator pour prévenir les attaques
+          d'approbation involontaire de demandes MFA.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-microsoft-authenticator-lack-mfa-fatigue-protection"
+        cis_reference: "5.2.3.1"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Méthodes d'authentification > Microsoft Authenticator,
+             activer Number Matching et Additional Context.
+          2. Ces fonctionnalités empêchent les utilisateurs d'approuver des demandes MFA frauduleuses.
+
+      - id: cis5-5.2.3.2
+        title: "Liste de mots de passe interdits personnalisée activée"
+        description: >
+          Une liste de mots de passe interdits personnalisée doit être configurée dans
+          Entra ID Password Protection pour bloquer les mots de passe spécifiques à l'organisation.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-custom-banned-password-list-disabled"
+        cis_reference: "5.2.3.2"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Méthodes d'authentification > Protection par mot de passe,
+             activer la liste de mots de passe interdits personnalisée.
+          2. Ajouter le nom de l'organisation, ses produits, ses marques et variantes.
+
+      - id: cis5-5.2.3.3
+        title: "Protection par mot de passe on-premises activée"
+        description: >
+          La protection par mot de passe Entra ID doit être déployée sur l'environnement
+          AD on-premises pour appliquer les politiques de mots de passe dans l'annuaire local.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-password-protection-on-prem-not-enabled"
+        cis_reference: "5.2.3.3"
+        remediation: |
+          1. Installer les agents Azure AD Password Protection sur les contrôleurs de domaine.
+          2. Configurer le mode d'application (Audit puis Enforced).
+          3. Vérifier le bon fonctionnement via les journaux d'événements Windows.
+
+      - id: cis5-5.2.3.4
+        title: "Absence d'utilisateurs incapables de s'authentifier avec MFA"
+        description: >
+          Tous les utilisateurs actifs doivent avoir au moins une méthode d'authentification
+          MFA enregistrée et être capables de s'authentifier avec MFA.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-non-mfa-capable-users-present"
+        cis_reference: "5.2.3.4"
+        remediation: |
+          1. Dans le portail Entra ID > Rapports > Activité d'authentification,
+             identifier les utilisateurs sans méthode MFA enregistrée.
+          2. Lancer une campagne d'inscription MFA pour les utilisateurs concernés.
+          3. Exiger l'inscription MFA via une politique d'accès conditionnel.
+
+      - id: cis5-5.2.3.5
+        title: "Méthodes d'authentification faibles désactivées"
+        description: >
+          Les méthodes d'authentification considérées comme faibles (SMS, appel vocal)
+          doivent être désactivées au profit de méthodes plus sécurisées (Authenticator, FIDO2).
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-weak-authentication-methods-enabled"
+        cis_reference: "5.2.3.5"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Méthodes d'authentification > Politiques,
+             désactiver les méthodes faibles (SMS OTP, appel téléphonique) pour le MFA.
+          2. Favoriser Microsoft Authenticator (avec Number Matching) ou les clés FIDO2.
+
+      - id: cis5-5.2.3.6
+        title: "MFA préféré par le système activé"
+        description: >
+          La fonctionnalité « System-preferred MFA » doit être activée pour encourager
+          les utilisateurs à utiliser leur méthode MFA la plus sécurisée disponible.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-system-preferred-mfa-disabled"
+        cis_reference: "5.2.3.6"
+        remediation: |
+          1. Dans le portail Entra ID > Sécurité > Méthodes d'authentification > Paramètres,
+             activer le MFA préféré par le système.
+
+      - id: cis5-5.2.4.1
+        title: "Réinitialisation de mot de passe en libre-service (SSPR) activée pour tous"
+        description: >
+          La réinitialisation de mot de passe en libre-service (SSPR) doit être activée
+          pour tous les utilisateurs afin de réduire la charge du service d'assistance.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-sspr-enabled-set-to-all"
+        cis_reference: "5.2.4.1"
+        remediation: |
+          1. Dans le portail Entra ID > Protection > Réinitialisation de mot de passe,
+             activer SSPR pour tous les utilisateurs.
+          2. Exiger au moins deux méthodes d'authentification pour la réinitialisation.
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 5.3 — Entra ID — Gestion des identités privilégiées (PIM)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: entra-id-pim
+    name: "Entra ID — Gestion des identités privilégiées (PIM)"
+    description: "Privileged Identity Management : activation just-in-time, revues d'accès et approbations pour les rôles sensibles."
+    controls:
+
+      - id: cis5-5.3.1
+        title: "PIM utilisé pour la gestion des rôles privilégiés"
+        description: >
+          Privileged Identity Management (PIM) doit être utilisé pour tous les rôles
+          d'administration sensibles afin d'activer une élévation de privilège just-in-time.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-pim-is-used-to-manage-roles"
+        cis_reference: "5.3.1"
+        remediation: |
+          1. Activer Azure AD Privileged Identity Management (nécessite Premium P2).
+          2. Convertir les attributions permanentes de rôles sensibles en attributions éligibles PIM.
+          3. Configurer les paramètres PIM : durée d'activation, MFA obligatoire, justification requise.
+
+      - id: cis5-5.3.2
+        title: "Revues d'accès pour les utilisateurs invités configurées"
+        description: >
+          Des revues d'accès périodiques doivent être configurées pour les utilisateurs invités
+          afin de valider régulièrement la légitimité de leur accès.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-access-reviews-for-guest-users-are-configured"
+        cis_reference: "5.3.2"
+        remediation: |
+          1. Dans le portail Entra ID > Identity Governance > Revues d'accès,
+             créer une revue périodique (trimestrielle) pour les utilisateurs invités.
+          2. Configurer la suppression automatique en cas de non-réponse des réviseurs.
+
+      - id: cis5-5.3.3
+        title: "Revues d'accès pour les rôles hautement privilégiés configurées"
+        description: >
+          Des revues d'accès régulières doivent être configurées pour les rôles d'administration
+          sensibles afin de valider la légitimité des attributions.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-high-privileged-roles-access-reviews-not-configured"
+        cis_reference: "5.3.3"
+        remediation: |
+          1. Dans le portail Entra ID > Identity Governance > Revues d'accès,
+             créer des revues périodiques pour les rôles Global Administrator, Security Administrator, etc.
+          2. Configurer la révocation automatique en cas de non-approbation.
+
+      - id: cis5-5.3.4
+        title: "Approbation requise pour l'activation du rôle Global Administrator"
+        description: >
+          L'activation du rôle Global Administrator via PIM doit nécessiter une approbation
+          d'un second administrateur pour prévenir les élévations de privilège non autorisées.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-approval-not-required-for-global-admin-role-activation"
+        cis_reference: "5.3.4"
+        remediation: |
+          1. Dans PIM > Rôles Azure AD > Global Administrator > Paramètres,
+             activer l'option « Exiger une approbation pour activer ».
+          2. Désigner des approbateurs qualifiés pour ce rôle.
+
+      - id: cis5-5.3.5
+        title: "Approbation requise pour l'activation du rôle Privileged Role Administrator"
+        description: >
+          L'activation du rôle Privileged Role Administrator via PIM doit nécessiter
+          une approbation explicite en raison de sa capacité à modifier les attributions de rôles.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "eid-approval-not-required-for-privileged-role-administrator-activation"
+        cis_reference: "5.3.5"
+        remediation: |
+          1. Dans PIM > Rôles Azure AD > Privileged Role Administrator > Paramètres,
+             activer l'option « Exiger une approbation pour activer ».
+          2. Désigner des approbateurs distincts du titulaire du rôle.
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 6 — Exchange Online
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: exchange-online
+    name: "Exchange Online — Journalisation, sécurité et configuration"
+    description: "Audit des boîtes aux lettres, règles de transport, transfert automatique et authentification moderne."
+    controls:
+
+      - id: cis5-6.1.1
+        title: "Audit Exchange Online activé globalement"
+        description: >
+          L'audit des boîtes aux lettres Exchange Online doit être activé globalement
+          pour enregistrer les actions des propriétaires, délégués et administrateurs.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-audit-enabled-globally"
+        cis_reference: "6.1.1"
+        remediation: |
+          1. Activer l'audit global via PowerShell Exchange Online :
+             Set-OrganizationConfig -AuditDisabled $false
+          2. Vérifier que l'audit est activé pour chaque boîte aux lettres :
+             Get-Mailbox -ResultSize Unlimited | Set-Mailbox -AuditEnabled $true
+
+      - id: cis5-6.1.2
+        title: "Actions d'audit des boîtes aux lettres complètes configurées"
+        description: >
+          Les actions d'audit des boîtes aux lettres doivent couvrir les opérations sensibles
+          pour les propriétaires, délégués et administrateurs (lecture, suppression, déplacement, etc.).
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-mailbox-audit-actions-disabled"
+        cis_reference: "6.1.2"
+        remediation: |
+          1. Activer les actions d'audit recommandées via PowerShell :
+             Get-Mailbox -ResultSize Unlimited | Set-Mailbox -AuditOwner @{Add="MailboxLogin","HardDelete","SoftDelete","MoveToDeletedItems"} -AuditDelegate @{Add="SendAs","SendOnBehalf","SoftDelete","HardDelete","MoveToDeletedItems"} -AuditAdmin @{Add="Copy","MessageBind","HardDelete","SendAs"}
+
+      - id: cis5-6.1.3
+        title: "Contournement d'audit des boîtes aux lettres désactivé"
+        description: >
+          Aucun compte ne doit être configuré pour contourner l'audit des boîtes aux lettres,
+          ce qui rendrait ses actions invisibles dans les journaux.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-audit-bypass-enabled"
+        cis_reference: "6.1.3"
+        remediation: |
+          1. Identifier les comptes avec contournement d'audit :
+             Get-MailboxAuditBypassAssociation -ResultSize Unlimited | Where-Object {$_.AuditBypassEnabled -eq $true}
+          2. Désactiver le contournement pour chaque compte :
+             Set-MailboxAuditBypassAssociation -Identity "compte" -AuditBypassEnabled $false
+
+      - id: cis5-6.2.1
+        title: "Transfert automatique des emails vers l'externe bloqué"
+        description: >
+          Les règles de transfert automatique d'emails vers des adresses externes doivent être
+          bloquées pour prévenir l'exfiltration de données par des comptes compromis.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-mail-forwarding-blocked-and-disabled"
+        cis_reference: "6.2.1"
+        remediation: |
+          1. Dans le Centre d'administration Exchange > Flux de courrier > Règles,
+             créer une règle bloquant le transfert automatique vers des domaines externes.
+          2. Alternative : configurer la politique de transfert sortant dans les paramètres anti-spam.
+          3. Surveiller les boîtes aux lettres avec des règles de transfert existantes.
+
+      - id: cis5-6.2.2
+        title: "Règles de transport sans liste blanche de domaines"
+        description: >
+          Les règles de flux de courrier (transport rules) ne doivent pas contenir de domaines
+          en liste blanche qui permettraient de contourner les filtres de sécurité.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-transport-rules-domain-whitelisted"
+        cis_reference: "6.2.2"
+        remediation: |
+          1. Dans le Centre d'administration Exchange > Flux de courrier > Règles,
+             revoir et supprimer toute règle contenant des exceptions basées sur des domaines expéditeurs.
+          2. Utiliser des mécanismes d'authentification email (SPF, DKIM, DMARC) à la place.
+
+      - id: cis5-6.2.3
+        title: "Indicateur d'expéditeur externe configuré dans les emails"
+        description: >
+          Un marquage visuel ou un avertissement doit être ajouté aux emails provenant
+          de l'extérieur de l'organisation pour alerter les utilisateurs des risques de hameçonnage.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-external-email-sender-configured"
+        cis_reference: "6.2.3"
+        remediation: |
+          1. Activer le marquage des expéditeurs externes dans le Centre d'administration Exchange :
+             Paramètres de l'organisation > Email > Etiquette externe.
+          2. Alternative : créer une règle de transport ajoutant une bannière HTML aux emails externes.
+
+      - id: cis5-6.3.1
+        title: "Installation de compléments Outlook par les utilisateurs restreinte"
+        description: >
+          Les utilisateurs ne doivent pas pouvoir installer des compléments Outlook sans
+          approbation administrative pour prévenir l'installation de compléments malveillants.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-users-installing-outlook-add-ins-allowed"
+        cis_reference: "6.3.1"
+        remediation: |
+          1. Dans le Centre d'administration Microsoft 365 > Paramètres > Services > Applications intégrées,
+             désactiver l'installation autonome de compléments Outlook par les utilisateurs.
+          2. Gérer les compléments via le portail centralisé des applications.
+
+      - id: cis5-6.5.1
+        title: "Authentification moderne activée dans Exchange Online"
+        description: >
+          L'authentification moderne (OAuth 2.0) doit être activée dans Exchange Online
+          pour permettre l'accès conditionnel et le MFA sur tous les clients de messagerie.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-modern-authentication-disabled"
+        cis_reference: "6.5.1"
+        remediation: |
+          1. Vérifier l'état via PowerShell : Get-OrganizationConfig | Select-Object OAuth2ClientProfileEnabled
+          2. Activer si nécessaire : Set-OrganizationConfig -OAuth2ClientProfileEnabled $true
+          3. S'assurer que les clients Outlook supportent l'authentification moderne.
+
+      - id: cis5-6.5.2
+        title: "MailTips activé pour les destinataires externes"
+        description: >
+          Les MailTips doivent être configurés pour alerter les utilisateurs lorsqu'ils
+          envoient des emails à des destinataires externes, réduisant les risques d'envoi accidentel.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-mailtips-disabled"
+        cis_reference: "6.5.2"
+        remediation: |
+          1. Activer les MailTips dans Exchange Online via PowerShell :
+             Set-OrganizationConfig -MailTipsExternalRecipientsTipsEnabled $true
+             Set-OrganizationConfig -MailTipsLargeAudienceThreshold 25
+
+      - id: cis5-6.5.3
+        title: "Accès au stockage externe dans Outlook Web App désactivé"
+        description: >
+          L'accès aux services de stockage tiers (Google Drive, Box, etc.) depuis
+          Outlook Web App doit être désactivé pour prévenir les fuites de données.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-owa-external-storage-allowed"
+        cis_reference: "6.5.3"
+        remediation: |
+          1. Dans le Centre d'administration Exchange > Paramètres Outlook Web App,
+             désactiver les compléments de stockage tiers.
+
+      - id: cis5-6.5.4
+        title: "Authentification SMTP désactivée"
+        description: >
+          L'authentification SMTP (SMTP AUTH) doit être désactivée globalement.
+          Elle ne doit être activée que pour les comptes spécifiques nécessitant
+          un accès SMTP authentifié (imprimantes, scanners, applications legacy).
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "exchange-smtp-auth-enabled"
+        cis_reference: "6.5.4"
+        remediation: |
+          1. Désactiver SMTP AUTH globalement :
+             Set-TransportConfig -SmtpClientAuthenticationDisabled $true
+          2. Réactiver individuellement pour les comptes légitimes :
+             Set-CASMailbox -Identity "service-account" -SmtpClientAuthenticationDisabled $false
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 7 — SharePoint Online et OneDrive
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: sharepoint-onedrive
+    name: "SharePoint Online et OneDrive"
+    description: "Partage externe, accès invité, liens anonymes, protection des fichiers et exécution de scripts."
+    controls:
+
+      - id: cis5-7.2.1
+        title: "Authentification moderne requise dans SharePoint Online"
+        description: >
+          SharePoint Online doit exiger l'authentification moderne pour toutes les connexions
+          afin de bénéficier de l'accès conditionnel et du MFA.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-modern-authentication-required"
+        cis_reference: "7.2.1"
+        remediation: |
+          1. Via PowerShell SharePoint Online :
+             Set-SPOTenant -LegacyAuthProtocolsEnabled $false
+
+      - id: cis5-7.2.2
+        title: "Intégration B2B SharePoint configurée"
+        description: >
+          L'intégration Azure B2B pour les invités SharePoint doit être activée pour gérer
+          les accès invités via Entra ID plutôt que via des comptes SharePoint ad hoc.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-b2b-integration-disabled"
+        cis_reference: "7.2.2"
+        remediation: |
+          1. Via PowerShell SharePoint Online : Set-SPOTenant -EnableAzureADB2BIntegration $true
+
+      - id: cis5-7.2.3
+        title: "Partage externe SharePoint limité aux domaines autorisés ou désactivé"
+        description: >
+          Le partage externe de SharePoint doit être limité aux utilisateurs existants,
+          aux domaines autorisés ou désactivé selon la politique de l'organisation.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-external-content-sharing-not-restricted"
+        cis_reference: "7.2.3"
+        remediation: |
+          1. Dans le Centre d'administration SharePoint > Partage,
+             définir le niveau de partage externe sur « Invités existants » ou « Uniquement les personnes de votre organisation ».
+          2. Éviter les niveaux « Tout le monde » et « Invités nouveaux et existants » sans contrôles compensatoires.
+
+      - id: cis5-7.2.4
+        title: "Partage externe OneDrive limité"
+        description: >
+          Le partage externe dans OneDrive doit être restreint pour éviter le partage
+          non contrôlé de fichiers avec des personnes extérieures à l'organisation.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-onedrive-external-content-sharing-not-restricted"
+        cis_reference: "7.2.4"
+        remediation: |
+          1. Dans le Centre d'administration SharePoint > Partage,
+             restreindre le niveau de partage externe pour OneDrive au niveau le plus restrictif adapté.
+          2. Le niveau OneDrive ne peut pas dépasser le niveau SharePoint.
+
+      - id: cis5-7.2.5
+        title: "Partage invité dans SharePoint restreint aux invités authentifiés"
+        description: >
+          Le partage avec des invités ne doit être autorisé qu'avec des utilisateurs
+          disposant d'un compte Microsoft ou d'entreprise, pas avec n'importe qui.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-guest-user-sharing-disabled"
+        cis_reference: "7.2.5"
+        remediation: |
+          1. Dans le Centre d'administration SharePoint > Paramètres de partage avancés,
+             s'assurer que les invités doivent se connecter avec le même compte auquel l'invitation a été envoyée.
+
+      - id: cis5-7.2.6
+        title: "Liste de domaines autorisés/bloqués pour le partage externe configurée"
+        description: >
+          Une liste de domaines autorisés ou bloqués doit être configurée pour le partage
+          externe SharePoint et OneDrive afin de contrôler avec qui les fichiers peuvent être partagés.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-external-sharing-managed-allow-deny-domain-list"
+        cis_reference: "7.2.6"
+        remediation: |
+          1. Dans le Centre d'administration SharePoint > Partage > Partage externe avancé,
+             configurer la liste des domaines autorisés ou bloqués.
+
+      - id: cis5-7.2.7
+        title: "Type de lien de partage par défaut restreint"
+        description: >
+          Le type de lien de partage par défaut dans SharePoint doit être défini sur
+          « Personnes spécifiques » et non « Tout le monde » pour limiter le partage accidentel.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-link-sharing-not-restricted"
+        cis_reference: "7.2.7"
+        remediation: |
+          1. Dans le Centre d'administration SharePoint > Partage,
+             définir « Type de lien de partage par défaut » sur « Personnes spécifiques ».
+          2. Éviter les paramètres « Tout le monde » ou « Les personnes de votre organisation ».
+
+      - id: cis5-7.2.8
+        title: "Partage externe restreint par groupe de sécurité"
+        description: >
+          Le partage externe SharePoint doit être limité à un groupe de sécurité spécifique
+          d'utilisateurs autorisés à partager avec des personnes externes.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-external-sharing-not-restricted-by-security-group"
+        cis_reference: "7.2.8"
+        remediation: |
+          1. Via PowerShell SharePoint Online :
+             Set-SPOTenant -SharingAllowedDomainList "domaine1.com,domaine2.com" -SharingBlockedDomainList ""
+          2. Configurer un groupe de sécurité pour contrôler qui peut partager externement.
+
+      - id: cis5-7.2.9
+        title: "Expiration de l'accès invité aux sites et OneDrive configurée"
+        description: >
+          L'accès invité aux sites SharePoint et OneDrive doit avoir une date d'expiration
+          automatique pour éviter les accès persistants non contrôlés.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-guest-access-to-site-or-onedrive-not-expire"
+        cis_reference: "7.2.9"
+        remediation: |
+          1. Dans le Centre d'administration SharePoint > Partage,
+             configurer l'expiration de l'accès invité (recommandé : 30 ou 60 jours).
+          2. Via PowerShell : Set-SPOTenant -ExternalUserExpirationRequired $true -ExternalUserExpireInDays 30
+
+      - id: cis5-7.2.10
+        title: "Ré-authentification des destinataires de liens avec code de vérification"
+        description: >
+          Les destinataires de liens de partage protégés par code de vérification doivent
+          se ré-authentifier périodiquement pour confirmer leur identité.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-reauthentication-with-verification-code-disabled"
+        cis_reference: "7.2.10"
+        remediation: |
+          1. Via PowerShell SharePoint Online :
+             Set-SPOTenant -EmailAttestationRequired $true -EmailAttestationReAuthDays 30
+
+      - id: cis5-7.2.11
+        title: "Permission des liens de partage définie sur Lecture seule par défaut"
+        description: >
+          Les liens de partage doivent avoir la permission Lecture seule par défaut
+          pour éviter l'attribution accidentelle de droits de modification.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-link-sharing-permission-not-set"
+        cis_reference: "7.2.11"
+        remediation: |
+          1. Dans le Centre d'administration SharePoint > Partage,
+             définir la permission par défaut des liens sur « Afficher » (lecture seule).
+
+      - id: cis5-7.3.1
+        title: "Téléchargement de fichiers infectés bloqué dans SharePoint/OneDrive"
+        description: >
+          Le téléchargement de fichiers détectés comme infectés par malware doit être
+          bloqué dans SharePoint Online et OneDrive.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-microsoft365-infected-files-disallowed-to-download-not-enabled"
+        cis_reference: "7.3.1"
+        remediation: |
+          1. Via PowerShell SharePoint Online :
+             Set-SPOTenant -DisallowInfectedFileDownload $true
+
+      - id: cis5-7.3.2
+        title: "Synchronisation OneDrive restreinte aux appareils gérés"
+        description: >
+          La synchronisation OneDrive doit être restreinte aux appareils joints au domaine
+          ou conformes aux politiques Intune pour éviter la synchronisation sur des appareils non gérés.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-onedrive-sync-restricted-for-unmanaged-devices"
+        cis_reference: "7.3.2"
+        remediation: |
+          1. Dans le Centre d'administration SharePoint > Paramètres,
+             activer la restriction de synchronisation OneDrive aux appareils joints au domaine.
+          2. Via PowerShell : Set-SPOTenant -AllowedDomainGuidsForSyncApp @("<GUID-domaine>")
+
+      - id: cis5-7.3.3
+        title: "Exécution de scripts personnalisés sur les sites personnels désactivée"
+        description: >
+          L'exécution de scripts personnalisés sur les sites personnels SharePoint (OneDrive)
+          doit être désactivée pour prévenir les risques de XSS et d'exécution de code malveillant.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-custom-script-execution-personal-sites-disabled"
+        cis_reference: "7.3.3"
+        remediation: |
+          1. Via PowerShell SharePoint Online :
+             Set-SPOSite -Identity <URL-site-personnel> -DenyAddAndCustomizePages 1
+          2. Appliquer globalement : Set-SPOTenant -UserVoiceForFeedbackEnabled $false
+
+      - id: cis5-7.3.4
+        title: "Exécution de scripts personnalisés sur les collections de sites désactivée"
+        description: >
+          L'exécution de scripts personnalisés sur les collections de sites SharePoint
+          doit être désactivée pour limiter les risques d'exploitation XSS.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "sharepoint-custom-script-execution-enabled-on-site-collections"
+        cis_reference: "7.3.4"
+        remediation: |
+          1. Via PowerShell SharePoint Online, vérifier et désactiver pour chaque collection de sites :
+             Set-SPOSite -Identity <URL-site> -DenyAddAndCustomizePages 1
+          2. Auditer régulièrement les collections de sites avec scripts personnalisés activés.
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 8 — Microsoft Teams
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: microsoft-teams
+    name: "Microsoft Teams — Sécurité et configuration"
+    description: "Partage de fichiers, domaines externes, accès invités, paramètres de réunion et sécurité des canaux."
+    controls:
+
+      - id: cis5-8.1.1
+        title: "Partage de fichiers externe limité aux services de stockage cloud approuvés"
+        description: >
+          Le partage de fichiers externe dans Teams doit être limité aux services
+          de stockage cloud approuvés par l'organisation (SharePoint/OneDrive uniquement).
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-external-file-sharing-enabled-only-for-approved-cloud-storage-services"
+        cis_reference: "8.1.1"
+        remediation: |
+          1. Dans le Centre d'administration Teams > Paramètres de l'organisation > Fichiers,
+             désactiver les services de stockage tiers (Google Drive, Box, Dropbox, ShareFile).
+          2. Autoriser uniquement SharePoint et OneDrive pour le partage de fichiers.
+
+      - id: cis5-8.1.2
+        title: "Envoi d'emails aux adresses de canal Teams contrôlé"
+        description: >
+          La fonctionnalité permettant aux utilisateurs d'envoyer des emails à l'adresse
+          d'un canal Teams doit être évaluée et contrôlée selon la politique de l'organisation.
+        severity: info
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-disable-users-sent-emails-to-channel-email-address"
+        cis_reference: "8.1.2"
+        remediation: |
+          1. Dans le Centre d'administration Teams > Paramètres de messagerie,
+             évaluer si la réception d'emails par les canaux est nécessaire.
+          2. Désactiver si non nécessaire pour réduire la surface d'attaque.
+
+      - id: cis5-8.2.1
+        title: "Domaines externes dans Teams contrôlés"
+        description: >
+          La fédération Teams avec des domaines externes doit être auditée pour identifier
+          les configurations autorisant la communication avec tous les domaines sans restriction.
+        severity: info
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-external-domains-not-restricted"
+        cis_reference: "8.2.1"
+        remediation: |
+          1. Dans le Centre d'administration Teams > Utilisateurs externes > Accès externe,
+             évaluer la politique de fédération avec les domaines externes.
+          2. Passer de « Autoriser tous les domaines externes » à une liste de domaines autorisés spécifiques.
+
+      - id: cis5-8.2.2
+        title: "Communication avec les utilisateurs Teams non gérés restreinte"
+        description: >
+          La communication avec des utilisateurs Teams appartenant à des tenants non gérés
+          (comptes personnels Microsoft Teams non professionnels) doit être restreinte.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-communication-with-unmanaged-teams-users-not-restricted"
+        cis_reference: "8.2.2"
+        remediation: |
+          1. Dans le Centre d'administration Teams > Accès externe,
+             désactiver « Les utilisateurs de Teams peuvent communiquer avec des utilisateurs Teams dans des organisations non gérées ».
+
+      - id: cis5-8.2.3
+        title: "Initiation de conversations par des utilisateurs externes restreinte"
+        description: >
+          Les utilisateurs externes ne doivent pas pouvoir initier des conversations avec
+          des utilisateurs internes sans restriction pour limiter les risques de hameçonnage.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-external-users-can-initiate-conversations"
+        cis_reference: "8.2.3"
+        remediation: |
+          1. Dans le Centre d'administration Teams > Accès externe,
+             restreindre la communication entrante depuis des domaines externes non gérés.
+
+      - id: cis5-8.2.4
+        title: "Communication avec les utilisateurs Skype restreinte"
+        description: >
+          La communication entre Teams et les utilisateurs Skype Consumer doit être
+          évaluée et restreinte selon la politique de l'organisation.
+        severity: info
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-communication-with-skype-users-enabled"
+        cis_reference: "8.2.4"
+        remediation: |
+          1. Dans le Centre d'administration Teams > Accès externe,
+             désactiver la communication avec les utilisateurs Skype Consumer si non nécessaire.
+
+      - id: cis5-8.4.1
+        title: "Politiques d'autorisation d'applications Teams configurées"
+        description: >
+          Des politiques d'autorisation d'applications doivent être configurées dans Teams
+          pour contrôler quelles applications tierces peuvent être installées et utilisées.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-app-permission-policies-not-configured"
+        cis_reference: "8.4.1"
+        remediation: |
+          1. Dans le Centre d'administration Teams > Applications Teams > Politiques d'autorisation,
+             créer une politique restrictive n'autorisant que les applications approuvées.
+          2. Désactiver les applications tierces non évaluées par défaut.
+
+      - id: cis5-8.5.1
+        title: "Participation anonyme aux réunions Teams contrôlée"
+        description: >
+          La participation anonyme aux réunions Teams doit être évaluée et configurée
+          selon la politique de l'organisation.
+        severity: info
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-anonymous-users-cant-join-meeting"
+        cis_reference: "8.5.1"
+        remediation: |
+          1. Dans le Centre d'administration Teams > Réunions > Paramètres de réunion,
+             configurer si les utilisateurs anonymes peuvent rejoindre les réunions.
+          2. Activer la salle d'attente pour contrôler l'admission.
+
+      - id: cis5-8.5.2
+        title: "Démarrage de réunion par utilisateurs anonymes ou appelants dial-in restreint"
+        description: >
+          Les utilisateurs anonymes et les appelants via numérotation ne doivent pas
+          pouvoir démarrer une réunion avant l'arrivée d'un participant authentifié.
+        severity: info
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-anonymous-users-and-dial-in-callers-not-restricted-start-meeting"
+        cis_reference: "8.5.2"
+        remediation: |
+          1. Dans les politiques de réunion Teams,
+             désactiver « Permettre aux utilisateurs anonymes de démarrer une réunion ».
+          2. S'assurer que les appelants en numérotation attendent dans la salle d'attente.
+
+      - id: cis5-8.5.3
+        title: "Contournement de la salle d'attente limité aux membres de l'organisation"
+        description: >
+          Seuls les membres de l'organisation doivent pouvoir contourner automatiquement
+          la salle d'attente lors des réunions Teams.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-only-org-people-can-bypass-lobby"
+        cis_reference: "8.5.3"
+        remediation: |
+          1. Dans les politiques de réunion Teams,
+             configurer « Qui peut contourner la salle d'attente ? » sur « Personnes de mon organisation ».
+
+      - id: cis5-8.5.4
+        title: "Les appelants en numérotation doivent passer par la salle d'attente"
+        description: >
+          Les participants rejoignant par numérotation téléphonique doivent être placés
+          en salle d'attente jusqu'à admission par l'organisateur.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-users-dialing-in-cant-bypass-lobby"
+        cis_reference: "8.5.4"
+        remediation: |
+          1. Dans les politiques de réunion Teams,
+             désactiver le contournement automatique de la salle d'attente pour les appelants en numérotation.
+
+      - id: cis5-8.5.5
+        title: "Chat de réunion désactivé pour les utilisateurs anonymes"
+        description: >
+          Les utilisateurs anonymes ne doivent pas pouvoir participer au chat
+          des réunions Teams pour limiter les risques de hameçonnage dans les réunions.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-meeting-chat-not-allow-anonymous-users"
+        cis_reference: "8.5.5"
+        remediation: |
+          1. Dans les politiques de réunion Teams,
+             désactiver la participation au chat pour les utilisateurs anonymes.
+
+      - id: cis5-8.5.6
+        title: "Présentation limitée aux organisateurs et co-organisateurs"
+        description: >
+          Seuls les organisateurs et co-organisateurs doivent avoir le rôle de présentateur
+          par défaut dans les réunions Teams pour contrôler le partage d'écran.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-only-organizers-and-co-organizers-can-present"
+        cis_reference: "8.5.6"
+        remediation: |
+          1. Dans les politiques de réunion Teams,
+             configurer « Qui peut présenter ? » sur « Organisateurs et co-organisateurs ».
+
+      - id: cis5-8.5.7
+        title: "Contrôle de partage d'écran par les participants externes désactivé"
+        description: >
+          Les participants externes ne doivent pas pouvoir donner ou demander le contrôle
+          du partage d'écran lors des réunions Teams.
+        severity: medium
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-external-participants-cannot-give-or-request-control"
+        cis_reference: "8.5.7"
+        remediation: |
+          1. Dans les politiques de réunion Teams,
+             désactiver l'option permettant aux participants externes de donner ou demander le contrôle.
+
+      - id: cis5-8.5.8
+        title: "Chat de réunion externe désactivé"
+        description: >
+          Le chat des réunions Teams impliquant des participants externes à l'organisation
+          doit être désactivé pour limiter les risques d'exfiltration d'informations.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-external-meeting-chat-is-off"
+        cis_reference: "8.5.8"
+        remediation: |
+          1. Dans les politiques de réunion Teams,
+             désactiver le chat pour les réunions incluant des participants externes.
+
+      - id: cis5-8.5.9
+        title: "Enregistrement des réunions Teams contrôlé"
+        description: >
+          La fonctionnalité d'enregistrement des réunions Teams doit être évaluée
+          et contrôlée selon la politique de confidentialité de l'organisation.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-meeting-recording-enabled"
+        cis_reference: "8.5.9"
+        remediation: |
+          1. Dans les politiques de réunion Teams,
+             configurer les droits d'enregistrement selon la politique de l'organisation.
+          2. S'assurer que les enregistrements sont stockés dans OneDrive/SharePoint avec les droits d'accès appropriés.
+
+      - id: cis5-8.6.1
+        title: "Signalement de problèmes de sécurité par les utilisateurs Teams activé"
+        description: >
+          La fonctionnalité de signalement de messages de sécurité dans Teams doit être
+          activée pour permettre aux utilisateurs de signaler les messages suspects.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "teams-users-can-report-security-concerns-not-configured"
+        cis_reference: "8.6.1"
+        remediation: |
+          1. Dans le portail Microsoft Defender > Paramètres > Paramètres de signalement des utilisateurs,
+             activer le signalement dans Microsoft Teams.
+          2. Configurer la destination des signalements (boîte de signalement interne, Microsoft).
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SECTION 9 — Microsoft Fabric
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: microsoft-fabric
+    name: "Microsoft Fabric — Gouvernance et sécurité"
+    description: "Contrôle des accès invités, partage externe, publication web et authentification dans Microsoft Fabric (Power BI)."
+    controls:
+
+      - id: cis5-9.1.1
+        title: "Accès invité à Microsoft Fabric restreint"
+        description: >
+          L'accès des utilisateurs invités à Microsoft Fabric (Power BI) doit être restreint
+          pour éviter la divulgation de données analytiques sensibles à des parties externes.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-guest-user-access-not-restricted"
+        cis_reference: "9.1.1"
+        remediation: |
+          1. Dans le portail d'administration Fabric/Power BI > Paramètres tenant > Paramètres d'exportation et de partage,
+             désactiver ou restreindre l'accès des utilisateurs invités.
+
+      - id: cis5-9.1.2
+        title: "Invitation d'utilisateurs externes dans Fabric restreinte"
+        description: >
+          La possibilité d'inviter des utilisateurs externes à collaborer dans Microsoft Fabric
+          doit être restreinte aux administrateurs ou désactivée.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-external-user-invitations-not-restricted"
+        cis_reference: "9.1.2"
+        remediation: |
+          1. Dans le portail d'administration Fabric > Paramètres tenant,
+             désactiver ou restreindre « Permettre aux utilisateurs Microsoft Fabric d'inviter des utilisateurs externes ».
+
+      - id: cis5-9.1.3
+        title: "Accès invité au contenu Fabric restreint"
+        description: >
+          L'accès des utilisateurs invités au contenu Microsoft Fabric (rapports, tableaux de bord)
+          doit être contrôlé et limité au contenu explicitement partagé.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-guest-access-to-content-not-restricted"
+        cis_reference: "9.1.3"
+        remediation: |
+          1. Dans le portail d'administration Fabric > Paramètres tenant,
+             configurer « Les utilisateurs invités peuvent accéder à Microsoft Fabric » selon la politique.
+          2. Restreindre l'accès invité aux espaces de travail spécifiques uniquement.
+
+      - id: cis5-9.1.4
+        title: "Publication sur le web depuis Fabric désactivée"
+        description: >
+          La fonctionnalité « Publier sur le web » doit être désactivée pour éviter
+          la publication publique non contrôlée de rapports Power BI.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-publish-to-web-not-restricted"
+        cis_reference: "9.1.4"
+        remediation: |
+          1. Dans le portail d'administration Fabric > Paramètres tenant > Paramètres d'exportation et de partage,
+             désactiver « Publier sur le web » ou le restreindre aux administrateurs.
+
+      - id: cis5-9.1.5
+        title: "Interaction avec R et Python dans Fabric contrôlée"
+        description: >
+          L'exécution de scripts R et Python dans Microsoft Fabric doit être contrôlée
+          car ces scripts peuvent accéder à des données externes ou présenter des risques.
+        severity: low
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-interact-with-r-and-python-not-disabled"
+        cis_reference: "9.1.5"
+        remediation: |
+          1. Dans le portail d'administration Fabric > Paramètres tenant > Paramètres R et Python,
+             évaluer si cette fonctionnalité est nécessaire et la désactiver si non utilisée.
+
+      - id: cis5-9.1.6
+        title: "Application des étiquettes de sensibilité dans Fabric activée"
+        description: >
+          Les utilisateurs doivent pouvoir appliquer des étiquettes de sensibilité Purview
+          aux contenus Microsoft Fabric pour classifier les données analytiques.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-allow-users-apply-sensitivity-labels-not-enabled"
+        cis_reference: "9.1.6"
+        remediation: |
+          1. Dans le portail d'administration Fabric > Paramètres tenant > Protection des informations,
+             activer « Permettre aux utilisateurs d'appliquer des étiquettes de sensibilité pour le contenu ».
+          2. S'assurer que les étiquettes sont publiées via Purview vers les utilisateurs Fabric.
+
+      - id: cis5-9.1.7
+        title: "Liens partageables dans Fabric restreints"
+        description: >
+          Les liens de partage dans Microsoft Fabric doivent être restreints pour éviter
+          la diffusion non contrôlée de rapports et tableaux de bord.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-shareable-links-not-restricted"
+        cis_reference: "9.1.7"
+        remediation: |
+          1. Dans le portail d'administration Fabric > Paramètres tenant,
+             restreindre la création de liens de partage public.
+
+      - id: cis5-9.1.8
+        title: "Partage de données externe dans Fabric restreint"
+        description: >
+          Le partage de données externes depuis Microsoft Fabric (connexions à des sources
+          de données externes) doit être contrôlé et limité aux sources approuvées.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-enabling-external-data-sharing-not-restricted"
+        cis_reference: "9.1.8"
+        remediation: |
+          1. Dans le portail d'administration Fabric > Paramètres tenant,
+             restreindre ou désactiver le partage de données externes.
+
+      - id: cis5-9.1.9
+        title: "Authentification par clé de ressource dans Fabric bloquée"
+        description: >
+          L'authentification par clé de ressource (Resource Key Authentication) dans Fabric
+          doit être bloquée pour forcer l'utilisation de méthodes d'authentification plus sécurisées.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-block-resourcekey-authentication-not-enabled"
+        cis_reference: "9.1.9"
+        remediation: |
+          1. Dans le portail d'administration Fabric > Paramètres tenant,
+             activer « Bloquer l'authentification par clé de ressource ».
+
+      - id: cis5-9.1.10
+        title: "Accès à l'API Fabric par les principaux de service restreint"
+        description: >
+          L'accès à l'API Microsoft Fabric par les principaux de service (Service Principals)
+          doit être restreint pour limiter les accès programmatiques non contrôlés.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-access-to-api-by-service-principal-not-restricted"
+        cis_reference: "9.1.10"
+        remediation: |
+          1. Dans le portail d'administration Fabric > Paramètres tenant > Paramètres du développeur,
+             restreindre « Les principaux de service peuvent utiliser les API Fabric » à un groupe de sécurité spécifique.
+
+      - id: cis5-9.1.11
+        title: "Création et utilisation de profils par les principaux de service restreinte"
+        description: >
+          La capacité des principaux de service à créer et utiliser des profils dans Fabric
+          doit être restreinte pour limiter l'escalade de privilèges automatisée.
+        severity: high
+        check_type: automatic
+        auto_check: true
+        monkey365_rule: "fabric-service-principals-can-create-and-use-profiles"
+        cis_reference: "9.1.11"
+        remediation: |
+          1. Dans le portail d'administration Fabric > Paramètres tenant,
+             désactiver ou restreindre « Les principaux de service peuvent créer et utiliser des profils ».
