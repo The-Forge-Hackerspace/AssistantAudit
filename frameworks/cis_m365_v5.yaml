@@ -119,7 +119,7 @@ categories:
     severity: high
     check_type: automatic
     auto_check: true
-    monkey365_rule: microsoft365_2197
+    # monkey365_rule: microsoft365_2197 (ID en doublon avec teams-communication — non évaluable automatiquement)
     cis_reference: 1.2.2
     remediation: '1. Dans Exchange Online, vérifier que le compte associé à chaque boîte partagée est bloqué (BlockSignIn
       = True).
@@ -568,7 +568,7 @@ categories:
     severity: high
     check_type: automatic
     auto_check: true
-    monkey365_rule: purview-lack-of-information-protection-label-policies
+    monkey365_rule: microsoft365_2162
     cis_reference: 3.3.1
     remediation: "1. Dans le portail Microsoft Purview > Protection des informations > Étiquettes,\n   créer une hiérarchie\
       \ d'étiquettes (Public, Interne, Confidentiel, Très Confidentiel).\n2. Configurer le chiffrement et les marquages visuels\
@@ -699,7 +699,7 @@ categories:
     severity: medium
     check_type: automatic
     auto_check: true
-    monkey365_rule: eid-dynamic-group-for-guest-users-not-present
+    monkey365_rule: entraid_1133
     cis_reference: 5.1.3.1
     remediation: "1. Dans le portail Entra ID > Groupes > Nouveau groupe,\n   créer un groupe dynamique avec la règle : (user.userType\
       \ -eq \"Guest\")\n2. Utiliser ce groupe pour appliquer des politiques d'accès spécifiques aux invités.\n"
@@ -898,7 +898,7 @@ categories:
     severity: medium
     check_type: automatic
     auto_check: true
-    monkey365_rule: eid-cap-block-sign-in-risk-not-enabled
+    monkey365_rule: entraid_1105
     cis_reference: 5.2.2.8
     remediation: "1. Dans le portail Entra ID > Sécurité > Accès conditionnel,\n   créer une politique bloquant l'accès pour\
       \ les connexions à risque élevé.\n2. Vérifier les faux positifs dans les journaux Identity Protection avant d'activer.\n"
@@ -911,7 +911,7 @@ categories:
     severity: medium
     check_type: automatic
     auto_check: true
-    monkey365_rule: eid-require-device-compliant-all-apps-missing-cap
+    monkey365_rule: entraid_1121
     cis_reference: 5.2.2.9
     remediation: "1. Dans le portail Entra ID > Sécurité > Accès conditionnel,\n   créer une politique exigeant « Appareil\
       \ marqué comme conforme » pour toutes les applications.\n2. Vérifier que les politiques de conformité Intune sont configurées\
@@ -925,7 +925,7 @@ categories:
     severity: medium
     check_type: automatic
     auto_check: true
-    monkey365_rule: eid-require-device-compliant-to-register-security-info-missing-cap
+    monkey365_rule: entraid_1122
     cis_reference: 5.2.2.10
     remediation: "1. Dans le portail Entra ID > Sécurité > Accès conditionnel,\n   créer une politique ciblant l'action d'inscription\
       \ « Enregistrer des informations de sécurité »\n   exigeant un appareil conforme.\n"
@@ -938,7 +938,7 @@ categories:
     severity: medium
     check_type: automatic
     auto_check: true
-    monkey365_rule: eid-sign-in-frequency-intune-enrollment-missing-cap
+    monkey365_rule: entraid_1172
     cis_reference: 5.2.2.11
     remediation: "1. Dans le portail Entra ID > Sécurité > Accès conditionnel,\n   créer une politique de contrôle de session\
       \ pour l'inscription Intune\n   configurant une fréquence de connexion raisonnable (ex. : 1 jour).\n"
@@ -979,7 +979,7 @@ categories:
     severity: medium
     check_type: automatic
     auto_check: true
-    monkey365_rule: eid-custom-banned-password-list-disabled
+    monkey365_rule: entraid_1152
     cis_reference: 5.2.3.2
     remediation: "1. Dans le portail Entra ID > Sécurité > Méthodes d'authentification > Protection par mot de passe,\n  \
       \ activer la liste de mots de passe interdits personnalisée.\n2. Ajouter le nom de l'organisation, ses produits, ses\
@@ -1039,7 +1039,7 @@ categories:
     severity: medium
     check_type: automatic
     auto_check: true
-    monkey365_rule: eid-system-preferred-mfa-disabled
+    monkey365_rule: entraid_1169
     cis_reference: 5.2.3.6
     remediation: "1. Dans le portail Entra ID > Sécurité > Méthodes d'authentification > Paramètres,\n   activer le MFA préféré\
       \ par le système.\n"
@@ -1157,7 +1157,7 @@ categories:
     severity: medium
     check_type: automatic
     auto_check: true
-    monkey365_rule: exchange-mailbox-audit-actions-disabled
+    monkey365_rule: microsoft365_2142
     cis_reference: 6.1.2
     remediation: "1. Activer les actions d'audit recommandées via PowerShell :\n   Get-Mailbox -ResultSize Unlimited | Set-Mailbox\
       \ -AuditOwner @{Add=\"MailboxLogin\",\"HardDelete\",\"SoftDelete\",\"MoveToDeletedItems\"} -AuditDelegate @{Add=\"SendAs\"\
@@ -1548,7 +1548,7 @@ categories:
     severity: medium
     check_type: automatic
     auto_check: true
-    monkey365_rule: teams-communication-with-unmanaged-teams-users-not-restricted
+    monkey365_rule: microsoft365_2197
     cis_reference: 8.2.2
     remediation: "1. Dans le Centre d'administration Teams > Accès externe,\n   désactiver « Les utilisateurs de Teams peuvent\
       \ communiquer avec des utilisateurs Teams dans des organisations non gérées ».\n"
