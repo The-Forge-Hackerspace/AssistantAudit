@@ -39,7 +39,7 @@ def test_ensure_monkey365_ready_clones_if_missing(tmp_path):
     monkey365_dir = tmp_path / "monkey365"
     assert not monkey365_dir.exists()
 
-    executor = Monkey365Executor(config, str(tmp_path))
+    executor = Monkey365Executor(config, str(tmp_path), allow_auto_clone=True)
 
     with patch('subprocess.run') as mock_run:
         def side_effect(*args, **kwargs):
@@ -133,7 +133,7 @@ def test_git_clone_failure_raises_error(tmp_path):
     monkey365_dir = tmp_path / "monkey365"
     assert not monkey365_dir.exists()
 
-    executor = Monkey365Executor(config, str(tmp_path))
+    executor = Monkey365Executor(config, str(tmp_path), allow_auto_clone=True)
 
     with patch('subprocess.run') as mock_run:
         mock_run.return_value = MagicMock(

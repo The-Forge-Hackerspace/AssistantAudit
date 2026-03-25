@@ -488,6 +488,13 @@ class Monkey365ConfigSchema(BaseModel):
     spo_sites: list[str] = Field(default_factory=list, description="SharePoint sites to scan (e.g., https://domain.sharepoint.com)")
     export_to: list[Monkey365ExportFormat] = Field(default_factory=lambda: [Monkey365ExportFormat.JSON, Monkey365ExportFormat.HTML], description="Formats d'export : JSON, HTML, CSV")
 
+    @field_validator("export_to", mode="after")
+    @classmethod
+    def ensure_json_included(cls, v: list[Monkey365ExportFormat]) -> list[Monkey365ExportFormat]:
+        if Monkey365ExportFormat.JSON not in v:
+            return [Monkey365ExportFormat.JSON] + v
+        return v
+
 
 class Monkey365ScanCreate(BaseModel):
     """Paramètres pour lancer un audit Monkey365."""

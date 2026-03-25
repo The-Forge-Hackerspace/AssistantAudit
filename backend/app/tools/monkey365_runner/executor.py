@@ -30,8 +30,9 @@ class Monkey365Executor:
 
     COLLECT_MODULES = ["ExchangeOnline", "MicrosoftTeams", "Purview", "SharePointOnline", "AdminPortal"]
 
-    def __init__(self, config: Monkey365Config, monkey365_path: str | None = None):
+    def __init__(self, config: Monkey365Config, monkey365_path: str | None = None, allow_auto_clone: bool = False):
         self.config = config
+        self.allow_auto_clone = allow_auto_clone
         self.monkey365_path = self._resolve_path(monkey365_path)
         self.monkey365_base_dir: Path = self.monkey365_path.parent
         self.output_dir = Path(self.config.output_dir)
@@ -69,6 +70,11 @@ class Monkey365Executor:
         monkey365_dir = self.monkey365_path.parent if self.monkey365_path else DEFAULT_MONKEY365_DIR
 
         if not monkey365_dir.exists():
+            if not self.allow_auto_clone:
+                raise RuntimeError(
+                    f"Monkey365 not found at {monkey365_dir}. "
+                    "Set MONKEY365_PATH to the correct location or enable MONKEY365_AUTO_CLONE."
+                )
             logger.info("Monkey365 missing. Auto-cloning...")
             monkey365_dir.parent.mkdir(parents=True, exist_ok=True)
             clone_result = subprocess.run(
@@ -218,7 +224,7 @@ Invoke-Monkey365 @param -Verbose
 
         temp_dir_env = os.getenv("ASSISTANTAUDIT_TEMP_DIR", "").strip()
         temp_dir = Path(temp_dir_env) if temp_dir_env else (self.output_dir.parent / "temp")
-        ps1_path = temp_dir / "monkey365_scan.ps1"
+        ps1_path = temp_dir / f"monkey365_scan_{scan_id}.ps1"
         ps1_path.parent.mkdir(parents=True, exist_ok=True)
 
         logger.info("[MONKEY365] Generated script:\n%s", script)

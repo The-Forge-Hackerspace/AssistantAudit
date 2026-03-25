@@ -151,6 +151,11 @@ export default function Monkey365Page() {
         setElapsedSeconds(Math.floor((Date.now() - created) / 1000));
       } else {
         setElapsedSeconds(detail.duration_seconds || 0);
+        // Polling only runs for running scans, so fetch logs eagerly for finished ones
+        const logs = await toolsApi.getMonkey365ScanLogs(scanId).catch(() => null);
+        if (logs !== null) {
+          setScanLogs(logs);
+        }
       }
     } catch (err) {
       console.error("Failed to load scan detail:", err);

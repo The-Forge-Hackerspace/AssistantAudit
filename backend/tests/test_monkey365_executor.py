@@ -208,22 +208,28 @@ def test_run_scan_captures_output_and_imports_module(tmp_path):
     script = executor.build_script("scan-1")
     assert "Import-Module .\\monkey365.psm1" in script
 
+    # The executor reads stdout from the Start-Transcript log file, not subprocess stdout.
+    # Simulate a transcript log written by PowerShell.
+    log_content = "Scan completed\nWarning: minor issue\n"
+
     with (
         patch.object(executor, "ensure_monkey365_ready", return_value=executor.monkey365_path),
         patch("subprocess.run") as mock_run,
     ):
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="Scan completed",
-            stderr="Warning: minor issue",
-        )
+        def run_side_effect(*args, **kwargs):
+            # Write the transcript log as PowerShell would
+            output_dir.mkdir(parents=True, exist_ok=True)
+            (output_dir / "monkey365.log").write_text(log_content, encoding="utf-8")
+            return MagicMock(returncode=0)
+
+        mock_run.side_effect = run_side_effect
         executor.run_scan("scan-1")
 
     output_file = output_dir / "powershell_raw_output.json"
     assert output_file.exists()
     output_data = json.loads(output_file.read_text(encoding="utf-8"))
-    assert output_data["stdout"] == "Scan completed"
-    assert output_data["stderr"] == "Warning: minor issue"
+    assert output_data["stdout"] == log_content
+    assert output_data["stderr"] == ""
 
 
 def test_ensure_monkey365_ready_creates_directory(tmp_path):
@@ -231,6 +237,7 @@ def test_ensure_monkey365_ready_creates_directory(tmp_path):
     monkey365_dir = tmp_path / "monkey365"
     executor = Monkey365Executor.__new__(Monkey365Executor)
     executor.config = config
+    executor.allow_auto_clone = True
     executor.monkey365_path = monkey365_dir / "Invoke-Monkey365.ps1"
     executor.output_dir = tmp_path
 

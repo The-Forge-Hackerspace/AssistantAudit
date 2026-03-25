@@ -158,12 +158,11 @@ class Monkey365ScanService:
                 export_to=config.export_to,
             )
 
-            executor = Monkey365Executor(executor_config, settings.MONKEY365_PATH or None)
+            executor = Monkey365Executor(executor_config, settings.MONKEY365_PATH or None, allow_auto_clone=settings.MONKEY365_AUTO_CLONE)
 
-            # MONKEY365_PATH may be a .ps1 file — resolve to install dir (where monkey-reports/ lives)
-            monkey365_base = Path(settings.MONKEY365_PATH) if settings.MONKEY365_PATH else Path(".")
-            if monkey365_base.is_file():
-                monkey365_base = monkey365_base.parent
+            # Derive base dir from the executor's resolved path so it stays in sync
+            # even when MONKEY365_PATH is unset and the executor falls back to DEFAULT_MONKEY365_DIR.
+            monkey365_base = executor.monkey365_base_dir
             dirs_before = Monkey365ScanService._snapshot_report_dirs(monkey365_base)
 
             run_result = executor.run_scan(result.scan_id)

@@ -406,3 +406,304 @@ def test_launch_scan_export_to_auto_includes_json(mock_exec, client: TestClient,
     config = detail_response.json()["config_snapshot"]
     assert "JSON" in config["export_to"]
     assert "HTML" in config["export_to"]
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Cancel Endpoint Tests
+# ────────────────────────────────────────────────────────────────────────
+
+
+@patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
+def test_cancel_running_scan_moves_to_failed(mock_exec, client: TestClient, db_session, auditeur_headers):
+    """POST /cancel on a running scan transitions status to failed."""
+    mock_exec.return_value = None
+    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+
+    launch = client.post(
+        "/api/v1/tools/monkey365/run",
+        json=_run_payload(entreprise.id),
+        headers=auditeur_headers,
+    )
+    assert launch.status_code == 201
+    result_id = launch.json()["id"]
+
+    cancel = client.post(
+        f"/api/v1/tools/monkey365/scans/{result_id}/cancel",
+        headers=auditeur_headers,
+    )
+    assert cancel.status_code == 200
+    assert cancel.json()["status"] == "failed"
+
+
+@patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
+def test_cancel_non_running_scan_returns_400(mock_exec, client: TestClient, db_session, auditeur_headers):
+    """POST /cancel on an already-cancelled scan returns 400."""
+    mock_exec.return_value = None
+    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+
+    launch = client.post(
+        "/api/v1/tools/monkey365/run",
+        json=_run_payload(entreprise.id),
+        headers=auditeur_headers,
+    )
+    assert launch.status_code == 201
+    result_id = launch.json()["id"]
+
+    # First cancel succeeds
+    first = client.post(
+        f"/api/v1/tools/monkey365/scans/{result_id}/cancel",
+        headers=auditeur_headers,
+    )
+    assert first.status_code == 200
+
+    # Second cancel — scan is no longer running
+    second = client.post(
+        f"/api/v1/tools/monkey365/scans/{result_id}/cancel",
+        headers=auditeur_headers,
+    )
+    assert second.status_code == 400
+
+
+def test_cancel_not_found_returns_404(client: TestClient, auditeur_headers):
+    """POST /cancel on a non-existent scan returns 404."""
+    response = client.post(
+        "/api/v1/tools/monkey365/scans/99999/cancel",
+        headers=auditeur_headers,
+    )
+    assert response.status_code == 404
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Logs Endpoint Tests
+# ────────────────────────────────────────────────────────────────────────
+
+
+@patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
+def test_logs_returns_empty_when_no_log_file(mock_exec, client: TestClient, db_session, auditeur_headers, tmp_path):
+    """GET /logs returns empty lines list when the log file does not exist yet."""
+    mock_exec.return_value = None
+    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+
+    launch = client.post(
+        "/api/v1/tools/monkey365/run",
+        json=_run_payload(entreprise.id),
+        headers=auditeur_headers,
+    )
+    assert launch.status_code == 201
+    result_id = launch.json()["id"]
+
+    # output_path points to a real directory that has no log file yet
+    response = client.get(
+        f"/api/v1/tools/monkey365/scans/result/{result_id}/logs",
+        headers=auditeur_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "lines" in data
+    assert isinstance(data["lines"], list)
+    assert "total_lines" in data
+
+
+@patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
+def test_logs_returns_content_when_log_file_exists(mock_exec, client: TestClient, db_session, auditeur_headers):
+    """GET /logs returns log lines when monkey365.log exists in output_path."""
+    mock_exec.return_value = None
+    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+
+    launch = client.post(
+        "/api/v1/tools/monkey365/run",
+        json=_run_payload(entreprise.id),
+        headers=auditeur_headers,
+    )
+    assert launch.status_code == 201
+    result_id = launch.json()["id"]
+    output_path = launch.json()["output_path"] if "output_path" in launch.json() else None
+
+    # Get output_path from detail endpoint
+    detail = client.get(
+        f"/api/v1/tools/monkey365/scans/result/{result_id}",
+        headers=auditeur_headers,
+    )
+    output_path = detail.json()["output_path"]
+
+    # Write a fake log file
+    from pathlib import Path
+    log_file = Path(output_path) / "monkey365.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    log_file.write_text("line 1\nline 2\nline 3\n", encoding="utf-8")
+
+    response = client.get(
+        f"/api/v1/tools/monkey365/scans/result/{result_id}/logs",
+        headers=auditeur_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_lines"] == 3
+    assert data["lines"] == ["line 1", "line 2", "line 3"]
+
+
+def test_logs_not_found_returns_404(client: TestClient, auditeur_headers):
+    """GET /logs for a non-existent scan returns 404."""
+    response = client.get(
+        "/api/v1/tools/monkey365/scans/result/99999/logs",
+        headers=auditeur_headers,
+    )
+    assert response.status_code == 404
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Report Endpoint Tests
+# ────────────────────────────────────────────────────────────────────────
+
+
+@patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
+def test_report_returns_400_for_non_success_scan(mock_exec, client: TestClient, db_session, auditeur_headers):
+    """GET /report returns 400 when the scan is not in success state."""
+    mock_exec.return_value = None
+    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+
+    launch = client.post(
+        "/api/v1/tools/monkey365/run",
+        json=_run_payload(entreprise.id),
+        headers=auditeur_headers,
+    )
+    assert launch.status_code == 201
+    result_id = launch.json()["id"]
+
+    # Scan is still in running state — report not available
+    response = client.get(
+        f"/api/v1/tools/monkey365/scans/result/{result_id}/report",
+        headers=auditeur_headers,
+    )
+    assert response.status_code == 400
+
+
+@patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
+def test_report_returns_404_when_no_html_for_success_scan(mock_exec, client: TestClient, db_session, auditeur_headers):
+    """GET /report returns 404 when scan succeeded but no HTML file was generated."""
+    from app.models.monkey365_scan_result import Monkey365ScanStatus
+
+    mock_exec.return_value = None
+    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+
+    launch = client.post(
+        "/api/v1/tools/monkey365/run",
+        json=_run_payload(entreprise.id),
+        headers=auditeur_headers,
+    )
+    assert launch.status_code == 201
+    result_id = launch.json()["id"]
+
+    # Force scan to success without creating any HTML file
+    from app.models.monkey365_scan_result import Monkey365ScanResult
+    result = db_session.get(Monkey365ScanResult, result_id)
+    result.status = Monkey365ScanStatus.SUCCESS
+    db_session.commit()
+
+    response = client.get(
+        f"/api/v1/tools/monkey365/scans/result/{result_id}/report",
+        headers=auditeur_headers,
+    )
+    assert response.status_code == 404
+
+
+@patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
+def test_report_returns_200_file_response_when_html_exists(mock_exec, client: TestClient, db_session, auditeur_headers):
+    """GET /report returns 200 FileResponse when a success scan has an HTML report."""
+    from pathlib import Path
+    from app.models.monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
+
+    mock_exec.return_value = None
+    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+
+    launch = client.post(
+        "/api/v1/tools/monkey365/run",
+        json=_run_payload(entreprise.id),
+        headers=auditeur_headers,
+    )
+    assert launch.status_code == 201
+    result_id = launch.json()["id"]
+
+    detail = client.get(
+        f"/api/v1/tools/monkey365/scans/result/{result_id}",
+        headers=auditeur_headers,
+    )
+    output_path = detail.json()["output_path"]
+
+    # Create the HTML report where the endpoint expects it
+    html_dir = Path(output_path) / "html"
+    html_dir.mkdir(parents=True, exist_ok=True)
+    html_file = html_dir / "report.html"
+    html_file.write_text("<html><body>Monkey365 report</body></html>", encoding="utf-8")
+
+    # Mark scan as success
+    result = db_session.get(Monkey365ScanResult, result_id)
+    result.status = Monkey365ScanStatus.SUCCESS
+    db_session.commit()
+
+    response = client.get(
+        f"/api/v1/tools/monkey365/scans/result/{result_id}/report",
+        headers=auditeur_headers,
+    )
+    assert response.status_code == 200
+    assert "text/html" in response.headers.get("content-type", "")
+    assert b"Monkey365 report" in response.content
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Delete Endpoint Tests
+# ────────────────────────────────────────────────────────────────────────
+
+
+@patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
+def test_delete_scan_removes_db_row_and_files(mock_exec, client: TestClient, db_session, auditeur_headers):
+    """DELETE /scans/{id} returns 200, removes DB row, and cleans up output directory."""
+    from pathlib import Path
+
+    mock_exec.return_value = None
+    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+
+    launch = client.post(
+        "/api/v1/tools/monkey365/run",
+        json=_run_payload(entreprise.id),
+        headers=auditeur_headers,
+    )
+    assert launch.status_code == 201
+    result_id = launch.json()["id"]
+
+    detail = client.get(
+        f"/api/v1/tools/monkey365/scans/result/{result_id}",
+        headers=auditeur_headers,
+    )
+    output_path = Path(detail.json()["output_path"])
+
+    # Create nested files to verify recursive deletion
+    nested = output_path / "nested"
+    nested.mkdir(parents=True, exist_ok=True)
+    (nested / "file.txt").write_text("dummy", encoding="utf-8")
+
+    response = client.delete(
+        f"/api/v1/tools/monkey365/scans/{result_id}",
+        headers=auditeur_headers,
+    )
+    assert response.status_code == 200
+    assert "message" in response.json()
+
+    # DB row gone
+    get_after = client.get(
+        f"/api/v1/tools/monkey365/scans/result/{result_id}",
+        headers=auditeur_headers,
+    )
+    assert get_after.status_code == 404
+
+    # Filesystem cleaned up
+    assert not output_path.exists()
+
+
+def test_delete_scan_not_found_returns_404(client: TestClient, auditeur_headers):
+    """DELETE /scans/{id} for a non-existent scan returns 404."""
+    response = client.delete(
+        "/api/v1/tools/monkey365/scans/99999",
+        headers=auditeur_headers,
+    )
+    assert response.status_code == 404
