@@ -93,28 +93,32 @@ class Monkey365ScanService:
 
     @staticmethod
     def move_results_to_archive(
-        source_path: Path,
-        dest_path: Path,
+        scan_id: str, source_path: Path
     ) -> Path:
         """
-        Move Monkey365 report files from source_path into dest_path.
+        Move Monkey365 report from source_path to the configured archive directory.
 
-        source_path : monkey-reports/{MONKEY_GUID}/ directory created by Monkey365.
-        dest_path   : pre-computed scan output directory,
-                      e.g. data/{slug}/Cloud/M365/{scan_id}/
-                      Files are moved preserving their relative structure ({FORMAT}/{FILE}).
+        source_path: the actual monkey-reports/{MONKEY_GUID}/ directory.
+        Destination: {MONKEY365_ARCHIVE_PATH}/{scan_id}/{FORMAT}/{FILE}
 
         Skips powershell_raw_output.json.
         """
-        if dest_path.exists():
-            shutil.rmtree(dest_path)
-        dest_path.mkdir(parents=True, exist_ok=True)
+        archive_base = Path(settings.MONKEY365_ARCHIVE_PATH)
+        archive_path = archive_base / scan_id
+
+        if archive_path.exists():
+            shutil.rmtree(archive_path)
+
+        archive_path.mkdir(parents=True, exist_ok=True)
 
         if source_path.exists():
             for item in source_path.rglob("*"):
-                if item.is_file() and item.name != "powershell_raw_output.json":
+                if item.is_file():
+                    if item.name == "powershell_raw_output.json":
+                        continue
+
                     rel_path = item.relative_to(source_path)
-                    target_file = dest_path / rel_path
+                    target_file = archive_path / rel_path
                     target_file.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(item), str(target_file))
                     logger.info("[MONKEY365] Moved %s → %s", item.name, target_file)
@@ -127,8 +131,8 @@ class Monkey365ScanService:
         else:
             logger.warning("[MONKEY365] Source not found: %s", source_path)
 
-        logger.info("[MONKEY365] Results archived to %s", dest_path)
-        return dest_path
+        logger.info("[MONKEY365] Results archived to %s", archive_path)
+        return archive_path
 
     @staticmethod
     def execute_scan_background(result_id: int, config_data: dict[str, object]) -> None:
@@ -152,7 +156,10 @@ class Monkey365ScanService:
 
             executor = Monkey365Executor(executor_config, settings.MONKEY365_PATH or None)
 
-            monkey365_base = executor.monkey365_base_dir
+            # MONKEY365_PATH may be a .ps1 file — resolve to install dir (where monkey-reports/ lives)
+            monkey365_base = Path(settings.MONKEY365_PATH) if settings.MONKEY365_PATH else Path(".")
+            if monkey365_base.is_file():
+                monkey365_base = monkey365_base.parent
             dirs_before = Monkey365ScanService._snapshot_report_dirs(monkey365_base)
 
             run_result = executor.run_scan(result.scan_id)
@@ -181,9 +188,8 @@ class Monkey365ScanService:
                     monkey365_base, dirs_before
                 )
                 if new_report_dir:
-                    dest_path = Path(result.output_path)
                     archive_path = Monkey365ScanService.move_results_to_archive(
-                        new_report_dir, dest_path
+                        result.scan_id, new_report_dir
                     )
                     result.archive_path = str(archive_path)
                     logger.info("[MONKEY365] Scan #%s archived to %s", result_id, archive_path)
