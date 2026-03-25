@@ -1,7 +1,10 @@
 """
-Storage path utilities for Monkey365 scan output directories.
+Generic storage path utilities for scan output directories.
 
-Provides slug generation, path management, and metadata handling for scan results.
+Provides slug generation, path management, and metadata handling that can be
+reused by any tool that writes scan results (Monkey365, future cloud tools, etc.).
+
+Path convention: {DATA_DIR}/{slug(entreprise)}/Cloud/{tool}/{scan_id}/
 """
 
 import json

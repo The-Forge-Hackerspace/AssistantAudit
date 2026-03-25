@@ -96,7 +96,6 @@ class Settings(BaseSettings):
     NMAP_TIMEOUT: int = 600  # secondes
     MONKEY365_PATH: str = ""  # chemin vers Invoke-Monkey365.ps1
     MONKEY365_TIMEOUT: int = 600  # secondes
-    MONKEY365_ARCHIVE_PATH: str = "/data/enterprise/Cloud/M365"  # archive directory for Monkey365 results
 
     # --- PingCastle ---
     PINGCASTLE_PATH: str = ""  # chemin vers PingCastle.exe

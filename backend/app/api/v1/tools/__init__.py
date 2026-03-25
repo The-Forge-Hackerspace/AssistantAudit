@@ -5,13 +5,7 @@ from .ssl_checker import router as ssl_checker_router
 from .collect import router as collect_router
 from .ad_audit import router as ad_audit_router
 from .pingcastle import router as pingcastle_router
-from .monkey365 import (
-    router as monkey365_router,
-    launch_monkey365_scan,
-    list_monkey365_scans,
-    get_monkey365_scan_result,
-    delete_monkey365_scan,
-)
+from .monkey365 import router as monkey365_router
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 

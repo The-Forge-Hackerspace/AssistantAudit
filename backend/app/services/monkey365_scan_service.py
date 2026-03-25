@@ -38,6 +38,17 @@ class QueryChain(Protocol):
 
 class Monkey365ScanService:
     @staticmethod
+    def _open_db() -> DBSession:
+        """Ouvre une nouvelle session SQLAlchemy pour les threads en arrière-plan.
+
+        Les threads background ne peuvent pas réutiliser la session liée à la
+        requête HTTP (fermée dès que la réponse est envoyée). Cette méthode
+        centralise la création de session pour éviter d'importer SessionLocal
+        directement dans execute_scan_background.
+        """
+        return cast(DBSession, SessionLocal())
+
+    @staticmethod
     def create_pending_scan(
         db: DBSession,
         entreprise_id: int,
@@ -92,24 +103,18 @@ class Monkey365ScanService:
         return None
 
     @staticmethod
-    def move_results_to_archive(
-        scan_id: str, source_path: Path
-    ) -> Path:
+    def move_results_to_output(source_path: Path, dest_path: Path) -> None:
         """
-        Move Monkey365 report from source_path to the configured archive directory.
+        Move Monkey365 report files from source_path into dest_path.
 
-        source_path: the actual monkey-reports/{MONKEY_GUID}/ directory.
-        Destination: {MONKEY365_ARCHIVE_PATH}/{scan_id}/{FORMAT}/{FILE}
+        source_path: the monkey-reports/{MONKEY_GUID}/ directory Monkey365 created.
+        dest_path:   the scan output_path (data/{slug}/Cloud/M365/{scan_id}/).
 
-        Skips powershell_raw_output.json.
+        Files are merged into dest_path preserving sub-directory structure.
+        powershell_raw_output.json is skipped (large, not useful).
+        Source directory is removed after move.
         """
-        archive_base = Path(settings.MONKEY365_ARCHIVE_PATH)
-        archive_path = archive_base / scan_id
-
-        if archive_path.exists():
-            shutil.rmtree(archive_path)
-
-        archive_path.mkdir(parents=True, exist_ok=True)
+        dest_path.mkdir(parents=True, exist_ok=True)
 
         if source_path.exists():
             for item in source_path.rglob("*"):
@@ -118,7 +123,7 @@ class Monkey365ScanService:
                         continue
 
                     rel_path = item.relative_to(source_path)
-                    target_file = archive_path / rel_path
+                    target_file = dest_path / rel_path
                     target_file.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(item), str(target_file))
                     logger.info("[MONKEY365] Moved %s → %s", item.name, target_file)
@@ -131,12 +136,11 @@ class Monkey365ScanService:
         else:
             logger.warning("[MONKEY365] Source not found: %s", source_path)
 
-        logger.info("[MONKEY365] Results archived to %s", archive_path)
-        return archive_path
+        logger.info("[MONKEY365] Results moved to %s", dest_path)
 
     @staticmethod
     def execute_scan_background(result_id: int, config_data: dict[str, object]) -> None:
-        db = cast(DBSession, SessionLocal())
+        db = Monkey365ScanService._open_db()
         final_status = Monkey365ScanStatus.FAILED
         final_error: str | None = None
         findings_count: int | None = None
@@ -188,11 +192,12 @@ class Monkey365ScanService:
                     monkey365_base, dirs_before
                 )
                 if new_report_dir:
-                    archive_path = Monkey365ScanService.move_results_to_archive(
-                        result.scan_id, new_report_dir
-                    )
-                    result.archive_path = str(archive_path)
-                    logger.info("[MONKEY365] Scan #%s archived to %s", result_id, archive_path)
+                    dest = Path(result.output_path) if result.output_path else None
+                    if dest:
+                        Monkey365ScanService.move_results_to_output(new_report_dir, dest)
+                        logger.info("[MONKEY365] Scan #%s results moved to %s", result_id, dest)
+                    else:
+                        logger.warning("[MONKEY365] Scan #%s: output_path non défini, résultats non déplacés", result_id)
                 else:
                     logger.warning(
                         "[MONKEY365] Scan #%s succeeded but no new report dir found in %s/monkey-reports/",
@@ -294,7 +299,7 @@ class Monkey365ScanService:
         if not result:
             return False
 
-        # Clean up output directory
+        # Clean up output directory (contains logs, meta and reports)
         if result.output_path:
             try:
                 output_path = Path(result.output_path)
@@ -303,16 +308,6 @@ class Monkey365ScanService:
                     logger.info(f"[MONKEY365] Cleaned up output directory: {result.output_path}")
             except Exception as exc:
                 logger.warning(f"[MONKEY365] Could not delete output directory {result.output_path}: {exc}")
-
-        # Clean up archive path
-        if result.archive_path:
-            try:
-                archive_path = Path(result.archive_path)
-                if archive_path.exists():
-                    shutil.rmtree(archive_path)
-                    logger.info(f"[MONKEY365] Cleaned up archive directory: {result.archive_path}")
-            except Exception as exc:
-                logger.warning(f"[MONKEY365] Could not delete archive directory {result.archive_path}: {exc}")
 
         # Delete from database
         db.delete(result)

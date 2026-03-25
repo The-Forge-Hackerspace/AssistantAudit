@@ -966,7 +966,6 @@ export interface Monkey365ScanResultSummary {
 export interface Monkey365ScanResultDetail extends Monkey365ScanResultSummary {
   config_snapshot?: Record<string, unknown> | null;
   output_path?: string | null;
-  archive_path?: string | null;
   error_message?: string | null;
 }
 

@@ -43,14 +43,11 @@ class Monkey365ScanResult(Base):
     # Configuration snapshot (provider, tenant info, etc.)
     config_snapshot: Mapped[dict | None] = mapped_column(JSON)
 
-    # Chemin vers les résultats du scan
+    # Chemin vers les résultats du scan (destination unique : logs, meta et rapports)
     output_path: Mapped[str | None] = mapped_column(String(500))
 
     # Slug de l'entreprise pour référence rapide
     entreprise_slug: Mapped[str | None] = mapped_column(String(200))
-
-    # Archive path where results were stored (e.g., /data/enterprise/Cloud/M365/{scan_id})
-    archive_path: Mapped[str | None] = mapped_column(String(500))
 
     # Nombre total de findings
     findings_count: Mapped[int | None] = mapped_column(Integer)

@@ -472,7 +472,7 @@ Monkey365 supports 4 authentication methods:
 | Models | **24** | Includes inherited types (audit discrepancy noted) |
 | Frontend Pages | **17** | 100% implemented (16/17 protected) |
 | Tests | **12** | Coverage gaps - only 40% of tools have tests |
-| Lines of Code | **~37.59 MB** | Including dependencies |
+| Repository Size | **~37.59 MB** | Including dependencies |
 | Référentiels YAML | 12 | With SHA-256 sync engine |
 | Composants shadcn/ui | 25 | All actively used |
 | Migrations Alembic | 7 | All applied successfully |

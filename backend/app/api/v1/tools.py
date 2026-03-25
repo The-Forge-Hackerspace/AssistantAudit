@@ -33,9 +33,6 @@ from ...schemas.scan import (
     PingCastleCreate,
     PingCastleResultSummary,
     PingCastleResultRead,
-    Monkey365ScanCreate,
-    Monkey365ScanResultSummary,
-    Monkey365ScanResultRead,
 )
 from ...schemas.common import MessageResponse
 from ...tools.config_parsers import get_parser, ConfigParserBase
@@ -71,9 +68,6 @@ from ...services.pingcastle_service import (
     delete_pingcastle_result,
     prefill_assessment_from_pingcastle,
 )
-from ...services.monkey365_scan_service import Monkey365ScanService
-from ...models.entreprise import Entreprise
-
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tools", tags=["tools"])
 
@@ -689,67 +683,4 @@ async def prefill_from_pingcastle(
         result = prefill_assessment_from_pingcastle(db, result_id, assessment_id)
     except ValueError as e:
         raise HTTPException(404, str(e))
-    return result
-
-
-# ──────────────────────────────────────────────
-# Monkey365 (Audit Microsoft 365 / Azure AD)
-# ──────────────────────────────────────────────
-
-@router.post("/monkey365/run", response_model=Monkey365ScanResultSummary, status_code=201)
-async def launch_monkey365_scan(
-    request: Monkey365ScanCreate,
-    db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
-):
-    """
-    Lance un audit Monkey365 sur Microsoft 365 / Azure AD.
-    L'audit s'exécute en arrière-plan.
-    """
-    # Verify entreprise exists
-    entreprise = db.get(Entreprise, request.entreprise_id)
-    if not entreprise:
-        raise HTTPException(404, f"Entreprise #{request.entreprise_id} introuvable")
-
-    try:
-        result = Monkey365ScanService.launch_scan(
-            db=db,
-            entreprise_id=request.entreprise_id,
-            config=request.config,
-        )
-    except ValueError as e:
-        raise HTTPException(404, str(e))
-
-    auth_mode = request.config.auth_mode.value if hasattr(request.config.auth_mode, "value") else str(request.config.auth_mode)
-    tenant_display = request.config.tenant_id or "n/a"
-    logger.info(
-        f"Monkey365 scan #{result.id} lancé en background "
-        f"(mode={auth_mode}, tenant={tenant_display}, entreprise={request.entreprise_id})"
-    )
-    return result
-
-
-@router.get("/monkey365/scans/{entreprise_id}", response_model=list[Monkey365ScanResultSummary])
-async def list_monkey365_scans(
-    entreprise_id: int,
-    db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
-):
-    """Liste les audits Monkey365 pour une entreprise."""
-    return Monkey365ScanService.list_scans(
-        db=db,
-        entreprise_id=entreprise_id,
-    )
-
-
-@router.get("/monkey365/scans/result/{result_id}", response_model=Monkey365ScanResultRead)
-async def get_monkey365_scan_result(
-    result_id: int,
-    db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
-):
-    """Récupère le détail d'un audit Monkey365."""
-    result = Monkey365ScanService.get_scan(db, result_id)
-    if not result:
-        raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
     return result

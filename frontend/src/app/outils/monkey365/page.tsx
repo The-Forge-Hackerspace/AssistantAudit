@@ -37,13 +37,21 @@ export default function Monkey365Page() {
 
   // Entreprises state — persisted in sessionStorage so selection survives navigation
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
-  const [selectedEntrepriseId, setSelectedEntrepriseIdState] = useState<string>(() =>
-    typeof window !== "undefined" ? sessionStorage.getItem("monkey365_entreprise") ?? "" : ""
-  );
+  const [selectedEntrepriseId, setSelectedEntrepriseIdState] = useState<string>("");
   const setSelectedEntrepriseId = (id: string) => {
     setSelectedEntrepriseIdState(id);
-    if (typeof window !== "undefined") sessionStorage.setItem("monkey365_entreprise", id);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("monkey365_entreprise", id);
+    }
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedEntrepriseId = sessionStorage.getItem("monkey365_entreprise");
+    if (storedEntrepriseId) {
+      setSelectedEntrepriseIdState(storedEntrepriseId);
+    }
+  }, []);
 
   // PowerShell logs state
   const [scanLogs, setScanLogs] = useState<Monkey365ScanLogs | null>(null);
@@ -155,25 +163,6 @@ export default function Monkey365Page() {
     loadScans();
   }, [loadScans]);
 
-  // Poll the running scan detail every 2s — recreate only when id or status changes
-  useEffect(() => {
-    if (!selectedScan || selectedScan.status !== "running") return;
-    const scanId = selectedScan.id;
-    const interval = setInterval(async () => {
-      try {
-        const updated = await toolsApi.getMonkey365ScanDetail(scanId);
-        setSelectedScan(updated);
-        if (updated.status !== "running") {
-          clearInterval(interval);
-          setElapsedSeconds(updated.duration_seconds || 0);
-        }
-      } catch (err) {
-        console.error("Failed to poll scan status:", err);
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [selectedScan?.id, selectedScan?.status]);
-
   // Elapsed-seconds ticker — recreate only when id or status changes (not every poll)
   useEffect(() => {
     if (!selectedScan || selectedScan.status !== "running") return;
@@ -183,31 +172,43 @@ export default function Monkey365Page() {
     return () => clearInterval(ticker);
   }, [selectedScan?.id, selectedScan?.status]);
 
+  // Clear logs when selected scan changes
   useEffect(() => {
-    if (scans.some(s => s.status === "running")) {
-      const interval = setInterval(loadScans, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [scans, loadScans]);
+    if (!selectedScan) { setScanLogs(null); }
+  }, [selectedScan?.id]);
 
-  // Poll PowerShell logs while scan is running, clear them when scan changes
+  // Centralized per-scan poll: fetch detail + logs together every 2s while running
   useEffect(() => {
-    if (!selectedScan) { setScanLogs(null); return; }
-    const fetchLogs = async () => {
+    if (!selectedScan?.id || selectedScan.status !== "running") return;
+    const scanId = selectedScan.id;
+    const poll = async () => {
       try {
-        const logs = await toolsApi.getMonkey365ScanLogs(selectedScan.id);
-        setScanLogs(logs);
-        // Auto-scroll to bottom
-        logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      } catch {
-        // ignore — log file may not exist yet
+        const [updated, logs] = await Promise.all([
+          toolsApi.getMonkey365ScanDetail(scanId),
+          toolsApi.getMonkey365ScanLogs(scanId).catch(() => null),
+        ]);
+        setSelectedScan(updated);
+        if (logs !== null) {
+          setScanLogs(logs);
+          logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+        if (updated.status !== "running") {
+          setElapsedSeconds(updated.duration_seconds || 0);
+        }
+      } catch (err) {
+        console.error("Erreur lors du polling du scan:", err);
       }
     };
-    fetchLogs();
-    if (selectedScan.status !== "running") return;
-    const interval = setInterval(fetchLogs, 3000);
+    poll();
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
   }, [selectedScan?.id, selectedScan?.status]);
+
+  // Slow background poll to keep scans list fresh without rapid teardown/recreation
+  useEffect(() => {
+    const interval = setInterval(loadScans, 15000);
+    return () => clearInterval(interval);
+  }, [loadScans]);
 
   useEffect(() => {
     const loadEntreprises = async () => {

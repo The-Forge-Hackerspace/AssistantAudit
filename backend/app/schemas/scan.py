@@ -478,9 +478,15 @@ class PingCastleResultRead(BaseModel):
 
 # ─── Monkey365 Audit ─────────────────────────────────────────
 
+class Monkey365ExportFormat(str, Enum):
+    JSON = "JSON"
+    HTML = "HTML"
+    CSV = "CSV"
+
+
 class Monkey365ConfigSchema(BaseModel):
     spo_sites: list[str] = Field(default_factory=list, description="SharePoint sites to scan (e.g., https://domain.sharepoint.com)")
-    export_to: list[str] = Field(default_factory=lambda: ["JSON", "HTML"], description="Export formats: JSON, HTML")
+    export_to: list[Monkey365ExportFormat] = Field(default_factory=lambda: [Monkey365ExportFormat.JSON, Monkey365ExportFormat.HTML], description="Formats d'export : JSON, HTML, CSV")
 
 
 class Monkey365ScanCreate(BaseModel):
@@ -512,7 +518,6 @@ class Monkey365ScanResultRead(BaseModel):
     scan_id: str
     config_snapshot: Optional[dict] = None
     output_path: Optional[str] = None
-    archive_path: Optional[str] = None
     entreprise_slug: Optional[str] = None
     findings_count: Optional[int] = None
     error_message: Optional[str] = None

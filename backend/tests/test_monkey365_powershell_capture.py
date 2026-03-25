@@ -170,16 +170,14 @@ def test_powershell_raw_output_not_copied_to_archive(tmp_path):
     other_result_file.write_text('{"status": "ok"}')
     nested_file.write_text('{"nested": true}')
 
-    archive_base = tmp_path / "archive"
-    archive_base.mkdir(parents=True)
+    dest = tmp_path / "output"
+    dest.mkdir(parents=True)
 
-    with _patch("app.services.monkey365_scan_service.settings") as mock_settings:
-        mock_settings.MONKEY365_ARCHIVE_PATH = str(archive_base)
-        result_path = Monkey365ScanService.move_results_to_archive(scan_id, monkey_reports)
+    Monkey365ScanService.move_results_to_output(monkey_reports, dest)
 
-    assert not (result_path / "powershell_raw_output.json").exists(), \
-        "powershell_raw_output.json must not be copied to the archive"
-    assert (result_path / "result.json").exists(), \
-        "result.json should be present in the archive"
-    assert (result_path / "nested" / "nested_result.json").exists(), \
-        "nested files should be preserved in the archive"
+    assert not (dest / "powershell_raw_output.json").exists(), \
+        "powershell_raw_output.json must not be copied to the output"
+    assert (dest / "result.json").exists(), \
+        "result.json should be present in the output"
+    assert (dest / "nested" / "nested_result.json").exists(), \
+        "nested files should be preserved in the output"

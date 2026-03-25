@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -57,12 +57,17 @@ async def launch_monkey365_scan(
 @router.get("/monkey365/scans/{entreprise_id}", response_model=list[Monkey365ScanResultSummary])
 async def list_monkey365_scans(
     entreprise_id: int,
+    page: int = Query(1, ge=1, description="Numéro de page, commence à 1"),
+    page_size: int = Query(50, ge=1, le=500, description="Nombre de résultats par page"),
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
 ):
+    """Liste paginée des audits Monkey365 pour une entreprise."""
     return Monkey365ScanService.list_scans(
         db=db,
         entreprise_id=entreprise_id,
+        skip=(page - 1) * page_size,
+        limit=page_size,
     )
 
 
@@ -137,15 +142,19 @@ async def get_monkey365_scan_report(
     if result.status != "success":
         raise HTTPException(400, "Rapport disponible uniquement pour les scans réussis")
 
-    output_path = Path(result.output_path) if result.output_path else None
-    html_file: Path | None = None
+    if not result.output_path:
+        raise HTTPException(404, "Fichier HTML introuvable pour ce scan")
 
-    if output_path and output_path.exists():
-        html_dir = output_path / "HTML"
-        if html_dir.exists():
-            candidates = sorted(html_dir.glob("*.html"))
-            if candidates:
-                html_file = candidates[0]
+    html_file: Path | None = None
+    output_root = Path(result.output_path)
+    if output_root.exists():
+        for html_dir_name in ("html", "HTML"):
+            html_dir = output_root / html_dir_name
+            if html_dir.exists():
+                candidates = sorted(html_dir.glob("*.html"))
+                if candidates:
+                    html_file = candidates[0]
+                    break
 
     if not html_file:
         raise HTTPException(404, "Fichier HTML introuvable pour ce scan")

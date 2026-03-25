@@ -1,356 +1,258 @@
 # AssistantAudit
 
-**Open-source IT infrastructure security auditing platform for penetration testers, security auditors, and IT compliance teams.**
+Plateforme d'audit de sécurité IT destinée aux équipes Red Team, auditeurs de conformité et consultants en cybersécurité.
 
-AssistantAudit provides automated assessment of network devices, servers, cloud platforms (Microsoft 365), and compliance frameworks. Built with Python FastAPI backend, Next.js React frontend, and 12 customizable YAML frameworks (200+ controls). Includes integrated tools: Nmap scanner, SSL/TLS checker, SSH/WinRM collectors, Active Directory auditor, PingCastle, Monkey365 bridge, and configuration parsers.
-
----
-
-## Features
-
-✅ **Phase 1-3 Complete**
-
-- **Multi-tenant management** — organize audits by company, site, and equipment
-- **12 compliance frameworks** (200+ controls) — Firewall, Switch, Windows/Linux servers, Active Directory, Microsoft 365, DNS/DHCP, Wi-Fi, VPN, Sauvegarde, Messagerie, Périphériques, OPNsense
-- **Automated compliance scoring** — real-time conformity status (compliant/non-compliant/partial/N/A)
-- **45 REST API endpoints** — fully documented with Swagger UI
-- **JWT authentication** — role-based access control (admin, auditor, reader)
-- **Dynamic YAML frameworks** — SHA-256 integrity checking with automatic sync at startup
-- **Nmap network scanner** — host discovery, port enumeration, OS fingerprinting
-- **SSL/TLS certificate analyzer** — protocol detection, expiration warnings, security findings
-- **SSH/WinRM remote collection** — automated system data gathering (Linux, Windows, FortiGate, OPNsense, Stormshield)
-- **Active Directory auditor** — LDAP queries for domain security assessment
-- **PingCastle integration** — AD health check with risk scoring
-- **Monkey365 bridge** — Microsoft 365 / Azure AD automated audit
-- **Configuration parser** — Fortinet FortiGate and OPNsense firewall rule analysis
-- **Evidence attachments** — file upload/download for control result proof
-- **Full React UI** (17 pages) — dashboard, entity CRUD, evaluation forms, dark mode, responsive design
-
-🔄 **Phase 4: Tool Integrations (Testing)**
-- All 7 tools implemented and integrated
-- Ready for production testing
-
-⏳ **Phase 5-6: Future**
-- PDF/Word report generation (planned)
-- AI-assisted remediation suggestions (planned)
+AssistantAudit centralise l'ensemble du cycle d'audit : collecte automatique de données, évaluation de conformité sur des référentiels standards (CIS, ANSSI, ISO 27001, NIS2…), gestion des preuves et reporting — le tout depuis une interface web unique.
 
 ---
 
-## Tech Stack
+## Objectifs
 
-### Backend
-- **Python 3.13**
-- **FastAPI** — high-performance async web framework
-- **SQLAlchemy 2.0** — ORM with async support
-- **Pydantic v2** — data validation and serialization
-- **JWT OAuth2** — secure authentication with python-jose + bcrypt
-- **Alembic** — database migrations
-
-### Frontend
-- **Next.js 16** (App Router)
-- **React 19** + TypeScript
-- **Tailwind CSS v4** — utility-first styling
-- **shadcn/ui** — accessible component library
-- **Recharts** — data visualization
-- **Axios** — HTTP client with JWT interceptor
-- **next-themes** — dark mode support
-
-### Database
-- **SQLite** (development)
-- **PostgreSQL** (production, planned)
-
-### Tools & Services
-- **Nmap** — network discovery
-- **OpenSSL** — TLS/certificate analysis
-- **Monkey365** — M365/Azure AD auditor
-- **PingCastle** — AD security assessment
-- **Paramiko** — SSH remote execution
-- **pywinrm** — WinRM remote PowerShell
-- **ldap3** — LDAP queries for AD audit
+- **Automatiser la collecte** — scans réseau (Nmap), vérification TLS, collecte SSH/WinRM, audit Active Directory, audit Microsoft 365 (Monkey365), analyse de configs pare-feu
+- **Centraliser l'évaluation** — 15 référentiels de conformité YAML (363 contrôles), auto-synchronisés à chaque démarrage
+- **Tracer les résultats** — statuts par contrôle (conforme / non conforme / partiel / N/A), pièces justificatives, historique par campagne
+- **Exposer une API REST complète** — 45+ endpoints documentés (Swagger/ReDoc), intégration possible avec des outils tiers
 
 ---
 
-## Prerequisites
+## Stack technique
+
+| Couche | Technologie |
+|--------|-------------|
+| Backend | Python 3.13, FastAPI 0.115+, SQLAlchemy 2, Pydantic v2, Alembic |
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn/ui |
+| Base de données | SQLite (développement) — PostgreSQL (production, planifié) |
+| Auth | JWT (access 15 min + refresh 7 jours), RBAC 3 niveaux |
+| Outils intégrés | Nmap, OpenSSL, Paramiko (SSH), pywinrm, ldap3, Monkey365 (PowerShell), PingCastle |
+
+---
+
+## Prérequis
 
 - **Python 3.13+**
 - **Node.js 18+**
-- **PowerShell 7+** (for Monkey365 integration on Windows)
-- **Git** (for tool auto-updates)
-
-### Optional Tools
-- **Nmap** — for network scanning (available on PATH)
-- **OpenSSL** — for TLS testing (usually pre-installed)
+- **PowerShell 7+** (`pwsh` dans le PATH) — requis uniquement pour Monkey365
+- **Git**
+- Optionnel : Nmap (scan réseau), OpenSSL (analyse TLS)
 
 ---
 
-## Installation
-
-### Quick Start (Windows PowerShell)
+## Démarrage rapide (Windows)
 
 ```powershell
-# Clone repository
+# 1. Cloner le dépôt
 git clone https://github.com/The-Forge-Hackerspace/AssistantAudit
 cd AssistantAudit
 
-# Run the startup script
-.\start.ps1
+# 2. Configurer l'environnement
+cp .env.example .env
+# Éditer .env : au minimum, définir SECRET_KEY
 
-# Access the application
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:8000
-# Swagger UI: http://localhost:8000/docs
-```
-
-**First Login**
-- Default admin credentials will be displayed after `start.ps1` completes
-- Change password immediately in profile settings
-
-### Advanced Options
-
-```powershell
-# Development mode (verbose logs, hot-reload)
+# 3. Lancer la stack complète
 .\start.ps1 --dev
-
-# Production build mode
-.\start.ps1 --build
 ```
 
-### Manual Installation
+`start.ps1` crée le venv Python, installe les dépendances, initialise la base, lance le backend (port 8000) et le frontend (port 3000).
 
-**Backend:**
+```
+Frontend  : http://localhost:3000
+API       : http://localhost:8000
+Swagger   : http://localhost:8000/docs
+ReDoc     : http://localhost:8000/redoc
+```
+
+Les identifiants admin par défaut sont affichés dans le terminal au premier démarrage — à changer immédiatement.
+
+---
+
+## Démarrage manuel
+
+### Backend
+
 ```bash
 cd backend
 python -m venv ../venv
-# Windows: ..\venv\Scripts\Activate.ps1
-# Linux/macOS: source ../venv/bin/activate
+# Windows : ..\venv\Scripts\Activate.ps1
+# Linux/macOS : source ../venv/bin/activate
 pip install -r requirements.txt
 
-# Initialize database
-python init_db.py
-
-# Start server
-cd ..
-python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+python init_db.py                                          # première fois uniquement
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Frontend (in another terminal):**
+### Frontend
+
 ```bash
 cd frontend
 npm install
-npm run dev
-
-# Open http://localhost:3000
+npm run dev     # http://localhost:3000
 ```
 
 ---
 
 ## Configuration
 
-### Environment Variables
-
-Create a `.env` file in the project root:
+Copier `.env.example` en `.env` à la racine du projet :
 
 ```env
-# Security (REQUIRED for production)
+# Obligatoire en production
 SECRET_KEY=your-secret-key-min-32-chars
 
-# Database
+# Base de données
 DATABASE_URL=sqlite:///./instance/assistantaudit.db
 # DATABASE_URL=postgresql://user:password@localhost:5432/assistantaudit
 
-# Application
+# Environnement
 ENV=development          # development | production
-DEBUG=true
 LOG_LEVEL=INFO
 
-# Tools
-NMAP_TIMEOUT=600         # Timeout in seconds
+# Outils (chemins absolus)
+MONKEY365_PATH=C:\path\to\Invoke-Monkey365.ps1
+MONKEY365_ARCHIVE_PATH=C:\data\monkey365
+PINGCASTLE_PATH=C:\path\to\PingCastle.exe
+
+# Timeouts (secondes)
+NMAP_TIMEOUT=600
 PINGCASTLE_TIMEOUT=300
 MONKEY365_TIMEOUT=600
 
-# Admin (optional - auto-generated if not set)
+# Admin initial (optionnel — généré automatiquement sinon)
 ADMIN_PASSWORD=your-secure-password
 ```
 
 ---
 
-## Project Status
-
-- ✅ **Phase 1:** Backend foundation (45 endpoints, 24 models, JWT auth)
-- ✅ **Phase 2:** 12 YAML security frameworks with SHA-256 sync
-- ✅ **Phase 3:** Full React UI (17 pages, dark mode, responsive)
-- 🔄 **Phase 4:** Tool integrations (7/7 implemented, testing in progress)
-- ⏳ **Phase 5:** PDF/Word report generation (planned)
-- ⏳ **Phase 6:** AI-assisted remediation suggestions (planned)
-
-**Sprint 0 Audit Status:** All critical security findings documented. Known issues and technical debt listed in [CONCEPT.md#known-issues](CONCEPT.md#-known-issues--technical-debt).
-
----
-
-## API Documentation
-
-### Interactive API Explorer
-- **Swagger UI:** http://localhost:8000/docs
-- **ReDoc:** http://localhost:8000/redoc
-
-### Full API Reference
-See [API.md](API.md) for complete endpoint documentation (45 endpoints across 14 services).
-
----
-
 ## Architecture
 
-The application follows a layered architecture:
-
 ```
-┌─────────────────────────────────────┐
-│     Frontend (Next.js React)        │
-│  17 pages, JWT auth, dark mode      │
-└──────────────┬──────────────────────┘
-               │ Axios + JWT Interceptor
-┌──────────────┴──────────────────────┐
-│     REST API (FastAPI)              │
-│  45 endpoints, role-based auth      │
-└──────────────┬──────────────────────┘
-               │ SQLAlchemy ORM
-┌──────────────┴──────────────────────┐
-│  Core Engine                        │
-│  ├─ Framework sync + versioning     │
-│  ├─ Compliance scoring              │
-│  ├─ Tool integration bridge         │
-│  └─ 7 integrated audit tools        │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────┴──────────────────────┐
-│  Database Layer                     │
-│  SQLite (dev) → PostgreSQL (prod)   │
-└─────────────────────────────────────┘
+Frontend (Next.js)
+    │ Axios + JWT interceptor
+    ▼
+REST API (FastAPI) — 45 endpoints, RBAC
+    │
+    ├── Services (logique métier)
+    │     ├── framework_service    — sync YAML ↔ DB (SHA-256)
+    │     ├── assessment_service   — campagnes, évaluations, scoring
+    │     ├── monkey365_service    — scan M365, mapping vers contrôles
+    │     ├── scan_service         — Nmap
+    │     ├── collect_service      — SSH/WinRM (Linux, Windows, FortiGate, OPNsense)
+    │     ├── ad_audit_service     — LDAP
+    │     ├── pingcastle_service   — PingCastle runner
+    │     └── config_analysis_service — parse configs pare-feu
+    │
+    └── SQLAlchemy ORM → SQLite / PostgreSQL
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design decisions.
+Règle fondamentale : `Router → Service → Model`. Les routers ne font jamais de requêtes DB directement.
 
 ---
 
-## Contributing
+## Référentiels de conformité
 
-Contributions are welcome! Please:
+15 référentiels YAML dans `frameworks/` — auto-synchronisés au démarrage via hash SHA-256 :
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+| ref_id | Nom | Moteur | Contrôles |
+|--------|-----|--------|-----------|
+| `ANSSI-GUIDE-SECURITE-AD` | Guide sécurité AD (ANSSI) | `manual` | 29 |
+| `ANSSI-PA-022` | Recommandations AD (ANSSI PA-022) | `manual` | 18 |
+| `CIS-AZURE-V3` | CIS Microsoft Azure Foundations v3 | `manual` | 29 |
+| `CIS-ENTRA-ID-V2` | CIS Microsoft Entra ID v2 | `manual` | 12 |
+| `CIS-LINUX-V3` | CIS Linux Benchmark v3 | `collect_ssh` | 27 |
+| `CIS-M365-V3` | CIS Microsoft 365 Foundations v3 | `monkey365` | 52 |
+| `CIS-M365-V5` | CIS Microsoft 365 Foundations v5 | `monkey365` | 130 |
+| `CIS-WINDOWS-SERVER-2022` | CIS Windows Server 2022 | `manual` | 23 |
+| `DORA` | Digital Operational Resilience Act | `manual` | 14 |
+| `HADS` | Hébergement de Données de Santé | `manual` | 18 |
+| `ISO-27001-2022` | ISO/IEC 27001:2022 | `manual` | 23 |
+| `NIS2` | Directive NIS2 | `manual` | 16 |
+| `PASSI` | Prestataires d'Audit de la Sécurité des SI | `manual` | 8 |
+| `SOC2-TYPE2` | SOC 2 Type II | `manual` | 20 |
 
-### Development Guidelines
+Moteurs : `manual` (évaluation humaine), `monkey365` (automatisé via PowerShell), `collect_ssh` (collecte SSH).
 
-- Follow PEP 8 for Python code
-- Use TypeScript for frontend
-- Write tests for new features
-- Update documentation
-- Run tests before submitting PR
-
----
-
-## Security
-
-AssistantAudit implements comprehensive security controls:
-
-✅ **Authentication & Authorization**
-- JWT tokens with 15-minute access + 7-day refresh
-- Role-based access control (admin, auditor, reader)
-- Password hashing with bcrypt
-
-✅ **Data Protection**
-- SQL injection prevention (SQLAlchemy ORM)
-- Command injection mitigation (whitelisting, no shell=True)
-- Path traversal protection (Path.resolve + is_relative_to checks)
-- CSRF protection (SameSite cookies)
-- XSS prevention (httpOnly tokens)
-
-✅ **Infrastructure**
-- Security headers (CSP, HSTS, X-Frame-Options, etc.)
-- Rate limiting on authentication endpoints
-- Comprehensive audit logging
-- Dependency security scanning
-
-**For security concerns**, please see [SECURITY.md](SECURITY.md) or contact maintainers privately.
+Pour ajouter un référentiel : créer `frameworks/{REF_ID}.yaml` et redémarrer le backend.
 
 ---
 
-## Known Issues
+## Outils intégrés
 
-**Sprint 0 Audit (2026-03-20)** identified the following:
+| Outil | Usage | Dépendance |
+|-------|-------|------------|
+| **Nmap** | Découverte réseau, ports, OS | `nmap` dans le PATH |
+| **SSL Checker** | Analyse certificats TLS, protocoles | `openssl` |
+| **SSH/WinRM Collector** | Collecte config Linux, Windows, FortiGate, OPNsense, Stormshield | `paramiko`, `pywinrm` |
+| **AD Auditor** | Audit Active Directory via LDAP | `ldap3` |
+| **PingCastle** | Score de santé AD, rapport HTML | `PingCastle.exe` (Windows) |
+| **Monkey365** | Audit complet Microsoft 365 / Entra ID | `pwsh` + `Invoke-Monkey365.ps1` |
+| **Config Parser** | Analyse règles pare-feu FortiGate / OPNsense | — |
 
-### Critical (Must Fix Before Production)
-- Dashboard chart colors hardcoded (don't adapt to dark mode)
-- 4 icon buttons missing accessibility labels
-- 7 npm high-severity vulnerabilities
+### Monkey365 — installation des modules PowerShell
 
-### High Priority
-- 5 N+1 query patterns need optimization
-- Database and infrastructure environment variable issues
-- Several tools lack unit test coverage
+```powershell
+# Une seule fois, sur le poste Windows qui exécute les scans
+.\install_m365_modules.ps1
+```
 
-### Medium Priority
-- SSH private keys passed plaintext in API requests
-- CORS origins should be environment-based
-- WinRM SSL validation disabled in development
-
-**Full details:** See [CONCEPT.md#-known-issues--technical-debt](CONCEPT.md#-known-issues--technical-debt)
-
----
-
-## License
-
-Proprietary — All rights reserved. For licensing inquiries, contact the maintainers.
+Monkey365 nécessite une session desktop Windows pour l'authentification interactive MSAL (Device Code / Interactive). Il n'est pas compatible avec les serveurs headless.
 
 ---
 
-## Support
+## Commandes de développement
 
-### Documentation
-- [API.md](API.md) — Complete API reference
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Technical architecture
-- [CONCEPT.md](CONCEPT.md) — Vision, roadmap, and known issues
-- [SECURITY.md](SECURITY.md) — Security audit findings
+```bash
+# Tests backend
+cd backend
+pytest -q
+pytest tests/test_monkey365_executor.py -v
 
-### Community
-- **GitHub Issues** — Bug reports and feature requests
-- **Discussions** — Questions and ideas
+# Migrations DB
+alembic revision --autogenerate -m "description"
+alembic upgrade head
 
-### Getting Help
-For setup issues or questions:
-1. Check documentation above
-2. Search existing GitHub issues
-3. Open a new issue with reproduction steps
+# Build frontend
+cd frontend
+npm run build
+npm run lint
 
----
-
-## Roadmap
-
-**Near-term (Next 2 Sprints)**
-- Fix critical security findings from Sprint 0 audit
-- Add unit test coverage for tools
-- Implement CI/CD security scanning pipeline
-
-**Mid-term (Q2 2026)**
-- PostgreSQL production migration
-- PDF/Word report generation
-- Advanced role-based permissions
-
-**Long-term (H2 2026)**
-- AI-assisted remediation suggestions
-- Custom framework marketplace
-- SIEM integration
-- Multi-language support
+# Démarrage production
+.\start.ps1 --build
+```
 
 ---
 
-## Contact
+## Modèle de sécurité
 
-**Project Owner:** T0SAGA97  
-**GitHub:** https://github.com/The-Forge-Hackerspace/AssistantAudit
+- **JWT** : access token 15 min + refresh token 7 jours
+- **RBAC** : `admin` > `auditeur` > `lecteur` (vérifié dans `core/deps.py`)
+- **Rate limiting** : 5 tentatives/minute sur `POST /auth/login`, blocage 5 min
+- **Mots de passe** : hachés avec bcrypt
+- **Isolation** : pas de `shell=True` dans les appels subprocess, pas de chemins absolus codés en dur
 
 ---
 
-**Last Updated:** March 2026 (Sprint 0 Audit)
+## Feuille de route
+
+**Court terme**
+- Génération de rapports PDF/Word
+- Tests unitaires et E2E (couverture > 80 %)
+- Pipeline CI/CD
+
+**Moyen terme**
+- Migration PostgreSQL pour la production
+- Permissions RBAC avancées
+- Intégration SIEM
+
+**Long terme**
+- Suggestions de remédiation assistées par IA
+- Marketplace de référentiels personnalisés
+
+---
+
+## Licence
+
+Propriétaire — tous droits réservés. Pour toute demande de licence, contacter les mainteneurs.
+
+---
+
+**Mainteneur :** T0SAGA97
+**Dépôt :** https://github.com/The-Forge-Hackerspace/AssistantAudit

@@ -468,7 +468,7 @@ class AssessmentService:
         for category in framework.categories:
             all_controls.extend(category.controls)
 
-        control_results: list[ControlResult] = []
+        results_by_control: dict[int, ControlResult] = {}
         for control in all_controls:
             cr = ControlResult(
                 assessment_id=assessment.id,
@@ -476,17 +476,15 @@ class AssessmentService:
                 status=ComplianceStatus.NOT_ASSESSED,
             )
             db.add(cr)
-            control_results.append(cr)
+            results_by_control[control.id] = cr
         db.flush()
 
         # Parser les findings Monkey365
         scan_dir: Path | None = None
-        for path_str in [scan.output_path, scan.archive_path]:
-            if path_str:
-                candidate = Path(path_str)
-                if candidate.exists():
-                    scan_dir = candidate
-                    break
+        if scan.output_path:
+            candidate = Path(scan.output_path)
+            if candidate.exists():
+                scan_dir = candidate
 
         findings_by_rule: dict[str, str] = {}
         if scan_dir:
@@ -517,13 +515,15 @@ class AssessmentService:
         # Appliquer les findings aux ControlResult
         controls_mapped = 0
         now = datetime.now(timezone.utc)
-        for i, control in enumerate(all_controls):
+        for control in all_controls:
             rule_id = control.engine_rule_id
             if not rule_id:
                 continue
             status_text = findings_by_rule.get(rule_id.lower())
             if status_text and status_text in STATUS_MAP:
-                cr = control_results[i]
+                cr = results_by_control.get(control.id)
+                if cr is None:
+                    continue
                 cr.status = STATUS_MAP[status_text]
                 cr.is_auto_assessed = True
                 cr.assessed_by = assessed_by or "monkey365"
