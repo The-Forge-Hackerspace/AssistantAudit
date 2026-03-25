@@ -402,17 +402,21 @@ class AssessmentService:
         if not framework:
             raise ValueError("Framework CIS-M365-V5 introuvable — vérifiez que le YAML a bien été importé")
 
-        # Trouver le premier site de l'entreprise
+        # Trouver ou créer un site par défaut pour l'entreprise
         site = (
             db.query(Site)
             .filter(Site.entreprise_id == scan.entreprise_id)
             .first()
         )
         if not site:
-            raise ValueError(
-                f"Aucun site trouvé pour l'entreprise #{scan.entreprise_id} — "
-                "créez au moins un site avant d'importer"
+            site = Site(
+                nom="Cloud",
+                description="Site virtuel créé automatiquement pour les audits Microsoft 365",
+                entreprise_id=scan.entreprise_id,
             )
+            db.add(site)
+            db.flush()
+            logger.info(f"Site virtuel 'Cloud' créé pour entreprise #{scan.entreprise_id}")
 
         # Trouver ou créer un équipement virtuel cloud_gateway (IP 0.0.0.0 par site)
         virtual_eq = (
