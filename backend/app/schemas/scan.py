@@ -527,3 +527,16 @@ class Monkey365ScanLogs(BaseModel):
     """Logs PowerShell d'un scan Monkey365 (lecture en direct du fichier log)."""
     lines: list[str]
     total_lines: int
+
+
+class Monkey365ImportRequest(BaseModel):
+    """Paramètres pour importer un scan Monkey365 dans un audit existant."""
+    audit_id: int = Field(..., description="ID de l'audit cible")
+
+
+class Monkey365ImportResult(BaseModel):
+    """Résultat de l'import d'un scan Monkey365 dans un audit."""
+    campaign_id: int
+    assessment_id: int
+    controls_mapped: int
+    controls_total: int

@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ....core.database import get_db
@@ -13,9 +14,12 @@ from ....schemas.scan import (
     Monkey365ScanResultRead,
     Monkey365ScanResultSummary,
     Monkey365ScanLogs,
+    Monkey365ImportRequest,
+    Monkey365ImportResult,
 )
 from ....schemas.common import MessageResponse
 from ....services.monkey365_scan_service import Monkey365ScanService
+from ....services.assessment_service import AssessmentService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -118,6 +122,63 @@ async def cancel_monkey365_scan(
     db.commit()
     db.refresh(result)
     return result
+
+
+@router.get("/monkey365/scans/result/{result_id}/report")
+async def get_monkey365_scan_report(
+    result_id: int,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_auditeur),
+):
+    """Retourne le fichier HTML du rapport Monkey365."""
+    result = Monkey365ScanService.get_scan(db, result_id)
+    if not result:
+        raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
+    if result.status != "success":
+        raise HTTPException(400, "Rapport disponible uniquement pour les scans réussis")
+
+    output_path = Path(result.output_path) if result.output_path else None
+    html_file: Path | None = None
+
+    if output_path and output_path.exists():
+        html_dir = output_path / "HTML"
+        if html_dir.exists():
+            candidates = sorted(html_dir.glob("*.html"))
+            if candidates:
+                html_file = candidates[0]
+
+    if not html_file:
+        raise HTTPException(404, "Fichier HTML introuvable pour ce scan")
+
+    return FileResponse(
+        path=str(html_file),
+        media_type="text/html",
+        filename=html_file.name,
+    )
+
+
+@router.post("/monkey365/scans/{result_id}/import-to-audit", response_model=Monkey365ImportResult, status_code=201)
+async def import_monkey365_to_audit(
+    result_id: int,
+    request: Monkey365ImportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_auditeur),
+):
+    """Importe un scan Monkey365 réussi dans un audit existant (crée campagne + assessment CIS-M365-V5)."""
+    try:
+        result = AssessmentService.import_monkey365_scan(
+            db=db,
+            scan_result_id=result_id,
+            audit_id=request.audit_id,
+            assessed_by=current_user.username,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.exception("Erreur lors de l'import Monkey365 vers l'audit")
+        raise HTTPException(500, f"Erreur interne: {e}")
+
+    return Monkey365ImportResult(**result)
 
 
 @router.delete("/monkey365/scans/{result_id}", response_model=MessageResponse)
