@@ -201,6 +201,21 @@ Invoke-Monkey365 @param -Verbose
         log_file = output_path / "monkey365.log"
         script = self.build_script(scan_id, log_path=log_file)
 
+        params_snapshot = {
+            "scan_id": scan_id,
+            "Instance": "Microsoft365",
+            "Collect": self.COLLECT_MODULES,
+            "PromptBehavior": "SelectAccount",
+            "IncludeEntraID": True,
+            "ForceMSALDesktop": True,
+            "ExportTo": self.config.export_to,
+            "SpoSites": self.config.spo_sites or [],
+        }
+        (output_path / "scan_params.json").write_text(
+            json.dumps(params_snapshot, indent=2),
+            encoding="utf-8",
+        )
+
         temp_dir_env = os.getenv("ASSISTANTAUDIT_TEMP_DIR", "").strip()
         temp_dir = Path(temp_dir_env) if temp_dir_env else (self.output_dir.parent / "temp")
         ps1_path = temp_dir / "monkey365_scan.ps1"
@@ -298,7 +313,10 @@ Invoke-Monkey365 @param -Verbose
         results: list[dict[str, object]] = []
         output_path = self.output_dir
 
+        _INTERNAL_FILES = {"powershell_raw_output.json", "scan_params.json"}
         for json_file in output_path.rglob("*.json"):
+            if json_file.name in _INTERNAL_FILES:
+                continue
             try:
                 data: object = cast(object, json.loads(json_file.read_text(encoding="utf-8")))
                 if isinstance(data, list):
