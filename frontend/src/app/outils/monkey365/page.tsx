@@ -10,11 +10,13 @@ import {
   ArrowLeft,
   X,
   Plus,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +27,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 
-import { toolsApi, entreprisesApi } from "@/services/api";
-import type { Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail, Monkey365ScanLogs } from "@/types/api";
+import { toolsApi, entreprisesApi, auditsApi } from "@/services/api";
+import type { Audit, Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail, Monkey365ScanLogs, Monkey365ImportResult } from "@/types/api";
 
 export default function Monkey365Page() {
   const [activeTab, setActiveTab] = useState("launch");
@@ -56,6 +58,13 @@ export default function Monkey365Page() {
   const [selectedScan, setSelectedScan] = useState<Monkey365ScanResultDetail | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [openingReport, setOpeningReport] = useState(false);
+
+  // Import vers audit
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importAudits, setImportAudits] = useState<Audit[]>([]);
+  const [importAuditId, setImportAuditId] = useState<string>("");
+  const [importing, setImporting] = useState(false);
 
   function formatDuration(seconds: number | null | undefined): string {
     if (!seconds) return "-";
@@ -285,6 +294,17 @@ export default function Monkey365Page() {
     }
   };
 
+  const handleOpenReport = async (scanId: number) => {
+    setOpeningReport(true);
+    try {
+      await toolsApi.openMonkey365Report(scanId);
+    } catch {
+      toast.error("Rapport HTML introuvable ou indisponible");
+    } finally {
+      setOpeningReport(false);
+    }
+  };
+
   const handleCancelScan = async (scanId: number) => {
     try {
       const updated = await toolsApi.cancelMonkey365Scan(scanId);
@@ -310,6 +330,36 @@ export default function Monkey365Page() {
       toast.error("Erreur lors de la suppression du scan");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleOpenImportDialog = async () => {
+    setImportAuditId("");
+    setImportDialogOpen(true);
+    try {
+      const response = await auditsApi.list(1, 100, selectedScan?.entreprise_id);
+      setImportAudits(response.items ?? []);
+    } catch {
+      toast.error("Impossible de charger les audits");
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!selectedScan || !importAuditId) return;
+    setImporting(true);
+    try {
+      const result: Monkey365ImportResult = await toolsApi.importMonkey365ToAudit(
+        selectedScan.id,
+        parseInt(importAuditId, 10),
+      );
+      setImportDialogOpen(false);
+      toast.success(
+        `Import réussi — ${result.controls_mapped}/${result.controls_total} contrôles mappés (campagne #${result.campaign_id})`,
+      );
+    } catch {
+      toast.error("Erreur lors de l'import vers l'audit");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -551,6 +601,31 @@ export default function Monkey365Page() {
                     <div className="flex items-center justify-between">
                       <CardTitle>Détails du scan</CardTitle>
                       <div className="flex gap-2">
+                        {selectedScan.status === "success" && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenReport(selectedScan.id)}
+                              disabled={openingReport}
+                            >
+                              {openingReport ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <FileText className="h-4 w-4 mr-1" />
+                              )}
+                              Rapport HTML
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleOpenImportDialog}
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Ajouter à l'audit
+                            </Button>
+                          </>
+                        )}
                         {selectedScan.status === "running" && (
                           <Button
                             variant="outline"
@@ -677,6 +752,54 @@ export default function Monkey365Page() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Dialog — importer vers un audit */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ajouter à un audit</DialogTitle>
+            <DialogDescription>
+              Sélectionnez l'audit dans lequel importer ce scan Monkey365.
+              Une campagne CIS-M365-V5 sera créée automatiquement avec les résultats parsés.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2">
+            {importAudits.length === 0 ? (
+              <p className="text-sm text-gray-500">Aucun audit disponible pour cette entreprise.</p>
+            ) : (
+              <Select value={importAuditId} onValueChange={setImportAuditId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir un audit…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {importAudits.map((audit) => (
+                    <SelectItem key={audit.id} value={audit.id.toString()}>
+                      {audit.nom_projet}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)} disabled={importing}>
+              Annuler
+            </Button>
+            <Button onClick={handleConfirmImport} disabled={!importAuditId || importing}>
+              {importing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Import en cours…
+                </>
+              ) : (
+                "Importer"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

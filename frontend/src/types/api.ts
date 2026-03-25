@@ -966,10 +966,22 @@ export interface Monkey365ScanResultSummary {
 export interface Monkey365ScanResultDetail extends Monkey365ScanResultSummary {
   config_snapshot?: Record<string, unknown> | null;
   output_path?: string | null;
+  archive_path?: string | null;
   error_message?: string | null;
 }
 
 export interface Monkey365ScanLogs {
   lines: string[];
   total_lines: number;
+}
+
+export interface Monkey365ImportRequest {
+  audit_id: number;
+}
+
+export interface Monkey365ImportResult {
+  campaign_id: number;
+  assessment_id: number;
+  controls_mapped: number;
+  controls_total: number;
 }

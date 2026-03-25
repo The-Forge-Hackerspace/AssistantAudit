@@ -728,4 +728,24 @@ export const toolsApi = {
     const response = await api.post(`/tools/monkey365/scans/${resultId}/cancel`);
     return response.data;
   },
+
+  async openMonkey365Report(resultId: number): Promise<void> {
+    const response = await api.get(`/tools/monkey365/scans/result/${resultId}/report`, {
+      responseType: "blob",
+    });
+    const blob = new Blob([response.data], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    // Révoquer l'URL objet après que le navigateur a eu le temps de charger la page
+    if (win) {
+      win.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
+    } else {
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
+  },
+
+  async importMonkey365ToAudit(resultId: number, auditId: number): Promise<import("@/types/api").Monkey365ImportResult> {
+    const { data } = await api.post(`/tools/monkey365/scans/${resultId}/import-to-audit`, { audit_id: auditId });
+    return data;
+  },
 };
