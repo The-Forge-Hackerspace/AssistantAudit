@@ -23,12 +23,14 @@ def test_powershell_output_captured_to_file(tmp_path):
 
     executor = Monkey365Executor(config, str(monkey365_path.parent))
 
+    log_content = "Monkey365 scan completed successfully\nResults written to disk\n"
+
+    def run_side_effect(*args, **kwargs):
+        (output_dir / "monkey365.log").write_text(log_content, encoding="utf-8")
+        return MagicMock(returncode=0)
+
     with patch('subprocess.run') as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="Monkey365 scan completed successfully\nResults written to disk",
-            stderr="Warning: Some non-critical issue"
-        )
+        mock_run.side_effect = run_side_effect
 
         executor.run_scan("scan_1")
 
@@ -40,8 +42,10 @@ def test_powershell_output_captured_to_file(tmp_path):
         assert "stderr" in output_data
         assert "returncode" in output_data
         assert output_data["returncode"] == 0
+        # stdout comes from Start-Transcript log file, not subprocess.stdout
         assert "Monkey365 scan completed" in output_data["stdout"]
-        assert "Warning" in output_data["stderr"]
+        # stderr is always empty; PowerShell errors are captured in the transcript
+        assert output_data["stderr"] == ""
 
 
 def test_powershell_output_captured_on_failure(tmp_path):
@@ -55,12 +59,14 @@ def test_powershell_output_captured_on_failure(tmp_path):
 
     executor = Monkey365Executor(config, str(monkey365_path.parent))
 
+    log_content = "Starting scan...\nFATAL ERROR: Authentication failed\n"
+
+    def run_side_effect(*args, **kwargs):
+        (output_dir / "monkey365.log").write_text(log_content, encoding="utf-8")
+        return MagicMock(returncode=1)
+
     with patch('subprocess.run') as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=1,
-            stdout="Starting scan...",
-            stderr="FATAL ERROR: Authentication failed"
-        )
+        mock_run.side_effect = run_side_effect
 
         executor.run_scan("scan_failed")
 
@@ -69,7 +75,9 @@ def test_powershell_output_captured_on_failure(tmp_path):
 
         output_data = json.loads(output_file.read_text())
         assert output_data["returncode"] == 1
-        assert "FATAL ERROR" in output_data["stderr"]
+        # Errors are captured via Start-Transcript in stdout, not in stderr
+        assert "FATAL ERROR" in output_data["stdout"]
+        assert output_data["stderr"] == ""
 
 
 def test_powershell_output_empty_stdout_stderr(tmp_path):
@@ -112,12 +120,15 @@ def test_powershell_output_json_format_valid(tmp_path):
 
     executor = Monkey365Executor(config, str(monkey365_path.parent))
 
+    # Start-Transcript captures all PS streams in a single log file
+    log_content = 'Output with "quotes" and\nnewlines\nError with \'apostrophes\' and\ttabs\n'
+
+    def run_side_effect(*args, **kwargs):
+        (output_dir / "monkey365.log").write_text(log_content, encoding="utf-8")
+        return MagicMock(returncode=0)
+
     with patch('subprocess.run') as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout='Output with "quotes" and\nnewlines',
-            stderr="Error with 'apostrophes' and\ttabs"
-        )
+        mock_run.side_effect = run_side_effect
 
         executor.run_scan("scan_json")
 
@@ -126,7 +137,7 @@ def test_powershell_output_json_format_valid(tmp_path):
 
         assert '"quotes"' in output_data["stdout"]
         assert '\n' in output_data["stdout"]
-        assert "'apostrophes'" in output_data["stderr"]
+        assert "'apostrophes'" in output_data["stdout"]
 
 
 def test_run_scan_uses_execution_policy_bypass(tmp_path):

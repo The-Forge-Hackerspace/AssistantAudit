@@ -131,8 +131,8 @@ class Monkey365ScanService:
             try:
                 shutil.rmtree(source_path)
                 logger.info("[MONKEY365] Cleaned up source: %s", source_path)
-            except Exception:
-                logger.warning("[MONKEY365] Could not remove source: %s", source_path)
+            except OSError as exc:
+                logger.warning("[MONKEY365] Could not remove source: %s — %s", source_path, exc)
         else:
             logger.warning("[MONKEY365] Source not found: %s", source_path)
 
@@ -144,6 +144,7 @@ class Monkey365ScanService:
         final_status = Monkey365ScanStatus.FAILED
         final_error: str | None = None
         findings_count: int | None = None
+        duration_seconds: int = 0
 
         try:
             result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, result_id))
@@ -304,12 +305,12 @@ class Monkey365ScanService:
                 output_path = Path(result.output_path)
                 if output_path.exists():
                     shutil.rmtree(output_path)
-                    logger.info(f"[MONKEY365] Cleaned up output directory: {result.output_path}")
-            except Exception as exc:
-                logger.warning(f"[MONKEY365] Could not delete output directory {result.output_path}: {exc}")
+                    logger.info("[MONKEY365] Cleaned up output directory: %s", result.output_path)
+            except OSError as exc:
+                logger.warning("[MONKEY365] Could not delete output directory %s: %s", result.output_path, exc)
 
         # Delete from database
         db.delete(result)
         db.commit()
-        logger.info(f"[MONKEY365] Scan #{scan_id} deleted from database")
+        logger.info("[MONKEY365] Scan #%s deleted from database", scan_id)
         return True

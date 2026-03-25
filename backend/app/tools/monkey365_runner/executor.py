@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import cast
 
 logger = logging.getLogger(__name__)
-DEFAULT_MONKEY365_DIR = Path("D:\\AssistantAudit\\tools\\monkey365")
+# Derived from this file's location: backend/app/tools/monkey365_runner/executor.py
+# parents[4] → project root (AssistantAudit/)
+DEFAULT_MONKEY365_DIR = Path(__file__).resolve().parents[4] / "tools" / "monkey365"
 
 
 class Monkey365ExecutionError(RuntimeError):
@@ -250,9 +252,6 @@ Invoke-Monkey365 @param -Verbose
             # which records every stream (Write-Host, Write-Verbose, errors, output).
             result = subprocess.run(
                 powershell_command,
-                stdin=None,
-                stdout=None,
-                stderr=None,
                 timeout=3600,
                 cwd=self.monkey365_path.parent,
                 env=env,

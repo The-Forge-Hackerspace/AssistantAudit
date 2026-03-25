@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 from ....core.database import get_db
 from ....core.deps import get_current_auditeur
 from ....models.entreprise import Entreprise
+from ....models.monkey365_scan_result import Monkey365ScanStatus
 from ....models.user import User
 from ....schemas.scan import (
     Monkey365ScanCreate,
@@ -102,7 +104,8 @@ async def get_monkey365_scan_logs(
         content = log_file.read_text(encoding="utf-8", errors="replace")
         lines = content.splitlines()
         return Monkey365ScanLogs(lines=lines[-500:], total_lines=len(lines))
-    except Exception:
+    except OSError as exc:
+        logger.warning("Impossible de lire le fichier de logs %s: %s", log_file, exc)
         return Monkey365ScanLogs(lines=[], total_lines=0)
 
 
@@ -116,11 +119,9 @@ async def cancel_monkey365_scan(
     result = Monkey365ScanService.get_scan(db, result_id)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
-    if result.status != "running":
+    if result.status != Monkey365ScanStatus.RUNNING:
         raise HTTPException(400, "Ce scan n'est pas en cours d'exécution")
 
-    from datetime import datetime, timezone
-    from app.models.monkey365_scan_result import Monkey365ScanStatus
     result.status = Monkey365ScanStatus.FAILED
     result.completed_at = datetime.now(timezone.utc)
     result.error_message = "Scan annulé manuellement"
@@ -139,7 +140,7 @@ async def get_monkey365_scan_report(
     result = Monkey365ScanService.get_scan(db, result_id)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
-    if result.status != "success":
+    if result.status != Monkey365ScanStatus.SUCCESS:
         raise HTTPException(400, "Rapport disponible uniquement pour les scans réussis")
 
     if not result.output_path:
