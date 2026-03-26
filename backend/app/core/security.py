@@ -1,6 +1,8 @@
 """
-Sécurité : hashing de mots de passe et gestion JWT.
+Securite : hashing de mots de passe, gestion JWT (user + agent), enrollment.
 """
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import logging
@@ -69,7 +71,7 @@ def create_refresh_token(subject: str | int) -> str:
 
 
 def decode_token(token: str) -> Optional[dict]:
-    """Décode et valide un token JWT"""
+    """Decode et valide un token JWT"""
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
@@ -77,3 +79,57 @@ def decode_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+# --- Tokens agent (daemon Windows) ---
+
+def create_agent_token(agent_uuid: str, owner_id: int) -> str:
+    """
+    Token JWT pour un agent enrolle. Longue duree (30 jours).
+    L'owner_id est embarque — l'agent ne peut agir qu'au nom de son proprietaire.
+    """
+    now = datetime.now(timezone.utc)
+    payload = {
+        "type": "agent",
+        "sub": agent_uuid,
+        "owner_id": owner_id,
+        "exp": now + timedelta(days=30),
+        "iat": now,
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+def verify_agent_token(token: str) -> dict:
+    """
+    Verifie un token agent. Raise JWTError si invalide ou mauvais type.
+    Retourne {"sub": agent_uuid, "owner_id": int, ...}.
+    """
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    if payload.get("type") != "agent":
+        raise JWTError("Invalid token type: expected 'agent'")
+    return payload
+
+
+# --- Tokens d'enrollment (usage unique, ephemere) ---
+
+def create_enrollment_token() -> tuple[str, str, datetime]:
+    """
+    Genere un code d'enrollment pour un nouvel agent.
+
+    Returns:
+        (code_clair, code_hash, expiration)
+        - code_clair : 8 caracteres alphanumeriques majuscules, affiche a l'admin
+        - code_hash : SHA-256 du code, stocke en base
+        - expiration : datetime UTC, 10 minutes
+    """
+    code = secrets.token_urlsafe(6)[:8].upper()
+    code_hash = hashlib.sha256(code.encode()).hexdigest()
+    expiration = datetime.now(timezone.utc) + timedelta(minutes=10)
+    return code, code_hash, expiration
+
+
+def verify_enrollment_token(code: str, stored_hash: str, expiration: datetime) -> bool:
+    """Verifie un code d'enrollment contre son hash et son expiration."""
+    if datetime.now(timezone.utc) > expiration:
+        return False
+    return hashlib.sha256(code.encode()).hexdigest() == stored_hash
