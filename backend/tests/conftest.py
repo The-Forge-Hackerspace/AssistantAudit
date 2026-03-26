@@ -3,7 +3,6 @@ Pytest fixtures configuration for AssistantAudit backend tests.
 Provides database, client, authentication, and factory fixtures.
 """
 
-import os
 import tempfile
 from typing import Generator
 
