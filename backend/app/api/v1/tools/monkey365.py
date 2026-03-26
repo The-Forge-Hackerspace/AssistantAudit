@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ....core.database import get_db
 from ....core.deps import get_current_auditeur
+from ....models.audit import Audit
 from ....models.entreprise import Entreprise
 from ....models.monkey365_scan_result import Monkey365ScanStatus
 from ....models.user import User
@@ -18,6 +20,8 @@ from ....schemas.scan import (
     Monkey365ScanLogs,
     Monkey365ImportRequest,
     Monkey365ImportResult,
+    Monkey365StreamingScanCreate,
+    Monkey365StreamingScanResponse,
 )
 from ....schemas.common import MessageResponse
 from ....services.monkey365_scan_service import Monkey365ScanService
@@ -206,6 +210,70 @@ async def import_monkey365_to_audit(
         raise HTTPException(500, f"Erreur interne: {e}")
 
     return Monkey365ImportResult(**result)
+
+
+@router.post("/monkey365/stream", response_model=Monkey365StreamingScanResponse, status_code=201)
+async def launch_monkey365_streaming_scan(
+    request: Monkey365StreamingScanCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_auditeur),
+):
+    """
+    Lance un scan Monkey365 en mode streaming avec Device Code Flow.
+
+    Le scan est lance en background. Les evenements (device_code, scan_log,
+    scan_complete, scan_error) sont envoyes via WebSocket.
+    """
+    # Verifier que l'entreprise existe
+    entreprise = db.get(Entreprise, request.entreprise_id)
+    if not entreprise:
+        raise HTTPException(404, "Ressource introuvable")
+
+    # Verifier ownership : l'utilisateur doit avoir au moins un audit sur cette entreprise
+    audit = (
+        db.query(Audit)
+        .filter(
+            Audit.entreprise_id == request.entreprise_id,
+            Audit.owner_id == current_user.id,
+        )
+        .first()
+    )
+    if audit is None and current_user.role != "admin":
+        raise HTTPException(404, "Ressource introuvable")
+
+    try:
+        result = Monkey365ScanService.create_streaming_scan(
+            db=db,
+            entreprise_id=request.entreprise_id,
+            tenant_id=request.tenant_id,
+            auth_method=request.auth_method.value,
+            config=request.config,
+        )
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+    # Lancer le scan async en background
+    asyncio.create_task(
+        Monkey365ScanService.execute_streaming_scan(
+            result_id=result.id,
+            user_id=current_user.id,
+            tenant_id=request.tenant_id,
+            subscriptions=request.subscriptions,
+            ruleset=request.ruleset,
+            auth_method_str=request.auth_method.value,
+        )
+    )
+
+    logger.info(
+        "[MONKEY365-STREAM] Scan #%s lance (user=%s, entreprise=%s)",
+        result.id, current_user.id, request.entreprise_id,
+    )
+    return Monkey365StreamingScanResponse(
+        id=result.id,
+        scan_id=result.scan_id,
+        status=result.status.value,
+        auth_method=result.auth_method,
+    )
 
 
 @router.delete("/monkey365/scans/{result_id}", response_model=MessageResponse)
