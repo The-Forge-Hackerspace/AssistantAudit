@@ -406,10 +406,15 @@ class AssessmentService:
         if not framework:
             raise ValueError("Framework CIS-M365-V5 introuvable — vérifiez que le YAML a bien été importé")
 
-        # Trouver ou créer un site par défaut pour l'entreprise
+        # Trouver ou créer le site dédié aux audits Microsoft 365.
+        # On cherche explicitement nom='Cloud' pour éviter de prendre
+        # un site physique existant et de mélanger cloud/on-prem.
         site = (
             db.query(Site)
-            .filter(Site.entreprise_id == scan.entreprise_id)
+            .filter(
+                Site.entreprise_id == scan.entreprise_id,
+                Site.nom == "Cloud",
+            )
             .first()
         )
         if not site:

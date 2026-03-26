@@ -50,7 +50,7 @@ def ssl_check_batch(
             results.append(SSLCheckResult(
                 host=req.host,
                 port=req.port,
-                certificate=None,  # type: ignore[arg-type]
+                certificate=None,
                 protocols=[],
                 findings=[SecurityFinding(
                     severity="high",
