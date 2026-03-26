@@ -1,8 +1,9 @@
 """
 Alembic env.py — Configuration des migrations.
+Lit DATABASE_URL depuis la config applicative (Settings).
 """
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import pool
 from alembic import context
 import sys
 from pathlib import Path
@@ -10,8 +11,8 @@ from pathlib import Path
 # Ajouter le backend au path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.database import Base
-from app.models import *  # noqa: F401, F403 — Import tous les modèles
+from app.core.database import Base, engine
+from app.models import *  # noqa: F401, F403 — Import tous les modeles
 
 config = context.config
 if config.config_file_name is not None:
@@ -21,9 +22,11 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    """Run migrations in 'offline' mode — generates SQL script."""
+    from app.core.config import get_settings
+    settings = get_settings()
     context.configure(
-        url=url,
+        url=settings.DATABASE_URL,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -33,12 +36,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
+    """Run migrations in 'online' mode — uses the application engine."""
+    with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()

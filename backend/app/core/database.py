@@ -1,6 +1,7 @@
 """
-Configuration de la base de données SQLAlchemy (async-ready).
-Fournit le moteur, la session factory et le modèle de base.
+Configuration de la base de donnees SQLAlchemy.
+Supporte PostgreSQL (psycopg2) et SQLite (dev/tests).
+Fournit le moteur, la session factory et le modele de base.
 """
 from pathlib import Path
 from sqlalchemy import create_engine, event
@@ -10,26 +11,31 @@ from .config import get_settings
 
 
 class Base(DeclarativeBase):
-    """Classe de base pour tous les modèles SQLAlchemy"""
+    """Classe de base pour tous les modeles SQLAlchemy"""
     pass
 
 
 def _get_engine():
-    """Crée le moteur SQLAlchemy"""
+    """Cree le moteur SQLAlchemy avec configuration adaptee au backend."""
     settings = get_settings()
     db_url = settings.DATABASE_URL
+    is_sqlite = db_url.startswith("sqlite")
 
-    # Créer le dossier instance pour SQLite
-    if db_url.startswith("sqlite"):
+    # Creer le dossier instance pour SQLite
+    if is_sqlite:
         db_path = db_url.replace("sqlite:///", "")
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
     connect_args = {}
-    if db_url.startswith("sqlite"):
+    if is_sqlite:
         connect_args["check_same_thread"] = False
 
+    # Pool config : uniquement pour PostgreSQL (SQLite utilise NullPool implicitement)
     pool_kwargs = {}
-    if not db_url.startswith("sqlite"):
+    if not is_sqlite:
+        pool_kwargs["pool_size"] = 10
+        pool_kwargs["max_overflow"] = 5
+        pool_kwargs["pool_recycle"] = 3600
         pool_kwargs["pool_pre_ping"] = True
 
     engine = create_engine(
@@ -39,8 +45,8 @@ def _get_engine():
         **pool_kwargs,
     )
 
-    # Activer les clés étrangères pour SQLite
-    if db_url.startswith("sqlite"):
+    # Activer les cles etrangeres pour SQLite
+    if is_sqlite:
         @event.listens_for(engine, "connect")
         def _set_sqlite_pragma(dbapi_conn, connection_record):
             cursor = dbapi_conn.cursor()
@@ -62,7 +68,7 @@ SessionLocal = sessionmaker(
 
 def get_db():
     """
-    Générateur de session DB pour injection de dépendance FastAPI.
+    Generateur de session DB pour injection de dependance FastAPI.
     Usage: db: Session = Depends(get_db)
     """
     db = SessionLocal()
@@ -73,7 +79,7 @@ def get_db():
 
 
 def create_all_tables():
-    """Crée toutes les tables (développement uniquement)"""
+    """Cree toutes les tables (developpement uniquement)"""
     Base.metadata.create_all(bind=engine)
 
 

@@ -9,6 +9,13 @@ uvicorn[standard]>=0.30.0
 # --- Base de données ---
 SQLAlchemy>=2.0.35
 alembic>=1.13.0
+psycopg2-binary>=2.9.0
+
+# --- Chiffrement & Certificats ---
+cryptography>=42.0.0
+
+# --- WebSocket ---
+websockets>=12.0
 
 # --- Validation & Sérialisation ---
 pydantic>=2.9.0

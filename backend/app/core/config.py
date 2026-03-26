@@ -41,7 +41,18 @@ class Settings(BaseSettings):
     ]
 
     # --- Base de données ---
+    # PostgreSQL par défaut en production, SQLite en dev si non configuré
     DATABASE_URL: str = f"sqlite:///{BASE_DIR / 'instance' / 'assistantaudit.db'}"
+
+    # --- Chiffrement au repos (AES-256-GCM) ---
+    # 64 caractères hex = 32 bytes = 256 bits. Générer avec :
+    # python -c 'import os; print(os.urandom(32).hex())'
+    ENCRYPTION_KEY: str = ""       # Clé pour EncryptedText (colonnes sensibles en base)
+    FILE_ENCRYPTION_KEY: str = ""  # KEK pour envelope encryption (fichiers sur disque)
+
+    # --- Certificats mTLS (communication serveur ↔ agent) ---
+    CA_CERT_PATH: str = str(BASE_DIR / "certs" / "ca.pem")
+    CA_KEY_PATH: str = str(BASE_DIR / "certs" / "ca.key")
 
     # --- Sécurité / JWT ---
     SECRET_KEY: str = ""
