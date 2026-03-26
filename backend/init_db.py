@@ -1,42 +1,66 @@
 """
 Script d'initialisation de la base de données et du premier utilisateur admin.
 À exécuter une seule fois lors de la mise en place.
+
+Le schema est gere EXCLUSIVEMENT par Alembic. Ce script ne touche jamais
+au schema directement (pas de create_all_tables). Il se contente de :
+  1. Appliquer les migrations Alembic (alembic upgrade head)
+  2. Creer l'utilisateur admin par defaut
+  3. Synchroniser les referentiels YAML via sync_from_directory
 """
 import sys
 import io
+import os
+import subprocess
 from pathlib import Path
 
 # Forcer UTF-8 pour la sortie console (Windows)
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 # Ajouter le répertoire backend au path
-sys.path.insert(0, str(Path(__file__).parent))
+BACKEND_DIR = Path(__file__).parent
+sys.path.insert(0, str(BACKEND_DIR))
 
-from app.core.database import create_all_tables, SessionLocal
+from app.core.database import SessionLocal
 from app.core.security import hash_password
 from app.models.user import User
 from app.services.framework_service import FrameworkService
 from app.core.config import get_settings
 
 
+def _run_alembic_upgrade() -> bool:
+    """Execute alembic upgrade head et retourne True si OK."""
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=str(BACKEND_DIR),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"  [ERREUR] alembic upgrade head a echoue:")
+        for line in result.stderr.strip().splitlines():
+            print(f"    {line}")
+        return False
+    for line in result.stdout.strip().splitlines():
+        print(f"    {line}")
+    return True
+
+
 def init_database():
-    """Crée les tables et l'utilisateur admin par défaut"""
+    """Applique les migrations, cree l'admin et synchronise les referentiels."""
     print("=" * 60)
     print("  AssistantAudit - Initialisation de la base de donnees")
     print("=" * 60)
 
-    # 1. Créer les tables
-    print("\n[1/3] Creation des tables...")
-    # Import tous les modèles pour qu'ils soient détectés
-    from app.models import (  # noqa: F401
-        User, Entreprise, Contact, Audit, Site,
-        Equipement, EquipementReseau, EquipementServeur, EquipementFirewall,
-        ScanReseau, ScanHost, ScanPort,
-        Framework, FrameworkCategory, Control,
-        AssessmentCampaign, Assessment, ControlResult,
-    )
-    create_all_tables()
-    print("  [OK] Tables creees")
+    # 1. Appliquer les migrations Alembic
+    print("\n[1/3] Application des migrations Alembic...")
+    # Creer le dossier instance si absent (SQLite)
+    (BACKEND_DIR / "instance").mkdir(parents=True, exist_ok=True)
+    if _run_alembic_upgrade():
+        print("  [OK] Migrations appliquees")
+    else:
+        print("  [ERREUR] Echec des migrations — voir les messages ci-dessus")
+        sys.exit(1)
 
     # 2. Créer l'utilisateur admin
     print("\n[2/3] Creation de l'utilisateur admin...")
@@ -46,17 +70,14 @@ def init_database():
         if existing:
             print("  [SKIP] L'utilisateur 'admin' existe deja")
         else:
-            # Utiliser un mot de passe depuis l'environnement ou demander à l'utilisateur
-            import os
             admin_password = os.getenv("ADMIN_PASSWORD")
             if not admin_password:
-                # Générer un mot de passe aléatoire pour la première initialisation
                 import secrets
                 import string
                 alphabet = string.ascii_letters + string.digits + "!@#$%"
                 admin_password = "".join(secrets.choice(alphabet) for _ in range(16))
-                print(f"  [INFO] Mot de passe admin généré aléatoirement (à changer dès la première connexion)")
-            
+                print("  [INFO] Mot de passe admin genere aleatoirement")
+
             admin = User(
                 username="admin",
                 email="admin@assistantaudit.fr",
@@ -66,19 +87,23 @@ def init_database():
             )
             db.add(admin)
             db.commit()
-            print(f"  [OK] Utilisateur admin cree (login: admin / <mot_de_passe_genere>)")
+            print("  [OK] Utilisateur admin cree (login: admin)")
             print(f"  [INFO] Mot de passe initial: {admin_password}")
 
-        # 3. Importer les référentiels
-        print("\n[3/3] Import des referentiels YAML...")
+        # 3. Synchroniser les référentiels (hash-based, skip inchanges)
+        print("\n[3/3] Synchronisation des referentiels YAML...")
         settings = get_settings()
         frameworks_dir = Path(settings.FRAMEWORKS_DIR)
         if frameworks_dir.exists():
-            frameworks = FrameworkService.import_all_from_directory(db, frameworks_dir)
-            for fw in frameworks:
-                print(f"  [OK] {fw.name} ({fw.total_controls} controles)")
-            if not frameworks:
-                print("  [WARN] Aucun fichier YAML trouve dans frameworks/")
+            sync = FrameworkService.sync_from_directory(db, frameworks_dir)
+            total = sync["imported"] + sync["updated"] + sync["unchanged"]
+            print(
+                f"  [OK] {total} referentiels "
+                f"({sync['imported']} nouveaux, {sync['updated']} mis a jour, "
+                f"{sync['unchanged']} inchanges)"
+            )
+            for err in sync.get("errors", []):
+                print(f"  [WARN] {err}")
         else:
             print(f"  [WARN] Dossier {frameworks_dir} introuvable")
 

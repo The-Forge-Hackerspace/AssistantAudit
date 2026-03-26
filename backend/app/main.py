@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .core.config import get_settings
-from .core.database import create_all_tables, SessionLocal
+from .core.database import SessionLocal
 from .core.logging_config import configure_structured_logging
 from .core.audit_logger import AuditLoggingMiddleware
 from .core.metrics import init_app_metrics, get_metrics
@@ -39,11 +39,6 @@ async def lifespan(app: FastAPI):
         enable_tracing=settings.SENTRY_TRACING_ENABLED,
         traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
     )
-
-    # Création des tables en développement
-    if settings.ENV == "development":
-        logger.info("Mode développement : création des tables...")
-        create_all_tables()
 
     # Créer le dossier uploads
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
