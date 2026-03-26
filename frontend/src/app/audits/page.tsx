@@ -28,7 +28,7 @@ import {
   CircleDot,
   Minus,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,8 +52,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -70,6 +81,7 @@ import {
   equipementsApi,
 } from "@/services/api";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import type {
   Audit,
   AuditCreate,
@@ -331,7 +343,7 @@ function AuditListView({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -339,7 +351,7 @@ function AuditListView({
           <p className="text-muted-foreground">{total} projet{total !== 1 ? "s" : ""} d&apos;audit</p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus data-icon="inline-start" />
           Nouveau projet
         </Button>
       </div>
@@ -349,24 +361,28 @@ function AuditListView({
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input className="pl-9" placeholder="Rechercher par nom, entreprise ou objectifs..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <Select value={entrepriseFilter} onValueChange={setEntrepriseFilter}>
               <SelectTrigger className="w-[220px]"><SelectValue placeholder="Filtrer par entreprise" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Toutes les entreprises</SelectItem>
-                {entreprises.map((e) => (<SelectItem key={e.id} value={String(e.id)}>{e.nom}</SelectItem>))}
+                <SelectGroup>
+                  <SelectItem value="all">Toutes les entreprises</SelectItem>
+                  {entreprises.map((e) => (<SelectItem key={e.id} value={String(e.id)}>{e.nom}</SelectItem>))}
+                </SelectGroup>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[170px]"><SelectValue placeholder="Statut" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="NOUVEAU">Nouveau</SelectItem>
-                <SelectItem value="EN_COURS">En cours</SelectItem>
-                <SelectItem value="TERMINE">Terminé</SelectItem>
-                <SelectItem value="ARCHIVE">Archivé</SelectItem>
+                <SelectGroup>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="NOUVEAU">Nouveau</SelectItem>
+                  <SelectItem value="EN_COURS">En cours</SelectItem>
+                  <SelectItem value="TERMINE">Terminé</SelectItem>
+                  <SelectItem value="ARCHIVE">Archivé</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -377,11 +393,11 @@ function AuditListView({
       <Card>
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <Loader2 className="size-8 animate-spin text-muted-foreground" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            <ClipboardCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <ClipboardCheck className="size-12 mx-auto mb-4 opacity-50" />
             <p className="text-lg font-medium">Aucun projet d&apos;audit</p>
             <p className="text-sm mt-1">
               {audits.length === 0 ? "Créez votre premier projet d'audit pour commencer" : "Essayez de modifier vos critères de recherche"}
@@ -407,7 +423,7 @@ function AuditListView({
                     <TableRow key={audit.id} className="cursor-pointer" onClick={() => onOpenDetail(audit)}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
+                          <ClipboardCheck className="size-4 text-muted-foreground" />
                           <div>
                             <p className="font-medium">{audit.nom_projet}</p>
                             {audit.objectifs && <p className="text-xs text-muted-foreground line-clamp-1 max-w-xs">{audit.objectifs}</p>}
@@ -415,22 +431,22 @@ function AuditListView({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline"><Building2 className="h-3 w-3 mr-1" />{entrepriseMap[audit.entreprise_id] || `#${audit.entreprise_id}`}</Badge>
+                        <Badge variant="outline"><Building2 className="size-3 mr-1" />{entrepriseMap[audit.entreprise_id] || `#${audit.entreprise_id}`}</Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1 text-sm"><Calendar className="h-3 w-3 text-muted-foreground" />{formatDate(audit.date_debut)}</div>
+                        <div className="flex items-center gap-1 text-sm"><Calendar className="size-3 text-muted-foreground" />{formatDate(audit.date_debut)}</div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1 text-sm"><BarChart3 className="h-3 w-3 text-muted-foreground" />{audit.total_campaigns ?? 0}</div>
+                        <div className="flex items-center gap-1 text-sm"><BarChart3 className="size-3 text-muted-foreground" />{audit.total_campaigns ?? 0}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANTS[audit.status]}><StatusIcon className="h-3 w-3 mr-1" />{STATUS_LABELS[audit.status]}</Badge>
+                        <Badge variant={STATUS_VARIANTS[audit.status]}><StatusIcon className="size-3 mr-1" />{STATUS_LABELS[audit.status]}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button size="icon" variant="ghost" onClick={() => onOpenDetail(audit)}><Eye className="h-4 w-4" /></Button>
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(audit)}><Pencil className="h-4 w-4" /></Button>
-                          <Button size="icon" variant="ghost" onClick={() => openDelete(audit)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => onOpenDetail(audit)}><Eye /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => openEdit(audit)}><Pencil /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => openDelete(audit)}><Trash2 className="text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -439,13 +455,13 @@ function AuditListView({
               </TableBody>
             </Table>
 
-            <div className="flex items-center justify-between px-4 py-3 border-t">
+            <CardFooter className="flex items-center justify-between border-t">
               <p className="text-sm text-muted-foreground">Page {page} sur {pages} — {total} résultat{total !== 1 ? "s" : ""}</p>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft className="h-4 w-4 mr-1" />Précédent</Button>
-                <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Suivant<ChevronRight className="h-4 w-4 ml-1" /></Button>
+                <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft data-icon="inline-start" />Précédent</Button>
+                <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Suivant<ChevronRight data-icon="inline-end" /></Button>
               </div>
-            </div>
+            </CardFooter>
           </div>
         )}
       </Card>
@@ -457,34 +473,34 @@ function AuditListView({
             <DialogTitle>Nouveau projet d&apos;audit</DialogTitle>
             <DialogDescription>Créez un projet d&apos;audit pour une entreprise</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-nom">Nom du projet *</Label>
                 <Input id="create-nom" value={form.nom_projet} onChange={(e) => setForm({ ...form, nom_projet: e.target.value })} placeholder="ex: Audit Infra Q1 2026" />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label>Entreprise *</Label>
                 <Select value={form.entreprise_id ? String(form.entreprise_id) : ""} onValueChange={(v) => setForm({ ...form, entreprise_id: Number(v) })}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner une entreprise" /></SelectTrigger>
-                  <SelectContent>{entreprises.map((e) => (<SelectItem key={e.id} value={String(e.id)}>{e.nom}</SelectItem>))}</SelectContent>
+                  <SelectContent><SelectGroup>{entreprises.map((e) => (<SelectItem key={e.id} value={String(e.id)}>{e.nom}</SelectItem>))}</SelectGroup></SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-objectifs">Objectifs de l&apos;audit</Label>
               <Textarea id="create-objectifs" value={form.objectifs || ""} onChange={(e) => setForm({ ...form, objectifs: e.target.value })} placeholder="Décrire les objectifs principaux de cet audit..." rows={3} />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-limites">Limites / Périmètre</Label>
               <Textarea id="create-limites" value={form.limites || ""} onChange={(e) => setForm({ ...form, limites: e.target.value })} placeholder="Définir le périmètre et les limites de l'audit..." rows={2} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-hypotheses">Hypothèses</Label>
                 <Textarea id="create-hypotheses" value={form.hypotheses || ""} onChange={(e) => setForm({ ...form, hypotheses: e.target.value })} placeholder="Hypothèses de travail..." rows={2} />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-risques">Risques initiaux identifiés</Label>
                 <Textarea id="create-risques" value={form.risques_initiaux || ""} onChange={(e) => setForm({ ...form, risques_initiaux: e.target.value })} placeholder="Risques identifiés en amont..." rows={2} />
               </div>
@@ -493,7 +509,7 @@ function AuditListView({
           {formError && <p className="text-sm text-destructive">{formError}</p>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button>
-            <Button onClick={handleCreate} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Créer le projet</Button>
+            <Button onClick={handleCreate} disabled={saving}>{saving && <Loader2 className="animate-spin" data-icon="inline-start" />}Créer le projet</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -505,39 +521,41 @@ function AuditListView({
             <DialogTitle>Modifier le projet d&apos;audit</DialogTitle>
             <DialogDescription>Modifiez les informations de &laquo; {selected?.nom_projet} &raquo;</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-nom">Nom du projet *</Label>
                 <Input id="edit-nom" value={form.nom_projet} onChange={(e) => setForm({ ...form, nom_projet: e.target.value })} />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label>Statut</Label>
                 <Select value={form.status || "NOUVEAU"} onValueChange={(v) => setForm({ ...form, status: v as AuditStatus })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="NOUVEAU">Nouveau</SelectItem>
-                    <SelectItem value="EN_COURS">En cours</SelectItem>
-                    <SelectItem value="TERMINE">Terminé</SelectItem>
-                    <SelectItem value="ARCHIVE">Archivé</SelectItem>
+                    <SelectGroup>
+                      <SelectItem value="NOUVEAU">Nouveau</SelectItem>
+                      <SelectItem value="EN_COURS">En cours</SelectItem>
+                      <SelectItem value="TERMINE">Terminé</SelectItem>
+                      <SelectItem value="ARCHIVE">Archivé</SelectItem>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-objectifs">Objectifs</Label>
               <Textarea id="edit-objectifs" value={form.objectifs || ""} onChange={(e) => setForm({ ...form, objectifs: e.target.value })} rows={3} />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-limites">Limites / Périmètre</Label>
               <Textarea id="edit-limites" value={form.limites || ""} onChange={(e) => setForm({ ...form, limites: e.target.value })} rows={2} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-hypotheses">Hypothèses</Label>
                 <Textarea id="edit-hypotheses" value={form.hypotheses || ""} onChange={(e) => setForm({ ...form, hypotheses: e.target.value })} rows={2} />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-risques">Risques initiaux</Label>
                 <Textarea id="edit-risques" value={form.risques_initiaux || ""} onChange={(e) => setForm({ ...form, risques_initiaux: e.target.value })} rows={2} />
               </div>
@@ -546,28 +564,28 @@ function AuditListView({
           {formError && <p className="text-sm text-destructive">{formError}</p>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Annuler</Button>
-            <Button onClick={handleUpdate} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Enregistrer</Button>
+            <Button onClick={handleUpdate} disabled={saving}>{saving && <Loader2 className="animate-spin" data-icon="inline-start" />}Enregistrer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Supprimer */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer la suppression</DialogTitle>
-            <DialogDescription>
+      {/* AlertDialog: Supprimer */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
               Êtes-vous sûr de vouloir supprimer le projet d&apos;audit &laquo; <strong>{selected?.nom_projet}</strong> &raquo; ?
               Cette action est irréversible et supprimera toutes les campagnes et évaluations associées.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           {formError && <p className="text-sm text-destructive">{formError}</p>}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Annuler</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={saving}>{saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Supprimer</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={saving}>{saving && <Loader2 className="animate-spin" data-icon="inline-start" />}Supprimer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -603,15 +621,15 @@ function AuditDetailView({
   const StatusIcon = STATUS_ICONS[audit.status];
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft />
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <ClipboardCheck className="h-6 w-6" />
+            <ClipboardCheck className="size-6" />
             {audit.nom_projet}
           </h1>
           <p className="text-muted-foreground">
@@ -619,7 +637,7 @@ function AuditDetailView({
           </p>
         </div>
         <Badge variant={STATUS_VARIANTS[audit.status]} className="text-sm px-3 py-1">
-          <StatusIcon className="h-4 w-4 mr-1" />
+          <StatusIcon className="size-4 mr-1" />
           {STATUS_LABELS[audit.status]}
         </Badge>
       </div>
@@ -661,10 +679,12 @@ function AuditDetailView({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="NOUVEAU">Nouveau</SelectItem>
-                <SelectItem value="EN_COURS">En cours</SelectItem>
-                <SelectItem value="TERMINE">Terminé</SelectItem>
-                <SelectItem value="ARCHIVE">Archivé</SelectItem>
+                <SelectGroup>
+                  <SelectItem value="NOUVEAU">Nouveau</SelectItem>
+                  <SelectItem value="EN_COURS">En cours</SelectItem>
+                  <SelectItem value="TERMINE">Terminé</SelectItem>
+                  <SelectItem value="ARCHIVE">Archivé</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </CardContent>
@@ -674,9 +694,9 @@ function AuditDetailView({
       {/* Documents */}
       {(audit.lettre_mission_path || audit.contrat_path || audit.planning_path) && (
         <div className="flex gap-2 flex-wrap">
-          {audit.lettre_mission_path && <Badge variant="secondary"><FileText className="h-3 w-3 mr-1" />Lettre de mission</Badge>}
-          {audit.contrat_path && <Badge variant="secondary"><FileText className="h-3 w-3 mr-1" />Contrat</Badge>}
-          {audit.planning_path && <Badge variant="secondary"><FileText className="h-3 w-3 mr-1" />Planning</Badge>}
+          {audit.lettre_mission_path && <Badge variant="secondary"><FileText className="size-3 mr-1" />Lettre de mission</Badge>}
+          {audit.contrat_path && <Badge variant="secondary"><FileText className="size-3 mr-1" />Contrat</Badge>}
+          {audit.planning_path && <Badge variant="secondary"><FileText className="size-3 mr-1" />Planning</Badge>}
         </div>
       )}
 
@@ -689,7 +709,7 @@ function AuditDetailView({
 
         <TabsContent value="contexte">
           <Card>
-            <CardContent className="pt-6 space-y-6">
+            <CardContent className="pt-6 flex flex-col gap-6">
               {audit.objectifs && (
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground mb-1">Objectifs</p>
@@ -798,14 +818,14 @@ function CampaignsTab({ auditId, entrepriseId }: { auditId: number; entrepriseId
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {campaigns.length} campagne{campaigns.length !== 1 ? "s" : ""} d&apos;évaluation
         </p>
         <Button size="sm" onClick={() => { setFormError(""); setCampaignName(""); setCampaignDesc(""); setCreateOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus data-icon="inline-start" />
           Nouvelle campagne
         </Button>
       </div>
@@ -813,18 +833,18 @@ function CampaignsTab({ auditId, entrepriseId }: { auditId: number; entrepriseId
       {/* Campaign list */}
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       ) : campaigns.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12 text-muted-foreground">
-            <Target className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <Target className="size-10 mx-auto mb-3 opacity-50" />
             <p className="font-medium">Aucune campagne</p>
             <p className="text-sm mt-1">Créez une campagne pour commencer les évaluations</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
           {campaigns.map((c) => (
             <Card key={c.id} className="overflow-hidden">
               <div
@@ -832,7 +852,7 @@ function CampaignsTab({ auditId, entrepriseId }: { auditId: number; entrepriseId
                 onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Target className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Target className="size-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0">
                     <p className="font-medium truncate">{c.name}</p>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
@@ -852,17 +872,19 @@ function CampaignsTab({ auditId, entrepriseId }: { auditId: number; entrepriseId
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {(Object.keys(CAMPAIGN_LABELS) as CampaignStatus[]).map((s) => (
-                          <SelectItem key={s} value={s}>{CAMPAIGN_LABELS[s]}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {(Object.keys(CAMPAIGN_LABELS) as CampaignStatus[]).map((s) => (
+                            <SelectItem key={s} value={s}>{CAMPAIGN_LABELS[s]}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {expandedId === c.id ? (
-                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    <ChevronUp className="size-4 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <ChevronDown className="size-4 text-muted-foreground" />
                   )}
                 </div>
               </div>
@@ -891,8 +913,8 @@ function CampaignsTab({ auditId, entrepriseId }: { auditId: number; entrepriseId
               Créez une campagne pour regrouper les évaluations de cet audit
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="campaign-name">Nom de la campagne *</Label>
               <Input
                 id="campaign-name"
@@ -901,7 +923,7 @@ function CampaignsTab({ auditId, entrepriseId }: { auditId: number; entrepriseId
                 placeholder="ex: Évaluation réseau Q1 2026"
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="campaign-desc">Description</Label>
               <Textarea
                 id="campaign-desc"
@@ -916,7 +938,7 @@ function CampaignsTab({ auditId, entrepriseId }: { auditId: number; entrepriseId
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button>
             <Button onClick={handleCreate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Créer la campagne
             </Button>
           </DialogFooter>
@@ -1027,7 +1049,7 @@ function CampaignDetail({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-6">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -1037,10 +1059,10 @@ function CampaignDetail({
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 flex flex-col gap-4">
       {/* Score bar */}
       {score && score.total_controls > 0 && (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Score de conformité</span>
             <span className="font-bold text-lg">{score.compliance_score}%</span>
@@ -1083,7 +1105,7 @@ function CampaignDetail({
           {campaign.assessments.length} évaluation{campaign.assessments.length !== 1 ? "s" : ""}
         </p>
         <Button size="sm" variant="outline" onClick={openCreateAssessment}>
-          <Plus className="h-3 w-3 mr-1" />
+          <Plus data-icon="inline-start" />
           Ajouter une évaluation
         </Button>
       </div>
@@ -1091,12 +1113,12 @@ function CampaignDetail({
       {/* Assessment list */}
       {campaign.assessments.length === 0 ? (
         <div className="text-center py-6 text-muted-foreground">
-          <Shield className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <Shield className="size-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm">Aucune évaluation dans cette campagne</p>
           <p className="text-xs mt-1">Ajoutez une évaluation pour associer un équipement à un référentiel</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {campaign.assessments.map((assessment) => (
             <div key={assessment.id} className="border rounded-lg overflow-hidden">
               <div
@@ -1104,7 +1126,7 @@ function CampaignDetail({
                 onClick={() => setExpandedAssessmentId(expandedAssessmentId === assessment.id ? null : assessment.id)}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <Server className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Server className="size-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">
                       {assessment.equipement_hostname || assessment.equipement_ip || `Équipement #${assessment.equipement_id}`}
@@ -1113,7 +1135,7 @@ function CampaignDetail({
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      <Shield className="h-3 w-3 inline mr-1" />
+                      <Shield className="size-3 inline mr-1" />
                       {assessment.framework_name || `Framework #${assessment.framework_id}`}
                       {assessment.compliance_score !== null && (
                         <span className="ml-2 font-medium text-foreground">{assessment.compliance_score}%</span>
@@ -1139,13 +1161,13 @@ function CampaignDetail({
                       router.push(`/audits/evaluation?assessmentId=${assessment.id}`);
                     }}
                   >
-                    <ClipboardCheck className="h-3 w-3 mr-1" />
+                    <ClipboardCheck data-icon="inline-start" />
                     Évaluer
                   </Button>
                   {expandedAssessmentId === assessment.id ? (
-                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    <ChevronUp className="size-4 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <ChevronDown className="size-4 text-muted-foreground" />
                   )}
                 </div>
               </div>
@@ -1172,44 +1194,50 @@ function CampaignDetail({
               Associez un équipement à un référentiel pour créer les contrôles à évaluer
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label>Site *</Label>
               <Select value={selectedSite} onValueChange={handleSiteChange}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner un site" /></SelectTrigger>
                 <SelectContent>
-                  {sites.map((s) => (<SelectItem key={s.id} value={String(s.id)}>{s.nom}</SelectItem>))}
+                  <SelectGroup>
+                    {sites.map((s) => (<SelectItem key={s.id} value={String(s.id)}>{s.nom}</SelectItem>))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Équipement *</Label>
               <Select value={selectedEquipement} onValueChange={setSelectedEquipement} disabled={!selectedSite}>
                 <SelectTrigger><SelectValue placeholder={selectedSite ? "Sélectionner un équipement" : "Sélectionnez d'abord un site"} /></SelectTrigger>
                 <SelectContent>
-                  {equipements.map((eq) => (
-                    <SelectItem key={eq.id} value={String(eq.id)}>
-                      <span className="font-mono text-xs mr-2">{eq.ip_address}</span>
-                      {eq.hostname || eq.type_equipement}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {equipements.map((eq) => (
+                      <SelectItem key={eq.id} value={String(eq.id)}>
+                        <span className="font-mono text-xs mr-2">{eq.ip_address}</span>
+                        {eq.hostname || eq.type_equipement}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Référentiel *</Label>
               <Select value={selectedFramework} onValueChange={setSelectedFramework}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner un référentiel" /></SelectTrigger>
                 <SelectContent>
-                  {frameworks.map((fw) => (
-                    <SelectItem key={fw.id} value={String(fw.id)}>
-                      {fw.name} <span className="text-xs text-muted-foreground ml-1">v{fw.version} · {fw.total_controls} contrôles</span>
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {frameworks.map((fw) => (
+                      <SelectItem key={fw.id} value={String(fw.id)}>
+                        {fw.name} <span className="text-xs text-muted-foreground ml-1">v{fw.version} · {fw.total_controls} contrôles</span>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="assessment-notes">Notes</Label>
               <Textarea
                 id="assessment-notes"
@@ -1224,7 +1252,7 @@ function CampaignDetail({
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateAssessmentOpen(false)}>Annuler</Button>
             <Button onClick={handleCreateAssessment} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Créer l&apos;évaluation
             </Button>
           </DialogFooter>
@@ -1288,11 +1316,11 @@ function AssessmentControlResults({
 
   const statusIcon = (s: ComplianceStatus) => {
     switch (s) {
-      case "compliant": return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case "non_compliant": return <AlertCircle className="h-4 w-4 text-red-600" />;
-      case "partially_compliant": return <CircleDot className="h-4 w-4 text-yellow-600" />;
-      case "not_applicable": return <Minus className="h-4 w-4 text-gray-400" />;
-      default: return <CircleDot className="h-4 w-4 text-gray-300" />;
+      case "compliant": return <CheckCircle className="size-4 text-green-600" />;
+      case "non_compliant": return <AlertCircle className="size-4 text-red-600" />;
+      case "partially_compliant": return <CircleDot className="size-4 text-yellow-600" />;
+      case "not_applicable": return <Minus className="size-4 text-gray-400" />;
+      default: return <CircleDot className="size-4 text-gray-300" />;
     }
   };
 
@@ -1341,13 +1369,13 @@ function AssessmentControlResults({
                   )}
                 </TableCell>
                 <TableCell>
-                  <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${COMPLIANCE_CLASSES[r.status]}`}>
+                  <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold", COMPLIANCE_CLASSES[r.status])}>
                     {COMPLIANCE_LABELS[r.status]}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(r)}>
-                    <Pencil className="h-3 w-3" />
+                    <Pencil />
                   </Button>
                 </TableCell>
               </TableRow>
@@ -1365,21 +1393,23 @@ function AssessmentControlResults({
               {results.find((r) => r.id === editingId)?.control_title || "Contrôle"}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label>Statut de conformité *</Label>
               <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as ComplianceStatus })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="not_assessed">Non évalué</SelectItem>
-                  <SelectItem value="compliant">Conforme</SelectItem>
-                  <SelectItem value="non_compliant">Non conforme</SelectItem>
-                  <SelectItem value="partially_compliant">Partiellement conforme</SelectItem>
-                  <SelectItem value="not_applicable">Non applicable</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="not_assessed">Non évalué</SelectItem>
+                    <SelectItem value="compliant">Conforme</SelectItem>
+                    <SelectItem value="non_compliant">Non conforme</SelectItem>
+                    <SelectItem value="partially_compliant">Partiellement conforme</SelectItem>
+                    <SelectItem value="not_applicable">Non applicable</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="result-evidence">Preuve / Évidence</Label>
               <Textarea
                 id="result-evidence"
@@ -1389,7 +1419,7 @@ function AssessmentControlResults({
                 rows={3}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="result-comment">Commentaire</Label>
               <Textarea
                 id="result-comment"
@@ -1399,7 +1429,7 @@ function AssessmentControlResults({
                 rows={2}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="result-remediation">Note de remédiation</Label>
               <Textarea
                 id="result-remediation"
@@ -1413,7 +1443,7 @@ function AssessmentControlResults({
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingId(null)}>Annuler</Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Sauvegarder
             </Button>
           </DialogFooter>

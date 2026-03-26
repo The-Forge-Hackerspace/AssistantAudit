@@ -14,7 +14,7 @@ import {
   Server,
   MapPin,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,8 +37,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -46,6 +57,7 @@ import {
 import { equipementsApi, sitesApi } from "@/services/api";
 import type { Equipement, EquipementCreate, Site, TypeEquipement, StatusAudit } from "@/types";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { TableSkeleton } from "@/components/skeletons";
 import {
   EQUIPEMENT_TYPE_LABELS as TYPE_LABELS,
@@ -303,11 +315,11 @@ function EquipementsContent() {
 
   const TypeIcon = ({ type }: { type: TypeEquipement }) => {
     const Icon = TYPE_ICONS[type] || Server;
-    return <Icon className="h-4 w-4" />;
+    return <Icon className="size-4" />;
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
@@ -317,7 +329,7 @@ function EquipementsContent() {
           </p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus data-icon="inline-start" />
           Nouvel équipement
         </Button>
       </div>
@@ -327,7 +339,7 @@ function EquipementsContent() {
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input
                 className="pl-9"
                 placeholder="Rechercher par IP, hostname, fabricant..."
@@ -340,12 +352,14 @@ function EquipementsContent() {
                 <SelectValue placeholder="Filtrer par site" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les sites</SelectItem>
-                {sites.map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
-                    {s.nom}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value="all">Tous les sites</SelectItem>
+                  {sites.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.nom}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -353,12 +367,14 @@ function EquipementsContent() {
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les types</SelectItem>
-                {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value="all">Tous les types</SelectItem>
+                  {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -366,11 +382,13 @@ function EquipementsContent() {
                 <SelectValue placeholder="Statut" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="A_AUDITER">À auditer</SelectItem>
-                <SelectItem value="EN_COURS">En cours</SelectItem>
-                <SelectItem value="CONFORME">Conforme</SelectItem>
-                <SelectItem value="NON_CONFORME">Non conforme</SelectItem>
+                <SelectGroup>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="A_AUDITER">À auditer</SelectItem>
+                  <SelectItem value="EN_COURS">En cours</SelectItem>
+                  <SelectItem value="CONFORME">Conforme</SelectItem>
+                  <SelectItem value="NON_CONFORME">Non conforme</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -383,7 +401,7 @@ function EquipementsContent() {
           <TableSkeleton rows={5} cols={5} />
         ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            <Server className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <Server className="size-12 mx-auto mb-4 opacity-50" />
             <p className="text-lg font-medium">Aucun équipement trouvé</p>
             <p className="text-sm mt-1">
               {equipements.length === 0
@@ -392,7 +410,7 @@ function EquipementsContent() {
             </p>
           </div>
         ) : (
-          <div>
+          <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -433,13 +451,13 @@ function EquipementsContent() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button size="icon" variant="ghost" onClick={() => openDetail(eq)}>
-                          <Eye className="h-4 w-4" />
+                          <Eye />
                         </Button>
                         <Button size="icon" variant="ghost" onClick={() => openEdit(eq)}>
-                          <Pencil className="h-4 w-4" />
+                          <Pencil />
                         </Button>
                         <Button size="icon" variant="ghost" onClick={() => openDelete(eq)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <Trash2 className="text-destructive" />
                         </Button>
                       </div>
                     </TableCell>
@@ -449,7 +467,7 @@ function EquipementsContent() {
             </Table>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between px-4 py-3 border-t">
+            <CardFooter className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 Page {page} sur {pages} — {total} résultat{total !== 1 ? "s" : ""}
               </p>
@@ -460,7 +478,7 @@ function EquipementsContent() {
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  <ChevronLeft data-icon="inline-start" />
                   Précédent
                 </Button>
                 <Button
@@ -470,11 +488,11 @@ function EquipementsContent() {
                   onClick={() => setPage((p) => p + 1)}
                 >
                   Suivant
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                  <ChevronRight data-icon="inline-end" />
                 </Button>
               </div>
-            </div>
-          </div>
+            </CardFooter>
+          </>
         )}
       </Card>
 
@@ -488,8 +506,8 @@ function EquipementsContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label>Site *</Label>
               <Select
                 value={form.site_id ? String(form.site_id) : ""}
@@ -499,16 +517,18 @@ function EquipementsContent() {
                   <SelectValue placeholder="Sélectionner un site" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sites.map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.nom}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {sites.map((s) => (
+                      <SelectItem key={s.id} value={String(s.id)}>
+                        {s.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Type d&apos;équipement *</Label>
               <Select
                 value={form.type_equipement}
@@ -520,17 +540,19 @@ function EquipementsContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-ip">Adresse IP *</Label>
                 <Input
                   id="create-ip"
@@ -540,7 +562,7 @@ function EquipementsContent() {
                   className="font-mono"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-hostname">Hostname</Label>
                 <Input
                   id="create-hostname"
@@ -552,7 +574,7 @@ function EquipementsContent() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-fabricant">Fabricant</Label>
                 <Input
                   id="create-fabricant"
@@ -561,7 +583,7 @@ function EquipementsContent() {
                   placeholder="Dell, HP, Fortinet..."
                 />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-os">OS détecté</Label>
                 <Input
                   id="create-os"
@@ -574,9 +596,9 @@ function EquipementsContent() {
 
             {/* Type-specific fields */}
             {form.type_equipement === "reseau" && (
-              <div className="space-y-2 border-t pt-4">
+              <div className="flex flex-col gap-2 border-t pt-4">
                 <p className="text-sm font-medium text-muted-foreground">Champs réseau</p>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="create-firmware">Version firmware</Label>
                   <Input
                     id="create-firmware"
@@ -589,9 +611,9 @@ function EquipementsContent() {
             )}
 
             {form.type_equipement === "serveur" && (
-              <div className="space-y-4 border-t pt-4">
+              <div className="flex flex-col gap-4 border-t pt-4">
                 <p className="text-sm font-medium text-muted-foreground">Champs serveur</p>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="create-os-detail">Détail version OS</Label>
                   <Input
                     id="create-os-detail"
@@ -600,7 +622,7 @@ function EquipementsContent() {
                     placeholder="ex: Windows Server 2022 Datacenter Build 20348"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="create-modele">Modèle matériel</Label>
                   <Input
                     id="create-modele"
@@ -613,9 +635,9 @@ function EquipementsContent() {
             )}
 
             {form.type_equipement === "firewall" && (
-              <div className="space-y-4 border-t pt-4">
+              <div className="flex flex-col gap-4 border-t pt-4">
                 <p className="text-sm font-medium text-muted-foreground">Champs firewall</p>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="create-license">Statut licence</Label>
                   <Input
                     id="create-license"
@@ -625,7 +647,7 @@ function EquipementsContent() {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     <Label htmlFor="create-vpn">Utilisateurs VPN</Label>
                     <Input
                       id="create-vpn"
@@ -636,7 +658,7 @@ function EquipementsContent() {
                       }
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     <Label htmlFor="create-rules">Nombre de règles</Label>
                     <Input
                       id="create-rules"
@@ -651,7 +673,7 @@ function EquipementsContent() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-notes">Notes d&apos;audit</Label>
               <Textarea
                 id="create-notes"
@@ -670,7 +692,7 @@ function EquipementsContent() {
               Annuler
             </Button>
             <Button onClick={handleCreate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Créer
             </Button>
           </DialogFooter>
@@ -687,21 +709,21 @@ function EquipementsContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label>Adresse IP</Label>
                 <Input value={selected?.ip_address || ""} disabled className="font-mono" />
                 <p className="text-xs text-muted-foreground">Non modifiable</p>
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label>Type</Label>
                 <Input value={TYPE_LABELS[selected?.type_equipement || "equipement"]} disabled />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-hostname">Hostname</Label>
                 <Input
                   id="edit-hostname"
@@ -710,7 +732,7 @@ function EquipementsContent() {
                   placeholder="SRV-DC01"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-fabricant">Fabricant</Label>
                 <Input
                   id="edit-fabricant"
@@ -721,7 +743,7 @@ function EquipementsContent() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-os">OS détecté</Label>
               <Input
                 id="edit-os"
@@ -733,9 +755,9 @@ function EquipementsContent() {
 
             {/* Type-specific fields */}
             {selected?.type_equipement === "reseau" && (
-              <div className="space-y-2 border-t pt-4">
+              <div className="flex flex-col gap-2 border-t pt-4">
                 <p className="text-sm font-medium text-muted-foreground">Champs réseau</p>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="edit-firmware">Version firmware</Label>
                   <Input
                     id="edit-firmware"
@@ -747,9 +769,9 @@ function EquipementsContent() {
             )}
 
             {selected?.type_equipement === "serveur" && (
-              <div className="space-y-4 border-t pt-4">
+              <div className="flex flex-col gap-4 border-t pt-4">
                 <p className="text-sm font-medium text-muted-foreground">Champs serveur</p>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="edit-os-detail">Détail version OS</Label>
                   <Input
                     id="edit-os-detail"
@@ -757,7 +779,7 @@ function EquipementsContent() {
                     onChange={(e) => setForm({ ...form, os_version_detail: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="edit-modele">Modèle matériel</Label>
                   <Input
                     id="edit-modele"
@@ -769,9 +791,9 @@ function EquipementsContent() {
             )}
 
             {selected?.type_equipement === "firewall" && (
-              <div className="space-y-4 border-t pt-4">
+              <div className="flex flex-col gap-4 border-t pt-4">
                 <p className="text-sm font-medium text-muted-foreground">Champs firewall</p>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="edit-license">Statut licence</Label>
                   <Input
                     id="edit-license"
@@ -780,7 +802,7 @@ function EquipementsContent() {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     <Label htmlFor="edit-vpn">Utilisateurs VPN</Label>
                     <Input
                       id="edit-vpn"
@@ -791,7 +813,7 @@ function EquipementsContent() {
                       }
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     <Label htmlFor="edit-rules">Nombre de règles</Label>
                     <Input
                       id="edit-rules"
@@ -806,7 +828,7 @@ function EquipementsContent() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-notes">Notes d&apos;audit</Label>
               <Textarea
                 id="edit-notes"
@@ -825,38 +847,42 @@ function EquipementsContent() {
               Annuler
             </Button>
             <Button onClick={handleUpdate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Dialog: Supprimer ── */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer la suppression</DialogTitle>
-            <DialogDescription>
+      {/* ── AlertDialog: Supprimer ── */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
               Êtes-vous sûr de vouloir supprimer l&apos;équipement{" "}
               <strong>{selected?.hostname || selected?.ip_address}</strong> ? Cette action est
               irréversible et supprimera tous les assessments associés.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
           {formError && <p className="text-sm text-destructive">{formError}</p>}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteOpen(false)}>
               Annuler
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+              disabled={saving}
+            >
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Supprimer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Dialog: Détail ── */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
@@ -869,7 +895,7 @@ function EquipementsContent() {
           </DialogHeader>
 
           {selected && (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Type</p>
@@ -903,7 +929,7 @@ function EquipementsContent() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Site</p>
                   <Badge variant="outline" className="mt-1">
-                    <MapPin className="h-3 w-3 mr-1" />
+                    <MapPin className="size-3 mr-1" />
                     {siteMap[selected.site_id] || `#${selected.site_id}`}
                   </Badge>
                 </div>
@@ -930,7 +956,7 @@ function EquipementsContent() {
               )}
 
               {selected.type_equipement === "serveur" && (
-                <div className="border-t pt-4 space-y-3">
+                <div className="border-t pt-4 flex flex-col gap-3">
                   <p className="text-sm font-medium text-muted-foreground">Détails serveur</p>
                   {selected.os_version_detail && (
                     <div>
@@ -948,7 +974,7 @@ function EquipementsContent() {
               )}
 
               {selected.type_equipement === "firewall" && (
-                <div className="border-t pt-4 space-y-3">
+                <div className="border-t pt-4 flex flex-col gap-3">
                   <p className="text-sm font-medium text-muted-foreground">Détails firewall</p>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
@@ -983,7 +1009,7 @@ function EquipementsContent() {
                 if (selected) openEdit(selected);
               }}
             >
-              <Pencil className="h-4 w-4 mr-2" />
+              <Pencil data-icon="inline-start" />
               Modifier
             </Button>
           </DialogFooter>

@@ -50,6 +50,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -61,6 +62,18 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 import { scansApi, sitesApi } from "@/services/api";
 import type { Scan, ScanSummary, ScanHost, Site, TypeEquipement } from "@/types";
 import { toast } from "sonner";
@@ -264,7 +277,6 @@ function ScannerContent() {
 
   // ── Delete ──
   const handleDelete = async (id: number) => {
-    if (!confirm("Supprimer ce scan et tous ses résultats ?")) return;
     try {
       await scansApi.delete(id);
       toast.success("Scan supprimé");
@@ -320,12 +332,12 @@ function ScannerContent() {
     sites.find((s) => s.id === id)?.nom || `Site #${id}`;
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Radar className="h-6 w-6" />
+            <Radar className="size-6" />
             Scanner Réseau
           </h1>
           <p className="text-muted-foreground">
@@ -333,7 +345,7 @@ function ScannerContent() {
           </p>
         </div>
         <Button onClick={() => setShowLaunch(true)}>
-          <Play className="h-4 w-4 mr-2" />
+          <Play data-icon="inline-start" />
           Lancer un scan
         </Button>
       </div>
@@ -345,7 +357,7 @@ function ScannerContent() {
             Historique des scans
             {hasRunningScans && (
               <Badge className="gap-1 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400 text-xs">
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <Loader2 className="size-3 animate-spin" />
                 {scans.filter((s) => s.statut === "running").length} en cours
               </Badge>
             )}
@@ -359,7 +371,7 @@ function ScannerContent() {
             <TableSkeleton rows={3} cols={7} />
           ) : scans.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <Radar className="h-12 w-12 mx-auto mb-4 opacity-40" />
+              <Radar className="size-12 mx-auto mb-4 opacity-40" />
               <p>Aucun scan réalisé</p>
               <p className="text-sm">
                 Lancez un scan pour découvrir les équipements du réseau
@@ -436,16 +448,33 @@ function ScannerContent() {
                           onClick={() => handleViewScan(scan.id)}
                           disabled={scan.statut === "running"}
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(scan.id)}
-                          disabled={scan.statut === "running"}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={scan.statut === "running"}
+                            >
+                              <Trash2 className="text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Supprimer ce scan ?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Ce scan et tous ses résultats seront définitivement supprimés.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(scan.id)}>
+                                Supprimer
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -465,7 +494,7 @@ function ScannerContent() {
               Configurez les paramètres du scan Nmap
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             {/* Nom du scan */}
             <div>
               <Label>Nom du scan (optionnel)</Label>
@@ -487,11 +516,13 @@ function ScannerContent() {
                   <SelectValue placeholder="Sélectionner un site" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sites.map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.nom}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {sites.map((s) => (
+                      <SelectItem key={s.id} value={String(s.id)}>
+                        {s.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -515,11 +546,12 @@ function ScannerContent() {
                     key={type.value}
                     type="button"
                     onClick={() => setScanType(type.value)}
-                    className={`text-left p-3 rounded-lg border-2 transition-colors ${
+                    className={cn(
+                      "text-left p-3 rounded-lg border-2 transition-colors",
                       scanType === type.value
                         ? "border-primary bg-primary/5"
                         : "border-muted hover:border-muted-foreground/30"
-                    }`}
+                    )}
                   >
                     <div className="font-medium text-sm">{type.label}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">
@@ -554,7 +586,7 @@ function ScannerContent() {
             {/* Nmap command preview */}
             <div className="rounded-lg bg-zinc-950 p-3 mt-2">
               <div className="flex items-center gap-2 text-zinc-400 text-xs mb-1">
-                <Terminal className="h-3 w-3" />
+                <Terminal className="size-3" />
                 Commande qui sera exécutée
               </div>
               <code className="text-green-400 text-sm font-mono break-all">
@@ -578,7 +610,7 @@ function ScannerContent() {
               Annuler
             </Button>
             <Button onClick={handleLaunch}>
-              <Play className="h-4 w-4 mr-2" />
+              <Play data-icon="inline-start" />
               Lancer
             </Button>
           </DialogFooter>
@@ -592,7 +624,7 @@ function ScannerContent() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <Radar className="h-5 w-5" />
+                  <Radar className="size-5" />
                   {selectedScan.nom
                     ? `${selectedScan.nom} — ${getSiteName(selectedScan.site_id)}`
                     : `Résultats du scan — ${getSiteName(selectedScan.site_id)}`}
@@ -609,7 +641,7 @@ function ScannerContent() {
               {selectedScan.nmap_command && (
                 <div className="rounded-lg bg-zinc-950 p-3">
                   <div className="flex items-center gap-2 text-zinc-400 text-xs mb-1">
-                    <Terminal className="h-3 w-3" />
+                    <Terminal className="size-3" />
                     Commande exécutée
                   </div>
                   <code className="text-green-400 text-sm font-mono">
@@ -625,13 +657,13 @@ function ScannerContent() {
                   size="sm"
                   onClick={() => handleImportAll(selectedScan.id)}
                 >
-                  <Download className="h-4 w-4 mr-2" />
+                  <Download data-icon="inline-start" />
                   Importer tous les &quot;pending&quot;
                 </Button>
               </div>
 
               {/* Hosts table */}
-              <div className="space-y-3">
+              <div className="flex flex-col gap-3">
                 {selectedScan.hosts.map((host) => (
                   <HostRow
                     key={host.id}
@@ -663,9 +695,9 @@ function ScanStatusBadge({
 }) {
   if (statut === "running") {
     return (
-      <div className="space-y-1.5 min-w-[100px]">
+      <div className="flex flex-col gap-1.5 min-w-[100px]">
         <Badge className="gap-1.5 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400">
-          <Loader2 className="h-3 w-3 animate-spin" />
+          <Loader2 className="size-3 animate-spin" />
           En cours
         </Badge>
         <div className="h-1.5 w-full bg-blue-100 dark:bg-blue-900/30 rounded-full overflow-hidden">
@@ -680,7 +712,7 @@ function ScanStatusBadge({
         <Tooltip>
           <TooltipTrigger asChild>
             <Badge variant="destructive" className="gap-1 cursor-help">
-              <AlertCircle className="h-3 w-3" />
+              <AlertCircle className="size-3" />
               Échoué
             </Badge>
           </TooltipTrigger>
@@ -693,7 +725,7 @@ function ScanStatusBadge({
   }
   return (
     <Badge variant="outline" className="gap-1 text-green-600 border-green-200 dark:border-green-800 dark:text-green-400">
-      <Check className="h-3 w-3" />
+      <Check className="size-3" />
       Terminé
     </Badge>
   );
@@ -724,7 +756,7 @@ function HostRow({
         className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/50"
         onClick={() => setExpanded(!expanded)}
       >
-        <TypeIcon className="h-5 w-5 text-muted-foreground" />
+        <TypeIcon className="size-5 text-muted-foreground" />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -754,20 +786,20 @@ function HostRow({
 
         {host.equipement_id && (
           <Badge variant="default" className="gap-1">
-            <Globe className="h-3 w-3" />
+            <Globe className="size-3" />
             Éq. #{host.equipement_id}
           </Badge>
         )}
 
         {expanded ? (
-          <ChevronUp className="h-4 w-4" />
+          <ChevronUp className="size-4" />
         ) : (
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="size-4" />
         )}
       </div>
 
       {expanded && (
-        <CardContent className="border-t pt-4 space-y-4">
+        <CardContent className="border-t pt-4 flex flex-col gap-4">
           {/* Ports */}
           {host.ports.length > 0 && (
             <div>
@@ -826,20 +858,22 @@ function HostRow({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="serveur">Serveur</SelectItem>
-                    <SelectItem value="reseau">Réseau</SelectItem>
-                    <SelectItem value="switch">Switch</SelectItem>
-                    <SelectItem value="router">Router</SelectItem>
-                    <SelectItem value="access_point">Access Point</SelectItem>
-                    <SelectItem value="firewall">Firewall</SelectItem>
-                    <SelectItem value="printer">Printer</SelectItem>
-                    <SelectItem value="camera">Camera</SelectItem>
-                    <SelectItem value="nas">NAS</SelectItem>
-                    <SelectItem value="hyperviseur">Hyperviseur</SelectItem>
-                    <SelectItem value="telephone">Téléphone</SelectItem>
-                    <SelectItem value="iot">IoT</SelectItem>
-                    <SelectItem value="cloud_gateway">Cloud Gateway</SelectItem>
-                    <SelectItem value="equipement">Autre</SelectItem>
+                    <SelectGroup>
+                      <SelectItem value="serveur">Serveur</SelectItem>
+                      <SelectItem value="reseau">Réseau</SelectItem>
+                      <SelectItem value="switch">Switch</SelectItem>
+                      <SelectItem value="router">Router</SelectItem>
+                      <SelectItem value="access_point">Access Point</SelectItem>
+                      <SelectItem value="firewall">Firewall</SelectItem>
+                      <SelectItem value="printer">Printer</SelectItem>
+                      <SelectItem value="camera">Camera</SelectItem>
+                      <SelectItem value="nas">NAS</SelectItem>
+                      <SelectItem value="hyperviseur">Hyperviseur</SelectItem>
+                      <SelectItem value="telephone">Téléphone</SelectItem>
+                      <SelectItem value="iot">IoT</SelectItem>
+                      <SelectItem value="cloud_gateway">Cloud Gateway</SelectItem>
+                      <SelectItem value="equipement">Autre</SelectItem>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
@@ -850,7 +884,7 @@ function HostRow({
                   onDecision(host.id, "kept", chosenType);
                 }}
               >
-                <Check className="h-4 w-4 mr-1" />
+                <Check data-icon="inline-start" />
                 Conserver
               </Button>
               <Button
@@ -861,7 +895,7 @@ function HostRow({
                   onDecision(host.id, "ignored");
                 }}
               >
-                <X className="h-4 w-4 mr-1" />
+                <X data-icon="inline-start" />
                 Ignorer
               </Button>
             </div>

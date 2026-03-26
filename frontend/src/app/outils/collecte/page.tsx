@@ -66,6 +66,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 import { equipementsApi, toolsApi } from "@/services/api";
 import type {
@@ -143,8 +144,8 @@ export default function CollectePage() {
     try {
       const res = await equipementsApi.list(1, 100);
       setEquipements(res.items);
-    } catch (err) {
-      console.error("Erreur chargement équipements:", err);
+    } catch {
+      // silently handled
     } finally {
       setLoadingEquipements(false);
     }
@@ -155,8 +156,8 @@ export default function CollectePage() {
     try {
       const data = await toolsApi.listCollects();
       setCollects(data);
-    } catch (err) {
-      console.error("Erreur chargement collectes:", err);
+    } catch {
+      // silently handled
     } finally {
       setLoadingCollects(false);
     }
@@ -216,8 +217,7 @@ export default function CollectePage() {
       await toolsApi.launchCollect(params);
       toast.success("Collecte lancée en arrière-plan");
       loadCollects();
-    } catch (err) {
-      console.error("Erreur lancement collecte:", err);
+    } catch {
       toast.error("Erreur lors du lancement de la collecte");
     } finally {
       setLaunching(false);
@@ -229,8 +229,7 @@ export default function CollectePage() {
       const data = await toolsApi.getCollect(collectId);
       setSelectedCollect(data);
       setDetailOpen(true);
-    } catch (err) {
-      console.error("Erreur chargement détail:", err);
+    } catch {
       toast.error("Erreur lors du chargement du détail");
     }
   };
@@ -294,20 +293,20 @@ export default function CollectePage() {
   // Render
   // ══════════════════════════════════════════════════════════════
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Link href="/outils">
               <Button variant="ghost" size="sm" className="gap-1">
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft data-icon="inline-start" />
                 Outils
               </Button>
             </Link>
           </div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Terminal className="h-6 w-6" />
+            <Terminal className="size-6" />
             Collecte SSH / WinRM
           </h1>
           <p className="text-muted-foreground">
@@ -315,7 +314,7 @@ export default function CollectePage() {
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={loadCollects} className="gap-2">
-          <RefreshCw className="h-4 w-4" />
+          <RefreshCw data-icon="inline-start" />
           Rafraîchir
         </Button>
       </div>
@@ -324,63 +323,67 @@ export default function CollectePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Play className="h-5 w-5" />
+            <Play className="size-5" />
             Lancer une collecte
           </CardTitle>
           <CardDescription>
             Connectez-vous à un serveur pour collecter automatiquement les informations d&apos;audit.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="flex flex-col gap-6">
           {/* Row 1: Method + Profile + Equipment */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Méthode de connexion</Label>
               <Select value={method} onValueChange={(v) => setMethod(v as "ssh" | "winrm")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ssh">
-                    <span className="flex items-center gap-2">
-                      <Server className="h-4 w-4" /> SSH — Linux / Firewall
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="winrm">
-                    <span className="flex items-center gap-2">
-                      <Monitor className="h-4 w-4" /> WinRM — Serveur Windows
-                    </span>
-                  </SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="ssh">
+                      <span className="flex items-center gap-2">
+                        <Server className="size-4" /> SSH — Linux / Firewall
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="winrm">
+                      <span className="flex items-center gap-2">
+                        <Monitor className="size-4" /> WinRM — Serveur Windows
+                      </span>
+                    </SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
 
             {method === "ssh" && (
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label>Profil de collecte</Label>
                 <Select value={deviceProfile} onValueChange={setDeviceProfile}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROFILE_OPTIONS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>
-                        <span className="flex items-center gap-2">
-                          {p.value === "linux_server" ? (
-                            <Server className="h-4 w-4" />
-                          ) : (
-                            <Shield className="h-4 w-4" />
-                          )}
-                          {p.label}
-                        </span>
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      {PROFILE_OPTIONS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          <span className="flex items-center gap-2">
+                            {p.value === "linux_server" ? (
+                              <Server className="size-4" />
+                            ) : (
+                              <Shield className="size-4" />
+                            )}
+                            {p.label}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Équipement cible</Label>
               {loadingEquipements ? (
                 <Skeleton className="h-10 w-full" />
@@ -440,7 +443,7 @@ export default function CollectePage() {
 
           {/* Row 2: Connection details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Hôte / IP</Label>
               <Input
                 value={targetHost}
@@ -448,7 +451,7 @@ export default function CollectePage() {
                 placeholder="192.168.1.10"
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Port</Label>
               <Input
                 value={targetPort}
@@ -457,7 +460,7 @@ export default function CollectePage() {
                 type="number"
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Utilisateur</Label>
               <Input
                 value={username}
@@ -469,7 +472,7 @@ export default function CollectePage() {
 
           {/* Row 3: Auth */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Mot de passe</Label>
               <Input
                 type="password"
@@ -480,7 +483,7 @@ export default function CollectePage() {
             </div>
 
             {method === "ssh" ? (
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label>Clé privée SSH (optionnel)</Label>
                 <Textarea
                   value={privateKey}
@@ -492,20 +495,22 @@ export default function CollectePage() {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label>Transport</Label>
                   <Select value={transport} onValueChange={setTransport}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ntlm">NTLM</SelectItem>
-                      <SelectItem value="kerberos">Kerberos</SelectItem>
-                      <SelectItem value="basic">Basic</SelectItem>
+                      <SelectGroup>
+                        <SelectItem value="ntlm">NTLM</SelectItem>
+                        <SelectItem value="kerberos">Kerberos</SelectItem>
+                        <SelectItem value="basic">Basic</SelectItem>
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2 flex items-end">
+                <div className="flex flex-col gap-2 items-end">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -527,7 +532,7 @@ export default function CollectePage() {
           {/* Info box */}
           <div className="rounded-lg border p-3 bg-blue-50 dark:bg-blue-950/20 text-sm">
             <p className="font-medium text-blue-700 dark:text-blue-400 mb-1 flex items-center gap-1">
-              <Info className="h-4 w-4" /> Informations collectées
+              <Info className="size-4" /> Informations collectées
             </p>
             <p className="text-blue-600 dark:text-blue-500">
               {method === "winrm"
@@ -544,9 +549,9 @@ export default function CollectePage() {
             className="gap-2"
           >
             {launching ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="animate-spin" data-icon="inline-start" />
             ) : (
-              <Play className="h-4 w-4" />
+              <Play data-icon="inline-start" />
             )}
             Lancer la collecte
           </Button>
@@ -557,7 +562,7 @@ export default function CollectePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
+            <Activity className="size-5" />
             Historique des collectes
             {collects.length > 0 && (
               <Badge variant="secondary">{collects.length}</Badge>
@@ -566,14 +571,14 @@ export default function CollectePage() {
         </CardHeader>
         <CardContent>
           {loadingCollects ? (
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-14 w-full" />
               ))}
             </div>
           ) : collects.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <Terminal className="h-10 w-10 mx-auto mb-2 opacity-30" />
+              <Terminal className="size-10 mx-auto mb-2 opacity-30" />
               <p>Aucune collecte effectuée</p>
               <p className="text-sm">Lancez une collecte SSH ou WinRM pour commencer</p>
             </div>
@@ -601,12 +606,12 @@ export default function CollectePage() {
                         <Badge variant="outline" className="gap-1">
                           {c.method === "ssh" ? (
                             c.device_profile && c.device_profile !== "linux_server" ? (
-                              <Shield className="h-3 w-3" />
+                              <Shield className="size-3" />
                             ) : (
-                              <Server className="h-3 w-3" />
+                              <Server className="size-3" />
                             )
                           ) : (
-                            <Monitor className="h-3 w-3" />
+                            <Monitor className="size-3" />
                           )}
                           {c.method === "ssh"
                             ? (PROFILE_OPTIONS.find((p) => p.value === c.device_profile)?.label ?? "SSH (Linux)")
@@ -622,15 +627,15 @@ export default function CollectePage() {
                       <TableCell>
                         {c.status === "running" ? (
                           <Badge className={STATUS_COLORS.running}>
-                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            <Loader2 className="size-3 animate-spin" />
                             {STATUS_LABELS.running}
                           </Badge>
                         ) : (
                           <Badge className={STATUS_COLORS[c.status]}>
                             {c.status === "success" ? (
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              <CheckCircle2 className="size-3" />
                             ) : (
-                              <XCircle className="h-3 w-3 mr-1" />
+                              <XCircle className="size-3" />
                             )}
                             {STATUS_LABELS[c.status]}
                           </Badge>
@@ -685,7 +690,7 @@ export default function CollectePage() {
                                 onClick={() => handleViewDetail(c.id)}
                                 title="Voir le détail"
                               >
-                                <Eye className="h-4 w-4" />
+                                <Eye />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -693,7 +698,7 @@ export default function CollectePage() {
                                 onClick={() => openPrefillDialog(c.id)}
                                 title="Pré-remplir un audit"
                               >
-                                <ClipboardCheck className="h-4 w-4" />
+                                <ClipboardCheck />
                               </Button>
                             </>
                           )}
@@ -705,7 +710,7 @@ export default function CollectePage() {
                                 className="text-red-500 hover:text-red-700"
                                 title="Supprimer"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -742,7 +747,7 @@ export default function CollectePage() {
         <DialogContent className="max-w-[70vw] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Terminal className="h-5 w-5" />
+              <Terminal className="size-5" />
               Détail de la collecte #{selectedCollect?.id}
             </DialogTitle>
             <DialogDescription>
@@ -767,7 +772,7 @@ export default function CollectePage() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5" />
+              <ClipboardCheck className="size-5" />
               Pré-remplir l&apos;audit
             </DialogTitle>
             <DialogDescription>
@@ -778,8 +783,8 @@ export default function CollectePage() {
 
           {!prefillResult ? (
             <>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
+              <div className="flex flex-col gap-4 py-4">
+                <div className="flex flex-col gap-2">
                   <Label>Assessment à pré-remplir</Label>
                   <Select
                     value={selectedAssessmentId}
@@ -789,11 +794,13 @@ export default function CollectePage() {
                       <SelectValue placeholder="Sélectionner un assessment…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {assessments.map((a) => (
-                        <SelectItem key={a.id} value={String(a.id)}>
-                          {a.framework_name} — {new Date(a.created_at).toLocaleDateString("fr-FR")}
-                        </SelectItem>
-                      ))}
+                      <SelectGroup>
+                        {assessments.map((a) => (
+                          <SelectItem key={a.id} value={String(a.id)}>
+                            {a.framework_name} — {new Date(a.created_at).toLocaleDateString("fr-FR")}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </div>
@@ -816,14 +823,14 @@ export default function CollectePage() {
                   disabled={!selectedAssessmentId || prefilling}
                   className="gap-2"
                 >
-                  {prefilling && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {prefilling && <Loader2 className="animate-spin" />}
                   Pré-remplir
                 </Button>
               </DialogFooter>
             </>
           ) : (
             <>
-              <div className="space-y-4 py-4">
+              <div className="flex flex-col gap-4 py-4">
                 <div className="grid grid-cols-3 gap-3">
                   <Card>
                     <CardContent className="pt-3 text-center">
@@ -863,12 +870,12 @@ export default function CollectePage() {
                             <TableCell className="text-right">
                               {d.status === "compliant" ? (
                                 <Badge variant="outline" className="text-green-600 gap-1 whitespace-nowrap">
-                                  <CheckCircle2 className="h-3 w-3" />
+                                  <CheckCircle2 className="size-3" />
                                   Conforme
                                 </Badge>
                               ) : (
                                 <Badge variant="destructive" className="gap-1 whitespace-nowrap">
-                                  <XCircle className="h-3 w-3" />
+                                  <XCircle className="size-3" />
                                   Non conforme
                                 </Badge>
                               )}
@@ -905,16 +912,16 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
   const isFirewall = isOPNsense || summary?.device_profile === "stormshield" || summary?.device_profile === "fortigate";
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Summary cards */}
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card>
             <CardContent className="pt-3 text-center">
               {isFirewall ? (
-                <Shield className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                <Shield className="size-5 mx-auto mb-1 text-muted-foreground" />
               ) : (
-                <Cpu className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                <Cpu className="size-5 mx-auto mb-1 text-muted-foreground" />
               )}
               <p className="text-sm font-medium">{summary.os_name}</p>
               <p className="text-xs text-muted-foreground">{summary.os_version}</p>
@@ -922,7 +929,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
           </Card>
           <Card>
             <CardContent className="pt-3 text-center">
-              <Shield className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+              <Shield className="size-5 mx-auto mb-1 text-muted-foreground" />
               {summary.compliance_score != null ? (
                 <>
                   <p className="text-2xl font-bold">{summary.compliance_score}%</p>
@@ -943,14 +950,14 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
           </Card>
           <Card className="border-green-200">
             <CardContent className="pt-3 text-center">
-              <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-green-600" />
+              <CheckCircle2 className="size-5 mx-auto mb-1 text-green-600" />
               <p className="text-2xl font-bold text-green-600">{summary.compliant}</p>
               <p className="text-xs text-muted-foreground">Conformes</p>
             </CardContent>
           </Card>
           <Card className="border-red-200">
             <CardContent className="pt-3 text-center">
-              <XCircle className="h-5 w-5 mx-auto mb-1 text-red-600" />
+              <XCircle className="size-5 mx-auto mb-1 text-red-600" />
               <p className="text-2xl font-bold text-red-600">{summary.non_compliant}</p>
               <p className="text-xs text-muted-foreground">Non conformes</p>
             </CardContent>
@@ -962,27 +969,27 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
       <Tabs defaultValue="findings" className="w-full">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="findings" className="gap-1">
-            <AlertTriangle className="h-3 w-3" /> Findings
+            <AlertTriangle className="size-3" /> Findings
           </TabsTrigger>
           <TabsTrigger value="system" className="gap-1">
-            <Cpu className="h-3 w-3" /> Système
+            <Cpu className="size-3" /> Système
           </TabsTrigger>
           <TabsTrigger value="security" className="gap-1">
-            <Shield className="h-3 w-3" /> Sécurité
+            <Shield className="size-3" /> Sécurité
           </TabsTrigger>
           <TabsTrigger value="network" className="gap-1">
-            <Network className="h-3 w-3" /> Réseau
+            <Network className="size-3" /> Réseau
           </TabsTrigger>
           <TabsTrigger value="users" className="gap-1">
-            <Users className="h-3 w-3" /> Comptes
+            <Users className="size-3" /> Comptes
           </TabsTrigger>
           <TabsTrigger value="storage" className="gap-1">
-            <HardDrive className="h-3 w-3" /> Stockage
+            <HardDrive className="size-3" /> Stockage
           </TabsTrigger>
         </TabsList>
 
         {/* Findings tab */}
-        <TabsContent value="findings" className="space-y-3">
+        <TabsContent value="findings" className="flex flex-col gap-3">
           {collect.findings && collect.findings.length > 0 ? (
             collect.findings.map((f, idx) => (
               <div
@@ -990,8 +997,8 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                 className="rounded-lg border p-4 bg-red-50 dark:bg-red-950/20"
               >
                 <div className="flex items-start gap-3">
-                  <XCircle className="h-5 w-5 mt-0.5 shrink-0 text-red-600" />
-                  <div className="flex-1 space-y-1">
+                  <XCircle className="size-5 mt-0.5 shrink-0 text-red-600" />
+                  <div className="flex-1 flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <Badge variant="destructive">{f.severity}</Badge>
                       <Badge variant="outline">{f.control_ref}</Badge>
@@ -1009,7 +1016,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
             ))
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              <CheckCircle2 className="h-10 w-10 mx-auto mb-2 text-green-500 opacity-50" />
+              <CheckCircle2 className="size-10 mx-auto mb-2 text-green-500 opacity-50" />
               <p>Aucun finding détecté — tous les contrôles sont conformes</p>
             </div>
           )}
@@ -1017,7 +1024,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
 
         {/* System tab */}
         <TabsContent value="system">
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             {collect.os_info && (
               <div className="rounded-lg border p-4">
                 <h3 className="font-semibold mb-2">Informations système</h3>
@@ -1109,7 +1116,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
               <div className="rounded-lg border p-4">
                 <h3 className="font-semibold mb-2">{isOPNsense ? "Services & VPN" : "Services"}</h3>
                 {isOPNsense ? (
-                  <div className="space-y-3">
+                  <div className="flex flex-col gap-3">
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <InfoRow label="OpenVPN" value={collect.services.openvpn_status as string || "Non configuré"} />
                       <InfoRow label="IPsec" value={collect.services.ipsec_status as string || "Non configuré"} />
@@ -1139,14 +1146,14 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
 
         {/* Security tab */}
         <TabsContent value="security">
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             {collect.security && (
               <>
                 {/* Pare-feu */}
                 <div className="rounded-lg border p-4">
                   <h3 className="font-semibold mb-2">Pare-feu</h3>
                   {isOPNsense ? (
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <InfoRow label="Moteur" value={collect.security.firewall_engine as string || "pf"} />
                         <InfoRow label="Activé" value={(collect.security.firewall_enabled as boolean) ? "Oui" : "Non"} />
@@ -1179,7 +1186,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                       )}
                     </div>
                   ) : isWindows ? (
-                    <div className="space-y-2">
+                    <div className="flex flex-col gap-2">
                       <InfoRow
                         label="Tous profils activés"
                         value={(collect.security.firewall_all_enabled as boolean) ? "Oui" : "Non"}
@@ -1189,7 +1196,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
                       </pre>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="flex flex-col gap-2">
                       <InfoRow label="Status" value={collect.security.firewall_status as string} />
                       <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
                         {collect.security.firewall_details as string || "N/A"}
@@ -1288,7 +1295,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
         {/* Network tab */}
         <TabsContent value="network">
           {collect.network && (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <div className="rounded-lg border p-4">
                 <h3 className="font-semibold mb-2">{isOPNsense ? "Interfaces" : "Configuration IP"}</h3>
                 <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-60 overflow-y-auto">
@@ -1325,7 +1332,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
         {/* Users tab */}
         <TabsContent value="users">
           {collect.users && (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               {isOPNsense ? (
                 <div className="rounded-lg border p-4">
                   <h3 className="font-semibold mb-2">Comptes système avec shell</h3>
@@ -1416,7 +1423,7 @@ function CollectDetailView({ collect }: { collect: CollectResultRead }) {
         {/* Storage tab */}
         <TabsContent value="storage">
           {collect.storage && (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               {isOPNsense ? (
                 <div className="rounded-lg border p-4">
                   <h3 className="font-semibold mb-2">Configuration OPNsense</h3>

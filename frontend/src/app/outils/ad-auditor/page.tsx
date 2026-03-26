@@ -51,6 +51,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -68,6 +69,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 import { equipementsApi, toolsApi } from "@/services/api";
 import type {
@@ -101,10 +103,10 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 const FINDING_STATUS_ICONS: Record<string, React.ReactNode> = {
-  compliant: <CheckCircle2 className="h-4 w-4 text-green-500" />,
-  non_compliant: <XCircle className="h-4 w-4 text-red-500" />,
-  partial: <AlertTriangle className="h-4 w-4 text-yellow-500" />,
-  info: <Info className="h-4 w-4 text-blue-500" />,
+  compliant: <CheckCircle2 className="size-4 text-green-500" />,
+  non_compliant: <XCircle className="size-4 text-red-500" />,
+  partial: <AlertTriangle className="size-4 text-yellow-500" />,
+  info: <Info className="size-4 text-blue-500" />,
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -146,8 +148,8 @@ export default function ADAuditorPage() {
     try {
       const res = await equipementsApi.list(1, 100);
       setEquipements(res.items);
-    } catch (err) {
-      console.error("Erreur chargement équipements:", err);
+    } catch {
+      // silently handled
     } finally {
       setLoadingEquipements(false);
     }
@@ -158,8 +160,8 @@ export default function ADAuditorPage() {
     try {
       const data = await toolsApi.listADAudits();
       setAudits(data);
-    } catch (err) {
-      console.error("Erreur chargement audits AD:", err);
+    } catch {
+      // silently handled
     } finally {
       setLoadingAudits(false);
     }
@@ -282,19 +284,19 @@ export default function ADAuditorPage() {
 
   // ── Render ──
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Link href="/outils">
               <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-1" /> Outils
+                <ArrowLeft data-icon="inline-start" /> Outils
               </Button>
             </Link>
           </div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-cyan-500" />
+            <ShieldCheck className="size-6 text-cyan-500" />
             Audit Active Directory
           </h1>
           <p className="text-muted-foreground">
@@ -314,7 +316,7 @@ export default function ADAuditorPage() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {/* Equipment select */}
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Équipement (optionnel)</Label>
               {loadingEquipements ? (
                 <Skeleton className="h-10 w-full" />
@@ -324,18 +326,20 @@ export default function ADAuditorPage() {
                     <SelectValue placeholder="— Aucun —" />
                   </SelectTrigger>
                   <SelectContent>
-                    {equipements.map((eq) => (
-                      <SelectItem key={eq.id} value={String(eq.id)}>
-                        {eq.hostname || eq.type_equipement} ({eq.ip_address})
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      {equipements.map((eq) => (
+                        <SelectItem key={eq.id} value={String(eq.id)}>
+                          {eq.hostname || eq.type_equipement} ({eq.ip_address})
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               )}
             </div>
 
             {/* Target host */}
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Hôte DC *</Label>
               <Input
                 placeholder="dc01.domain.local"
@@ -345,7 +349,7 @@ export default function ADAuditorPage() {
             </div>
 
             {/* Port */}
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Port LDAP</Label>
               <Input
                 type="number"
@@ -355,7 +359,7 @@ export default function ADAuditorPage() {
             </div>
 
             {/* Domain */}
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Domaine *</Label>
               <Input
                 placeholder="DOMAIN.LOCAL"
@@ -365,7 +369,7 @@ export default function ADAuditorPage() {
             </div>
 
             {/* Username */}
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Utilisateur *</Label>
               <Input
                 placeholder="admin ou DOMAIN\\admin"
@@ -375,7 +379,7 @@ export default function ADAuditorPage() {
             </div>
 
             {/* Password */}
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Mot de passe *</Label>
               <Input
                 type="password"
@@ -386,28 +390,30 @@ export default function ADAuditorPage() {
             </div>
 
             {/* Auth method */}
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Méthode d&apos;authentification</Label>
               <Select value={authMethod} onValueChange={(v) => setAuthMethod(v as "ntlm" | "simple")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ntlm">NTLM</SelectItem>
-                  <SelectItem value="simple">Simple</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="ntlm">NTLM</SelectItem>
+                    <SelectItem value="simple">Simple</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
 
             {/* SSL */}
-            <div className="space-y-2 flex items-end gap-2">
+            <div className="flex flex-col gap-2 items-end">
               <div className="flex items-center space-x-2 pb-2">
                 <input
                   type="checkbox"
                   id="use-ssl"
                   checked={useSsl}
                   onChange={(e) => setUseSsl(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="size-4 rounded border-gray-300"
                 />
                 <Label htmlFor="use-ssl" className="cursor-pointer">
                   Utiliser LDAPS (SSL)
@@ -420,18 +426,18 @@ export default function ADAuditorPage() {
             <Button onClick={handleLaunch} disabled={launching}>
               {launching ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="animate-spin" data-icon="inline-start" />
                   Lancement...
                 </>
               ) : (
                 <>
-                  <Play className="mr-2 h-4 w-4" />
+                  <Play data-icon="inline-start" />
                   Lancer l&apos;audit AD
                 </>
               )}
             </Button>
             <Button variant="outline" onClick={loadAudits}>
-              <RefreshCw className="mr-2 h-4 w-4" />
+              <RefreshCw data-icon="inline-start" />
               Rafraîchir
             </Button>
           </div>
@@ -445,7 +451,7 @@ export default function ADAuditorPage() {
         </CardHeader>
         <CardContent>
           {loadingAudits ? (
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               {[...Array(3)].map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
@@ -476,7 +482,7 @@ export default function ADAuditorPage() {
                     <TableCell>{audit.domain_name || audit.domain || "—"}</TableCell>
                     <TableCell>
                       <Badge className={STATUS_COLORS[audit.status] || ""}>
-                        {audit.status === "running" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                        {audit.status === "running" && <Loader2 className="size-3 animate-spin" />}
                         {STATUS_LABELS[audit.status] || audit.status}
                       </Badge>
                     </TableCell>
@@ -507,7 +513,7 @@ export default function ADAuditorPage() {
                           onClick={() => handleViewDetail(audit.id)}
                           title="Voir le détail"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye />
                         </Button>
                         {audit.status === "success" && audit.equipement_id && (
                           <Button
@@ -516,13 +522,13 @@ export default function ADAuditorPage() {
                             onClick={() => handleOpenPrefill(audit.id, audit.equipement_id)}
                             title="Pré-remplir un assessment"
                           >
-                            <ClipboardCheck className="h-4 w-4" />
+                            <ClipboardCheck />
                           </Button>
                         )}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" title="Supprimer">
-                              <Trash2 className="h-4 w-4 text-red-500" />
+                              <Trash2 className="text-red-500" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
@@ -557,7 +563,7 @@ export default function ADAuditorPage() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-cyan-500" />
+                  <ShieldCheck className="size-5 text-cyan-500" />
                   Audit AD #{selectedAudit.id} — {selectedAudit.domain_name || selectedAudit.domain}
                 </DialogTitle>
                 <DialogDescription>
@@ -573,30 +579,30 @@ export default function ADAuditorPage() {
                   <SummaryCard
                     label="Contrôles"
                     value={selectedAudit.summary.total_controls}
-                    icon={<Shield className="h-4 w-4" />}
+                    icon={<Shield className="size-4" />}
                   />
                   <SummaryCard
                     label="Conformes"
                     value={selectedAudit.summary.compliant}
-                    icon={<CheckCircle2 className="h-4 w-4 text-green-500" />}
+                    icon={<CheckCircle2 className="size-4 text-green-500" />}
                     color="text-green-600"
                   />
                   <SummaryCard
                     label="Non conformes"
                     value={selectedAudit.summary.non_compliant}
-                    icon={<XCircle className="h-4 w-4 text-red-500" />}
+                    icon={<XCircle className="size-4 text-red-500" />}
                     color="text-red-600"
                   />
                   <SummaryCard
                     label="Partiels"
                     value={selectedAudit.summary.partial}
-                    icon={<AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                    icon={<AlertTriangle className="size-4 text-yellow-500" />}
                     color="text-yellow-600"
                   />
                   <SummaryCard
                     label="Score"
                     value={`${Math.round(selectedAudit.summary.compliance_score)}%`}
-                    icon={<Shield className="h-4 w-4 text-cyan-500" />}
+                    icon={<Shield className="size-4 text-cyan-500" />}
                     color="text-cyan-600"
                   />
                 </div>
@@ -613,7 +619,7 @@ export default function ADAuditorPage() {
                 </TabsList>
 
                 {/* Findings Tab */}
-                <TabsContent value="findings" className="space-y-3">
+                <TabsContent value="findings" className="flex flex-col gap-3">
                   {selectedAudit.findings && selectedAudit.findings.length > 0 ? (
                     <Table>
                       <TableHeader>
@@ -655,7 +661,7 @@ export default function ADAuditorPage() {
                 </TabsContent>
 
                 {/* Domain Tab */}
-                <TabsContent value="domain" className="space-y-4">
+                <TabsContent value="domain" className="flex flex-col gap-4">
                   <div className="grid gap-4 md:grid-cols-2">
                     <InfoBlock label="Nom du domaine" value={selectedAudit.domain_name} />
                     <InfoBlock label="Niveau fonctionnel" value={selectedAudit.domain_functional_level} />
@@ -667,7 +673,7 @@ export default function ADAuditorPage() {
                   {selectedAudit.dc_list && selectedAudit.dc_list.length > 0 && (
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-1">
-                        <Server className="h-4 w-4" /> Contrôleurs de domaine ({selectedAudit.dc_list.length})
+                        <Server className="size-4" /> Contrôleurs de domaine ({selectedAudit.dc_list.length})
                       </h4>
                       <Table>
                         <TableHeader>
@@ -696,7 +702,7 @@ export default function ADAuditorPage() {
                   {selectedAudit.gpo_list && selectedAudit.gpo_list.length > 0 && (
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-1">
-                        <FileText className="h-4 w-4" /> GPOs ({selectedAudit.gpo_list.length})
+                        <FileText className="size-4" /> GPOs ({selectedAudit.gpo_list.length})
                       </h4>
                       <Table>
                         <TableHeader>
@@ -723,23 +729,23 @@ export default function ADAuditorPage() {
                 </TabsContent>
 
                 {/* Users Tab */}
-                <TabsContent value="users" className="space-y-4">
+                <TabsContent value="users" className="flex flex-col gap-4">
                   <div className="grid gap-4 grid-cols-3">
                     <SummaryCard
                       label="Total"
                       value={selectedAudit.total_users ?? "—"}
-                      icon={<Users className="h-4 w-4" />}
+                      icon={<Users className="size-4" />}
                     />
                     <SummaryCard
                       label="Actifs"
                       value={selectedAudit.enabled_users ?? "—"}
-                      icon={<CheckCircle2 className="h-4 w-4 text-green-500" />}
+                      icon={<CheckCircle2 className="size-4 text-green-500" />}
                       color="text-green-600"
                     />
                     <SummaryCard
                       label="Désactivés"
                       value={selectedAudit.disabled_users ?? "—"}
-                      icon={<XCircle className="h-4 w-4 text-red-500" />}
+                      icon={<XCircle className="size-4 text-red-500" />}
                       color="text-red-600"
                     />
                   </div>
@@ -748,7 +754,7 @@ export default function ADAuditorPage() {
                   {selectedAudit.never_expire_password && selectedAudit.never_expire_password.length > 0 && (
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-1 text-orange-600">
-                        <AlertTriangle className="h-4 w-4" /> Mot de passe n&apos;expire jamais ({selectedAudit.never_expire_password.length})
+                        <AlertTriangle className="size-4" /> Mot de passe n&apos;expire jamais ({selectedAudit.never_expire_password.length})
                       </h4>
                       <UserTable users={selectedAudit.never_expire_password} />
                     </div>
@@ -758,7 +764,7 @@ export default function ADAuditorPage() {
                   {selectedAudit.inactive_users && selectedAudit.inactive_users.length > 0 && (
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-1 text-yellow-600">
-                        <Clock className="h-4 w-4" /> Utilisateurs inactifs ({selectedAudit.inactive_users.length})
+                        <Clock className="size-4" /> Utilisateurs inactifs ({selectedAudit.inactive_users.length})
                       </h4>
                       <UserTable users={selectedAudit.inactive_users} />
                     </div>
@@ -768,7 +774,7 @@ export default function ADAuditorPage() {
                   {selectedAudit.never_logged_in && selectedAudit.never_logged_in.length > 0 && (
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-1 text-gray-600">
-                        <Info className="h-4 w-4" /> Jamais connectés ({selectedAudit.never_logged_in.length})
+                        <Info className="size-4" /> Jamais connectés ({selectedAudit.never_logged_in.length})
                       </h4>
                       <UserTable users={selectedAudit.never_logged_in} />
                     </div>
@@ -776,7 +782,7 @@ export default function ADAuditorPage() {
                 </TabsContent>
 
                 {/* Groups Tab */}
-                <TabsContent value="groups" className="space-y-4">
+                <TabsContent value="groups" className="flex flex-col gap-4">
                   <GroupSection
                     title="Domain Admins"
                     members={selectedAudit.domain_admins}
@@ -796,7 +802,7 @@ export default function ADAuditorPage() {
                   {selectedAudit.admin_account_status && (
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-1">
-                        <Key className="h-4 w-4" /> Compte Administrateur Builtin
+                        <Key className="size-4" /> Compte Administrateur Builtin
                       </h4>
                       <div className="grid gap-2 md:grid-cols-3">
                         <InfoBlock
@@ -817,11 +823,11 @@ export default function ADAuditorPage() {
                 </TabsContent>
 
                 {/* Policy Tab */}
-                <TabsContent value="policy" className="space-y-4">
+                <TabsContent value="policy" className="flex flex-col gap-4">
                   {selectedAudit.password_policy && (
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-1">
-                        <Lock className="h-4 w-4" /> Politique de mots de passe par défaut
+                        <Lock className="size-4" /> Politique de mots de passe par défaut
                       </h4>
                       <div className="grid gap-3 md:grid-cols-3">
                         {Object.entries(selectedAudit.password_policy).map(([k, v]) => (
@@ -834,7 +840,7 @@ export default function ADAuditorPage() {
                   {selectedAudit.fine_grained_policies && selectedAudit.fine_grained_policies.length > 0 && (
                     <div>
                       <h4 className="font-semibold mb-2 flex items-center gap-1">
-                        <Shield className="h-4 w-4" /> Fine-Grained Password Policies ({selectedAudit.fine_grained_policies.length})
+                        <Shield className="size-4" /> Fine-Grained Password Policies ({selectedAudit.fine_grained_policies.length})
                       </h4>
                       <Table>
                         <TableHeader>
@@ -876,12 +882,12 @@ export default function ADAuditorPage() {
           </DialogHeader>
 
           {prefillResult ? (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <div className="grid gap-3 grid-cols-2">
-                <SummaryCard label="Pré-remplis" value={prefillResult.controls_prefilled} icon={<ClipboardCheck className="h-4 w-4" />} />
-                <SummaryCard label="Conformes" value={prefillResult.controls_compliant} icon={<CheckCircle2 className="h-4 w-4 text-green-500" />} color="text-green-600" />
-                <SummaryCard label="Non conformes" value={prefillResult.controls_non_compliant} icon={<XCircle className="h-4 w-4 text-red-500" />} color="text-red-600" />
-                <SummaryCard label="Partiels" value={prefillResult.controls_partial} icon={<AlertTriangle className="h-4 w-4 text-yellow-500" />} color="text-yellow-600" />
+                <SummaryCard label="Pré-remplis" value={prefillResult.controls_prefilled} icon={<ClipboardCheck className="size-4" />} />
+                <SummaryCard label="Conformes" value={prefillResult.controls_compliant} icon={<CheckCircle2 className="size-4 text-green-500" />} color="text-green-600" />
+                <SummaryCard label="Non conformes" value={prefillResult.controls_non_compliant} icon={<XCircle className="size-4 text-red-500" />} color="text-red-600" />
+                <SummaryCard label="Partiels" value={prefillResult.controls_partial} icon={<AlertTriangle className="size-4 text-yellow-500" />} color="text-yellow-600" />
               </div>
               <DialogFooter>
                 <Button onClick={() => setPrefillDialogOpen(false)}>Fermer</Button>
@@ -894,19 +900,21 @@ export default function ADAuditorPage() {
                   Aucun assessment trouvé pour cet équipement. Créez d&apos;abord un assessment avec le framework AD.
                 </p>
               ) : (
-                <div className="space-y-4">
-                  <div className="space-y-2">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
                     <Label>Assessment</Label>
                     <Select value={selectedAssessmentId} onValueChange={setSelectedAssessmentId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner un assessment" />
                       </SelectTrigger>
                       <SelectContent>
-                        {assessments.map((a) => (
-                          <SelectItem key={a.id} value={String(a.id)}>
-                            #{a.id} — {a.framework_name}
-                          </SelectItem>
-                        ))}
+                        <SelectGroup>
+                          {assessments.map((a) => (
+                            <SelectItem key={a.id} value={String(a.id)}>
+                              #{a.id} — {a.framework_name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </div>
@@ -917,12 +925,12 @@ export default function ADAuditorPage() {
                     <Button onClick={handlePrefill} disabled={!selectedAssessmentId || prefilling}>
                       {prefilling ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="animate-spin" data-icon="inline-start" />
                           Pré-remplissage...
                         </>
                       ) : (
                         <>
-                          <ClipboardCheck className="mr-2 h-4 w-4" />
+                          <ClipboardCheck data-icon="inline-start" />
                           Pré-remplir
                         </>
                       )}
@@ -1022,7 +1030,7 @@ function GroupSection({
   return (
     <div>
       <h4 className={`font-semibold mb-2 flex items-center gap-1 ${color || ""}`}>
-        <Users className="h-4 w-4" /> {title} ({members.length})
+        <Users className="size-4" /> {title} ({members.length})
       </h4>
       {members.length === 0 ? (
         <p className="text-muted-foreground text-sm">Aucun membre</p>
