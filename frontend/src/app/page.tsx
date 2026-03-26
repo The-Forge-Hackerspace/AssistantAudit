@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -45,6 +46,7 @@ import {
 import { entreprisesApi, auditsApi, sitesApi, equipementsApi, frameworksApi, campaignsApi } from "@/services/api";
 import type { Audit, Entreprise, FrameworkSummary, CampaignSummary, Score } from "@/types";
 import { STATUS_COLORS, STATUS_LABELS, SEVERITY_LABELS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { DashboardSkeleton } from "@/components/skeletons";
 
@@ -98,12 +100,6 @@ export default function DashboardPage() {
       const campRes = val(results[5], emptyPage);
 
       // Log any failures for debugging
-      results.forEach((r, i) => {
-        if (r.status === "rejected") {
-          console.error(`Dashboard API call #${i} failed:`, r.reason);
-        }
-      });
-
       // Populate entreprises dropdown
       if (entListRes.items.length > 0) {
         setEntreprises(entListRes.items);
@@ -154,7 +150,6 @@ export default function DashboardPage() {
       }
       setCampaignScores(scores);
     } catch (err: unknown) {
-      console.error("Dashboard load error:", err);
       toast.error("Impossible de charger le tableau de bord");
     } finally {
       setLoading(false);
@@ -170,7 +165,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
@@ -181,18 +176,20 @@ export default function DashboardPage() {
         </div>
         {/* Enterprise filter */}
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Filter className="size-4 text-muted-foreground" />
           <Select value={selectedEntreprise} onValueChange={setSelectedEntreprise}>
             <SelectTrigger className="w-[220px]">
               <SelectValue placeholder="Toutes les entreprises" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Toutes les entreprises</SelectItem>
-              {entreprises.map((e) => (
-                <SelectItem key={e.id} value={String(e.id)}>
-                  {e.nom}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                <SelectItem value="all">Toutes les entreprises</SelectItem>
+                {entreprises.map((e) => (
+                  <SelectItem key={e.id} value={String(e.id)}>
+                    {e.nom}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
@@ -394,7 +391,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5" />
+              <ClipboardCheck className="size-5" />
               Projets d&apos;audit récents
             </CardTitle>
             <CardDescription>Les derniers projets créés</CardDescription>
@@ -405,13 +402,13 @@ export default function DashboardPage() {
                 Aucun audit pour le moment
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="flex flex-col gap-3">
                 {recentAudits.map((audit) => (
                   <div
                     key={audit.id}
                     className="flex items-center justify-between rounded-lg border p-3"
                   >
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                       <p className="text-sm font-medium leading-none">
                         {audit.nom_projet}
                       </p>
@@ -421,7 +418,7 @@ export default function DashboardPage() {
                     </div>
                     <Badge
                       variant="outline"
-                      className={STATUS_COLORS[audit.status] || ""}
+                      className={cn(STATUS_COLORS[audit.status])}
                     >
                       {STATUS_LABELS[audit.status] || audit.status}
                     </Badge>
@@ -436,7 +433,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
+              <Activity className="size-5" />
               Campagnes d&apos;évaluation
             </CardTitle>
             <CardDescription>Suivi de conformité</CardDescription>
@@ -447,22 +444,22 @@ export default function DashboardPage() {
                 Aucune campagne pour le moment
               </p>
             ) : (
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4">
                 {campaigns.map((camp) => {
                   const score = campaignScores[camp.id];
                   return (
-                    <div key={camp.id} className="space-y-2">
+                    <div key={camp.id} className="flex flex-col gap-2">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium">{camp.name}</p>
                         <Badge
                           variant="outline"
-                          className={STATUS_COLORS[camp.status] || ""}
+                          className={cn(STATUS_COLORS[camp.status])}
                         >
                           {STATUS_LABELS[camp.status] || camp.status}
                         </Badge>
                       </div>
                       {score ? (
-                        <div className="space-y-1">
+                        <div className="flex flex-col gap-1">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span>
                               {score.assessed_controls}/{score.total_controls}{" "}
@@ -478,11 +475,11 @@ export default function DashboardPage() {
                           />
                           <div className="flex gap-3 text-xs">
                             <span className="flex items-center gap-1">
-                              <ShieldCheck className="h-3 w-3 text-green-600" />
+                              <ShieldCheck className="size-3 text-green-600" />
                               {score.compliant}
                             </span>
                             <span className="flex items-center gap-1">
-                              <ShieldAlert className="h-3 w-3 text-red-600" />
+                              <ShieldAlert className="size-3 text-red-600" />
                               {score.non_compliant}
                             </span>
                           </div>
@@ -505,7 +502,7 @@ export default function DashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
+            <BookOpen className="size-5" />
             Référentiels disponibles
           </CardTitle>
           <CardDescription>
@@ -517,7 +514,7 @@ export default function DashboardPage() {
             {frameworks.map((fw) => (
               <div
                 key={fw.id}
-                className="rounded-lg border p-3 space-y-2 hover:bg-accent/50 transition-colors"
+                className="rounded-lg border p-3 flex flex-col gap-2 hover:bg-accent/50 transition-colors"
               >
                 <div className="flex items-start justify-between">
                   <p className="text-sm font-medium leading-tight">
@@ -559,7 +556,7 @@ function StatCard({
 }) {
   return (
     <Card
-      className={onClick ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""}
+      className={cn(onClick && "cursor-pointer hover:bg-accent/50 transition-colors")}
       onClick={onClick}
     >
       <CardContent className="pt-6">
@@ -571,7 +568,7 @@ function StatCard({
             <p className="text-2xl font-bold mt-1">{value}</p>
           </div>
           <div className={`rounded-full p-2 bg-muted ${color}`}>
-            <Icon className="h-5 w-5" />
+            <Icon className="size-5" />
           </div>
         </div>
       </CardContent>

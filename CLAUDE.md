@@ -2,6 +2,7 @@
 
 **Last updated:** 2026-03-26
 
+
 ## OVERVIEW
 
 IT security auditing platform. FastAPI backend (Python 3.13), Next.js 16 frontend (React 19 + TypeScript), 12 YAML compliance frameworks auto-synced to SQLite, 7 integrated audit tools (Nmap, SSL checker, SSH/WinRM collectors, AD auditor, ORADAD, Monkey365, config parsers).
@@ -130,6 +131,14 @@ These decisions are final. Do NOT deviate without explicit approval.
 - **Code identifiers, variables, function names:** English
 - Applies to both backend Python and frontend TypeScript/React
 
+## FRONTEND STACK (BINDING)
+
+- **Next.js 16** with App Router (no Pages Router)
+- **React 19** — uses the new `use()` hook, `useActionState`, `useOptimistic`. Do NOT use deprecated patterns like `forwardRef` (refs are now regular props in React 19), `useContext` (use `use(Context)` instead)
+- **Tailwind CSS v4** — uses CSS-first configuration (`@theme` in CSS), NOT `tailwind.config.js`. Do NOT use `tailwind.config.js` or `tailwind.config.ts` patterns from v3
+- **shadcn/ui v4** — shadcn/skills is installed, USE it as reference. Use `pnpm dlx shadcn@latest` CLI for adding/updating components. Do NOT manually copy component code from docs
+- **TypeScript strict** — no `as any`, no `@ts-ignore`
+
 ## AUTH
 
 - **User JWT:** 15-minute access tokens + 7-day refresh tokens, type="user"
@@ -157,6 +166,13 @@ These decisions are final. Do NOT deviate without explicit approval.
 | `PINGCASTLE_PATH` | `""` | **DEPRECATED** — use ORADAD instead |
 | `LOG_LEVEL` | `INFO` | `DEBUG` in dev |
 | `CORS_ORIGINS` | `localhost:3000,5173` | Comma-separated allowed origins |
+
+## WORKFLOW RULES — ALWAYS DO THESE
+
+- **ALWAYS commit after completing a step or major change** — format: `feat: <description> (step N)` for migration steps, `fix: <description>` for bug fixes, `test: <description>` for test-only changes. Never leave work uncommitted between steps.
+- **ALWAYS run tests after each modification** — if a test breaks, fix it before continuing
+- **ALWAYS show the diff summary before moving to the next step** — wait for validation
+- **ALWAYS read ARCHITECTURE.md before any structural change**
 
 ## ANTI-PATTERNS — NEVER DO THESE
 

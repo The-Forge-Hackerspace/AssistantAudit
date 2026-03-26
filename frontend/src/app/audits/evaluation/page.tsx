@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -53,6 +54,7 @@ import {
 } from "@/components/ui/dialog";
 import { assessmentsApi, frameworksApi, attachmentsApi } from "@/services/api";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { AttachmentSection } from "@/components/evaluation/attachment-section";
 import type {
   Assessment,
@@ -78,7 +80,7 @@ export default function EvaluationPage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
       }
     >
@@ -230,7 +232,7 @@ function EvaluationContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -238,7 +240,7 @@ function EvaluationContent() {
   if (error || !assessment) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        <AlertCircle className="h-10 w-10 mx-auto mb-3 opacity-50" />
+        <AlertCircle className="size-10 mx-auto mb-3 opacity-50" />
         <p>{error || "Évaluation introuvable."}</p>
         <Button variant="outline" className="mt-4" onClick={() => router.push("/audits")}>
           Retour aux audits
@@ -248,11 +250,11 @@ function EvaluationContent() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => router.push("/audits")} className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft data-icon="inline-start" />
           Retour aux audits
         </Button>
         {progressStats && (
@@ -267,9 +269,9 @@ function EvaluationContent() {
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
             <div className="rounded-lg bg-primary/10 p-3">
-              <Shield className="h-6 w-6 text-primary" />
+              <Shield className="size-6 text-primary" />
             </div>
-            <div className="flex-1 space-y-3">
+            <div className="flex-1 flex flex-col gap-3">
               <div className="flex items-start justify-between">
                 <div>
                   <h1 className="text-2xl font-bold">Évaluation</h1>
@@ -297,7 +299,7 @@ function EvaluationContent() {
 
               {/* Score breakdown */}
               {score && score.total_controls > 0 && (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Progress value={score.compliance_score} className="h-2" />
                   <div className="grid grid-cols-5 gap-2 text-xs text-center">
                     <div>
@@ -327,7 +329,7 @@ function EvaluationContent() {
               {/* Progress bar */}
               {progressStats && (
                 <div className="flex items-center gap-3">
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  <BarChart3 className="size-4 text-muted-foreground" />
                   <div className="flex-1">
                     <Progress value={progressStats.percent} className="h-1.5" />
                   </div>
@@ -346,7 +348,7 @@ function EvaluationContent() {
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher un contrôle (réf, titre, description)…"
                 value={search}
@@ -360,12 +362,14 @@ function EvaluationContent() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="not_assessed">Non évalués</SelectItem>
-                <SelectItem value="compliant">Conformes</SelectItem>
-                <SelectItem value="non_compliant">Non conformes</SelectItem>
-                <SelectItem value="partially_compliant">Partiels</SelectItem>
-                <SelectItem value="not_applicable">N/A</SelectItem>
+                <SelectGroup>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="not_assessed">Non évalués</SelectItem>
+                  <SelectItem value="compliant">Conformes</SelectItem>
+                  <SelectItem value="non_compliant">Non conformes</SelectItem>
+                  <SelectItem value="partially_compliant">Partiels</SelectItem>
+                  <SelectItem value="not_applicable">N/A</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
             <Select value={filterSeverity} onValueChange={setFilterSeverity}>
@@ -374,12 +378,14 @@ function EvaluationContent() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Toutes sévérités</SelectItem>
-                <SelectItem value="critical">🔴 Critique</SelectItem>
-                <SelectItem value="high">🟠 Élevée</SelectItem>
-                <SelectItem value="medium">🟡 Moyenne</SelectItem>
-                <SelectItem value="low">🔵 Faible</SelectItem>
-                <SelectItem value="info">⚪ Info</SelectItem>
+                <SelectGroup>
+                  <SelectItem value="all">Toutes sévérités</SelectItem>
+                  <SelectItem value="critical">🔴 Critique</SelectItem>
+                  <SelectItem value="high">🟠 Élevée</SelectItem>
+                  <SelectItem value="medium">🟡 Moyenne</SelectItem>
+                  <SelectItem value="low">🔵 Faible</SelectItem>
+                  <SelectItem value="info">⚪ Info</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
             {(search || filterStatus !== "all" || filterSeverity !== "all") && (
@@ -417,7 +423,7 @@ function EvaluationContent() {
       </div>
 
       {/* Categories with controls */}
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         {filteredCategories.map((cat) => (
           <EvaluationCategoryCard
             key={cat.name}
@@ -436,7 +442,7 @@ function EvaluationContent() {
         {filteredCategories.length === 0 && (
           <Card>
             <CardContent className="text-center py-8 text-muted-foreground">
-              <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <Search className="size-8 mx-auto mb-2 opacity-50" />
               <p>Aucun contrôle ne correspond aux filtres.</p>
             </CardContent>
           </Card>
@@ -493,7 +499,7 @@ function EvaluationCategoryCard({
         onClick={onToggle}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Layers className="size-4 text-muted-foreground shrink-0" />
           <div className="min-w-0">
             <p className="font-medium truncate">{categoryName}</p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
@@ -518,7 +524,7 @@ function EvaluationCategoryCard({
               return (
                 <span
                   key={sev}
-                  className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium ${SEVERITY_COLORS[sev]}`}
+                  className={cn("inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium", SEVERITY_COLORS[sev])}
                 >
                   {count}
                 </span>
@@ -526,9 +532,9 @@ function EvaluationCategoryCard({
             })}
           </div>
           {expanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            <ChevronUp className="size-4 text-muted-foreground" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="size-4 text-muted-foreground" />
           )}
         </div>
       </div>
@@ -641,12 +647,13 @@ function EvaluationControlRow({
   const StatusIcon = COMPLIANCE_ICONS[r.status] || CircleDot;
 
   return (
-    <div className={`${isEditing ? "bg-muted/20" : "hover:bg-muted/10"} transition-colors`}>
+    <div className={cn("transition-colors", isEditing ? "bg-muted/20" : "hover:bg-muted/10")}>
       {/* Main row */}
       <div className="flex items-center gap-3 px-4 py-3">
         {/* Status icon */}
         <StatusIcon
-          className={`h-5 w-5 shrink-0 ${
+          className={cn(
+            "size-5 shrink-0",
             r.status === "compliant"
               ? "text-green-600"
               : r.status === "non_compliant"
@@ -656,7 +663,7 @@ function EvaluationControlRow({
               : r.status === "not_applicable"
               ? "text-gray-400"
               : "text-gray-300"
-          }`}
+          )}
         />
 
         {/* Control info */}
@@ -670,7 +677,7 @@ function EvaluationControlRow({
           <div className="flex items-center gap-2 mt-0.5">
             {r.control_severity && (
               <span
-                className={`inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium ${SEVERITY_COLORS[r.control_severity]}`}
+                className={cn("inline-flex items-center rounded-full border px-1.5 py-0 text-[10px] font-medium", SEVERITY_COLORS[r.control_severity])}
               >
                 {SEVERITY_LABELS[r.control_severity]}
               </span>
@@ -687,17 +694,17 @@ function EvaluationControlRow({
             )}
             {/* Indicators for evidence/comment/attachments */}
             {r.evidence && (
-              <span title="Preuve renseignée"><Eye className="h-3 w-3 text-blue-500" /></span>
+              <span title="Preuve renseignée"><Eye className="size-3 text-blue-500" /></span>
             )}
             {r.comment && (
-              <span title="Commentaire"><MessageSquare className="h-3 w-3 text-blue-500" /></span>
+              <span title="Commentaire"><MessageSquare className="size-3 text-blue-500" /></span>
             )}
             {r.remediation_note && (
-              <span title="Note de remédiation"><Wrench className="h-3 w-3 text-orange-500" /></span>
+              <span title="Note de remédiation"><Wrench className="size-3 text-orange-500" /></span>
             )}
             {attachments.length > 0 && (
               <span title={`${attachments.length} pièce(s) jointe(s)`}>
-                <Paperclip className="h-3 w-3 text-purple-500" />
+                <Paperclip className="size-3 text-purple-500" />
               </span>
             )}
           </div>
@@ -711,31 +718,33 @@ function EvaluationControlRow({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="not_assessed">
-                <span className="flex items-center gap-1.5">
-                  <CircleDot className="h-3 w-3 text-gray-300" /> Non évalué
-                </span>
-              </SelectItem>
-              <SelectItem value="compliant">
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle className="h-3 w-3 text-green-600" /> Conforme
-                </span>
-              </SelectItem>
-              <SelectItem value="non_compliant">
-                <span className="flex items-center gap-1.5">
-                  <AlertCircle className="h-3 w-3 text-red-600" /> Non conforme
-                </span>
-              </SelectItem>
-              <SelectItem value="partially_compliant">
-                <span className="flex items-center gap-1.5">
-                  <CircleDot className="h-3 w-3 text-yellow-600" /> Partiel
-                </span>
-              </SelectItem>
-              <SelectItem value="not_applicable">
-                <span className="flex items-center gap-1.5">
-                  <Minus className="h-3 w-3 text-gray-400" /> N/A
-                </span>
-              </SelectItem>
+              <SelectGroup>
+                <SelectItem value="not_assessed">
+                  <span className="flex items-center gap-1.5">
+                    <CircleDot className="size-3 text-gray-300" /> Non évalué
+                  </span>
+                </SelectItem>
+                <SelectItem value="compliant">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle className="size-3 text-green-600" /> Conforme
+                  </span>
+                </SelectItem>
+                <SelectItem value="non_compliant">
+                  <span className="flex items-center gap-1.5">
+                    <AlertCircle className="size-3 text-red-600" /> Non conforme
+                  </span>
+                </SelectItem>
+                <SelectItem value="partially_compliant">
+                  <span className="flex items-center gap-1.5">
+                    <CircleDot className="size-3 text-yellow-600" /> Partiel
+                  </span>
+                </SelectItem>
+                <SelectItem value="not_applicable">
+                  <span className="flex items-center gap-1.5">
+                    <Minus className="size-3 text-gray-400" /> N/A
+                  </span>
+                </SelectItem>
+              </SelectGroup>
             </SelectContent>
           </Select>
 
@@ -747,7 +756,7 @@ function EvaluationControlRow({
               className="h-7 w-7 p-0"
               onClick={() => setShowDetails(!showDetails)}
             >
-              <Info className="h-3.5 w-3.5" />
+              <Info />
             </Button>
           )}
 
@@ -758,14 +767,14 @@ function EvaluationControlRow({
             className="h-7 w-7 p-0"
             onClick={onEdit}
           >
-            <FileText className="h-3.5 w-3.5" />
+            <FileText />
           </Button>
         </div>
       </div>
 
       {/* Control description / remediation reference (from framework) */}
       {showDetails && !isEditing && (
-        <div className="px-4 pb-3 ml-8 space-y-3">
+        <div className="px-4 pb-3 ml-8 flex flex-col gap-3">
           {r.control_description && (
             <div className="bg-muted/30 rounded-md p-3">
               <p className="text-xs font-medium text-muted-foreground mb-1">Description du contrôle</p>
@@ -809,9 +818,9 @@ function EvaluationControlRow({
 
       {/* Editing panel */}
       {isEditing && (
-        <div className="px-4 pb-4 ml-8 space-y-4 border-t pt-4">
+        <div className="px-4 pb-4 ml-8 flex flex-col gap-4 border-t pt-4">
           {/* Status selector (larger in edit mode) */}
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label className="text-xs font-medium">Statut de conformité</Label>
             <div className="grid grid-cols-5 gap-2">
               {(["compliant", "non_compliant", "partially_compliant", "not_applicable", "not_assessed"] as ComplianceStatus[]).map(
@@ -821,14 +830,15 @@ function EvaluationControlRow({
                     <button
                       key={s}
                       type="button"
-                      className={`flex flex-col items-center gap-1 rounded-md border p-2 text-xs transition-colors ${
+                      className={cn(
+                        "flex flex-col items-center gap-1 rounded-md border p-2 text-xs transition-colors",
                         form.status === s
-                          ? `${COMPLIANCE_COLORS[s]} ring-2 ring-offset-1 ring-primary/30`
+                          ? cn(COMPLIANCE_COLORS[s], "ring-2 ring-offset-1 ring-primary/30")
                           : "border-gray-200 hover:bg-muted/50"
-                      }`}
+                      )}
                       onClick={() => setForm({ ...form, status: s })}
                     >
-                      <Icon className="h-4 w-4" />
+                      <Icon className="size-4" />
                       <span className="text-[10px] font-medium leading-tight text-center">
                         {COMPLIANCE_LABELS[s]}
                       </span>
@@ -848,7 +858,7 @@ function EvaluationControlRow({
           )}
 
           {/* Evidence text */}
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label className="text-xs font-medium flex items-center gap-1.5">
               <Eye className="h-3.5 w-3.5" />
               Preuve / Évidence (texte)
@@ -869,7 +879,7 @@ function EvaluationControlRow({
           />
 
           {/* Comment */}
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label className="text-xs font-medium flex items-center gap-1.5">
               <MessageSquare className="h-3.5 w-3.5" />
               Commentaire
@@ -883,7 +893,7 @@ function EvaluationControlRow({
           </div>
 
           {/* Remediation */}
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label className="text-xs font-medium flex items-center gap-1.5">
               <Wrench className="h-3.5 w-3.5" />
               Note de remédiation
@@ -909,9 +919,9 @@ function EvaluationControlRow({
             </Button>
             <Button size="sm" onClick={handleSave} disabled={saving}>
               {saving ? (
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                <Loader2 className="animate-spin" data-icon="inline-start" />
               ) : (
-                <Save className="h-4 w-4 mr-1.5" />
+                <Save data-icon="inline-start" />
               )}
               Sauvegarder
             </Button>

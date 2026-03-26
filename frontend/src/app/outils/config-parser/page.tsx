@@ -59,6 +59,7 @@ import type {
   PrefillResult,
 } from "@/types";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   SEVERITY_LABELS,
   SEVERITY_COLORS,
@@ -119,8 +120,8 @@ export default function ConfigParserPage() {
     try {
       const res = await equipementsApi.list(1, 100);
       setEquipements(res.items);
-    } catch (err) {
-      console.error("Erreur chargement équipements:", err);
+    } catch {
+      // silently handled
     } finally {
       setLoadingEquipements(false);
     }
@@ -227,11 +228,11 @@ export default function ConfigParserPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <FileCode className="h-6 w-6" />
+          <FileCode className="size-6" />
           Analyseur de Configuration
         </h1>
         <p className="text-muted-foreground">
@@ -247,7 +248,7 @@ export default function ConfigParserPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Link2 className="h-4 w-4" />
+                <Link2 className="size-4" />
                 Équipement cible (optionnel)
               </CardTitle>
               <CardDescription>
@@ -324,7 +325,7 @@ export default function ConfigParserPage() {
 
               {selectedEquipementId && selectedEquipementId !== "none" && (
                 <p className="mt-2 text-sm text-green-600 flex items-center gap-1">
-                  <CheckCircle2 className="h-4 w-4" />
+                  <CheckCircle2 className="size-4" />
                   L&apos;analyse sera automatiquement liée à cet équipement
                 </p>
               )}
@@ -335,11 +336,12 @@ export default function ConfigParserPage() {
           <Card>
             <CardContent className="pt-6">
               <div
-                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
+                className={cn(
+                  "border-2 border-dashed rounded-lg p-12 text-center transition-colors",
                   dragOver
                     ? "border-primary bg-primary/5"
                     : "border-muted-foreground/25 hover:border-primary/50"
-                }`}
+                )}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setDragOver(true);
@@ -349,7 +351,7 @@ export default function ConfigParserPage() {
               >
                 {loading ? (
                   <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    <Loader2 className="size-12 animate-spin text-primary" />
                     <p className="text-lg font-medium">Analyse en cours…</p>
                     <p className="text-sm text-muted-foreground">
                       Parsing de la configuration et détection des problèmes de sécurité
@@ -357,7 +359,7 @@ export default function ConfigParserPage() {
                   </div>
                 ) : (
                   <>
-                    <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <Upload className="size-12 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-lg font-medium mb-2">
                       Glissez-déposez un fichier de configuration
                     </p>
@@ -367,7 +369,7 @@ export default function ConfigParserPage() {
                     <label>
                       <Button asChild variant="outline">
                         <span>
-                          <Upload className="h-4 w-4 mr-2" />
+                          <Upload data-icon="inline-start" />
                           Parcourir…
                         </span>
                       </Button>
@@ -389,7 +391,7 @@ export default function ConfigParserPage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <History className="h-4 w-4" />
+                  <History className="size-4" />
                   Analyses sauvegardées
                   <Badge variant="outline" className="ml-2">
                     {savedAnalyses.length}
@@ -426,10 +428,10 @@ export default function ConfigParserPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8"
+                            className="size-8"
                             onClick={() => handleDeleteAnalysis(a.id)}
                           >
-                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            <Trash2 className="text-muted-foreground" />
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -490,7 +492,7 @@ export default function ConfigParserPage() {
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Link2 className="h-5 w-5 text-green-600" />
+                    <Link2 className="size-5 text-green-600" />
                     <span className="font-medium text-green-700 dark:text-green-400">
                       Analyse sauvegardée et liée à l&apos;équipement
                     </span>
@@ -502,7 +504,7 @@ export default function ConfigParserPage() {
                     onClick={openPrefillDialog}
                     className="gap-2"
                   >
-                    <ClipboardCheck className="h-4 w-4" />
+                    <ClipboardCheck data-icon="inline-start" />
                     Pré-remplir l&apos;audit
                   </Button>
                 </div>
@@ -511,19 +513,19 @@ export default function ConfigParserPage() {
           )}
 
           {/* Tabs: Findings / Interfaces / Rules */}
-          <Tabs defaultValue="findings" className="space-y-4">
+          <Tabs defaultValue="findings" className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <TabsList>
                 <TabsTrigger value="findings" className="gap-1">
-                  <Bug className="h-4 w-4" />
+                  <Bug className="size-4" />
                   Constats ({findings.length})
                 </TabsTrigger>
                 <TabsTrigger value="interfaces" className="gap-1">
-                  <Network className="h-4 w-4" />
+                  <Network className="size-4" />
                   Interfaces ({result.analysis.interfaces.length})
                 </TabsTrigger>
                 <TabsTrigger value="rules" className="gap-1">
-                  <List className="h-4 w-4" />
+                  <List className="size-4" />
                   Règles ({result.analysis.firewall_rules.length})
                 </TabsTrigger>
               </TabsList>
@@ -542,13 +544,13 @@ export default function ConfigParserPage() {
                 <CardContent className="pt-6">
                   {findings.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
-                      <Shield className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                      <Shield className="size-12 mx-auto mb-4 text-green-500" />
                       <p className="text-lg font-medium">
                         Aucun problème de sécurité détecté
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                       {findings.map((finding, idx) => (
                         <FindingCard key={idx} finding={finding} />
                       ))}
@@ -618,7 +620,7 @@ export default function ConfigParserPage() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5" />
+              <ClipboardCheck className="size-5" />
               Pré-remplir l&apos;audit
             </DialogTitle>
             <DialogDescription>
@@ -629,8 +631,8 @@ export default function ConfigParserPage() {
 
           {!prefillResult ? (
             <>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
+              <div className="flex flex-col gap-4 py-4">
+                <div className="flex flex-col gap-2">
                   <label className="text-sm font-medium">Assessment à pré-remplir</label>
                   <Select
                     value={selectedAssessmentId}
@@ -640,11 +642,13 @@ export default function ConfigParserPage() {
                       <SelectValue placeholder="Sélectionner un assessment…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {assessments.map((a) => (
-                        <SelectItem key={a.id} value={String(a.id)}>
-                          {a.framework_name} — {new Date(a.created_at).toLocaleDateString("fr-FR")}
-                        </SelectItem>
-                      ))}
+                      <SelectGroup>
+                        {assessments.map((a) => (
+                          <SelectItem key={a.id} value={String(a.id)}>
+                            {a.framework_name} — {new Date(a.created_at).toLocaleDateString("fr-FR")}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </div>
@@ -670,7 +674,7 @@ export default function ConfigParserPage() {
                   disabled={!selectedAssessmentId || prefilling}
                   className="gap-2"
                 >
-                  {prefilling && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {prefilling && <Loader2 className="animate-spin" data-icon="inline-start" />}
                   Pré-remplir
                 </Button>
               </DialogFooter>
@@ -678,7 +682,7 @@ export default function ConfigParserPage() {
           ) : (
             <>
               {/* Prefill results */}
-              <div className="space-y-4 py-4">
+              <div className="flex flex-col gap-4 py-4">
                 <div className="grid grid-cols-3 gap-3">
                   <Card>
                     <CardContent className="pt-3 text-center">
@@ -718,12 +722,12 @@ export default function ConfigParserPage() {
                             <TableCell className="text-right">
                               {d.status === "compliant" ? (
                                 <Badge variant="outline" className="text-green-600 gap-1 whitespace-nowrap">
-                                  <CheckCircle2 className="h-3 w-3" />
+                                  <CheckCircle2 className="size-3" />
                                   Conforme
                                 </Badge>
                               ) : (
                                 <Badge variant="destructive" className="gap-1 whitespace-nowrap">
-                                  <XCircle className="h-3 w-3" />
+                                  <XCircle className="size-3" />
                                   Non conforme ({d.findings_count})
                                 </Badge>
                               )}
@@ -762,13 +766,14 @@ function FindingCard({ finding }: { finding: SecurityFinding }) {
 
   return (
     <div
-      className={`rounded-lg border p-4 ${
+      className={cn(
+        "rounded-lg border p-4",
         SEVERITY_COLORS[finding.severity] || "bg-gray-50"
-      }`}
+      )}
     >
       <div className="flex items-start gap-3">
-        <SeverityIcon className="h-5 w-5 mt-0.5 shrink-0" />
-        <div className="flex-1 space-y-1">
+        <SeverityIcon className="size-5 mt-0.5 shrink-0" />
+        <div className="flex-1 flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <Badge variant={SEVERITY_VARIANTS[finding.severity] || "outline"}>
               {SEVERITY_LABELS[finding.severity] || finding.severity}

@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { toolsApi } from "@/services/api";
 import type { SSLCheckResult, SecurityFinding } from "@/types";
 import { toast } from "sonner";
@@ -107,11 +108,11 @@ export default function SSLCheckerPage() {
   const activeResult = results.find((r) => r.host === activeTab);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Lock className="h-6 w-6" />
+          <Lock className="size-6" />
           Vérificateur SSL/TLS
         </h1>
         <p className="text-muted-foreground">
@@ -130,7 +131,7 @@ export default function SSLCheckerPage() {
               Testez un hôte spécifique
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="flex flex-col gap-4">
             <div className="flex gap-2">
               <div className="flex-1">
                 <Label>Hôte</Label>
@@ -157,9 +158,9 @@ export default function SSLCheckerPage() {
               className="w-full"
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="animate-spin" data-icon="inline-start" />
               ) : (
-                <Search className="h-4 w-4 mr-2" />
+                <Search data-icon="inline-start" />
               )}
               Vérifier
             </Button>
@@ -174,7 +175,7 @@ export default function SSLCheckerPage() {
               Testez plusieurs hôtes en une fois (max 20)
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="flex flex-col gap-3">
             {batchHosts.map((h, idx) => (
               <div key={idx} className="flex gap-2">
                 <Input
@@ -194,7 +195,7 @@ export default function SSLCheckerPage() {
                       setBatchHosts(batchHosts.filter((_, i) => i !== idx))
                     }
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 />
                   </Button>
                 )}
               </div>
@@ -206,7 +207,7 @@ export default function SSLCheckerPage() {
                 onClick={() => setBatchHosts([...batchHosts, ""])}
                 disabled={batchHosts.length >= 20}
               >
-                <Plus className="h-4 w-4 mr-1" />
+                <Plus data-icon="inline-start" />
                 Ajouter
               </Button>
               <Button
@@ -216,9 +217,9 @@ export default function SSLCheckerPage() {
                 className="flex-1"
               >
                 {loading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="animate-spin" data-icon="inline-start" />
                 ) : (
-                  <Search className="h-4 w-4 mr-2" />
+                  <Search data-icon="inline-start" />
                 )}
                 Tout vérifier
               </Button>
@@ -235,14 +236,14 @@ export default function SSLCheckerPage() {
               <TabsTrigger key={r.host} value={r.host} className="gap-1">
                 {r.certificate && !r.certificate.error ? (
                   r.certificate.is_expired ? (
-                    <ShieldX className="h-3 w-3 text-red-500" />
+                    <ShieldX className="size-3 text-red-500" />
                   ) : r.certificate.is_trusted ? (
-                    <ShieldCheck className="h-3 w-3 text-green-500" />
+                    <ShieldCheck className="size-3 text-green-500" />
                   ) : (
-                    <ShieldAlert className="h-3 w-3 text-yellow-500" />
+                    <ShieldAlert className="size-3 text-yellow-500" />
                   )
                 ) : (
-                  <ShieldX className="h-3 w-3 text-red-500" />
+                  <ShieldX className="size-3 text-red-500" />
                 )}
                 {r.host}
               </TabsTrigger>
@@ -270,7 +271,7 @@ function SSLResultView({
   const cert = result.certificate;
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Certificate status */}
@@ -279,11 +280,11 @@ function SSLResultView({
             {cert && !cert.error ? (
               <>
                 {cert.is_expired ? (
-                  <XCircle className="h-8 w-8 mx-auto mb-2 text-red-500" />
+                  <XCircle className="size-8 mx-auto mb-2 text-red-500" />
                 ) : cert.is_trusted ? (
-                  <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                  <CheckCircle className="size-8 mx-auto mb-2 text-green-500" />
                 ) : (
-                  <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-yellow-500" />
+                  <AlertTriangle className="size-8 mx-auto mb-2 text-yellow-500" />
                 )}
                 <p className="text-sm font-medium">
                   {cert.is_expired
@@ -295,7 +296,7 @@ function SSLResultView({
               </>
             ) : (
               <>
-                <XCircle className="h-8 w-8 mx-auto mb-2 text-red-500" />
+                <XCircle className="size-8 mx-auto mb-2 text-red-500" />
                 <p className="text-sm font-medium">Erreur</p>
               </>
             )}
@@ -305,7 +306,7 @@ function SSLResultView({
         {/* Days remaining */}
         <Card>
           <CardContent className="pt-4 text-center">
-            <Clock className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <Clock className="size-8 mx-auto mb-2 text-muted-foreground" />
             <p className="text-2xl font-bold">
               {cert && cert.days_remaining >= 0 ? cert.days_remaining : "—"}
             </p>
@@ -316,7 +317,7 @@ function SSLResultView({
         {/* Protocols */}
         <Card>
           <CardContent className="pt-4 text-center">
-            <Shield className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <Shield className="size-8 mx-auto mb-2 text-muted-foreground" />
             <p className="text-2xl font-bold">
               {result.protocols.filter((p) => p.supported && p.is_secure).length}
               /
@@ -329,7 +330,7 @@ function SSLResultView({
         {/* Findings */}
         <Card>
           <CardContent className="pt-4 text-center">
-            <Info className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <Info className="size-8 mx-auto mb-2 text-muted-foreground" />
             <p className="text-2xl font-bold">{result.findings.length}</p>
             <p className="text-xs text-muted-foreground">constat(s)</p>
           </CardContent>
@@ -337,7 +338,7 @@ function SSLResultView({
       </div>
 
       {/* Detail tabs */}
-      <Tabs defaultValue="cert" className="space-y-4">
+      <Tabs defaultValue="cert" className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <TabsList>
             <TabsTrigger value="cert">Certificat</TabsTrigger>
@@ -347,7 +348,7 @@ function SSLResultView({
             </TabsTrigger>
           </TabsList>
           <Button variant="ghost" size="sm" onClick={onRemove}>
-            <Trash2 className="h-4 w-4 mr-1" />
+            <Trash2 data-icon="inline-start" />
             Retirer
           </Button>
         </div>
@@ -395,7 +396,7 @@ function SSLResultView({
                 </div>
               ) : (
                 <div className="text-center py-6 text-muted-foreground">
-                  <XCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+                  <XCircle className="size-12 mx-auto mb-4 text-red-500" />
                   <p className="font-medium">
                     Impossible de récupérer le certificat
                   </p>
@@ -427,9 +428,9 @@ function SSLResultView({
                       <TableCell className="font-medium">{proto.name}</TableCell>
                       <TableCell>
                         {proto.supported ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="size-4 text-green-500" />
                         ) : (
-                          <XCircle className="h-4 w-4 text-muted-foreground" />
+                          <XCircle className="size-4 text-muted-foreground" />
                         )}
                       </TableCell>
                       <TableCell>
@@ -463,10 +464,10 @@ function SSLResultView({
         {/* Findings tab */}
         <TabsContent value="findings">
           <Card>
-            <CardContent className="pt-6 space-y-3">
+            <CardContent className="pt-6 flex flex-col gap-3">
               {result.findings.length === 0 ? (
                 <div className="text-center py-6 text-muted-foreground">
-                  <ShieldCheck className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                  <ShieldCheck className="size-12 mx-auto mb-4 text-green-500" />
                   <p>Aucun problème détecté</p>
                 </div>
               ) : (
@@ -513,13 +514,14 @@ function FindingRow({ finding }: { finding: SecurityFinding }) {
 
   return (
     <div
-      className={`rounded-lg border p-4 ${
-        SEVERITY_COLORS[finding.severity] || ""
-      }`}
+      className={cn(
+        "rounded-lg border p-4",
+        SEVERITY_COLORS[finding.severity]
+      )}
     >
       <div className="flex items-start gap-3">
-        <SeverityIcon className="h-5 w-5 mt-0.5 shrink-0" />
-        <div className="flex-1 space-y-1">
+        <SeverityIcon className="size-5 mt-0.5 shrink-0" />
+        <div className="flex-1 flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <Badge variant={SEVERITY_VARIANTS[finding.severity] || "outline"}>
               {SEVERITY_LABELS[finding.severity] || finding.severity}

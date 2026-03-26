@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 import { toolsApi } from "@/services/api";
 import type {
@@ -93,11 +94,11 @@ function getSeverityVariant(severity: string): "destructive" | "secondary" | "ou
 function statusBadge(status: string) {
   switch (status) {
     case "success":
-      return <Badge className="bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Succès</Badge>;
+      return <Badge className="bg-green-600"><CheckCircle2 className="size-3" />Succès</Badge>;
     case "failed":
-      return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Échoué</Badge>;
+      return <Badge variant="destructive"><XCircle className="size-3" />Échoué</Badge>;
     case "running":
-      return <Badge className="bg-blue-500"><Loader2 className="h-3 w-3 mr-1 animate-spin" />En cours</Badge>;
+      return <Badge className="bg-blue-500"><Loader2 className="size-3 animate-spin" />En cours</Badge>;
     default:
       return <Badge variant="secondary">{status}</Badge>;
   }
@@ -214,10 +215,10 @@ export default function PingCastlePage() {
   // ── Detail view ──
   if (selectedResult) {
     return (
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => setSelectedResult(null)}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
+            <ArrowLeft data-icon="inline-start" />
             Retour
           </Button>
           <div>
@@ -267,7 +268,7 @@ export default function PingCastlePage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
+                <BarChart3 className="size-5" />
                 Niveau de maturité
               </CardTitle>
             </CardHeader>
@@ -280,11 +281,12 @@ export default function PingCastlePage() {
                   {[1, 2, 3, 4, 5].map((level) => (
                     <div
                       key={level}
-                      className={`w-10 h-3 rounded ${
+                      className={cn(
+                        "w-10 h-3 rounded",
                         level <= (selectedResult.maturity_level ?? 0)
                           ? "bg-primary"
                           : "bg-muted"
-                      }`}
+                      )}
                     />
                   ))}
                 </div>
@@ -298,7 +300,7 @@ export default function PingCastlePage() {
           <Card className="border-destructive">
             <CardHeader>
               <CardTitle className="text-destructive flex items-center gap-2">
-                <XCircle className="h-5 w-5" />
+                <XCircle className="size-5" />
                 Erreur
               </CardTitle>
             </CardHeader>
@@ -315,7 +317,7 @@ export default function PingCastlePage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
+                <AlertTriangle className="size-5" />
                 Règles de risque ({selectedResult.risk_rules.length})
               </CardTitle>
               <CardDescription>
@@ -360,7 +362,7 @@ export default function PingCastlePage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Info className="h-5 w-5" />
+                <Info className="size-5" />
                 Informations du domaine
               </CardTitle>
             </CardHeader>
@@ -384,11 +386,11 @@ export default function PingCastlePage() {
 
   // ── Main view with tabs ──
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Castle className="h-6 w-6" />
+            <Castle className="size-6" />
             PingCastle — Audit AD avancé
           </h1>
           <p className="text-muted-foreground">
@@ -397,7 +399,7 @@ export default function PingCastlePage() {
         </div>
         <Link href="/outils">
           <Button variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-1" />
+            <ArrowLeft data-icon="inline-start" />
             Outils
           </Button>
         </Link>
@@ -406,22 +408,22 @@ export default function PingCastlePage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="automated" className="flex items-center gap-1">
-            <ClipboardCheck className="h-4 w-4" />
+            <ClipboardCheck className="size-4" />
             Audit automatisé
           </TabsTrigger>
           <TabsTrigger value="terminal" className="flex items-center gap-1">
-            <Terminal className="h-4 w-4" />
+            <Terminal className="size-4" />
             Terminal interactif
           </TabsTrigger>
         </TabsList>
 
         {/* ── Onglet Audit automatisé ── */}
-        <TabsContent value="automated" className="space-y-6">
+        <TabsContent value="automated" className="flex flex-col gap-6">
           {/* Launch form */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Play className="h-5 w-5" />
+                <Play className="size-5" />
                 Lancer un audit PingCastle
               </CardTitle>
               <CardDescription>
@@ -431,7 +433,7 @@ export default function PingCastlePage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="pc-host">Contrôleur de domaine *</Label>
                   <Input
                     id="pc-host"
@@ -440,7 +442,7 @@ export default function PingCastlePage() {
                     onChange={(e) => setForm((f) => ({ ...f, target_host: e.target.value }))}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="pc-domain">Domaine AD *</Label>
                   <Input
                     id="pc-domain"
@@ -449,7 +451,7 @@ export default function PingCastlePage() {
                     onChange={(e) => setForm((f) => ({ ...f, domain: e.target.value }))}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="pc-user">Utilisateur *</Label>
                   <Input
                     id="pc-user"
@@ -458,7 +460,7 @@ export default function PingCastlePage() {
                     onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="pc-pass">Mot de passe *</Label>
                   <Input
                     id="pc-pass"
@@ -472,9 +474,9 @@ export default function PingCastlePage() {
               <div className="mt-4 flex gap-2">
                 <Button onClick={handleLaunch} disabled={launching}>
                   {launching ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="animate-spin" data-icon="inline-start" />
                   ) : (
-                    <Play className="h-4 w-4 mr-2" />
+                    <Play data-icon="inline-start" />
                   )}
                   {launching ? "Lancement..." : "Lancer l'audit"}
                 </Button>
@@ -493,21 +495,21 @@ export default function PingCastlePage() {
                   </CardDescription>
                 </div>
                 <Button variant="outline" size="sm" onClick={loadResults} disabled={loading}>
-                  <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
+                  <RefreshCw className={loading ? "animate-spin" : ""} data-icon="inline-start" />
                   Actualiser
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
               {loading && results.length === 0 ? (
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   {[...Array(3)].map((_, i) => (
                     <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
               ) : results.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Castle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <Castle className="size-12 mx-auto mb-2 opacity-50" />
                   <p>Aucun audit PingCastle lancé</p>
                   <p className="text-sm">Utilisez le formulaire ci-dessus pour lancer votre premier audit</p>
                 </div>
@@ -552,7 +554,7 @@ export default function PingCastlePage() {
                                 onClick={() => handleViewDetail(r.id)}
                                 title="Voir détails"
                               >
-                                <Eye className="h-4 w-4" />
+                                <Eye />
                               </Button>
                             )}
                             {r.status === "failed" && (
@@ -562,13 +564,13 @@ export default function PingCastlePage() {
                                 onClick={() => handleViewDetail(r.id)}
                                 title="Voir l'erreur"
                               >
-                                <Info className="h-4 w-4" />
+                                <Info />
                               </Button>
                             )}
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="icon" title="Supprimer">
-                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                  <Trash2 className="text-destructive" />
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
@@ -598,11 +600,11 @@ export default function PingCastlePage() {
         </TabsContent>
 
         {/* ── Onglet Terminal interactif ── */}
-        <TabsContent value="terminal" className="space-y-4">
+        <TabsContent value="terminal" className="flex flex-col gap-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Terminal className="h-5 w-5" />
+                <Terminal className="size-5" />
                 Terminal PingCastle interactif
               </CardTitle>
               <CardDescription>
@@ -615,7 +617,7 @@ export default function PingCastlePage() {
                 <Suspense
                   fallback={
                     <div className="flex items-center justify-center h-64">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      <Loader2 className="size-8 animate-spin text-muted-foreground" />
                     </div>
                   }
                 >
@@ -623,7 +625,7 @@ export default function PingCastlePage() {
                 </Suspense>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  <AlertTriangle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <AlertTriangle className="size-12 mx-auto mb-2 opacity-50" />
                   <p>Authentification requise pour le terminal interactif</p>
                   <p className="text-sm">Veuillez vous reconnecter</p>
                 </div>

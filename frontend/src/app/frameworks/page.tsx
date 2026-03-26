@@ -26,7 +26,7 @@ import {
   Save,
   X,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -56,11 +57,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/auth-context";
 import { frameworksApi } from "@/services/api";
 import type { FrameworkSummary, Framework, FrameworkCategory, Control, FrameworkCreatePayload, CategoryCreate, ControlCreate } from "@/types";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   SEVERITY_ORDER,
   SEVERITY_COLORS,
@@ -193,7 +205,7 @@ function FrameworkList({ onSelect, onCreate }: { onSelect: (fw: FrameworkSummary
   const pages = Math.ceil(total / pageSize);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -205,12 +217,12 @@ function FrameworkList({ onSelect, onCreate }: { onSelect: (fw: FrameworkSummary
         <div className="flex items-center gap-2">
           {isAdmin && (
             <Button onClick={onCreate}>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus data-icon="inline-start" />
               Nouveau référentiel
             </Button>
           )}
           <Button variant="outline" onClick={handleSync} disabled={syncing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+            <RefreshCw className={cn(syncing && "animate-spin")} data-icon="inline-start" />
             {syncing ? "Synchronisation…" : "Synchroniser"}
           </Button>
         </div>
@@ -220,7 +232,7 @@ function FrameworkList({ onSelect, onCreate }: { onSelect: (fw: FrameworkSummary
       <Card>
         <CardContent className="pt-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
               placeholder="Rechercher un référentiel…"
               value={search}
@@ -234,12 +246,12 @@ function FrameworkList({ onSelect, onCreate }: { onSelect: (fw: FrameworkSummary
       {/* Frameworks Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12 text-muted-foreground">
-            <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <BookOpen className="size-10 mx-auto mb-3 opacity-50" />
             <p className="font-medium">Aucun référentiel trouvé</p>
           </CardContent>
         </Card>
@@ -256,22 +268,22 @@ function FrameworkList({ onSelect, onCreate }: { onSelect: (fw: FrameworkSummary
         <div className="flex items-center justify-center gap-4">
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft />
           </Button>
           <span className="text-sm text-muted-foreground">
             Page {page} / {pages}
           </span>
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             disabled={page >= pages}
             onClick={() => setPage((p) => p + 1)}
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight />
           </Button>
         </div>
       )}
@@ -294,7 +306,7 @@ function FrameworkCard({
       className="cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group"
       onClick={onClick}
     >
-      <CardContent className="pt-6 space-y-4">
+      <CardContent className="pt-6 flex flex-col gap-4">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -327,7 +339,7 @@ function FrameworkCard({
 
         {/* Footer: view button hint */}
         <div className="flex items-center justify-end text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-          <Eye className="h-3 w-3 mr-1" />
+          <Eye className="size-3 mr-1" />
           Voir le détail
         </div>
       </CardContent>
@@ -471,18 +483,18 @@ function FrameworkDetail({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Back + actions */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack} className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft />
           Retour aux référentiels
         </Button>
         <div className="flex items-center gap-2">
           {isAdmin && (
             <>
               <Button variant="outline" size="sm" onClick={onEdit}>
-                <Pencil className="h-4 w-4 mr-2" />
+                <Pencil data-icon="inline-start" />
                 Modifier
               </Button>
               <Button
@@ -491,13 +503,13 @@ function FrameworkDetail({
                 className="text-destructive hover:text-destructive"
                 onClick={() => setDeleteOpen(true)}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 data-icon="inline-start" />
                 Supprimer
               </Button>
             </>
           )}
           <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
+            <Download data-icon="inline-start" />
             Exporter YAML
           </Button>
           <Button
@@ -510,7 +522,7 @@ function FrameworkDetail({
               setCloneOpen(true);
             }}
           >
-            <Copy className="h-4 w-4 mr-2" />
+            <Copy data-icon="inline-start" />
             Cloner
           </Button>
         </div>
@@ -521,7 +533,7 @@ function FrameworkDetail({
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
             <span className="text-4xl">{icon}</span>
-            <div className="flex-1 space-y-3">
+            <div className="flex-1 flex flex-col gap-3">
               <div className="flex items-start justify-between">
                 <div>
                   <h1 className="text-2xl font-bold">{framework.name}</h1>
@@ -582,7 +594,7 @@ function FrameworkDetail({
 
       {/* Search controls */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input
           placeholder="Rechercher un contrôle (ref, titre, description, sévérité)…"
           value={search}
@@ -623,7 +635,7 @@ function FrameworkDetail({
       </div>
 
       {/* Categories */}
-      <div className="space-y-3">
+      <div className="flex flex-col gap-3">
         {filteredCategories.map((cat) => (
           <CategoryCard
             key={cat.id}
@@ -636,7 +648,7 @@ function FrameworkDetail({
         {filteredCategories.length === 0 && search && (
           <Card>
             <CardContent className="text-center py-8 text-muted-foreground">
-              <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <Search className="size-8 mx-auto mb-2 opacity-50" />
               <p>Aucun contrôle ne correspond à &quot;{search}&quot;</p>
             </CardContent>
           </Card>
@@ -652,8 +664,8 @@ function FrameworkDetail({
               Créer une nouvelle version à partir de &quot;{framework.name}&quot; v{framework.version}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label>Nouvelle version *</Label>
               <Input
                 placeholder="Ex : 2.0"
@@ -661,7 +673,7 @@ function FrameworkDetail({
                 onChange={(e) => setCloneVersion(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Nouveau nom (optionnel)</Label>
               <Input
                 placeholder={framework.name}
@@ -678,7 +690,7 @@ function FrameworkDetail({
               Annuler
             </Button>
             <Button onClick={handleClone} disabled={cloning}>
-              {cloning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {cloning && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Cloner
             </Button>
           </DialogFooter>
@@ -686,26 +698,30 @@ function FrameworkDetail({
       </Dialog>
 
       {/* Delete confirmation dialog */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Supprimer le référentiel</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le référentiel</AlertDialogTitle>
+            <AlertDialogDescription>
               Êtes-vous sûr de vouloir supprimer &quot;{framework.name}&quot; v{framework.version} ?
               Cette action est irréversible et supprimera toutes les catégories et contrôles associés.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteOpen(false)}>
               Annuler
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Supprimer définitivement
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -739,7 +755,7 @@ function CategoryCard({
         onClick={onToggle}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Layers className="size-4 text-muted-foreground shrink-0" />
           <div className="min-w-0">
             <p className="font-medium truncate">{category.name}</p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
@@ -768,9 +784,9 @@ function CategoryCard({
             })}
           </div>
           {expanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            <ChevronUp className="size-4 text-muted-foreground" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="size-4 text-muted-foreground" />
           )}
         </div>
       </div>
@@ -819,11 +835,11 @@ function ControlRow({
   const checkTypeIcon = (type: string | null) => {
     switch (type) {
       case "automatic":
-        return <Settings className="h-3 w-3 mr-1" />;
+        return <Settings className="size-3 mr-1" />;
       case "semi-automatic":
-        return <Settings className="h-3 w-3 mr-1" />;
+        return <Settings className="size-3 mr-1" />;
       default:
-        return <FileText className="h-3 w-3 mr-1" />;
+        return <FileText className="size-3 mr-1" />;
     }
   };
 
@@ -868,7 +884,7 @@ function ControlRow({
       {showDetails && (
         <TableRow className="bg-muted/20">
           <TableCell colSpan={5}>
-            <div className="py-2 px-1 space-y-2 text-sm">
+            <div className="py-2 px-1 flex flex-col gap-2 text-sm">
               {ctrl.description && (
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-0.5">Description</p>
@@ -1197,11 +1213,11 @@ function FrameworkEditor({
   const totalControls = categories.reduce((sum, c) => sum + c.controls.length, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => setConfirmBack(true)} className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft />
           Retour
         </Button>
         <div className="flex items-center gap-2">
@@ -1210,9 +1226,9 @@ function FrameworkEditor({
           </Badge>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="animate-spin" data-icon="inline-start" />
             ) : (
-              <Save className="h-4 w-4 mr-2" />
+              <Save data-icon="inline-start" />
             )}
             {isEditMode ? "Enregistrer" : "Créer le référentiel"}
           </Button>
@@ -1237,9 +1253,9 @@ function FrameworkEditor({
           <CardTitle className="text-lg">Informations générales</CardTitle>
           <CardDescription>Identifiant, nom, version et moteur du référentiel</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="flex flex-col gap-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="ref_id">Identifiant (ref_id) *</Label>
               <Input
                 id="ref_id"
@@ -1252,7 +1268,7 @@ function FrameworkEditor({
                 <p className="text-[11px] text-muted-foreground">Non modifiable en édition</p>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="name">Nom *</Label>
               <Input
                 id="name"
@@ -1261,7 +1277,7 @@ function FrameworkEditor({
                 onChange={(e) => updateMeta("name", e.target.value)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="version">Version *</Label>
               <Input
                 id="version"
@@ -1271,7 +1287,7 @@ function FrameworkEditor({
               />
             </div>
           </div>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
@@ -1282,7 +1298,7 @@ function FrameworkEditor({
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="source">Source</Label>
               <Input
                 id="source"
@@ -1292,7 +1308,7 @@ function FrameworkEditor({
               />
               <p className="text-[11px] text-muted-foreground">Recommandations sur lesquelles se base ce référentiel</p>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="author">Auteur</Label>
               <Input
                 id="author"
@@ -1304,22 +1320,24 @@ function FrameworkEditor({
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Moteur</Label>
               <Select value={meta.engine} onValueChange={(v) => updateMeta("engine", v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">Manuel</SelectItem>
-                  <SelectItem value="monkey365">Monkey365</SelectItem>
-                  <SelectItem value="nmap">Nmap</SelectItem>
-                  <SelectItem value="automatic">Automatique</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="manual">Manuel</SelectItem>
+                    <SelectItem value="monkey365">Monkey365</SelectItem>
+                    <SelectItem value="nmap">Nmap</SelectItem>
+                    <SelectItem value="automatic">Automatique</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
             {meta.engine !== "manual" && (
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="engine_config">Configuration moteur (JSON)</Label>
                 <Textarea
                   id="engine_config"
@@ -1345,13 +1363,13 @@ function FrameworkEditor({
             Tout replier
           </Button>
           <Button variant="outline" size="sm" onClick={addCategory}>
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus data-icon="inline-start" />
             Catégorie
           </Button>
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         {categories.map((cat, catIdx) => (
           <EditorCategoryCard
             key={cat._key}
@@ -1377,33 +1395,36 @@ function FrameworkEditor({
         </Button>
         <Button onClick={handleSave} disabled={saving}>
           {saving ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <Loader2 className="animate-spin" data-icon="inline-start" />
           ) : (
-            <Save className="h-4 w-4 mr-2" />
+            <Save data-icon="inline-start" />
           )}
           {isEditMode ? "Enregistrer les modifications" : "Créer le référentiel"}
         </Button>
       </div>
 
       {/* Confirm back dialog */}
-      <Dialog open={confirmBack} onOpenChange={setConfirmBack}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Quitter l&apos;éditeur ?</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={confirmBack} onOpenChange={setConfirmBack}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Quitter l&apos;éditeur ?</AlertDialogTitle>
+            <AlertDialogDescription>
               Les modifications non sauvegardées seront perdues.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmBack(false)}>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmBack(false)}>
               Continuer l&apos;édition
-            </Button>
-            <Button variant="destructive" onClick={onBack}>
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={onBack}
+            >
               Quitter sans sauvegarder
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -1442,7 +1463,7 @@ function EditorCategoryCard({
         onClick={onToggle}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Layers className="size-4 text-muted-foreground shrink-0" />
           <div className="min-w-0">
             <p className="font-medium">
               {category.name || <span className="italic text-muted-foreground">Catégorie {catIndex + 1} (sans nom)</span>}
@@ -1457,29 +1478,29 @@ function EditorCategoryCard({
             <Button
               variant="ghost"
               size="sm"
-              className="text-destructive hover:text-destructive h-7 w-7 p-0"
+              className="text-destructive hover:text-destructive size-7 p-0"
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove();
               }}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 />
             </Button>
           )}
           {expanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            <ChevronUp className="size-4 text-muted-foreground" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="size-4 text-muted-foreground" />
           )}
         </div>
       </div>
 
       {/* Expanded content */}
       {expanded && (
-        <div className="border-t p-4 space-y-4">
+        <div className="border-t p-4 flex flex-col gap-4">
           {/* Category fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Nom de la catégorie *</Label>
               <Input
                 placeholder="Ex : Configuration réseau"
@@ -1487,7 +1508,7 @@ function EditorCategoryCard({
                 onChange={(e) => onUpdate("name", e.target.value)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label>Description</Label>
               <Input
                 placeholder="Description de la catégorie…"
@@ -1503,12 +1524,12 @@ function EditorCategoryCard({
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">Contrôles</p>
             <Button variant="outline" size="sm" onClick={onAddControl}>
-              <Plus className="h-3.5 w-3.5 mr-1" />
+              <Plus data-icon="inline-start" />
               Contrôle
             </Button>
           </div>
 
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {category.controls.map((ctrl, ctrlIdx) => (
               <EditorControlCard
                 key={ctrl._key}
@@ -1547,14 +1568,14 @@ function EditorControlCard({
 
   return (
     <Card className="border-dashed">
-      <CardContent className="pt-4 pb-4 space-y-3">
+      <CardContent className="pt-4 pb-4 flex flex-col gap-3">
         {/* Row 1: ref_id, title, actions */}
         <div className="flex items-start gap-3">
           <span className="text-xs text-muted-foreground mt-2 shrink-0 w-6 text-center font-mono">
             {ctrlIndex + 1}
           </span>
           <div className="flex-1 grid grid-cols-1 md:grid-cols-[140px_1fr] gap-3">
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label className="text-[11px]">Réf. *</Label>
               <Input
                 placeholder="FW-01"
@@ -1563,7 +1584,7 @@ function EditorControlCard({
                 className="font-mono text-xs h-8"
               />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label className="text-[11px]">Titre *</Label>
               <Input
                 placeholder="Vérifier les règles de filtrage"
@@ -1577,21 +1598,21 @@ function EditorControlCard({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 p-0"
+              className="size-7 p-0"
               onClick={onDuplicate}
               title="Dupliquer"
             >
-              <Copy className="h-3.5 w-3.5" />
+              <Copy />
             </Button>
             {canDelete && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                className="size-7 p-0 text-destructive hover:text-destructive"
                 onClick={onRemove}
                 title="Supprimer"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 />
               </Button>
             )}
           </div>
@@ -1599,31 +1620,35 @@ function EditorControlCard({
 
         {/* Row 2: severity, check_type */}
         <div className="ml-9 grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-[11px]">Sévérité</Label>
             <Select value={control.severity} onValueChange={(v) => onUpdate("severity", v)}>
               <SelectTrigger className="w-full h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="critical">🔴 Critique</SelectItem>
-                <SelectItem value="high">🟠 Élevée</SelectItem>
-                <SelectItem value="medium">🟡 Moyenne</SelectItem>
-                <SelectItem value="low">🔵 Faible</SelectItem>
-                <SelectItem value="info">⚪ Info</SelectItem>
+                <SelectGroup>
+                  <SelectItem value="critical">🔴 Critique</SelectItem>
+                  <SelectItem value="high">🟠 Élevée</SelectItem>
+                  <SelectItem value="medium">🟡 Moyenne</SelectItem>
+                  <SelectItem value="low">🔵 Faible</SelectItem>
+                  <SelectItem value="info">⚪ Info</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-[11px]">Type de vérification</Label>
             <Select value={control.check_type} onValueChange={(v) => onUpdate("check_type", v)}>
               <SelectTrigger className="w-full h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="manual">Manuel</SelectItem>
-                <SelectItem value="automatic">Automatique</SelectItem>
-                <SelectItem value="semi-automatic">Semi-auto</SelectItem>
+                <SelectGroup>
+                  <SelectItem value="manual">Manuel</SelectItem>
+                  <SelectItem value="automatic">Automatique</SelectItem>
+                  <SelectItem value="semi-automatic">Semi-auto</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -1634,7 +1659,7 @@ function EditorControlCard({
               className="text-xs h-8"
               onClick={() => setShowAdvanced(!showAdvanced)}
             >
-              {showAdvanced ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
+              {showAdvanced ? <ChevronUp data-icon="inline-start" /> : <ChevronDown data-icon="inline-start" />}
               {showAdvanced ? "Masquer détails" : "Plus de détails"}
             </Button>
           </div>
@@ -1642,8 +1667,8 @@ function EditorControlCard({
 
         {/* Row 3: advanced fields */}
         {showAdvanced && (
-          <div className="ml-9 space-y-3 border-t pt-3">
-            <div className="space-y-1">
+          <div className="ml-9 flex flex-col gap-3 border-t pt-3">
+            <div className="flex flex-col gap-1">
               <Label className="text-[11px]">Description</Label>
               <Textarea
                 placeholder="Description détaillée du contrôle…"
@@ -1652,7 +1677,7 @@ function EditorControlCard({
                 className="text-xs min-h-[50px]"
               />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label className="text-[11px]">Remédiation</Label>
               <Textarea
                 placeholder="Instructions de remédiation…"
@@ -1662,7 +1687,7 @@ function EditorControlCard({
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label className="text-[11px]">Règle moteur</Label>
                 <Input
                   placeholder="rule_id"
@@ -1671,7 +1696,7 @@ function EditorControlCard({
                   className="font-mono text-xs h-8"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label className="text-[11px]">Référence CIS</Label>
                 <Input
                   placeholder="CIS 1.2.3"

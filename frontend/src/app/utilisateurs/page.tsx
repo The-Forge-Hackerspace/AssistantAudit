@@ -14,7 +14,7 @@ import {
   EyeOff,
   Power,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,8 +36,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -46,6 +57,7 @@ import { usersApi } from "@/services/api";
 import { useAuth } from "@/contexts/auth-context";
 import type { User, RegisterRequest, UserUpdate } from "@/types";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { TableSkeleton } from "@/components/skeletons";
 
 type UserRole = "admin" | "auditeur" | "lecteur";
@@ -268,19 +280,19 @@ export default function UtilisateursPage() {
   if (currentUser?.role !== "admin") {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-        <Users2 className="h-12 w-12 mb-4 opacity-30" />
+        <Users2 className="size-12 mb-4 opacity-30" />
         <p className="text-lg font-medium">Accès réservé aux administrateurs</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Users2 className="h-6 w-6" />
+            <Users2 className="size-6" />
             Utilisateurs
           </h1>
           <p className="text-muted-foreground">
@@ -288,7 +300,7 @@ export default function UtilisateursPage() {
           </p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus data-icon="inline-start" />
           Nouvel utilisateur
         </Button>
       </div>
@@ -296,7 +308,7 @@ export default function UtilisateursPage() {
       {/* Search + filters */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             placeholder="Rechercher par nom, username ou email..."
             value={search}
@@ -309,10 +321,12 @@ export default function UtilisateursPage() {
             <SelectValue placeholder="Tous les rôles" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les rôles</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="auditeur">Auditeur</SelectItem>
-            <SelectItem value="lecteur">Lecteur</SelectItem>
+            <SelectGroup>
+              <SelectItem value="all">Tous les rôles</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="auditeur">Auditeur</SelectItem>
+              <SelectItem value="lecteur">Lecteur</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
         <Badge variant="secondary" className="text-sm">
@@ -327,7 +341,7 @@ export default function UtilisateursPage() {
             <TableSkeleton rows={5} cols={6} />
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <Users2 className="h-12 w-12 mb-4 opacity-30" />
+              <Users2 className="size-12 mb-4 opacity-30" />
               <p className="text-lg font-medium">Aucun utilisateur</p>
               <p className="text-sm">
                 {search || roleFilter !== "all"
@@ -376,31 +390,31 @@ export default function UtilisateursPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="size-8"
                           onClick={() => openEdit(u)}
                           title="Modifier"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="size-8"
                           onClick={() => handleToggleActive(u)}
                           title={u.is_active ? "Désactiver" : "Activer"}
                           disabled={u.id === currentUser?.id}
                         >
-                          <Power className={`h-4 w-4 ${u.is_active ? "text-green-500" : "text-muted-foreground"}`} />
+                          <Power className={cn(u.is_active ? "text-emerald-600" : "text-muted-foreground")} />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          className="size-8 text-destructive hover:text-destructive"
                           onClick={() => openDelete(u)}
                           title="Désactiver"
                           disabled={u.id === currentUser?.id}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 />
                         </Button>
                       </div>
                     </TableCell>
@@ -413,7 +427,7 @@ export default function UtilisateursPage() {
 
         {/* Pagination */}
         {pages > 1 && (
-          <div className="flex items-center justify-between border-t px-4 py-3">
+          <CardFooter className="flex items-center justify-between border-t px-4 py-3">
             <p className="text-sm text-muted-foreground">
               Page {page} sur {pages} — {total} résultat{total > 1 ? "s" : ""}
             </p>
@@ -424,7 +438,7 @@ export default function UtilisateursPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                <ChevronLeft className="h-4 w-4 mr-1" />
+                <ChevronLeft data-icon="inline-start" />
                 Précédent
               </Button>
               <Button
@@ -434,10 +448,10 @@ export default function UtilisateursPage() {
                 onClick={() => setPage((p) => p + 1)}
               >
                 Suivant
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <ChevronRight data-icon="inline-end" />
               </Button>
             </div>
-          </div>
+          </CardFooter>
         )}
       </Card>
 
@@ -451,8 +465,8 @@ export default function UtilisateursPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-fullname">Nom complet *</Label>
               <Input
                 id="create-fullname"
@@ -462,7 +476,7 @@ export default function UtilisateursPage() {
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-username">Nom d&apos;utilisateur *</Label>
                 <Input
                   id="create-username"
@@ -471,7 +485,7 @@ export default function UtilisateursPage() {
                   placeholder="jdupont"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-email">Email *</Label>
                 <Input
                   id="create-email"
@@ -482,7 +496,7 @@ export default function UtilisateursPage() {
                 />
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-password">Mot de passe *</Label>
               <div className="relative">
                 <Input
@@ -501,14 +515,14 @@ export default function UtilisateursPage() {
                   onClick={() => setShowCreatePassword(!showCreatePassword)}
                 >
                   {showCreatePassword ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    <EyeOff className="text-muted-foreground" />
                   ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
+                    <Eye className="text-muted-foreground" />
                   )}
                 </Button>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-role">Rôle</Label>
               <Select
                 value={createForm.role}
@@ -518,9 +532,11 @@ export default function UtilisateursPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="auditeur">Auditeur</SelectItem>
-                  <SelectItem value="lecteur">Lecteur</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="auditeur">Auditeur</SelectItem>
+                    <SelectItem value="lecteur">Lecteur</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -535,7 +551,7 @@ export default function UtilisateursPage() {
               Annuler
             </Button>
             <Button onClick={handleCreate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Créer
             </Button>
           </DialogFooter>
@@ -552,8 +568,8 @@ export default function UtilisateursPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-fullname">Nom complet</Label>
               <Input
                 id="edit-fullname"
@@ -562,7 +578,7 @@ export default function UtilisateursPage() {
                 placeholder="Jean Dupont"
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-email">Email</Label>
               <Input
                 id="edit-email"
@@ -572,7 +588,7 @@ export default function UtilisateursPage() {
                 placeholder="jean@exemple.com"
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-password">
                 Nouveau mot de passe{" "}
                 <span className="text-muted-foreground font-normal">(laisser vide pour ne pas changer)</span>
@@ -594,14 +610,14 @@ export default function UtilisateursPage() {
                   onClick={() => setShowEditPassword(!showEditPassword)}
                 >
                   {showEditPassword ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    <EyeOff className="text-muted-foreground" />
                   ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
+                    <Eye className="text-muted-foreground" />
                   )}
                 </Button>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-role">Rôle</Label>
               <Select
                 value={editForm.role || "auditeur"}
@@ -611,9 +627,11 @@ export default function UtilisateursPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="auditeur">Auditeur</SelectItem>
-                  <SelectItem value="lecteur">Lecteur</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="auditeur">Auditeur</SelectItem>
+                    <SelectItem value="lecteur">Lecteur</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -628,40 +646,40 @@ export default function UtilisateursPage() {
               Annuler
             </Button>
             <Button onClick={handleUpdate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Supprimer (désactiver) */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer la désactivation</DialogTitle>
-            <DialogDescription>
+      {/* AlertDialog: Supprimer (désactiver) */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la désactivation</AlertDialogTitle>
+            <AlertDialogDescription>
               Êtes-vous sûr de vouloir désactiver le compte de &laquo;{" "}
               <strong>{selected?.full_name || selected?.username}</strong> &raquo; ?
               L&apos;utilisateur ne pourra plus se connecter mais ses données seront conservées.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
           {formError && (
             <p className="text-sm text-destructive">{formError}</p>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
               Annuler
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            </AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={saving}>
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Désactiver
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, use, useEffect, useState, useCallback } from "react";
 import { authApi } from "@/services/api";
 import { isAuthenticated } from "@/lib/api-client";
 import type { User } from "@/types";
@@ -28,8 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const me = await authApi.me();
       setUser(me);
-    } catch (err) {
-      console.error("[AuthContext] refresh() failed:", err);
+    } catch {
       setUser(null);
       authApi.logout();
     } finally {
@@ -60,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context = use(AuthContext);
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }

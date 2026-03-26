@@ -16,7 +16,7 @@ import {
   Building2,
   Filter,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,10 +41,21 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { sitesApi, entreprisesApi } from "@/services/api";
 import type { Site, SiteCreate, Entreprise } from "@/types";
 import { toast } from "sonner";
@@ -54,7 +65,7 @@ export default function SitesPage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     }>
       <SitesContent />
@@ -113,7 +124,6 @@ function SitesContent() {
         });
         setEntrepriseMap(map);
       } catch (error) {
-        console.error("Erreur chargement entreprises:", error);
         toast.error("Impossible de charger les entreprises");
       }
     }
@@ -129,7 +139,6 @@ function SitesContent() {
       setTotal(res.total);
       setPages(res.pages);
     } catch (error) {
-      console.error("Erreur chargement sites:", error);
       toast.error("Impossible de charger les sites");
     } finally {
       setLoading(false);
@@ -262,12 +271,12 @@ function SitesContent() {
 
   // ── Render ──
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <MapPin className="h-6 w-6" />
+            <MapPin className="size-6" />
             Sites
           </h1>
           <p className="text-muted-foreground">
@@ -275,7 +284,7 @@ function SitesContent() {
           </p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus data-icon="inline-start" />
           Nouveau site
         </Button>
       </div>
@@ -283,7 +292,7 @@ function SitesContent() {
       {/* Search + filters */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             placeholder="Rechercher par nom, adresse ou entreprise..."
             value={search}
@@ -293,18 +302,20 @@ function SitesContent() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Filter className="size-4 text-muted-foreground" />
           <Select value={entrepriseFilter} onValueChange={setEntrepriseFilter}>
             <SelectTrigger className="w-[220px]">
               <SelectValue placeholder="Toutes les entreprises" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Toutes les entreprises</SelectItem>
-              {entreprises.map((e) => (
-                <SelectItem key={e.id} value={String(e.id)}>
-                  {e.nom}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                <SelectItem value="all">Toutes les entreprises</SelectItem>
+                {entreprises.map((e) => (
+                  <SelectItem key={e.id} value={String(e.id)}>
+                    {e.nom}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
@@ -321,7 +332,7 @@ function SitesContent() {
             <TableSkeleton rows={5} cols={4} />
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <MapPin className="h-12 w-12 mb-4 opacity-30" />
+              <MapPin className="size-12 mb-4 opacity-30" />
               <p className="text-lg font-medium">Aucun site</p>
               <p className="text-sm">
                 {search || entrepriseFilter !== "all"
@@ -349,13 +360,13 @@ function SitesContent() {
                   >
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <MapPin className="size-4 text-muted-foreground" />
                         {site.nom}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="font-normal">
-                        <Building2 className="h-3 w-3 mr-1" />
+                        <Building2 className="size-3 mr-1" />
                         {entrepriseMap[site.entreprise_id] || `#${site.entreprise_id}`}
                       </Badge>
                     </TableCell>
@@ -376,29 +387,29 @@ function SitesContent() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="size-8"
                           onClick={() => openDetail(site)}
                           title="Voir le détail"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="size-8"
                           onClick={() => openEdit(site)}
                           title="Modifier"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          className="size-8 text-destructive hover:text-destructive"
                           onClick={() => openDelete(site)}
                           title="Supprimer"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 />
                         </Button>
                       </div>
                     </TableCell>
@@ -411,7 +422,7 @@ function SitesContent() {
 
         {/* Pagination */}
         {pages > 1 && (
-          <div className="flex items-center justify-between border-t px-4 py-3">
+          <CardFooter className="flex items-center justify-between border-t px-4 py-3">
             <p className="text-sm text-muted-foreground">
               Page {page} sur {pages} — {total} résultat{total > 1 ? "s" : ""}
             </p>
@@ -422,7 +433,7 @@ function SitesContent() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                <ChevronLeft className="h-4 w-4 mr-1" />
+                <ChevronLeft data-icon="inline-start" />
                 Précédent
               </Button>
               <Button
@@ -432,10 +443,10 @@ function SitesContent() {
                 onClick={() => setPage((p) => p + 1)}
               >
                 Suivant
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <ChevronRight data-icon="inline-end" />
               </Button>
             </div>
-          </div>
+          </CardFooter>
         )}
       </Card>
 
@@ -449,8 +460,8 @@ function SitesContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label>Entreprise *</Label>
               <Select
                 value={form.entreprise_id ? String(form.entreprise_id) : ""}
@@ -460,15 +471,17 @@ function SitesContent() {
                   <SelectValue placeholder="Sélectionner une entreprise" />
                 </SelectTrigger>
                 <SelectContent>
-                  {entreprises.map((e) => (
-                    <SelectItem key={e.id} value={String(e.id)}>
-                      {e.nom}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {entreprises.map((e) => (
+                      <SelectItem key={e.id} value={String(e.id)}>
+                        {e.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-site-nom">Nom du site *</Label>
               <Input
                 id="create-site-nom"
@@ -477,7 +490,7 @@ function SitesContent() {
                 placeholder="ex: Siège social, Datacenter Paris, Agence Lyon..."
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-site-description">Description</Label>
               <Textarea
                 id="create-site-description"
@@ -487,7 +500,7 @@ function SitesContent() {
                 rows={3}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-site-adresse">Adresse</Label>
               <Input
                 id="create-site-adresse"
@@ -505,7 +518,7 @@ function SitesContent() {
               Annuler
             </Button>
             <Button onClick={handleCreate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Créer
             </Button>
           </DialogFooter>
@@ -522,8 +535,8 @@ function SitesContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-site-nom">Nom du site *</Label>
               <Input
                 id="edit-site-nom"
@@ -532,7 +545,7 @@ function SitesContent() {
                 placeholder="ex: Siège social, Datacenter Paris, Agence Lyon..."
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-site-description">Description</Label>
               <Textarea
                 id="edit-site-description"
@@ -542,7 +555,7 @@ function SitesContent() {
                 rows={3}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-site-adresse">Adresse</Label>
               <Input
                 id="edit-site-adresse"
@@ -560,7 +573,7 @@ function SitesContent() {
               Annuler
             </Button>
             <Button onClick={handleUpdate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Enregistrer
             </Button>
           </DialogFooter>
@@ -568,55 +581,53 @@ function SitesContent() {
       </Dialog>
 
       {/* ── Dialog: Supprimer ── */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer la suppression</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
               Êtes-vous sûr de vouloir supprimer le site &laquo;{" "}
               <strong>{selected?.nom}</strong> &raquo; ? Cette action est
               irréversible et supprimera tous les équipements associés.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
           {formError && <p className="text-sm text-destructive">{formError}</p>}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-              Annuler
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={saving}>
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Supprimer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Dialog: Détail ── */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
+              <MapPin className="size-5" />
               {selected?.nom}
             </DialogTitle>
           </DialogHeader>
 
           {selected && (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Entreprise</p>
                   <Badge variant="outline" className="mt-1">
-                    <Building2 className="h-3 w-3 mr-1" />
+                    <Building2 className="size-3 mr-1" />
                     {entrepriseMap[selected.entreprise_id] || `#${selected.entreprise_id}`}
                   </Badge>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Équipements</p>
                   <div className="flex items-center gap-1 mt-1">
-                    <Server className="h-4 w-4 text-muted-foreground" />
+                    <Server className="size-4 text-muted-foreground" />
                     <span className="text-sm font-medium">{selected.equipement_count}</span>
                   </div>
                 </div>
@@ -640,7 +651,7 @@ function SitesContent() {
                 router.push(`/equipements?site=${selected?.id}`)
               }
             >
-              <Server className="h-4 w-4 mr-2" />
+              <Server data-icon="inline-start" />
               Voir les équipements
             </Button>
             <Button
@@ -649,7 +660,7 @@ function SitesContent() {
                 if (selected) openEdit(selected);
               }}
             >
-              <Pencil className="h-4 w-4 mr-2" />
+              <Pencil data-icon="inline-start" />
               Modifier
             </Button>
           </DialogFooter>

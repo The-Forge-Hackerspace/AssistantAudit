@@ -22,10 +22,21 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 import { toolsApi, entreprisesApi, auditsApi } from "@/services/api";
 import type { Audit, Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail, Monkey365ScanLogs, Monkey365ImportResult } from "@/types/api";
@@ -121,7 +132,7 @@ export default function Monkey365Page() {
       case "failed":
         return <Badge variant="destructive">Échec</Badge>;
       case "running":
-        return <Badge className="bg-blue-500"><Loader2 className="h-3 w-3 mr-1 animate-spin" />En cours</Badge>;
+        return <Badge className="bg-blue-500"><Loader2 className="size-3 animate-spin" />En cours</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -133,8 +144,7 @@ export default function Monkey365Page() {
     try {
       const data = await toolsApi.listMonkey365Scans(parseInt(selectedEntrepriseId, 10));
       setScans(data);
-    } catch (err) {
-      console.error("Failed to load scans:", err);
+    } catch {
       toast.error("Erreur lors du chargement des scans");
     } finally {
       setLoading(false);
@@ -157,8 +167,7 @@ export default function Monkey365Page() {
           setScanLogs(logs);
         }
       }
-    } catch (err) {
-      console.error("Failed to load scan detail:", err);
+    } catch {
       toast.error("Erreur lors du chargement des détails");
     }
   };
@@ -200,8 +209,8 @@ export default function Monkey365Page() {
         if (updated.status !== "running") {
           setElapsedSeconds(updated.duration_seconds || 0);
         }
-      } catch (err) {
-        console.error("Erreur lors du polling du scan:", err);
+      } catch {
+        // polling error silently handled
       }
     };
     poll();
@@ -292,8 +301,7 @@ export default function Monkey365Page() {
       
       setActiveTab("history");
       await loadScans();
-    } catch (err) {
-      console.error("Failed to launch scan:", err);
+    } catch {
       toast.error("Erreur lors du lancement du scan");
     } finally {
       setLaunching(false);
@@ -322,17 +330,23 @@ export default function Monkey365Page() {
     }
   };
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+
+  const confirmDeleteScan = (scanId: number) => {
+    setPendingDeleteId(scanId);
+    setDeleteDialogOpen(true);
+  };
+
   const handleDeleteScan = async (scanId: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce scan ?")) return;
-    
+    setDeleteDialogOpen(false);
     setDeletingId(scanId);
     try {
       await toolsApi.deleteMonkey365Scan(scanId);
       toast.success("Scan supprimé avec succès");
       setSelectedScan(null);
       await loadScans();
-    } catch (err) {
-      console.error("Failed to delete scan:", err);
+    } catch {
       toast.error("Erreur lors de la suppression du scan");
     } finally {
       setDeletingId(null);
@@ -376,7 +390,7 @@ export default function Monkey365Page() {
           <div className="flex items-center gap-4">
             <Link href="/outils">
               <Button variant="outline" size="icon">
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft />
               </Button>
             </Link>
             <h1 className="text-3xl font-bold">Monkey365 — Audit Microsoft 365</h1>
@@ -384,7 +398,7 @@ export default function Monkey365Page() {
         </div>
 
         <Alert className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-          <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertTriangle className="size-4 text-blue-600 dark:text-blue-400" />
           <AlertDescription className="text-blue-800 dark:text-blue-300">
             Mode simplifié : INTERACTIVE auth (navigateur), collecte des 5 modules M365 standard, export JSON + HTML.
           </AlertDescription>
@@ -400,11 +414,13 @@ export default function Monkey365Page() {
                   <SelectValue placeholder="Sélectionner une entreprise" />
                 </SelectTrigger>
                 <SelectContent>
-                  {entreprises.map((ent) => (
-                    <SelectItem key={ent.id} value={ent.id.toString()}>
-                      {ent.nom}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {entreprises.map((ent) => (
+                      <SelectItem key={ent.id} value={ent.id.toString()}>
+                        {ent.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -418,7 +434,7 @@ export default function Monkey365Page() {
             <TabsTrigger value="details">Détails</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="launch" className="space-y-6">
+          <TabsContent value="launch" className="flex flex-col gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Configuration du scan</CardTitle>
@@ -426,9 +442,9 @@ export default function Monkey365Page() {
                   Les paramètres sont fixés pour le cas d'usage standard (99% du temps)
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="flex flex-col gap-6">
                 {/* SharePoint Sites */}
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label>Sites SharePoint (optionnel)</Label>
                   <div className="flex gap-2">
                     <Input
@@ -438,7 +454,7 @@ export default function Monkey365Page() {
                       onKeyPress={(e) => e.key === "Enter" && handleAddSite()}
                     />
                     <Button onClick={handleAddSite} size="sm" variant="outline">
-                      <Plus className="h-4 w-4" />
+                      <Plus />
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-2">
@@ -446,7 +462,7 @@ export default function Monkey365Page() {
                       <Badge key={site} variant="secondary" className="cursor-pointer">
                         {site}
                         <X
-                          className="h-3 w-3 ml-1 hover:text-destructive"
+                          className="size-3 ml-1 hover:text-destructive"
                           onClick={() => handleRemoveSite(site)}
                         />
                       </Badge>
@@ -455,9 +471,9 @@ export default function Monkey365Page() {
                 </div>
 
                 {/* Export Formats */}
-                <div className="space-y-3">
+                <div className="flex flex-col gap-3">
                   <Label>Formats d'export</Label>
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     {["JSON", "HTML", "CSV"].map((format) => (
                       <div key={format} className="flex items-center space-x-2">
                         <Checkbox
@@ -477,9 +493,9 @@ export default function Monkey365Page() {
                 </div>
 
                 {/* Fixed Parameters Info */}
-                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-800 space-y-2 text-sm">
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-800 flex flex-col gap-2 text-sm">
                   <p className="font-semibold">Paramètres fixés :</p>
-                  <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300">
+                  <ul className="list-disc list-inside flex flex-col gap-1 text-gray-700 dark:text-gray-300">
                     <li>Instance: Microsoft365</li>
                     <li>Authentification: INTERACTIVE (navigateur)</li>
                     <li>Modules: ExchangeOnline, MicrosoftTeams, Purview, SharePointOnline, AdminPortal</li>
@@ -489,7 +505,7 @@ export default function Monkey365Page() {
                 </div>
 
                 {/* PowerShell Preview */}
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label>Aperçu PowerShell</Label>
                   <pre className="bg-gray-900 text-gray-100 p-4 rounded overflow-auto text-xs max-h-48">
                     {generatePSPreview()}
@@ -505,12 +521,12 @@ export default function Monkey365Page() {
                 >
                   {launching ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="animate-spin" data-icon="inline-start" />
                       Lancement en cours...
                     </>
                   ) : (
                     <>
-                      <Play className="h-4 w-4 mr-2" />
+                      <Play data-icon="inline-start" />
                       Lancer le scan
                     </>
                   )}
@@ -519,7 +535,7 @@ export default function Monkey365Page() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="history" className="space-y-4">
+          <TabsContent value="history" className="flex flex-col gap-4">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -532,7 +548,7 @@ export default function Monkey365Page() {
                     size="sm"
                     variant="outline"
                   >
-                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                    <RefreshCw className={loading ? "animate-spin" : ""} />
                   </Button>
                 </div>
               </CardHeader>
@@ -575,12 +591,12 @@ export default function Monkey365Page() {
                                  variant="ghost"
                                  onClick={(e) => {
                                    e.stopPropagation();
-                                   handleDeleteScan(scan.id);
+                                   confirmDeleteScan(scan.id);
                                  }}
                                  disabled={deletingId === scan.id}
                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                                >
-                                 {deletingId === scan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                                 {deletingId === scan.id ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />}
                                </Button>
                              </div>
                           </TableCell>
@@ -593,7 +609,7 @@ export default function Monkey365Page() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="details" className="space-y-4">
+          <TabsContent value="details" className="flex flex-col gap-4">
             {!selectedScan ? (
               <Card>
                 <CardContent className="py-8">
@@ -616,9 +632,9 @@ export default function Monkey365Page() {
                               disabled={openingReport}
                             >
                               {openingReport ? (
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                <Loader2 className="animate-spin" data-icon="inline-start" />
                               ) : (
-                                <FileText className="h-4 w-4 mr-1" />
+                                <FileText data-icon="inline-start" />
                               )}
                               Rapport HTML
                             </Button>
@@ -627,7 +643,7 @@ export default function Monkey365Page() {
                               size="sm"
                               onClick={handleOpenImportDialog}
                             >
-                              <Plus className="h-4 w-4 mr-1" />
+                              <Plus data-icon="inline-start" />
                               Ajouter à l'audit
                             </Button>
                           </>
@@ -638,24 +654,24 @@ export default function Monkey365Page() {
                             size="sm"
                             onClick={() => handleCancelScan(selectedScan.id)}
                           >
-                            <X className="h-4 w-4 mr-1" />
+                            <X data-icon="inline-start" />
                             Forcer l'arrêt
                           </Button>
                         )}
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => handleDeleteScan(selectedScan.id)}
+                        onClick={() => confirmDeleteScan(selectedScan.id)}
                         disabled={deletingId === selectedScan.id}
                       >
                         {deletingId === selectedScan.id ? (
                           <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            <Loader2 className="animate-spin" data-icon="inline-start" />
                             Suppression...
                           </>
                         ) : (
                           <>
-                            <X className="h-4 w-4 mr-2" />
+                            <X data-icon="inline-start" />
                             Supprimer
                           </>
                         )}
@@ -663,7 +679,7 @@ export default function Monkey365Page() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="flex flex-col gap-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">ID Scan</p>
@@ -700,7 +716,7 @@ export default function Monkey365Page() {
 
                     {selectedScan.error_message && (
                       <Alert variant="destructive">
-                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTriangle className="size-4" />
                         <AlertDescription>{selectedScan.error_message}</AlertDescription>
                       </Alert>
                     )}
@@ -723,7 +739,7 @@ export default function Monkey365Page() {
                       <CardTitle className="text-base">Logs PowerShell</CardTitle>
                       {selectedScan.status === "running" && (
                         <Badge className="bg-blue-500">
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          <Loader2 className="size-3 animate-spin" />
                           En direct
                         </Badge>
                       )}
@@ -779,11 +795,13 @@ export default function Monkey365Page() {
                   <SelectValue placeholder="Choisir un audit…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {importAudits.map((audit) => (
-                    <SelectItem key={audit.id} value={audit.id.toString()}>
-                      {audit.nom_projet}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {importAudits.map((audit) => (
+                      <SelectItem key={audit.id} value={audit.id.toString()}>
+                        {audit.nom_projet}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             )}
@@ -796,7 +814,7 @@ export default function Monkey365Page() {
             <Button onClick={handleConfirmImport} disabled={!importAuditId || importing}>
               {importing ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="animate-spin" data-icon="inline-start" />
                   Import en cours…
                 </>
               ) : (
@@ -806,6 +824,24 @@ export default function Monkey365Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce scan ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ce scan et ses résultats seront définitivement supprimés. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => pendingDeleteId && handleDeleteScan(pendingDeleteId)}>
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
