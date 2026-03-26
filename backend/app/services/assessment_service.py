@@ -392,6 +392,10 @@ class AssessmentService:
         audit = db.get(Audit, audit_id)
         if not audit:
             raise ValueError(f"Audit #{audit_id} introuvable")
+        if audit.entreprise_id != scan.entreprise_id:
+            raise ValueError(
+                "Le scan Monkey365 appartient à une entreprise différente de l'audit cible"
+            )
 
         # Trouver le framework CIS-M365-V5
         framework = (

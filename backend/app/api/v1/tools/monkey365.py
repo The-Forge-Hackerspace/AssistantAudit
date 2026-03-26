@@ -138,7 +138,7 @@ async def cancel_monkey365_scan(
     if result.status != Monkey365ScanStatus.RUNNING:
         raise HTTPException(400, "Ce scan n'est pas en cours d'exécution")
 
-    result.status = Monkey365ScanStatus.FAILED
+    result.status = Monkey365ScanStatus.CANCELLED
     result.completed_at = datetime.now(timezone.utc)
     result.error_message = "Scan annulé manuellement"
     db.commit()

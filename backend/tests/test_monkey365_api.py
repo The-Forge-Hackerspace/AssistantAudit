@@ -415,7 +415,7 @@ def test_launch_scan_export_to_auto_includes_json(mock_exec, client: TestClient,
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
 def test_cancel_running_scan_moves_to_failed(mock_exec, client: TestClient, db_session, auditeur_headers):
-    """POST /cancel on a running scan transitions status to failed."""
+    """POST /cancel on a running scan transitions status to cancelled."""
     mock_exec.return_value = None
     entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
 
@@ -432,7 +432,7 @@ def test_cancel_running_scan_moves_to_failed(mock_exec, client: TestClient, db_s
         headers=auditeur_headers,
     )
     assert cancel.status_code == 200
-    assert cancel.json()["status"] == "failed"
+    assert cancel.json()["status"] == "cancelled"
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
@@ -708,3 +708,41 @@ def test_delete_scan_not_found_returns_404(client: TestClient, auditeur_headers)
         headers=auditeur_headers,
     )
     assert response.status_code == 404
+
+
+# ─── Import-to-audit cross-tenant tests ──────────────────────────────────
+
+@patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
+def test_import_to_audit_rejects_cross_tenant_mismatch(mock_exec, client: TestClient, db_session, auditeur_headers):
+    """POST /import-to-audit rejects scan-audit entreprise mismatch (multi-tenant safety)."""
+    from app.models.monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
+    from tests.factories import AuditFactory
+
+    mock_exec.return_value = None
+
+    entreprise_scan = EntrepriseFactory.create(db_session, nom="Entreprise Scan")
+    entreprise_audit = EntrepriseFactory.create(db_session, nom="Entreprise Audit")
+
+    # Create a successful scan belonging to entreprise_scan
+    launch = client.post(
+        "/api/v1/tools/monkey365/run",
+        json=_run_payload(entreprise_scan.id),
+        headers=auditeur_headers,
+    )
+    assert launch.status_code == 201
+    result_id = launch.json()["id"]
+
+    result = db_session.get(Monkey365ScanResult, result_id)
+    result.status = Monkey365ScanStatus.SUCCESS
+    db_session.commit()
+
+    # Create an audit belonging to a DIFFERENT entreprise
+    audit = AuditFactory.create(db_session, nom_projet="Audit Autre", entreprise_id=entreprise_audit.id)
+
+    response = client.post(
+        f"/api/v1/tools/monkey365/scans/{result_id}/import-to-audit",
+        json={"audit_id": audit.id},
+        headers=auditeur_headers,
+    )
+    assert response.status_code == 400
+    assert "entreprise" in response.json()["detail"].lower()

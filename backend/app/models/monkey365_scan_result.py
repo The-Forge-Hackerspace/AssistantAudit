@@ -22,6 +22,7 @@ class Monkey365ScanStatus(str, PyEnum):
     RUNNING = "running"
     SUCCESS = "success"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class Monkey365ScanResult(Base):

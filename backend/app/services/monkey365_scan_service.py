@@ -242,6 +242,12 @@ class Monkey365ScanService:
             try:
                 result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, result_id))
                 if result:
+                    if result.status == Monkey365ScanStatus.CANCELLED:
+                        logger.info(
+                            "[MONKEY365] Scan #%s annulé par l'utilisateur — finalisation ignorée",
+                            result_id,
+                        )
+                        return
                     completed_at = datetime.now(timezone.utc)
                     result.status = final_status
                     result.completed_at = completed_at
