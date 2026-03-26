@@ -13,6 +13,7 @@ from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
+from ..core.encryption import EncryptedText
 
 
 def _utcnow() -> datetime:
@@ -33,6 +34,10 @@ class ADAuditResultModel(Base):
     equipement_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("equipements.id"), nullable=True, index=True
     )
+    # Isolation inter-techniciens — NULL temporaire
+    owner_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), index=True
+    )
     status: Mapped[ADAuditStatus] = mapped_column(
         Enum(ADAuditStatus), default=ADAuditStatus.RUNNING, nullable=False
     )
@@ -41,7 +46,7 @@ class ADAuditResultModel(Base):
     # Connexion
     target_host: Mapped[str] = mapped_column(String(255), nullable=False)
     target_port: Mapped[int] = mapped_column(Integer, nullable=False, default=389)
-    username: Mapped[str] = mapped_column(String(255), nullable=False)
+    username: Mapped[str] = mapped_column(EncryptedText, nullable=False)
     domain: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Données domaine
@@ -68,8 +73,8 @@ class ADAuditResultModel(Base):
     gpo_list: Mapped[list | None] = mapped_column(JSON)
     laps_deployed: Mapped[bool | None] = mapped_column(default=False)
 
-    # Findings (constats d'audit)
-    findings: Mapped[list | None] = mapped_column(JSON)
+    # Findings (constats d'audit) — chiffre au repos, JSON serialise en texte
+    findings: Mapped[str | None] = mapped_column(EncryptedText)
     summary: Mapped[dict | None] = mapped_column(JSON)
 
     # Métadonnées

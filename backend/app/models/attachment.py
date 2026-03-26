@@ -9,7 +9,9 @@ La base de données ne stocke que le chemin relatif.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+import uuid
+
+from sqlalchemy import DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -41,10 +43,19 @@ class Attachment(Base):
     # Description optionnelle
     description: Mapped[str | None] = mapped_column(Text)
 
+    # Chiffrement envelope (fichiers sur disque)
+    file_uuid: Mapped[str | None] = mapped_column(
+        String(36), unique=True, default=lambda: str(uuid.uuid4())
+    )  # Nom du fichier chiffre sur disque : {file_uuid}.enc dans data/blobs/
+    encrypted_dek: Mapped[bytes | None] = mapped_column(LargeBinary)
+    dek_nonce: Mapped[bytes | None] = mapped_column(LargeBinary)
+    kek_version: Mapped[int | None] = mapped_column(Integer, default=1)
+
     # Métadonnées
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
+    # TODO: Migrer uploaded_by vers Integer FK users.id dans une etape ulterieure
     uploaded_by: Mapped[str | None] = mapped_column(String(200))
 
     # Relations

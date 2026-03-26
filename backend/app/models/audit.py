@@ -39,6 +39,10 @@ class Audit(Base):
     entreprise_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("entreprises.id"), nullable=False, index=True
     )
+    # Isolation inter-techniciens — NULL temporaire, sera peuple par script de migration
+    owner_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), index=True
+    )
 
     # Bloc Administratif
     lettre_mission_path: Mapped[str | None] = mapped_column(String(500))
@@ -52,6 +56,7 @@ class Audit(Base):
     risques_initiaux: Mapped[str | None] = mapped_column(Text)
 
     # Relations
+    owner: Mapped["User"] = relationship()  # type: ignore[name-defined]
     entreprise: Mapped["Entreprise"] = relationship(back_populates="audits")  # type: ignore[name-defined]
     campaigns: Mapped[list["AssessmentCampaign"]] = relationship(  # type: ignore[name-defined]
         back_populates="audit", cascade="all, delete-orphan", lazy="selectin"
