@@ -4,6 +4,7 @@ Service Assessment : campagnes d'évaluation, scoring, résultats.
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.orm import Session, selectinload
@@ -15,8 +16,11 @@ from ..models.assessment import (
     CampaignStatus,
     ComplianceStatus,
 )
-from ..models.framework import Framework
+from ..models.audit import Audit
+from ..models.framework import Framework, Control
 from ..models.equipement import Equipement, EquipementAuditStatus
+from ..models.monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
+from ..models.site import Site
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +157,7 @@ class AssessmentService:
         campaign_id: int,
         equipement_id: int,
         framework_id: int,
-        assessed_by: str = None,
+        assessed_by: str | None = None,
     ) -> Assessment:
         """
         Crée un assessment : lie un équipement à un framework dans une campagne.
@@ -244,7 +248,7 @@ class AssessmentService:
         evidence: str = None,
         comment: str = None,
         remediation_note: str = None,
-        assessed_by: str = None,
+        assessed_by: str | None = None,
     ) -> ControlResult:
         """Met à jour le résultat d'un contrôle"""
         result = db.get(ControlResult, result_id)
@@ -269,7 +273,7 @@ class AssessmentService:
     def bulk_update_results(
         db: Session,
         updates: list[dict],
-        assessed_by: str = None,
+        assessed_by: str | None = None,
     ) -> int:
         """Met à jour plusieurs résultats en une fois (ex: résultats auto)"""
         count = 0
@@ -348,10 +352,211 @@ class AssessmentService:
         campaign = db.query(AssessmentCampaign).options(
             selectinload(AssessmentCampaign.assessments).selectinload(Assessment.results),
         ).filter(AssessmentCampaign.id == campaign_id).first()
-        
+
         if not campaign:
             return None
         all_results = []
         for assessment in campaign.assessments:
             all_results.extend(assessment.results)
         return AssessmentService.compute_score(all_results)
+
+    # ── Importation Monkey365 ─────────────────────────────────────────────────
+
+    @staticmethod
+    def import_monkey365_scan(
+        db: Session,
+        scan_result_id: int,
+        audit_id: int,
+        assessed_by: str | None = None,
+    ) -> dict:
+        """
+        Importe un scan Monkey365 réussi dans un audit existant.
+
+        - Crée (ou réutilise) un équipement virtuel cloud_gateway par site
+        - Crée une campagne et un assessment liés au framework CIS-M365-V5
+        - Remplit les ControlResult automatiquement à partir des findings Monkey365
+        - Démarre la campagne (statut IN_PROGRESS)
+
+        Retourne : { campaign_id, assessment_id, controls_mapped, controls_total }
+        """
+        from ..tools.monkey365_runner.parser import Monkey365Parser
+
+        # Charger et valider le scan
+        scan = db.get(Monkey365ScanResult, scan_result_id)
+        if not scan:
+            raise ValueError(f"Scan Monkey365 #{scan_result_id} introuvable")
+        if scan.status != Monkey365ScanStatus.SUCCESS:
+            raise ValueError("L'import n'est possible que pour les scans réussis")
+
+        # Charger et valider l'audit
+        audit = db.get(Audit, audit_id)
+        if not audit:
+            raise ValueError(f"Audit #{audit_id} introuvable")
+        if audit.entreprise_id != scan.entreprise_id:
+            raise ValueError(
+                "Le scan Monkey365 appartient à une entreprise différente de l'audit cible"
+            )
+
+        # Trouver le framework CIS-M365-V5
+        framework = (
+            db.query(Framework)
+            .filter(Framework.ref_id == "CIS-M365-V5")
+            .first()
+        )
+        if not framework:
+            raise ValueError("Framework CIS-M365-V5 introuvable — vérifiez que le YAML a bien été importé")
+
+        # Trouver ou créer le site dédié aux audits Microsoft 365.
+        # On cherche explicitement nom='Cloud' pour éviter de prendre
+        # un site physique existant et de mélanger cloud/on-prem.
+        site = (
+            db.query(Site)
+            .filter(
+                Site.entreprise_id == scan.entreprise_id,
+                Site.nom == "Cloud",
+            )
+            .first()
+        )
+        if not site:
+            site = Site(
+                nom="Cloud",
+                description="Site virtuel créé automatiquement pour les audits Microsoft 365",
+                entreprise_id=scan.entreprise_id,
+            )
+            db.add(site)
+            db.flush()
+            logger.info(f"Site virtuel 'Cloud' créé pour entreprise #{scan.entreprise_id}")
+
+        # Trouver ou créer un équipement virtuel cloud_gateway (IP 0.0.0.0 par site)
+        virtual_eq = (
+            db.query(Equipement)
+            .filter(
+                Equipement.site_id == site.id,
+                Equipement.ip_address == "0.0.0.0",
+                Equipement.type_equipement == "cloud_gateway",
+            )
+            .first()
+        )
+        if not virtual_eq:
+            virtual_eq = Equipement(
+                site_id=site.id,
+                ip_address="0.0.0.0",
+                type_equipement="cloud_gateway",
+                hostname="Microsoft 365 Tenant",
+            )
+            db.add(virtual_eq)
+            db.flush()
+            logger.info(f"Équipement virtuel cloud_gateway créé pour site #{site.id}")
+
+        # Créer la campagne
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        entreprise_label = scan.entreprise_slug or f"entreprise-{scan.entreprise_id}"
+        campaign_name = f"Audit M365 Cloud — {entreprise_label} — {date_str}"
+
+        campaign = AssessmentCampaign(
+            name=campaign_name,
+            description=f"Import automatique du scan Monkey365 #{scan_result_id}",
+            audit_id=audit_id,
+            status=CampaignStatus.DRAFT,
+        )
+        db.add(campaign)
+        db.flush()
+
+        # Créer l'assessment
+        assessment = Assessment(
+            campaign_id=campaign.id,
+            equipement_id=virtual_eq.id,
+            framework_id=framework.id,
+            assessed_by=assessed_by,
+        )
+        db.add(assessment)
+        db.flush()
+
+        # Générer un ControlResult par contrôle du framework
+        all_controls: list[Control] = []
+        for category in framework.categories:
+            all_controls.extend(category.controls)
+
+        results_by_control: dict[int, ControlResult] = {}
+        for control in all_controls:
+            cr = ControlResult(
+                assessment_id=assessment.id,
+                control_id=control.id,
+                status=ComplianceStatus.NOT_ASSESSED,
+            )
+            db.add(cr)
+            results_by_control[control.id] = cr
+        db.flush()
+
+        # Parser les findings Monkey365
+        scan_dir: Path | None = None
+        if scan.output_path:
+            candidate = Path(scan.output_path)
+            if candidate.exists():
+                scan_dir = candidate
+
+        findings_by_rule: dict[str, str] = {}
+        if scan_dir:
+            try:
+                findings = Monkey365Parser.parse_output_directory(str(scan_dir))
+                for f in findings:
+                    if f.rule_id:
+                        findings_by_rule[f.rule_id.lower()] = f.status_text
+                logger.info(
+                    f"Monkey365Parser : {len(findings)} findings, "
+                    f"{len(findings_by_rule)} règles distinctes"
+                )
+            except Exception:
+                logger.exception("Erreur lors du parsing des findings Monkey365")
+        else:
+            logger.warning(
+                f"Aucun répertoire de sortie accessible pour le scan #{scan_result_id}"
+            )
+
+        # Mapping status_text → ComplianceStatus
+        STATUS_MAP = {
+            "compliant": ComplianceStatus.COMPLIANT,
+            "non_compliant": ComplianceStatus.NON_COMPLIANT,
+            "partially_compliant": ComplianceStatus.PARTIALLY_COMPLIANT,
+            "not_assessed": ComplianceStatus.NOT_ASSESSED,
+        }
+
+        # Appliquer les findings aux ControlResult
+        controls_mapped = 0
+        now = datetime.now(timezone.utc)
+        for control in all_controls:
+            rule_id = control.engine_rule_id
+            if not rule_id:
+                continue
+            status_text = findings_by_rule.get(rule_id.lower())
+            if status_text and status_text in STATUS_MAP:
+                cr = results_by_control.get(control.id)
+                if cr is None:
+                    continue
+                cr.status = STATUS_MAP[status_text]
+                cr.is_auto_assessed = True
+                cr.assessed_by = assessed_by or "monkey365"
+                cr.assessed_at = now
+                controls_mapped += 1
+
+        # Démarrer la campagne
+        campaign.status = CampaignStatus.IN_PROGRESS
+        campaign.started_at = now
+        virtual_eq.status_audit = EquipementAuditStatus.EN_COURS
+
+        db.commit()
+        db.refresh(campaign)
+        db.refresh(assessment)
+
+        logger.info(
+            f"Import Monkey365 #{scan_result_id} → audit #{audit_id} : "
+            f"campagne #{campaign.id}, assessment #{assessment.id}, "
+            f"{controls_mapped}/{len(all_controls)} contrôles mappés"
+        )
+
+        return {
+            "campaign_id": campaign.id,
+            "assessment_id": assessment.id,
+            "controls_mapped": controls_mapped,
+            "controls_total": len(all_controls),
+        }

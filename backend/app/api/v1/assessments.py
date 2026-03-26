@@ -16,13 +16,12 @@ from ...schemas.assessment import (
     AssessmentRead,
     ControlResultUpdate,
     ControlResultRead,
-    M365ScanRequest,
     M365ScanSimulateRequest,
     M365ScanResponse,
 )
 from ...schemas.common import PaginatedResponse, MessageResponse, ScoreResponse
 from ...services.assessment_service import AssessmentService
-from ...services.monkey365_service import Monkey365Service, ScanRequest
+from ...services.monkey365_service import Monkey365Service
 
 router = APIRouter()
 
@@ -263,45 +262,6 @@ async def get_campaign_score(
 
 
 # --- Monkey365 / M365 Scan ---
-
-@router.post("/{assessment_id}/scan/m365", response_model=M365ScanResponse)
-async def run_m365_scan(
-    assessment_id: int,
-    body: M365ScanRequest,
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
-):
-    """
-    Lance un scan Monkey365 sur un assessment M365.
-    L'assessment doit utiliser un framework avec engine=monkey365.
-    Les résultats sont automatiquement mappés vers les contrôles.
-    """
-    from ...core.config import get_settings
-    settings = get_settings()
-
-    scan_req = ScanRequest(
-        tenant_id=body.tenant_id,
-        client_id=body.client_id,
-        client_secret=body.client_secret,
-        auth_method=body.auth_method,
-        provider=body.provider,
-        plugins=body.plugins,
-    )
-    result = Monkey365Service.run_scan_and_map(
-        db, assessment_id, scan_req,
-        monkey365_path=settings.MONKEY365_PATH or None,
-    )
-    return M365ScanResponse(
-        scan_id=result.scan_id,
-        status=result.status,
-        findings_count=result.findings_count,
-        mapped_count=result.mapped_count,
-        unmapped_count=result.unmapped_count,
-        error=result.error,
-        mapping_details=result.mapping_details,
-        manual_controls=result.manual_controls,
-    )
-
 
 @router.post("/{assessment_id}/scan/simulate", response_model=M365ScanResponse)
 async def simulate_m365_scan(

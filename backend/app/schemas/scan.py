@@ -2,9 +2,10 @@
 Schémas Pydantic pour les scans réseau (Nmap) et les outils intégrés.
 """
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from ..models.equipement import EQUIPEMENT_TYPE_VALUES
 
 
@@ -474,3 +475,80 @@ class PingCastleResultRead(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+# ─── Monkey365 Audit ─────────────────────────────────────────
+
+class Monkey365ExportFormat(str, Enum):
+    JSON = "JSON"
+    HTML = "HTML"
+    CSV = "CSV"
+
+
+class Monkey365ConfigSchema(BaseModel):
+    spo_sites: list[str] = Field(default_factory=list, description="SharePoint sites to scan (e.g., https://domain.sharepoint.com)")
+    export_to: list[Monkey365ExportFormat] = Field(default_factory=lambda: [Monkey365ExportFormat.JSON, Monkey365ExportFormat.HTML], description="Formats d'export : JSON, HTML, CSV")
+
+    @field_validator("export_to", mode="after")
+    @classmethod
+    def ensure_json_included(cls, v: list[Monkey365ExportFormat]) -> list[Monkey365ExportFormat]:
+        if Monkey365ExportFormat.JSON not in v:
+            return [Monkey365ExportFormat.JSON] + v
+        return v
+
+
+class Monkey365ScanCreate(BaseModel):
+    """Paramètres pour lancer un audit Monkey365."""
+    entreprise_id: int = Field(..., description="ID de l'entreprise")
+    config: Monkey365ConfigSchema = Field(..., description="Configuration Monkey365")
+
+
+class Monkey365ScanResultSummary(BaseModel):
+    """Résumé d'un audit Monkey365 pour la liste."""
+    id: int
+    entreprise_id: int
+    status: str
+    scan_id: str
+    entreprise_slug: Optional[str] = None
+    findings_count: Optional[int] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
+class Monkey365ScanResultRead(BaseModel):
+    """Détail complet d'un audit Monkey365."""
+    id: int
+    entreprise_id: int
+    status: str
+    scan_id: str
+    config_snapshot: Optional[dict] = None
+    output_path: Optional[str] = None
+    entreprise_slug: Optional[str] = None
+    findings_count: Optional[int] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
+class Monkey365ScanLogs(BaseModel):
+    """Logs PowerShell d'un scan Monkey365 (lecture en direct du fichier log)."""
+    lines: list[str]
+    total_lines: int
+
+
+class Monkey365ImportRequest(BaseModel):
+    """Paramètres pour importer un scan Monkey365 dans un audit existant."""
+    audit_id: int = Field(..., description="ID de l'audit cible")
+
+
+class Monkey365ImportResult(BaseModel):
+    """Résultat de l'import d'un scan Monkey365 dans un audit."""
+    campaign_id: int
+    assessment_id: int
+    controls_mapped: int
+    controls_total: int

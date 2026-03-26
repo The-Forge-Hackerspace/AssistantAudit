@@ -34,8 +34,16 @@ class Monkey365Parser:
     une liste de Monkey365Finding normalisés.
     """
 
-    # Mapping du niveau Monkey365 → statut normalisé
+    # Mapping statusCode Monkey365 (OCSF) → statut normalisé
     LEVEL_MAP = {
+        # Format OCSF (actuel)
+        "pass": "compliant",
+        "fail": "non_compliant",
+        "warning": "partially_compliant",
+        "warn": "partially_compliant",
+        "manual": "not_assessed",
+        "info": "not_assessed",
+        # Format legacy
         "Good": "compliant",
         "Pass": "compliant",
         "PASS": "compliant",
@@ -43,8 +51,8 @@ class Monkey365Parser:
         "WARN": "partially_compliant",
         "Fail": "non_compliant",
         "FAIL": "non_compliant",
-        "Info": "info",
-        "INFO": "info",
+        "Info": "not_assessed",
+        "INFO": "not_assessed",
         "Manual": "not_assessed",
         "MANUAL": "not_assessed",
     }
@@ -119,13 +127,21 @@ class Monkey365Parser:
 
     @classmethod
     def _parse_single_finding(cls, item: dict) -> Optional[Monkey365Finding]:
-        """Parse un résultat individuel Monkey365"""
+        """Parse un résultat individuel Monkey365 (format OCSF ou legacy)"""
         if not isinstance(item, dict):
             return None
 
-        # Monkey365 utilise plusieurs schémas de clés selon la version
+        # --- Format OCSF (Monkey365 actuel) ---
+        # rule_id : unmapped.ruleId (ex: "entraid_1145") ou metadata.eventCode
+        unmapped = item.get("unmapped") or {}
+        metadata = item.get("metadata") or {}
+        finding_info = item.get("findingInfo") or {}
+
         rule_id = (
-            item.get("idSuffix")
+            unmapped.get("ruleId")
+            or metadata.get("eventCode")
+            # Format legacy
+            or item.get("idSuffix")
             or item.get("ruleId")
             or item.get("id")
             or item.get("checkName")
@@ -135,40 +151,58 @@ class Monkey365Parser:
             return None
 
         title = (
-            item.get("title")
+            finding_info.get("title")
+            or item.get("title")
             or item.get("checkName")
             or item.get("displayName")
             or rule_id
         )
 
+        description = (
+            finding_info.get("description")
+            or item.get("description")
+            or ""
+        )
+
+        # statusCode OCSF : "pass" | "fail" | "warning" | "manual" | "info"
         level = (
-            item.get("level")
-            or item.get("status")
+            item.get("statusCode")
+            or item.get("level")
             or item.get("result")
-            or "Info"
+            or "info"
         )
 
-        severity = item.get("severity", "medium")
-        if isinstance(severity, dict):
-            severity = severity.get("level", "medium")
+        # Sévérité : chaîne (ex: "High") ou dict ou absent
+        raw_severity = item.get("severity", "medium")
+        if isinstance(raw_severity, dict):
+            raw_severity = raw_severity.get("level", "medium")
+        severity_map = {
+            "critical": "critical", "high": "high", "medium": "medium",
+            "low": "low", "info": "info", "informational": "info",
+            "unknown": "medium",
+        }
+        severity = severity_map.get(str(raw_severity).lower(), "medium")
 
-        # Ressources affectées
-        resources = (
-            item.get("affectedResources")
-            or item.get("resources")
-            or item.get("resourceName")
-            or []
-        )
-        if isinstance(resources, str):
-            resources = [resources]
+        # Ressources affectées (OCSF: resources.data[].details)
+        raw_resources = item.get("resources") or {}
+        if isinstance(raw_resources, dict):
+            data_entries = raw_resources.get("data") or []
+            resources = [
+                str(e.get("details") or e.get("name") or "")
+                for e in data_entries
+                if isinstance(e, dict) and (e.get("details") or e.get("name"))
+            ]
+        elif isinstance(raw_resources, list):
+            resources = [str(r) for r in raw_resources]
+        elif isinstance(raw_resources, str):
+            resources = [raw_resources]
+        else:
+            resources = []
 
-        # Références CIS
-        refs = item.get("references", {})
-        cis_ref = None
-        if isinstance(refs, dict):
-            cis_ref = refs.get("cis") or refs.get("CIS")
-        elif isinstance(refs, str):
-            cis_ref = refs if "CIS" in refs.upper() else None
+        # Remédiation
+        raw_remediation = item.get("remediation") or ""
+        if isinstance(raw_remediation, dict):
+            raw_remediation = raw_remediation.get("description") or ""
 
         # Output / evidence
         output = item.get("output") or item.get("rawData") or item.get("details") or ""
@@ -178,15 +212,15 @@ class Monkey365Parser:
         return Monkey365Finding(
             rule_id=rule_id,
             title=title,
-            description=item.get("description", ""),
+            description=description,
             level=level,
-            severity=str(severity).lower(),
+            severity=severity,
             status_text=cls.LEVEL_MAP.get(level, "not_assessed"),
-            output=str(output)[:5000],  # limiter la taille
+            output=str(output)[:5000],
             affected_resources=resources[:50],
-            remediation=item.get("remediation", item.get("rationale", "")),
+            remediation=raw_remediation,
             rationale=item.get("rationale", ""),
-            cis_reference=cis_ref,
+            cis_reference=None,
             raw=item,
         )
 
