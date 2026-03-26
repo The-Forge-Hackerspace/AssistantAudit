@@ -1,3 +1,4 @@
+import json
 import logging
 import threading
 import uuid
@@ -16,6 +17,9 @@ from ..tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+_scan_locks: dict[str, threading.Lock] = {}
+_lock_registry_lock = threading.Lock()
 
 
 class DBSession(Protocol):
@@ -139,6 +143,31 @@ class Monkey365ScanService:
         logger.info("[MONKEY365] Results moved to %s", dest_path)
 
     @staticmethod
+    def _get_scan_lock(monkey365_base: Path) -> threading.Lock:
+        """Return (or create) the per-instance lock for monkey365_base."""
+        key = str(monkey365_base)
+        with _lock_registry_lock:
+            if key not in _scan_locks:
+                _scan_locks[key] = threading.Lock()
+            return _scan_locks[key]
+
+    @staticmethod
+    def _count_json_findings(output_path: Path) -> int:
+        """Count findings from JSON files after results have been moved to output_path."""
+        INTERNAL_FILES = frozenset({"scan_params.json", "meta.json", "powershell_raw_output.json"})
+        total = 0
+        for json_file in output_path.rglob("*.json"):
+            if json_file.name in INTERNAL_FILES:
+                continue
+            try:
+                data = json.loads(json_file.read_text(encoding="utf-8", errors="replace"))
+                if isinstance(data, list):
+                    total += len(data)
+            except Exception:
+                pass
+        return total
+
+    @staticmethod
     def execute_scan_background(result_id: int, config_data: dict[str, object]) -> None:
         db = Monkey365ScanService._open_db()
         final_status = Monkey365ScanStatus.FAILED
@@ -164,17 +193,31 @@ class Monkey365ScanService:
             # Derive base dir from the executor's resolved path so it stays in sync
             # even when MONKEY365_PATH is unset and the executor falls back to DEFAULT_MONKEY365_DIR.
             monkey365_base = executor.monkey365_base_dir
-            dirs_before = Monkey365ScanService._snapshot_report_dirs(monkey365_base)
-
-            run_result = executor.run_scan(result.scan_id)
+            with Monkey365ScanService._get_scan_lock(monkey365_base):
+                dirs_before = Monkey365ScanService._snapshot_report_dirs(monkey365_base)
+                run_result = executor.run_scan(result.scan_id)
+                new_report_dir = Monkey365ScanService._find_new_report_dir(
+                    monkey365_base, dirs_before
+                )
 
             if run_result.get("status") == "success":
                 final_status = Monkey365ScanStatus.SUCCESS
-                raw_findings = run_result.get("results", [])
-                if isinstance(raw_findings, list):
-                    findings_count = len(raw_findings)
-
                 completed_at = datetime.now(timezone.utc)
+
+                if new_report_dir:
+                    dest = Path(result.output_path) if result.output_path else None
+                    if dest:
+                        Monkey365ScanService.move_results_to_output(new_report_dir, dest)
+                        findings_count = Monkey365ScanService._count_json_findings(dest)
+                        logger.info("[MONKEY365] Scan #%s results moved to %s", result_id, dest)
+                    else:
+                        logger.warning("[MONKEY365] Scan #%s: output_path non défini, résultats non déplacés", result_id)
+                else:
+                    logger.warning(
+                        "[MONKEY365] Scan #%s succeeded but no new report dir found in %s/monkey-reports/",
+                        result_id, monkey365_base,
+                    )
+
                 meta = {
                     "scan_id": result.scan_id,
                     "entreprise_id": result.entreprise_id,
@@ -187,22 +230,6 @@ class Monkey365ScanService:
                 }
                 if result.output_path:
                     write_meta_json(Path(result.output_path), meta)
-
-                new_report_dir = Monkey365ScanService._find_new_report_dir(
-                    monkey365_base, dirs_before
-                )
-                if new_report_dir:
-                    dest = Path(result.output_path) if result.output_path else None
-                    if dest:
-                        Monkey365ScanService.move_results_to_output(new_report_dir, dest)
-                        logger.info("[MONKEY365] Scan #%s results moved to %s", result_id, dest)
-                    else:
-                        logger.warning("[MONKEY365] Scan #%s: output_path non défini, résultats non déplacés", result_id)
-                else:
-                    logger.warning(
-                        "[MONKEY365] Scan #%s succeeded but no new report dir found in %s/monkey-reports/",
-                        result_id, monkey365_base,
-                    )
             else:
                 error = run_result.get("error", "Erreur inconnue")
                 final_error = str(error)[:500]
@@ -256,20 +283,11 @@ class Monkey365ScanService:
         entreprise_id: int,
         config: Monkey365ConfigSchema,
     ) -> Monkey365ScanResult:
-        pending = Monkey365ScanService.create_pending_scan(
+        return Monkey365ScanService.create_pending_scan(
             db=db,
             entreprise_id=entreprise_id,
             config=config,
         )
-
-        thread = threading.Thread(
-            target=Monkey365ScanService.execute_scan_background,
-            args=(pending.id, config.model_dump()),
-            daemon=True,
-            name=f"monkey365-scan-{pending.id}",
-        )
-        thread.start()
-        return pending
 
     @staticmethod
     def list_scans(

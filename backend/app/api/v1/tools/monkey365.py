@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -30,6 +30,7 @@ router = APIRouter()
 @router.post("/monkey365/run", response_model=Monkey365ScanResultSummary, status_code=201)
 async def launch_monkey365_scan(
     request: Monkey365ScanCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
 ):
@@ -49,6 +50,11 @@ async def launch_monkey365_scan(
         logger.exception("Unexpected error launching monkey365 scan")
         raise HTTPException(500, f"Erreur interne: {e}")
 
+    background_tasks.add_task(
+        Monkey365ScanService.execute_scan_background,
+        result.id,
+        request.config.model_dump(),
+    )
     logger.info(
         f"Monkey365 scan #{result.id} lancé en background "
         f"(entreprise={request.entreprise_id})"
@@ -100,9 +106,19 @@ async def get_monkey365_scan_logs(
     log_file = Path(result.output_path) / "monkey365.log"
     if not log_file.exists():
         return Monkey365ScanLogs(lines=[], total_lines=0)
+    LOG_TAIL_BYTES = 50 * 1024
     try:
-        content = log_file.read_text(encoding="utf-8", errors="replace")
+        with log_file.open("rb") as fh:
+            fh.seek(0, 2)
+            file_size = fh.tell()
+            tail_start = max(0, file_size - LOG_TAIL_BYTES)
+            fh.seek(tail_start)
+            raw = fh.read()
+        content = raw.decode("utf-8", errors="replace")
         lines = content.splitlines()
+        # Discard potentially partial first line when reading from the middle
+        if tail_start > 0 and len(lines) > 1:
+            lines = lines[1:]
         return Monkey365ScanLogs(lines=lines[-500:], total_lines=len(lines))
     except OSError as exc:
         logger.warning("Impossible de lire le fichier de logs %s: %s", log_file, exc)
@@ -164,6 +180,7 @@ async def get_monkey365_scan_report(
         path=str(html_file),
         media_type="text/html",
         filename=html_file.name,
+        headers={"Content-Disposition": f'attachment; filename="{html_file.name}"'},
     )
 
 

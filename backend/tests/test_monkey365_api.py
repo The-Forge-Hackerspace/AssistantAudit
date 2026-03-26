@@ -647,6 +647,7 @@ def test_report_returns_200_file_response_when_html_exists(mock_exec, client: Te
     )
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
+    assert "attachment" in response.headers.get("content-disposition", "")
     assert b"Monkey365 report" in response.content
 
 

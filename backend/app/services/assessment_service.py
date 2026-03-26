@@ -157,7 +157,7 @@ class AssessmentService:
         campaign_id: int,
         equipement_id: int,
         framework_id: int,
-        assessed_by: str = None,
+        assessed_by: str | None = None,
     ) -> Assessment:
         """
         Crée un assessment : lie un équipement à un framework dans une campagne.
@@ -248,7 +248,7 @@ class AssessmentService:
         evidence: str = None,
         comment: str = None,
         remediation_note: str = None,
-        assessed_by: str = None,
+        assessed_by: str | None = None,
     ) -> ControlResult:
         """Met à jour le résultat d'un contrôle"""
         result = db.get(ControlResult, result_id)
@@ -273,7 +273,7 @@ class AssessmentService:
     def bulk_update_results(
         db: Session,
         updates: list[dict],
-        assessed_by: str = None,
+        assessed_by: str | None = None,
     ) -> int:
         """Met à jour plusieurs résultats en une fois (ex: résultats auto)"""
         count = 0
@@ -367,7 +367,7 @@ class AssessmentService:
         db: Session,
         scan_result_id: int,
         audit_id: int,
-        assessed_by: str = None,
+        assessed_by: str | None = None,
     ) -> dict:
         """
         Importe un scan Monkey365 réussi dans un audit existant.
