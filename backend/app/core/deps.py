@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .database import get_db
-from .security import decode_token
+from .security import decode_token, verify_agent_token
 
 settings = get_settings()
 
@@ -72,6 +72,45 @@ async def get_current_admin(current_user=Depends(get_current_user)):
             detail="Droits administrateur requis",
         )
     return current_user
+
+
+async def get_current_agent(
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    """
+    Dependance pour les routes agent.
+    Verifie le token JWT agent et retourne l'objet Agent.
+    """
+    from jose import JWTError
+
+    if token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token agent requis",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        payload = verify_agent_token(token)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token agent invalide ou expire",
+        )
+
+    from ..models.agent import Agent
+
+    agent = db.query(Agent).filter(
+        Agent.agent_uuid == payload["sub"],
+        Agent.status == "active",
+    ).first()
+    if agent is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Agent introuvable ou revoque",
+        )
+    return agent
 
 
 async def get_current_auditeur(current_user=Depends(get_current_user)):
