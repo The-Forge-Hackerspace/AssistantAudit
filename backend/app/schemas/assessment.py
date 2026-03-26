@@ -119,11 +119,6 @@ class CampaignSummary(BaseModel):
 
 
 # --- M365 Scan ---
-class M365ScanRequest(BaseModel):
-    """Paramètres pour lancer un scan Monkey365 sur un assessment"""
-    spo_sites: list[str] = Field(default_factory=list, description="SharePoint sites to scan (e.g., https://domain.sharepoint.com)")
-
-
 class M365ScanSimulateRequest(BaseModel):
     """Injection manuelle de findings pour test/simulation"""
     findings: list[dict] = Field(..., description="Liste de findings Monkey365 simulés")
