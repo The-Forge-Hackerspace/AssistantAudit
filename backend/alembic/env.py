@@ -5,6 +5,7 @@ Lit DATABASE_URL depuis la config applicative (Settings).
 from logging.config import fileConfig
 from sqlalchemy import pool
 from alembic import context
+import sqlalchemy as sa
 import sys
 from pathlib import Path
 
@@ -38,9 +39,21 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode — uses the application engine."""
     with engine.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        # SQLite: disable FK checks during batch_alter_table (copy-and-move)
+        is_sqlite = connection.dialect.name == "sqlite"
+        if is_sqlite:
+            connection.execute(sa.text("PRAGMA foreign_keys=OFF"))
+
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=True,  # Required for SQLite ALTER TABLE support
+        )
         with context.begin_transaction():
             context.run_migrations()
+
+        if is_sqlite:
+            connection.execute(sa.text("PRAGMA foreign_keys=ON"))
 
 
 if context.is_offline_mode():
