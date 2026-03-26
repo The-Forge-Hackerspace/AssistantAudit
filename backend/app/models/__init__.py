@@ -49,6 +49,7 @@ from .pingcastle_result import PingCastleResult, PingCastleStatus
 from .monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
 from .agent import Agent
 from .agent_task import AgentTask
+from .anssi_checklist import AnssiCheckpoint
 
 __all__ = [
     "User",
@@ -102,4 +103,5 @@ __all__ = [
     "Monkey365ScanStatus",
     "Agent",
     "AgentTask",
+    "AnssiCheckpoint",
 ]
