@@ -40,6 +40,7 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     role: Optional[str] = Field(default=None, pattern=r"^(admin|auditeur|lecteur)$")
     is_active: Optional[bool] = None
+    password: Optional[str] = Field(default=None, min_length=8)
 
 
 class UserRead(UserBase):

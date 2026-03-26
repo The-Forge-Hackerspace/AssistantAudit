@@ -40,6 +40,14 @@ export interface RegisterRequest {
   role: "admin" | "auditeur" | "lecteur";
 }
 
+export interface UserUpdate {
+  email?: string;
+  full_name?: string;
+  role?: "admin" | "auditeur" | "lecteur";
+  is_active?: boolean;
+  password?: string;
+}
+
 export interface ChangePasswordRequest {
   current_password: string;
   new_password: string;
