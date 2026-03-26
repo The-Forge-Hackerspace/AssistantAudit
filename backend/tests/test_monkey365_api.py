@@ -5,10 +5,8 @@ Simplified config: only spo_sites and export_to (interactive auth hardcoded).
 """
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 
-from app.models.entreprise import Entreprise
 from tests.factories import EntrepriseFactory
 
 
@@ -517,8 +515,7 @@ def test_logs_returns_content_when_log_file_exists(mock_exec, client: TestClient
     )
     assert launch.status_code == 201
     result_id = launch.json()["id"]
-    output_path = launch.json()["output_path"] if "output_path" in launch.json() else None
-
+   
     # Get output_path from detail endpoint
     detail = client.get(
         f"/api/v1/tools/monkey365/scans/result/{result_id}",

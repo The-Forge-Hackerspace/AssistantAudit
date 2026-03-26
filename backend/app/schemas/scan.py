@@ -3,9 +3,9 @@ Schémas Pydantic pour les scans réseau (Nmap) et les outils intégrés.
 """
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from ..models.equipement import EQUIPEMENT_TYPE_VALUES
 
 

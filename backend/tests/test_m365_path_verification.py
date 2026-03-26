@@ -7,7 +7,7 @@ Tests path construction, backward compatibility, edge cases, and data integrity.
 
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import pytest
 
 from app.core.storage import (

@@ -4,8 +4,6 @@ Tests for PowerShell script generation in interactive mode.
 Covers the fix where interactive scripts were missing the Import-Module statement,
 causing "Invoke-Monkey365 : The term 'Invoke-Monkey365' is not recognized" errors.
 """
-import pytest
-from pathlib import Path
 
 from app.tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor
 

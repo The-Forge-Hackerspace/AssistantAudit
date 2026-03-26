@@ -6,7 +6,6 @@ with the simplified interactive-only configuration.
 """
 
 import json
-import pytest
 from unittest.mock import MagicMock, patch
 
 from app.tools.monkey365_runner.executor import (
