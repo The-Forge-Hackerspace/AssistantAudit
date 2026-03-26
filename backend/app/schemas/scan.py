@@ -552,3 +552,38 @@ class Monkey365ImportResult(BaseModel):
     assessment_id: int
     controls_mapped: int
     controls_total: int
+
+
+# ─── Monkey365 Streaming (Device Code Flow) ─────────────────
+
+class Monkey365AuthMethod(str, Enum):
+    DEVICE_CODE = "device_code"
+    CERTIFICATE = "certificate"
+    CLIENT_SECRET = "client_secret"
+
+
+class Monkey365StreamingScanCreate(BaseModel):
+    """Parametres pour lancer un scan Monkey365 streaming avec Device Code Flow."""
+    entreprise_id: int = Field(..., description="ID de l'entreprise")
+    tenant_id: str = Field(..., min_length=1, description="Azure AD tenant ID")
+    auth_method: Monkey365AuthMethod = Field(
+        default=Monkey365AuthMethod.DEVICE_CODE,
+        description="Methode d'authentification",
+    )
+    subscriptions: list[str] = Field(default_factory=list, description="Azure subscriptions a auditer")
+    ruleset: str = Field(default="cis", description="Ruleset (cis, etc.)")
+    config: Monkey365ConfigSchema = Field(
+        default_factory=Monkey365ConfigSchema,
+        description="Configuration Monkey365 (spo_sites, export_to)",
+    )
+
+
+class Monkey365StreamingScanResponse(BaseModel):
+    """Reponse immediate au lancement d'un scan streaming."""
+    id: int
+    scan_id: str
+    status: str
+    auth_method: Optional[str] = None
+    message: str = "Scan lance. Ecoutez les evenements WebSocket pour le device code."
+
+    model_config = {"from_attributes": True}

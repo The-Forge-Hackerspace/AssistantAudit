@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import threading
@@ -11,6 +12,7 @@ from ..core.config import get_settings
 from ..core.database import SessionLocal
 from ..core.storage import ensure_scan_directory, slugify, write_meta_json
 from ..models.entreprise import Entreprise
+from ..models.enums import AuthMethod
 from ..models.monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
 from ..schemas.scan import Monkey365ConfigSchema
 from ..tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor
@@ -315,6 +317,125 @@ class Monkey365ScanService:
     @staticmethod
     def get_scan(db: DBSession, scan_id: int) -> Monkey365ScanResult | None:
         return cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, scan_id))
+
+    # ── Streaming scan (Device Code Flow) ─────────────────────────
+
+    @staticmethod
+    def create_streaming_scan(
+        db: DBSession,
+        entreprise_id: int,
+        tenant_id: str,
+        auth_method: str,
+        config: Monkey365ConfigSchema,
+    ) -> Monkey365ScanResult:
+        """Cree un scan en mode streaming avec status AUTHENTICATING."""
+        entreprise = cast(Entreprise | None, db.get(Entreprise, entreprise_id))
+        if not entreprise:
+            raise ValueError(f"Entreprise #{entreprise_id} introuvable")
+
+        scan_id = str(uuid.uuid4())
+        entreprise_slug = slugify(entreprise.nom)
+        output_path = ensure_scan_directory(entreprise.nom, scan_id, tool="M365")
+
+        config_snapshot = {
+            "tenant_id": tenant_id,
+            "auth_method": auth_method,
+            "spo_sites": config.spo_sites,
+            "export_to": config.export_to,
+            "output_dir": str(output_path),
+        }
+
+        result = Monkey365ScanResult(
+            entreprise_id=entreprise_id,
+            status=Monkey365ScanStatus.AUTHENTICATING,
+            scan_id=scan_id,
+            auth_method=auth_method,
+            config_snapshot=config_snapshot,
+            output_path=str(output_path),
+            entreprise_slug=entreprise_slug,
+        )
+        db.add(result)
+        db.commit()
+        db.refresh(result)
+        return result
+
+    @staticmethod
+    async def execute_streaming_scan(
+        result_id: int,
+        user_id: int,
+        tenant_id: str,
+        subscriptions: list[str],
+        ruleset: str,
+        auth_method_str: str,
+    ) -> None:
+        """
+        Tache async en background : lance le scan streaming et streame via WebSocket.
+        """
+        from ..core.websocket_manager import ws_manager
+        from .monkey365_streaming_executor import Monkey365StreamingExecutor
+
+        db = Monkey365ScanService._open_db()
+        try:
+            result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, result_id))
+            if not result:
+                logger.error("[MONKEY365-STREAM] Scan #%s introuvable", result_id)
+                return
+
+            auth_method = AuthMethod(auth_method_str)
+
+            async def ws_callback(event_type: str, data: dict) -> None:
+                await ws_manager.send_to_user(user_id, event_type, data)
+
+            executor = Monkey365StreamingExecutor(
+                scan_id=result_id,
+                ws_callback=ws_callback,
+            )
+
+            # Passer en RUNNING des que l'auth est faite (device code envoye)
+            result.status = Monkey365ScanStatus.RUNNING
+            db.commit()
+
+            run_result = await executor.run_scan_streaming(
+                tenant_id=tenant_id,
+                subscriptions=subscriptions,
+                ruleset=ruleset,
+                auth_method=auth_method,
+            )
+
+            if run_result.get("status") == "success":
+                result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, result_id))
+                if result and result.status != Monkey365ScanStatus.CANCELLED:
+                    result.status = Monkey365ScanStatus.SUCCESS
+                    result.completed_at = datetime.now(timezone.utc)
+                    if result.created_at:
+                        created = result.created_at
+                        if created.tzinfo is None:
+                            created = created.replace(tzinfo=timezone.utc)
+                        result.duration_seconds = max(
+                            0, int((result.completed_at - created).total_seconds())
+                        )
+                    db.commit()
+            else:
+                result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, result_id))
+                if result and result.status != Monkey365ScanStatus.CANCELLED:
+                    result.status = Monkey365ScanStatus.FAILED
+                    result.error_message = str(run_result.get("error", ""))[:500]
+                    result.completed_at = datetime.now(timezone.utc)
+                    db.commit()
+
+        except Exception as exc:
+            logger.exception("[MONKEY365-STREAM] Erreur fatale scan #%s", result_id)
+            try:
+                result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, result_id))
+                if result and result.status != Monkey365ScanStatus.CANCELLED:
+                    result.status = Monkey365ScanStatus.FAILED
+                    result.error_message = str(exc)[:500]
+                    result.completed_at = datetime.now(timezone.utc)
+                    db.commit()
+            except Exception:
+                logger.exception("[MONKEY365-STREAM] Impossible de finaliser #%s", result_id)
+        finally:
+            db.close()
 
     @staticmethod
     def delete_scan(db: DBSession, scan_id: int) -> bool:
