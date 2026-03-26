@@ -95,11 +95,16 @@ class Settings(BaseSettings):
     # --- Outils intégrés ---
     NMAP_TIMEOUT: int = 600  # secondes
     MONKEY365_PATH: str = ""  # chemin vers Invoke-Monkey365.ps1
+    MONKEY365_TIMEOUT: int = 600  # secondes
+    MONKEY365_AUTO_CLONE: bool = False  # autoriser le clonage git automatique de monkey365
 
     # --- PingCastle ---
     PINGCASTLE_PATH: str = ""  # chemin vers PingCastle.exe
     PINGCASTLE_TIMEOUT: int = 300  # secondes
     PINGCASTLE_OUTPUT_DIR: str = str(BASE_DIR / "uploads" / "pingcastle")
+
+    # --- Données / Stockage ---
+    DATA_DIR: str = "./data"  # base directory for scan output storage
 
     # --- Logging ---
     LOG_LEVEL: str = "INFO"

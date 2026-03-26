@@ -1,264 +1,335 @@
-"""
-Monkey365 Executor — Bridge Python → PowerShell pour l'audit M365/Azure.
-"""
 import json
 import logging
-import re
+import os
 import subprocess
+import time
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import cast
 
 logger = logging.getLogger(__name__)
+# Derived from this file's location: backend/app/tools/monkey365_runner/executor.py
+# parents[4] → project root (AssistantAudit/)
+DEFAULT_MONKEY365_DIR = Path(__file__).resolve().parents[4] / "tools" / "monkey365"
 
 
-# ── Sanitisation des paramètres PowerShell ───────────────────────────────────
-
-# UUID / GUID pattern (tenant_id, client_id)
-_UUID_PATTERN = re.compile(
-    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-)
-# Client secret : alphanumériques, tirets, tildes, points, underscores (Azure AD format)
-_SECRET_PATTERN = re.compile(r"^[a-zA-Z0-9_.~\-]{1,256}$")
-# Certificate thumbprint : hexadécimal 40 chars (SHA-1)
-_THUMBPRINT_PATTERN = re.compile(r"^[0-9a-fA-F]{40}$")
-# Nom d'analyse / ruleset : alphanum, underscores, tirets
-_SAFE_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]+$")
+class Monkey365ExecutionError(RuntimeError):
+    pass
 
 
 def _escape_ps_string(value: str) -> str:
-    """
-    Échappe une valeur pour insertion sûre dans une string PowerShell
-    entourée de guillemets simples.
-
-    En PowerShell, le seul échappement dans une single-quoted string est
-    de doubler les apostrophes : ' → ''
-    """
     return value.replace("'", "''")
-
-
-def _validate_uuid(value: str, field_name: str) -> str:
-    """Valide qu'une valeur est un UUID valide."""
-    if not _UUID_PATTERN.match(value):
-        raise ValueError(
-            f"{field_name} invalide : format UUID attendu (ex: 12345678-1234-1234-1234-123456789abc)"
-        )
-    return value
-
-
-def _validate_secret(value: str) -> str:
-    """Valide un client secret (pas d'injection possible)."""
-    if not _SECRET_PATTERN.match(value):
-        raise ValueError(
-            "Client secret contient des caractères non autorisés. "
-            "Seuls les caractères alphanumériques, points, tirets, tildes "
-            "et underscores sont acceptés."
-        )
-    return value
-
-
-def _validate_thumbprint(value: str) -> str:
-    """Valide un thumbprint de certificat."""
-    if not _THUMBPRINT_PATTERN.match(value):
-        raise ValueError(
-            "Thumbprint de certificat invalide : 40 caractères hexadécimaux attendus."
-        )
-    return value
-
-
-def _validate_safe_name(value: str, field_name: str) -> str:
-    """Valide un nom (analyse, ruleset) pour éviter l'injection."""
-    if not _SAFE_NAME_PATTERN.match(value):
-        raise ValueError(
-            f"{field_name} invalide : seuls les caractères alphanumériques, "
-            f"tirets et underscores sont autorisés."
-        )
-    return value
-
-
-class M365Provider(str, Enum):
-    MICROSOFT365 = "Microsoft365"
-    AZURE = "Azure"
-    ENTRA_ID = "EntraID"
-
-
-class AuthMethod(str, Enum):
-    INTERACTIVE = "interactive"
-    CLIENT_CREDENTIALS = "client_credentials"
-    CERTIFICATE = "certificate"
 
 
 @dataclass
 class Monkey365Config:
-    provider: M365Provider = M365Provider.MICROSOFT365
-    auth_method: AuthMethod = AuthMethod.CLIENT_CREDENTIALS
-    tenant_id: str = ""
-    client_id: str = ""
-    client_secret: str = ""
-    certificate_path: Optional[str] = None
     output_dir: str = "./monkey365_output"
-    rulesets: list[str] = field(default_factory=lambda: ["cis_m365_benchmark"])
-    plugins: list[str] = field(default_factory=list)
+    spo_sites: list[str] = field(default_factory=list)
+    export_to: list[str] = field(default_factory=lambda: ["JSON", "HTML"])
 
 
 class Monkey365Executor:
-    """Exécute Monkey365 via PowerShell et récupère les résultats JSON."""
 
-    DEFAULT_ANALYSES = {
-        M365Provider.MICROSOFT365: [
-            "ExchangeOnline", "SharePointOnline",
-            "MicrosoftTeams", "MicrosoftForms", "Purview",
-        ],
-        M365Provider.ENTRA_ID: [
-            "EntraID", "EntraIDIdentityGovernance", "ConditionalAccess",
-        ],
-        M365Provider.AZURE: [
-            "Compute", "Networking", "Storage",
-            "KeyVault", "RBAC", "Monitor",
-        ],
-    }
+    COLLECT_MODULES = ["ExchangeOnline", "MicrosoftTeams", "Purview", "SharePointOnline", "AdminPortal"]
 
-    def __init__(self, config: Monkey365Config, monkey365_path: Optional[str] = None):
+    def __init__(self, config: Monkey365Config, monkey365_path: str | None = None, allow_auto_clone: bool = False):
         self.config = config
+        self.allow_auto_clone = allow_auto_clone
         self.monkey365_path = self._resolve_path(monkey365_path)
-        self.output_dir = Path(config.output_dir)
+        self.monkey365_base_dir: Path = self.monkey365_path.parent
+        self.output_dir = Path(self.config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def _resolve_path(self, path: Optional[str]) -> Path:
-        """Localise Monkey365"""
-        candidates = [
-            Path(path) if path else None,
-            Path("./integrations/monkey365/Invoke-Monkey365.ps1"),
-        ]
-        for p in candidates:
-            if p and p.exists():
-                return p
-        raise FileNotFoundError(
-            "Monkey365 non trouvé. Installez-le avec :\n"
-            "  git submodule add https://github.com/silverhack/monkey365 integrations/monkey365\n"
-            "  ou : Install-Module -Name monkey365 -Scope CurrentUser"
-        )
+    def _resolve_path(self, path: str | None) -> Path:
+        if path:
+            candidate = Path(path)
+            if candidate.is_dir():
+                direct_invoke = candidate / "Invoke-Monkey365.ps1"
+                direct_module = candidate / "monkey365.psm1"
+                if direct_invoke.exists() or direct_module.exists():
+                    return direct_invoke
 
-    def _get_analyses(self) -> list[str]:
-        if self.config.plugins:
-            return self.config.plugins
-        return self.DEFAULT_ANALYSES.get(self.config.provider, [])
+                nested_dir = candidate / "monkey365"
+                nested_invoke = nested_dir / "Invoke-Monkey365.ps1"
+                nested_module = nested_dir / "monkey365.psm1"
+                if nested_invoke.exists() or nested_module.exists():
+                    return nested_invoke
 
-    def build_script(self, scan_id: str) -> str:
-        """
-        Génère le script PowerShell pour lancer le scan.
-        Tous les paramètres utilisateur sont validés ET échappés.
-        """
-        # ── Validation des paramètres sensibles ──────────────────────────
-        _validate_uuid(self.config.tenant_id, "tenant_id")
+                return nested_invoke
+            return candidate
 
-        if self.config.auth_method == AuthMethod.CLIENT_CREDENTIALS:
-            _validate_uuid(self.config.client_id, "client_id")
-            _validate_secret(self.config.client_secret)
-        elif self.config.auth_method == AuthMethod.CERTIFICATE:
-            _validate_uuid(self.config.client_id, "client_id")
-            if self.config.certificate_path:
-                _validate_thumbprint(self.config.certificate_path)
+        default_invoke = DEFAULT_MONKEY365_DIR / "Invoke-Monkey365.ps1"
+        if default_invoke.exists():
+            return default_invoke
 
-        # Valider les noms d'analyses et rulesets
-        for analysis in self._get_analyses():
-            _validate_safe_name(analysis, "analysis")
+        integrations_invoke = Path(".\\integrations\\monkey365\\Invoke-Monkey365.ps1")
+        if integrations_invoke.exists():
+            return integrations_invoke
 
-        if self.config.rulesets:
-            for ruleset in self.config.rulesets:
-                _validate_safe_name(ruleset, "ruleset")
+        return default_invoke
 
-        # ── Construction du script avec échappement ──────────────────────
-        output_path = self.output_dir / scan_id
-        analyses = ", ".join(
-            f"'{_escape_ps_string(a)}'" for a in self._get_analyses()
-        )
+    def ensure_monkey365_ready(self) -> Path:
+        monkey365_dir = self.monkey365_path.parent if self.monkey365_path else DEFAULT_MONKEY365_DIR
 
-        # Échapper toutes les valeurs interpolées
-        safe_module_path = _escape_ps_string(str(self.monkey365_path.parent))
-        safe_provider = _escape_ps_string(self.config.provider.value)
-        safe_output = _escape_ps_string(str(output_path))
-        safe_tenant = _escape_ps_string(self.config.tenant_id)
-
-        script = f"""
-Import-Module '{safe_module_path}' -Force
-
-$params = @{{
-    Instance   = '{safe_provider}'
-    Analysis   = @({analyses})
-    ExportTo   = @('JSON', 'HTML')
-    OutDir     = '{safe_output}'
-    TenantId   = '{safe_tenant}'
-}}
-"""
-        if self.config.auth_method == AuthMethod.CLIENT_CREDENTIALS:
-            safe_secret = _escape_ps_string(self.config.client_secret)
-            safe_client_id = _escape_ps_string(self.config.client_id)
-            script += f"""
-$secret = ConvertTo-SecureString '{safe_secret}' -AsPlainText -Force
-$cred = New-Object System.Management.Automation.PSCredential('{safe_client_id}', $secret)
-$params['AppCredential'] = $cred
-$params['ConfidentialApp'] = $true
-"""
-        elif self.config.auth_method == AuthMethod.CERTIFICATE:
-            safe_client_id = _escape_ps_string(self.config.client_id)
-            safe_cert = _escape_ps_string(self.config.certificate_path or "")
-            script += f"""
-$params['ClientId'] = '{safe_client_id}'
-$params['CertificateThumbprint'] = '{safe_cert}'
-"""
-
-        if self.config.rulesets:
-            ruleset_paths = ", ".join(
-                f"'{_escape_ps_string(str(self.monkey365_path.parent / 'rulesets' / r))}.json'"
-                for r in self.config.rulesets
-            )
-            script += f"\n$params['RuleSets'] = @({ruleset_paths})\n"
-
-        script += "\nInvoke-Monkey365 @params\n"
-        return script
-
-    def run_scan(self, scan_id: str) -> dict:
-        """Lance le scan Monkey365 (synchrone)"""
-        script = self.build_script(scan_id)
-        script_path = self.output_dir / f"{scan_id}_script.ps1"
-        script_path.write_text(script, encoding="utf-8")
-
-        try:
-            process = subprocess.run(
-                ["pwsh", "-NoProfile", "-NonInteractive",
-                 "-ExecutionPolicy", "Bypass", "-File", str(script_path)],
+        if not monkey365_dir.exists():
+            if not self.allow_auto_clone:
+                raise RuntimeError(
+                    f"Monkey365 not found at {monkey365_dir}. "
+                    "Set MONKEY365_PATH to the correct location or enable MONKEY365_AUTO_CLONE."
+                )
+            logger.info("Monkey365 missing. Auto-cloning...")
+            monkey365_dir.parent.mkdir(parents=True, exist_ok=True)
+            clone_result = subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "--depth=1",
+                    "https://github.com/silverhack/monkey365.git",
+                    str(monkey365_dir),
+                ],
                 capture_output=True,
                 text=True,
-                timeout=3600,
+                cwd=monkey365_dir.parent,
             )
-            if process.returncode != 0:
-                return {"status": "error", "scan_id": scan_id, "error": process.stderr}
+            if clone_result.returncode != 0:
+                raise RuntimeError(
+                    "Failed to clone Monkey365 repository:\n"
+                    + (clone_result.stderr or clone_result.stdout)
+                )
 
-            results = self._parse_output(scan_id)
+        module_path = monkey365_dir / "monkey365.psm1"
+        if not module_path.exists():
+            logger.warning("Monkey365 module missing at %s", monkey365_dir)
+            if self.monkey365_path and not self.monkey365_path.exists():
+                self.monkey365_path.write_text(
+                    "# Auto-generated placeholder for Monkey365 execution script\n",
+                    encoding="utf-8",
+                )
+            return self.monkey365_path
+
+        safe_dir = _escape_ps_string(str(monkey365_dir))
+        test_ps = f"""
+        Set-Location '{safe_dir}'
+        Import-Module .\\monkey365.psm1 -Force -Verbose
+        Get-Command Invoke-Monkey365
+        """
+        verify_command = [
+            "pwsh",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            test_ps,
+        ]
+        logger.info("[MONKEY365] Verifying module with command args: %s", verify_command)
+        result = subprocess.run(
+            verify_command,
+            capture_output=True,
+            text=True,
+            cwd=monkey365_dir,
+        )
+
+        stderr = result.stderr or ""
+        if (
+            "exécution de scripts est désactivée" in stderr.lower()
+            or "execution of scripts is disabled" in stderr.lower()
+        ):
+            logger.error(
+                "[MONKEY365] Execution policy blocked module import. STDERR:\n%s",
+                result.stderr,
+            )
+
+        if result.returncode != 0 or "Invoke-Monkey365" not in result.stdout:
+            raise RuntimeError("Monkey365 module import failed:\n" + result.stderr)
+
+        logger.info("Monkey365 module verified at %s", monkey365_dir)
+
+        monkey365_script = monkey365_dir / "Invoke-Monkey365.ps1"
+        if not monkey365_script.exists():
+            monkey365_script.write_text(
+                "# Auto-generated placeholder for Monkey365 execution script\n",
+                encoding="utf-8",
+            )
+
+        self.monkey365_path = monkey365_script
+        return monkey365_script
+
+    def build_script(self, scan_id: str, log_path: Path | None = None) -> str:
+        safe_monkey365_dir = _escape_ps_string(str(self.monkey365_path.parent))
+
+        export_to = ", ".join(f"'{_escape_ps_string(fmt)}'" for fmt in self.config.export_to)
+        collect_items = ", ".join(f"'{module}'" for module in self.COLLECT_MODULES)
+
+        param_lines = [
+            "    Instance        = 'Microsoft365';",
+            f"    Collect         = @({collect_items});",
+            "    PromptBehavior  = 'SelectAccount';",
+            "    IncludeEntraID  = $true;",
+            "    ForceMSALDesktop = $true;",
+            f"    ExportTo        = @({export_to});",
+        ]
+
+        if self.config.spo_sites:
+            sites = ", ".join(f"'{_escape_ps_string(s)}'" for s in self.config.spo_sites)
+            param_lines.append(f"    SpoSites        = @({sites});")
+
+        param_block = "\n".join(param_lines)
+
+        # Start-Transcript captures ALL PS streams: Write-Host (stream 6),
+        # Write-Verbose (stream 4), Write-Warning (3), Write-Error (2), output (1).
+        # This is far more complete than redirecting subprocess stdout/stderr.
+        transcript_start = ""
+        transcript_stop = ""
+        if log_path:
+            safe_log = _escape_ps_string(str(log_path))
+            transcript_start = f"Start-Transcript -Path '{safe_log}' -Force | Out-Null"
+            transcript_stop = "Stop-Transcript | Out-Null"
+
+        script = f"""
+Set-Location '{safe_monkey365_dir}'
+Import-Module .\\monkey365.psm1 -Force
+{transcript_start}
+
+$VerbosePreference = 'Continue'
+$param = @{{
+{param_block}
+}}
+
+Invoke-Monkey365 @param -Verbose
+{transcript_stop}
+"""
+        return script
+
+    def run_scan(self, scan_id: str) -> dict[str, object]:
+        self.ensure_monkey365_ready()
+
+        output_path = Path(self.config.output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        log_file = output_path / "monkey365.log"
+        script = self.build_script(scan_id, log_path=log_file)
+
+        params_snapshot = {
+            "scan_id": scan_id,
+            "Instance": "Microsoft365",
+            "Collect": self.COLLECT_MODULES,
+            "PromptBehavior": "SelectAccount",
+            "IncludeEntraID": True,
+            "ForceMSALDesktop": True,
+            "ExportTo": self.config.export_to,
+            "SpoSites": self.config.spo_sites or [],
+        }
+        (output_path / "scan_params.json").write_text(
+            json.dumps(params_snapshot, indent=2),
+            encoding="utf-8",
+        )
+
+        temp_dir_env = os.getenv("ASSISTANTAUDIT_TEMP_DIR", "").strip()
+        temp_dir = Path(temp_dir_env) if temp_dir_env else (self.output_dir.parent / "temp")
+        ps1_path = temp_dir / f"monkey365_scan_{scan_id}.ps1"
+        ps1_path.parent.mkdir(parents=True, exist_ok=True)
+
+        logger.info("[MONKEY365] Generated script:\n%s", script)
+        ps1_path.write_text(script, encoding="utf-8")
+
+        start_time = time.time()
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+
+        try:
+            powershell_command = [
+                "pwsh",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(ps1_path),
+            ]
+            logger.info("[MONKEY365] Running PowerShell with args: %s", powershell_command)
+
+            # stdin/stdout/stderr all inherited — MSAL browser popup stays visible.
+            # All PS output is captured via Start-Transcript in the script itself,
+            # which records every stream (Write-Host, Write-Verbose, errors, output).
+            result = subprocess.run(
+                powershell_command,
+                timeout=3600,
+                cwd=self.monkey365_path.parent,
+                env=env,
+            )
+            returncode = result.returncode
+            ps_stdout = log_file.read_text(encoding="utf-8", errors="replace") if log_file.exists() else ""
+            ps_stderr = ""
+
+            raw_output = {
+                "stdout": ps_stdout,
+                "stderr": ps_stderr,
+                "returncode": returncode,
+                "duration_seconds": time.time() - start_time,
+            }
+
+            (output_path / "powershell_raw_output.json").write_text(
+                json.dumps(raw_output, indent=2),
+                encoding="utf-8",
+            )
+
+            if returncode != 0:
+                error = Monkey365ExecutionError(
+                    "PowerShell failed (code "
+                    + str(returncode)
+                    + ")"
+                )
+                return {"status": "error", "scan_id": scan_id, "error": str(error)}
+
+            results = self.parse_results(ps_stdout, scan_id)
             return {"status": "success", "scan_id": scan_id, "results": results}
 
-        except subprocess.TimeoutExpired:
-            return {"status": "timeout", "scan_id": scan_id, "error": "Timeout 1h dépassé"}
+        except subprocess.TimeoutExpired as exc:
+            raw_output = {
+                "stdout": (exc.stdout or b"").decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or ""),
+                "stderr": (exc.stderr or b"").decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or ""),
+                "returncode": None,
+                "duration_seconds": time.time() - start_time,
+            }
+            (output_path / "powershell_raw_output.json").write_text(
+                json.dumps(raw_output, indent=2),
+                encoding="utf-8",
+            )
+            return {"status": "timeout", "scan_id": scan_id, "error": "Timeout 1h exceeded"}
         except FileNotFoundError:
-            return {"status": "error", "scan_id": scan_id, "error": "pwsh introuvable"}
+            return {"status": "error", "scan_id": scan_id, "error": "pwsh not found — PowerShell 7+ is required"}
         finally:
-            if script_path.exists():
-                script_path.unlink()
+            if ps1_path.exists():
+                ps1_path.unlink()
 
-    def _parse_output(self, scan_id: str) -> list[dict]:
-        """Parse les JSON de sortie Monkey365"""
-        results = []
-        output_path = self.output_dir / scan_id
-
-        for json_file in output_path.rglob("*.json"):
+    def parse_results(self, stdout: str, scan_id: str) -> list[dict[str, object]]:
+        if stdout:
             try:
-                data = json.loads(json_file.read_text(encoding="utf-8"))
+                data = json.loads(stdout)
                 if isinstance(data, list):
-                    results.extend(data)
+                    return cast(list[dict[str, object]], data)
+                if isinstance(data, dict):
+                    return [cast(dict[str, object], data)]
+            except json.JSONDecodeError:
+                pass
+
+        return self._parse_output_files(scan_id)
+
+    def _parse_output_files(self, scan_id: str) -> list[dict[str, object]]:
+        results: list[dict[str, object]] = []
+        output_path = self.output_dir
+
+        _INTERNAL_FILES = {"powershell_raw_output.json", "scan_params.json"}
+        for json_file in output_path.rglob("*.json"):
+            if json_file.name in _INTERNAL_FILES:
+                continue
+            try:
+                data: object = cast(object, json.loads(json_file.read_text(encoding="utf-8")))
+                if isinstance(data, list):
+                    for item in cast(list[object], data):
+                        if isinstance(item, dict):
+                            results.append(cast(dict[str, object], item))
                 elif isinstance(data, dict):
-                    results.append(data)
+                    results.append(cast(dict[str, object], data))
             except (json.JSONDecodeError, UnicodeDecodeError):
                 continue
 

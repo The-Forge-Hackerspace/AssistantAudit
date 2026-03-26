@@ -20,8 +20,8 @@ venv/
 *.swp
 *.swo
 
-# Tools
-tools/
+# Tools (vendored external tools at repo root — not source code subdirs)
+/tools/
 .tools/
 ./tool
 
@@ -62,11 +62,20 @@ desktop.ini
 # Docker
 docker-compose.override.yml
 
-# Alembic
-backend/alembic/versions/*.py
-!backend/alembic/versions/.gitkeep
+# Alembic versions are tracked in git
+
 
 # Tests
 .pytest_cache/
 htmlcov/
 .coverage
+
+# AI assistant metadata (Claude Code, GitHub Copilot, etc.)
+.claude/
+CLAUDE.md
+**/CLAUDE.md
+AGENTS.md
+**/AGENTS.md
+.copilot/
+.github/copilot*
+*.copilot*

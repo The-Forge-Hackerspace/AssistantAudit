@@ -46,6 +46,7 @@ import {
   Terminal,
   Castle,
   Map,
+  Cloud,
 } from "lucide-react";
 
 const navItems = [
@@ -80,6 +81,7 @@ const navItems = [
       { title: "Audit AD", href: "/outils/ad-auditor", icon: ShieldCheck },
       { title: "Cartographie réseau", href: "/outils/network-map", icon: Map },
       { title: "PingCastle", href: "/outils/pingcastle", icon: Castle },
+      { title: "Monkey365", href: "/outils/monkey365", icon: Cloud },
     ],
   },
 ];
