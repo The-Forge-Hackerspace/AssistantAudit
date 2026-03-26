@@ -17,6 +17,7 @@ from .pingcastle_terminal import router as pingcastle_ws_router
 from .health import router as health_router
 from .network_map import router as network_map_router
 from .websocket import router as websocket_router
+from .agents import router as agents_router
 
 api_router = APIRouter()
 
@@ -34,3 +35,4 @@ api_router.include_router(network_map_router, prefix="/network-map", tags=["Cart
 api_router.include_router(tools_router)
 api_router.include_router(pingcastle_ws_router)
 api_router.include_router(websocket_router)
+api_router.include_router(agents_router)

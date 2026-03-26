@@ -25,6 +25,19 @@ def manager():
     return ConnectionManager()
 
 
+@pytest.fixture(autouse=True)
+def _clear_global_ws_manager():
+    """Reset global ws_manager state between tests to avoid cross-test pollution."""
+    from app.core.websocket_manager import ws_manager
+    ws_manager.user_connections.clear()
+    ws_manager.agent_connections.clear()
+    ws_manager.user_event_buffer.clear()
+    yield
+    ws_manager.user_connections.clear()
+    ws_manager.agent_connections.clear()
+    ws_manager.user_event_buffer.clear()
+
+
 # ────────────────────────────────────────────────────────────────────────
 # Integration: /ws/user endpoint
 # ────────────────────────────────────────────────────────────────────────

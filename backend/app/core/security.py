@@ -130,6 +130,9 @@ def create_enrollment_token() -> tuple[str, str, datetime]:
 
 def verify_enrollment_token(code: str, stored_hash: str, expiration: datetime) -> bool:
     """Verifie un code d'enrollment contre son hash et son expiration."""
-    if datetime.now(timezone.utc) > expiration:
+    now = datetime.now(timezone.utc)
+    # SQLite peut retourner des datetimes naive — les traiter comme UTC
+    exp = expiration if expiration.tzinfo else expiration.replace(tzinfo=timezone.utc)
+    if now > exp:
         return False
     return hashlib.sha256(code.encode()).hexdigest() == stored_hash
