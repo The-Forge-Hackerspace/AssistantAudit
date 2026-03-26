@@ -2,6 +2,7 @@ import api, { setTokens, clearTokens } from "@/lib/api-client";
 import type {
   TokenResponse,
   User,
+  UserUpdate,
   PaginatedResponse,
   Entreprise,
   EntrepriseCreate,
@@ -93,6 +94,31 @@ export const authApi = {
 
   logout() {
     clearTokens();
+  },
+};
+
+// ── Users (admin) ──
+export const usersApi = {
+  async list(page = 1, pageSize = 20): Promise<PaginatedResponse<User>> {
+    const { data } = await api.get("/users/", {
+      params: { page, page_size: pageSize },
+    });
+    return data;
+  },
+
+  async create(payload: RegisterRequest): Promise<User> {
+    const { data } = await api.post("/users/", payload);
+    return data;
+  },
+
+  async update(id: number, payload: UserUpdate): Promise<User> {
+    const { data } = await api.put(`/users/${id}`, payload);
+    return data;
+  },
+
+  async delete(id: number): Promise<{ message: string }> {
+    const { data } = await api.delete(`/users/${id}`);
+    return data;
   },
 };
 
