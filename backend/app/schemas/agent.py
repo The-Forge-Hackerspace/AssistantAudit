@@ -74,6 +74,7 @@ class AgentResponse(BaseModel):
     os_info: Optional[str] = None
     agent_version: Optional[str] = None
     owner_name: Optional[str] = None
+    revoked_at: Optional[datetime] = None
     created_at: datetime
 
 

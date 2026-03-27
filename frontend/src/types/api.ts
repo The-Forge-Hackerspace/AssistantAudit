@@ -1007,6 +1007,7 @@ export interface Agent {
   os_info: string | null;
   agent_version: string | null;
   owner_name: string | null;
+  revoked_at: string | null;
   created_at: string;
 }
 
