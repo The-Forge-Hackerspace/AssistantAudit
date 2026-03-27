@@ -18,6 +18,7 @@ from ...core.security import (
 )
 from ...models.agent import Agent
 from ...models.agent_task import AgentTask
+from ...models.user import User
 from ...schemas.agent import (
     AgentCreateRequest,
     AgentCreateResponse,
@@ -47,12 +48,23 @@ def create_agent(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_auditeur),
 ):
-    """Cree un agent et genere un code d'enrollment (valide 10 min)."""
+    """Cree un agent et genere un code d'enrollment (valide 10 min).
+    Admin peut creer pour un autre user via target_user_id."""
+    owner_id = current_user.id
+
+    if body.target_user_id is not None:
+        if current_user.role != "admin":
+            raise HTTPException(status_code=403, detail="Seul un admin peut attribuer un agent a un autre utilisateur")
+        target_user = db.query(User).filter(User.id == body.target_user_id).first()
+        if target_user is None or not target_user.is_active:
+            raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+        owner_id = target_user.id
+
     code, code_hash, expiration = create_enrollment_token()
 
     agent = Agent(
         name=body.name,
-        user_id=current_user.id,
+        user_id=owner_id,
         allowed_tools=body.allowed_tools,
         enrollment_token_hash=code_hash,
         enrollment_token_expires=expiration,
@@ -62,7 +74,7 @@ def create_agent(
     db.commit()
     db.refresh(agent)
 
-    logger.info(f"Agent created: uuid={agent.agent_uuid}, user={current_user.id}")
+    logger.info(f"Agent created: uuid={agent.agent_uuid}, owner={owner_id}, by={current_user.id}")
     return AgentCreateResponse(
         agent_uuid=agent.agent_uuid,
         enrollment_code=code,

@@ -64,10 +64,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
-import { agentsApi } from "@/services/api";
+import { agentsApi, usersApi } from "@/services/api";
 import { getAccessToken } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import type { Agent, AgentCreateResponse, AgentStatus } from "@/types";
+import type { Agent, AgentCreateResponse, AgentStatus, User } from "@/types";
 
 // ── Constants ──
 const AVAILABLE_TOOLS = ["nmap", "oradad", "ad_collector"] as const;
@@ -145,10 +145,14 @@ export default function AgentsPage() {
   const [filterStatuses, setFilterStatuses] = useState<AgentStatus[]>([]);
   const [filterVersion, setFilterVersion] = useState<string>("__all__");
 
+  // Users list (admin: for "assign to" selector)
+  const [assignableUsers, setAssignableUsers] = useState<User[]>([]);
+
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newAgentName, setNewAgentName] = useState("");
   const [selectedTools, setSelectedTools] = useState<string[]>([...AVAILABLE_TOOLS]);
+  const [targetUserId, setTargetUserId] = useState<string>("__self__");
 
   // Enrollment dialog
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false);
@@ -241,6 +245,21 @@ export default function AgentsPage() {
     else setLoading(false);
   }, [hasAccess, fetchAgents]);
 
+  // Fetch assignable users (admin only)
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      try {
+        const resp = await usersApi.list(1, 100);
+        setAssignableUsers(
+          resp.items.filter((u) => u.is_active && (u.role === "admin" || u.role === "auditeur"))
+        );
+      } catch {
+        // non-blocking
+      }
+    })();
+  }, [isAdmin]);
+
   // ── WebSocket for real-time status ──
   useEffect(() => {
     if (!hasAccess) return;
@@ -314,6 +333,7 @@ export default function AgentsPage() {
       const result = await agentsApi.create({
         name: newAgentName.trim(),
         allowed_tools: selectedTools,
+        target_user_id: isAdmin && targetUserId !== "__self__" ? Number(targetUserId) : undefined,
       });
       setEnrollmentData(result);
       setShowCreateDialog(false);
@@ -396,6 +416,7 @@ export default function AgentsPage() {
   const openCreateDialog = () => {
     setNewAgentName("");
     setSelectedTools([...AVAILABLE_TOOLS]);
+    setTargetUserId("__self__");
     setShowCreateDialog(true);
   };
 
@@ -719,6 +740,30 @@ export default function AgentsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-4">
+            {isAdmin && assignableUsers.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <Label>Attribuer à</Label>
+                <Select value={targetUserId} onValueChange={setTargetUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un utilisateur" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="__self__">
+                        Moi-même ({user?.full_name})
+                      </SelectItem>
+                      {assignableUsers
+                        .filter((u) => u.id !== user?.id)
+                        .map((u) => (
+                          <SelectItem key={u.id} value={String(u.id)}>
+                            {u.full_name} ({u.username})
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               <Label htmlFor="agent-name">Nom de l&apos;agent</Label>
               <Input
