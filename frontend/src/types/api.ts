@@ -1014,6 +1014,7 @@ export interface Agent {
 export interface AgentCreateRequest {
   name: string;
   allowed_tools?: string[];
+  target_user_id?: number | null;
 }
 
 export interface AgentCreateResponse {

@@ -15,6 +15,7 @@ class AgentCreateRequest(BaseModel):
     allowed_tools: list[str] = Field(
         default=["nmap", "oradad", "ad_collector"]
     )
+    target_user_id: Optional[int] = None
 
 
 class EnrollRequest(BaseModel):
