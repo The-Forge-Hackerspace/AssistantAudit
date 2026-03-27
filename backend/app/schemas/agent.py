@@ -73,6 +73,7 @@ class AgentResponse(BaseModel):
     allowed_tools: list[str]
     os_info: Optional[str] = None
     agent_version: Optional[str] = None
+    owner_name: Optional[str] = None
     created_at: datetime
 
 
