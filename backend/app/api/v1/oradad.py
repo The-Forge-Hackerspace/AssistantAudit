@@ -23,10 +23,28 @@ router = APIRouter(prefix="/oradad", tags=["ORADAD"])
 # ── Schemas ──────────────────────────────────────────────────────────
 
 
+class DomainEntry(BaseModel):
+    server: str = Field(..., min_length=1, description="IP ou FQDN du DC")
+    port: int = Field(default=389, ge=1, le=65535)
+    domain_name: str = Field(..., min_length=1, description="ex: client.local")
+    username: str = Field(..., min_length=1, description="ex: auditeur")
+    user_domain: str = Field(..., min_length=1, description="ex: CLIENT")
+    password: str = Field(..., min_length=1)
+
+
+class DomainEntryResponse(BaseModel):
+    server: str
+    port: int
+    domain_name: str
+    username: str
+    user_domain: str
+    password: str  # toujours masque dans les reponses
+
+
 class OradadConfigCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
-    auto_get_domain: bool = True
-    auto_get_trusts: bool = True
+    auto_get_domain: bool = False
+    auto_get_trusts: bool = False
     level: int = Field(default=4, ge=1, le=4)
     confidential: int = Field(default=0, ge=0, le=2)
     process_sysvol: bool = True
@@ -34,7 +52,7 @@ class OradadConfigCreate(BaseModel):
     output_files: bool = False
     output_mla: bool = True
     sleep_time: int = Field(default=0, ge=0)
-    explicit_domains: Optional[list[dict]] = None
+    explicit_domains: Optional[list[DomainEntry]] = None
 
 
 class OradadConfigUpdate(BaseModel):
@@ -48,12 +66,10 @@ class OradadConfigUpdate(BaseModel):
     output_files: Optional[bool] = None
     output_mla: Optional[bool] = None
     sleep_time: Optional[int] = Field(default=None, ge=0)
-    explicit_domains: Optional[list[dict]] = None
+    explicit_domains: Optional[list[DomainEntry]] = None
 
 
 class OradadConfigResponse(BaseModel):
-    model_config = {"from_attributes": True}
-
     id: int
     name: str
     auto_get_domain: bool
@@ -65,9 +81,29 @@ class OradadConfigResponse(BaseModel):
     output_files: bool
     output_mla: bool
     sleep_time: int
-    explicit_domains: Optional[list[dict]] = None
+    explicit_domains: Optional[list[DomainEntryResponse]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+
+def _config_to_response(config: OradadConfig) -> dict:
+    """Convertit un OradadConfig en dict de reponse avec mots de passe masques."""
+    return {
+        "id": config.id,
+        "name": config.name,
+        "auto_get_domain": config.auto_get_domain,
+        "auto_get_trusts": config.auto_get_trusts,
+        "level": config.level,
+        "confidential": config.confidential,
+        "process_sysvol": config.process_sysvol,
+        "sysvol_filter": config.sysvol_filter,
+        "output_files": config.output_files,
+        "output_mla": config.output_mla,
+        "sleep_time": config.sleep_time,
+        "explicit_domains": config.get_domains_masked() or None,
+        "created_at": config.created_at,
+        "updated_at": config.updated_at,
+    }
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -126,7 +162,7 @@ def list_configs(
     if current_user.role != "admin":
         query = query.filter(OradadConfig.owner_id == current_user.id)
     configs = query.order_by(OradadConfig.created_at.desc()).all()
-    return [OradadConfigResponse.model_validate(c) for c in configs]
+    return [_config_to_response(c) for c in configs]
 
 
 @router.post("/configs", status_code=201)
@@ -148,12 +184,13 @@ def create_config(
         output_files=body.output_files,
         output_mla=body.output_mla,
         sleep_time=body.sleep_time,
-        explicit_domains=body.explicit_domains,
     )
+    if body.explicit_domains:
+        config.set_domains_list([d.model_dump() for d in body.explicit_domains])
     db.add(config)
     db.commit()
     db.refresh(config)
-    return OradadConfigResponse.model_validate(config)
+    return _config_to_response(config)
 
 
 @router.put("/configs/{config_id}")
@@ -166,11 +203,32 @@ def update_config(
     """Met a jour un profil de configuration ORADAD."""
     config = _get_config_or_404(db, config_id, current_user)
     update_data = body.model_dump(exclude_unset=True)
+
+    # Traitement special pour explicit_domains (chiffre)
+    if "explicit_domains" in update_data:
+        domains_raw = update_data.pop("explicit_domains")
+        if domains_raw is not None:
+            # Fusionner avec les mots de passe existants si masques
+            existing_domains = config.get_domains_list()
+            new_domains = [d.model_dump() for d in body.explicit_domains]
+            for new_d in new_domains:
+                if new_d.get("password") == "••••••":
+                    # Chercher le domaine existant pour recuperer le vrai mot de passe
+                    for old_d in existing_domains:
+                        if (old_d.get("server") == new_d.get("server")
+                                and old_d.get("domain_name") == new_d.get("domain_name")):
+                            new_d["password"] = old_d.get("password", "")
+                            break
+            config.set_domains_list(new_domains)
+        else:
+            config.set_domains_list(None)
+
     for field, value in update_data.items():
         setattr(config, field, value)
+
     db.commit()
     db.refresh(config)
-    return OradadConfigResponse.model_validate(config)
+    return _config_to_response(config)
 
 
 @router.delete("/configs/{config_id}")

@@ -16,13 +16,14 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -71,7 +72,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
 import { agentsApi, oradadApi } from "@/services/api";
 import { cn } from "@/lib/utils";
-import type { Agent, OradadTask, OradadConfig, AnssiReport, AnssiCheckResult } from "@/types";
+import type { Agent, OradadTask, OradadConfig, AnssiReport, AnssiCheckResult, DomainEntry } from "@/types";
 
 // ── Constants ──
 const ANSSI_LEVELS: Record<number, { label: string; color: string; bg: string }> = {
@@ -80,6 +81,28 @@ const ANSSI_LEVELS: Record<number, { label: string; color: string; bg: string }>
   3: { label: "Basique", color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-500" },
   4: { label: "Bon", color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-500" },
   5: { label: "État de l'art", color: "text-emerald-800 dark:text-emerald-300", bg: "bg-emerald-700" },
+};
+
+const EMPTY_DOMAIN: DomainEntry = {
+  server: "",
+  port: 389,
+  domain_name: "",
+  username: "",
+  user_domain: "",
+  password: "",
+};
+
+const LEVEL_LABELS: Record<string, string> = {
+  "1": "Minimal",
+  "2": "Standard",
+  "3": "Détaillé",
+  "4": "Complet",
+};
+
+const CONFIDENTIAL_LABELS: Record<string, string> = {
+  "0": "Ne pas collecter",
+  "1": "Avec limites",
+  "2": "Sans limites",
 };
 
 function taskStatusBadge(status: string) {
@@ -122,6 +145,102 @@ function findingStatusLabel(status: string) {
   }
 }
 
+// ── Domain row component ──
+function DomainRow({
+  domain,
+  index,
+  onChange,
+  onRemove,
+  canRemove,
+}: {
+  domain: DomainEntry;
+  index: number;
+  onChange: (index: number, field: keyof DomainEntry, value: string | number) => void;
+  onRemove: (index: number) => void;
+  canRemove: boolean;
+}) {
+  const [showPassword, setShowPassword] = useState(false);
+
+  return (
+    <div className="rounded-lg border p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">Domaine {index + 1}</span>
+        {canRemove && (
+          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => onRemove(index)}>
+            <Trash2 data-icon="inline-start" />
+            Retirer
+          </Button>
+        )}
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs">Serveur / IP du DC *</Label>
+          <Input
+            placeholder="192.168.1.10 ou dc01.client.local"
+            value={domain.server}
+            onChange={(e) => onChange(index, "server", e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs">Port LDAP</Label>
+          <Input
+            type="number"
+            min={1}
+            max={65535}
+            placeholder="389"
+            value={domain.port}
+            onChange={(e) => onChange(index, "port", Number(e.target.value) || 389)}
+          />
+        </div>
+        <div className="flex flex-col gap-1 md:col-span-2">
+          <Label className="text-xs">Nom du domaine *</Label>
+          <Input
+            placeholder="client.local"
+            value={domain.domain_name}
+            onChange={(e) => onChange(index, "domain_name", e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs">Nom d&apos;utilisateur *</Label>
+          <Input
+            placeholder="auditeur"
+            value={domain.username}
+            onChange={(e) => onChange(index, "username", e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs">Domaine utilisateur *</Label>
+          <Input
+            placeholder="CLIENT"
+            value={domain.user_domain}
+            onChange={(e) => onChange(index, "user_domain", e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1 md:col-span-2">
+          <Label className="text-xs">Mot de passe *</Label>
+          <div className="flex gap-2">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••"
+              value={domain.password}
+              onChange={(e) => onChange(index, "password", e.target.value)}
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──
 export default function OradadPage() {
   const { user } = useAuth();
@@ -145,8 +264,8 @@ export default function OradadPage() {
 
   // Config form fields
   const [cfgName, setCfgName] = useState("");
-  const [cfgAutoGetDomain, setCfgAutoGetDomain] = useState(true);
-  const [cfgAutoGetTrusts, setCfgAutoGetTrusts] = useState(true);
+  const [cfgAutoGetDomain, setCfgAutoGetDomain] = useState(false);
+  const [cfgAutoGetTrusts, setCfgAutoGetTrusts] = useState(false);
   const [cfgLevel, setCfgLevel] = useState("4");
   const [cfgConfidential, setCfgConfidential] = useState("0");
   const [cfgProcessSysvol, setCfgProcessSysvol] = useState(true);
@@ -155,13 +274,12 @@ export default function OradadPage() {
   const [cfgOutputMla, setCfgOutputMla] = useState(true);
   const [cfgSleepTime, setCfgSleepTime] = useState("0");
   const [cfgShowAdvanced, setCfgShowAdvanced] = useState(false);
+  const [cfgDomains, setCfgDomains] = useState<DomainEntry[]>([{ ...EMPTY_DOMAIN }]);
 
-  // Launch form
+  // Launch form — simplified: agent + config (required) + domain override
   const [selectedAgentUuid, setSelectedAgentUuid] = useState<string>("");
-  const [selectedConfigId, setSelectedConfigId] = useState<string>("__none__");
-  const [domain, setDomain] = useState("");
-  const [outputFiles, setOutputFiles] = useState(false);
-  const [confidential, setConfidential] = useState(false);
+  const [selectedConfigId, setSelectedConfigId] = useState<string>("");
+  const [domainOverride, setDomainOverride] = useState("");
   const [launching, setLaunching] = useState(false);
 
   // Report view
@@ -228,23 +346,22 @@ export default function OradadPage() {
 
   // ── Launch collect ──
   const handleLaunch = async () => {
-    if (!selectedAgentUuid) return;
+    if (!selectedAgentUuid || !selectedConfigId) {
+      toast.error("Veuillez sélectionner un agent et un profil de configuration");
+      return;
+    }
     setLaunching(true);
     try {
       await agentsApi.dispatch({
         agent_uuid: selectedAgentUuid,
         tool: "oradad",
         parameters: {
-          domain: domain || undefined,
-          output_files: outputFiles ? 1 : 0,
-          confidential: confidential ? 1 : 0,
-          config_id: selectedConfigId !== "__none__" ? Number(selectedConfigId) : undefined,
+          config_id: Number(selectedConfigId),
+          domain: domainOverride || undefined,
         },
       });
       toast.success("Collecte ORADAD lancée");
-      setDomain("");
-      setOutputFiles(false);
-      setConfidential(false);
+      setDomainOverride("");
       setTimeout(fetchTasks, 1000);
     } catch {
       toast.error("Erreur lors du lancement de la collecte");
@@ -253,37 +370,27 @@ export default function OradadPage() {
     }
   };
 
-  const handleConfigOradad = async () => {
-    if (!selectedAgentUuid) return;
-    setLaunching(true);
-    try {
-      await agentsApi.dispatch({
-        agent_uuid: selectedAgentUuid,
-        tool: "config-oradad",
-        parameters: {
-          domain: domain || undefined,
-          output_files: outputFiles ? 1 : 0,
-          confidential: confidential ? 1 : 0,
-          config_id: selectedConfigId !== "__none__" ? Number(selectedConfigId) : undefined,
-        },
-      });
-      toast.success("Configuration ORADAD lancée");
-      setDomain("");
-      setOutputFiles(false);
-      setConfidential(false);
-      setTimeout(fetchTasks, 1000);
-    } catch {
-      toast.error("Erreur lors du lancement de la configuration");
-    } finally {
-      setLaunching(false);
-    }
+  // ── Domain management in config dialog ──
+  const handleDomainChange = (index: number, field: keyof DomainEntry, value: string | number) => {
+    setCfgDomains((prev) =>
+      prev.map((d, i) => (i === index ? { ...d, [field]: value } : d))
+    );
   };
+
+  const handleAddDomain = () => {
+    setCfgDomains((prev) => [...prev, { ...EMPTY_DOMAIN }]);
+  };
+
+  const handleRemoveDomain = (index: number) => {
+    setCfgDomains((prev) => prev.filter((_, i) => i !== index));
+  };
+
   // ── Config CRUD ──
   const openNewConfig = () => {
     setEditingConfig(null);
     setCfgName("");
-    setCfgAutoGetDomain(true);
-    setCfgAutoGetTrusts(true);
+    setCfgAutoGetDomain(false);
+    setCfgAutoGetTrusts(false);
     setCfgLevel("4");
     setCfgConfidential("0");
     setCfgProcessSysvol(true);
@@ -292,6 +399,7 @@ export default function OradadPage() {
     setCfgOutputMla(true);
     setCfgSleepTime("0");
     setCfgShowAdvanced(false);
+    setCfgDomains([{ ...EMPTY_DOMAIN }]);
     setShowConfigDialog(true);
   };
 
@@ -308,6 +416,11 @@ export default function OradadPage() {
     setCfgOutputMla(config.output_mla);
     setCfgSleepTime(String(config.sleep_time));
     setCfgShowAdvanced(false);
+    setCfgDomains(
+      config.explicit_domains && config.explicit_domains.length > 0
+        ? config.explicit_domains.map((d) => ({ ...d }))
+        : [{ ...EMPTY_DOMAIN }]
+    );
     setShowConfigDialog(true);
   };
 
@@ -316,7 +429,41 @@ export default function OradadPage() {
       toast.error("Le nom du profil est requis");
       return;
     }
+
+    // Validate domains if auto-detect is off
+    if (!cfgAutoGetDomain) {
+      const validDomains = cfgDomains.filter(
+        (d) => d.server.trim() && d.domain_name.trim()
+      );
+      if (validDomains.length === 0) {
+        toast.error("Au moins un domaine cible est requis quand la détection automatique est désactivée");
+        return;
+      }
+      // Check all required fields
+      for (const d of validDomains) {
+        if (!d.username.trim() || !d.user_domain.trim() || !d.password.trim()) {
+          toast.error("Tous les champs d'identification sont requis pour chaque domaine");
+          return;
+        }
+      }
+    }
+
     setSavingConfig(true);
+
+    // Build domains list — only include non-empty rows
+    const domainsToSend = cfgAutoGetDomain
+      ? null
+      : cfgDomains
+          .filter((d) => d.server.trim() && d.domain_name.trim())
+          .map((d) => ({
+            server: d.server.trim(),
+            port: d.port || 389,
+            domain_name: d.domain_name.trim(),
+            username: d.username.trim(),
+            user_domain: d.user_domain.trim(),
+            password: d.password,
+          }));
+
     const payload = {
       name: cfgName.trim(),
       auto_get_domain: cfgAutoGetDomain,
@@ -328,6 +475,7 @@ export default function OradadPage() {
       output_files: cfgOutputFiles,
       output_mla: cfgOutputMla,
       sleep_time: Number(cfgSleepTime),
+      explicit_domains: domainsToSend,
     };
     try {
       if (editingConfig) {
@@ -352,7 +500,7 @@ export default function OradadPage() {
       await oradadApi.deleteConfig(deleteConfigTarget.id);
       toast.success("Profil supprimé");
       if (selectedConfigId === String(deleteConfigTarget.id)) {
-        setSelectedConfigId("__none__");
+        setSelectedConfigId("");
       }
       await fetchConfigs();
     } catch {
@@ -360,19 +508,6 @@ export default function OradadPage() {
     } finally {
       setDeleteConfigTarget(null);
     }
-  };
-
-  const LEVEL_LABELS: Record<string, string> = {
-    "1": "Minimal",
-    "2": "Standard",
-    "3": "Détaillé",
-    "4": "Complet",
-  };
-
-  const CONFIDENTIAL_LABELS: Record<string, string> = {
-    "0": "Ne pas collecter",
-    "1": "Avec limites",
-    "2": "Sans limites",
   };
 
   // ── View report ──
@@ -399,7 +534,6 @@ export default function OradadPage() {
       const data = await oradadApi.analyze(selectedTask.task_uuid);
       setReport(data);
       setSelectedTask({ ...selectedTask, has_report: true });
-      // Update task in list
       setTasks((prev) =>
         prev.map((t) =>
           t.task_uuid === selectedTask.task_uuid ? { ...t, has_report: true } : t
@@ -417,7 +551,6 @@ export default function OradadPage() {
   const groupedFindings = useMemo(() => {
     if (!report) return new Map<string, AnssiCheckResult[]>();
     const groups = new Map<string, AnssiCheckResult[]>();
-    // Sort: fail first, then warning, then pass, then not_checked; within each by level desc
     const sorted = [...report.findings].sort((a, b) => {
       const statusOrder = { fail: 0, warning: 1, pass: 2, not_checked: 3 };
       const sa = statusOrder[a.status as keyof typeof statusOrder] ?? 4;
@@ -471,7 +604,7 @@ export default function OradadPage() {
                 </div>
                 {configs.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    Aucun profil. Les paramètres par défaut seront utilisés.
+                    Aucun profil. Créez un profil de configuration avant de lancer une collecte.
                   </p>
                 ) : (
                   <Table>
@@ -480,6 +613,7 @@ export default function OradadPage() {
                         <TableHead>Nom</TableHead>
                         <TableHead>Niveau</TableHead>
                         <TableHead>Confidentiel</TableHead>
+                        <TableHead>Domaines</TableHead>
                         <TableHead>SYSVOL</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -493,6 +627,15 @@ export default function OradadPage() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">{CONFIDENTIAL_LABELS[String(cfg.confidential)] || cfg.confidential}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {cfg.auto_get_domain ? (
+                              <Badge variant="secondary">Auto</Badge>
+                            ) : cfg.explicit_domains ? (
+                              <Badge variant="outline">{cfg.explicit_domains.length} domaine(s)</Badge>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell>{cfg.process_sysvol ? "Oui" : "Non"}</TableCell>
                           <TableCell className="text-right">
@@ -522,14 +665,14 @@ export default function OradadPage() {
         <CardHeader>
           <CardTitle>Lancer une collecte</CardTitle>
           <CardDescription>
-            Sélectionnez un agent avec l&apos;outil ORADAD pour collecter les données AD.
+            Sélectionnez un agent et un profil de configuration pour collecter les données AD.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="flex flex-col gap-2">
-                <Label>Agent</Label>
+                <Label>Agent *</Label>
                 {loadingAgents ? (
                   <Skeleton className="h-10 w-full" />
                 ) : oradadAgents.length === 0 ? (
@@ -554,14 +697,13 @@ export default function OradadPage() {
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                <Label>Profil de configuration</Label>
+                <Label>Profil de configuration *</Label>
                 <Select value={selectedConfigId} onValueChange={setSelectedConfigId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Par défaut" />
+                    <SelectValue placeholder="Sélectionner un profil" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="__none__">Par défaut</SelectItem>
                       {configs.map((c) => (
                         <SelectItem key={c.id} value={String(c.id)}>
                           {c.name} (Niv. {c.level})
@@ -570,37 +712,26 @@ export default function OradadPage() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
+                {configs.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Créez d&apos;abord un profil dans la section ci-dessus.
+                  </p>
+                )}
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="oradad-domain">Domaine (optionnel)</Label>
+                <Label htmlFor="oradad-domain-override">Domaine override (optionnel)</Label>
                 <Input
-                  id="oradad-domain"
-                  placeholder="Auto-détecté si vide"
-                  value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
+                  id="oradad-domain-override"
+                  placeholder="Override ponctuel"
+                  value={domainOverride}
+                  onChange={(e) => setDomainOverride(e.target.value)}
                 />
               </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={outputFiles}
-                  onCheckedChange={(v) => setOutputFiles(v === true)}
-                />
-                <span className="text-sm">Exporter aussi les fichiers texte</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={confidential}
-                  onCheckedChange={(v) => setConfidential(v === true)}
-                />
-                <span className="text-sm">Collecter les attributs confidentiels</span>
-              </label>
             </div>
             <div className="flex gap-2">
               <Button
                 onClick={handleLaunch}
-                disabled={launching || !selectedAgentUuid}
+                disabled={launching || !selectedAgentUuid || !selectedConfigId}
               >
                 {launching ? (
                   <Loader2 data-icon="inline-start" className="animate-spin" />
@@ -608,18 +739,6 @@ export default function OradadPage() {
                   <Play data-icon="inline-start" />
                 )}
                 Lancer la collecte
-              </Button>
-              <Button
-                onClick={handleConfigOradad}
-                disabled={launching || !selectedAgentUuid}
-                variant="outline"
-              >
-                {launching ? (
-                  <Loader2 data-icon="inline-start" className="animate-spin" />
-                ) : (
-                  <Settings data-icon="inline-start" />
-                )}
-                Configurer ORADAD
               </Button>
             </div>
           </div>
@@ -894,9 +1013,10 @@ export default function OradadPage() {
           </CardContent>
         </Card>
       )}
+
       {/* ── Config dialog ── */}
       <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingConfig ? "Modifier le profil" : "Nouveau profil"}</DialogTitle>
             <DialogDescription>
@@ -905,17 +1025,66 @@ export default function OradadPage() {
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="cfg-name">Nom du profil</Label>
-              <Input id="cfg-name" value={cfgName} onChange={(e) => setCfgName(e.target.value)} placeholder="ex : Config standard" />
+              <Label htmlFor="cfg-name">Nom du profil *</Label>
+              <Input id="cfg-name" value={cfgName} onChange={(e) => setCfgName(e.target.value)} placeholder="ex : Audit Client X" />
             </div>
+
+            <Separator />
+
+            {/* Auto-detect toggles */}
             <div className="flex items-center justify-between">
-              <Label>Détection automatique du domaine</Label>
+              <div className="flex flex-col gap-0.5">
+                <Label>Détection automatique du domaine</Label>
+                <span className="text-xs text-muted-foreground">
+                  Activer uniquement si l&apos;agent est joint au domaine cible
+                </span>
+              </div>
               <Switch checked={cfgAutoGetDomain} onCheckedChange={setCfgAutoGetDomain} />
             </div>
             <div className="flex items-center justify-between">
-              <Label>Détection automatique des trusts</Label>
+              <div className="flex flex-col gap-0.5">
+                <Label>Détection automatique des trusts</Label>
+                <span className="text-xs text-muted-foreground">
+                  Activer uniquement si l&apos;agent est joint au domaine cible
+                </span>
+              </div>
               <Switch checked={cfgAutoGetTrusts} onCheckedChange={setCfgAutoGetTrusts} />
             </div>
+
+            {/* ── Target domains — central section, shown when auto-detect is OFF ── */}
+            {!cfgAutoGetDomain && (
+              <>
+                <Separator />
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base font-semibold">Domaines cibles *</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Renseignez les contrôleurs de domaine et les identifiants de connexion.
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleAddDomain}>
+                      <Plus data-icon="inline-start" />
+                      Ajouter un domaine
+                    </Button>
+                  </div>
+                  {cfgDomains.map((d, i) => (
+                    <DomainRow
+                      key={i}
+                      domain={d}
+                      index={i}
+                      onChange={handleDomainChange}
+                      onRemove={handleRemoveDomain}
+                      canRemove={cfgDomains.length > 1}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            <Separator />
+
+            {/* Collection parameters */}
             <div className="flex flex-col gap-2">
               <Label>Niveau de collecte</Label>
               <Select value={cfgLevel} onValueChange={setCfgLevel}>
