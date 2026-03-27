@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ....core.database import get_db
@@ -8,6 +8,7 @@ from ....core.deps import get_current_auditeur
 from ....models.user import User
 from ....schemas.scan import ADAuditCreate, ADAuditResultSummary, ADAuditResultRead, PrefillResult
 from ....schemas.common import MessageResponse
+from ....core.task_runner import get_task_runner
 from ....services.ad_audit_service import (
     create_pending_ad_audit,
     execute_ad_audit_background,
@@ -24,7 +25,6 @@ router = APIRouter()
 @router.post("/ad-audit", response_model=ADAuditResultSummary)
 def launch_ad_audit(
     params: ADAuditCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
 ):
@@ -44,7 +44,8 @@ def launch_ad_audit(
     except ValueError as e:
         raise HTTPException(404, str(e))
 
-    background_tasks.add_task(
+    task_runner = get_task_runner()
+    task_runner.submit(
         execute_ad_audit_background,
         audit_id=audit.id,
         password=params.password,

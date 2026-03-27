@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ....core.database import get_db
@@ -8,6 +8,7 @@ from ....core.deps import get_current_auditeur
 from ....models.user import User
 from ....schemas.scan import CollectCreate, CollectResultSummary, CollectResultRead, PrefillResult
 from ....schemas.common import MessageResponse
+from ....core.task_runner import get_task_runner
 from ....services.collect_service import (
     create_pending_collect,
     execute_collect_background,
@@ -24,7 +25,6 @@ router = APIRouter()
 @router.post("/collect", response_model=CollectResultSummary)
 def launch_collect(
     params: CollectCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
 ):
@@ -49,7 +49,8 @@ def launch_collect(
         raise HTTPException(404, str(e))
 
     # Lancer la collecte en arrière-plan
-    background_tasks.add_task(
+    task_runner = get_task_runner()
+    task_runner.submit(
         execute_collect_background,
         collect_id=collect.id,
         password=params.password,
