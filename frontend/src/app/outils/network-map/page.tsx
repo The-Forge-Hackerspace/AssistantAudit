@@ -1,55 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
-import dagre from "@dagrejs/dagre";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
-  BaseEdge,
   Controls,
-  Handle,
   MiniMap,
-  Position,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
-  useReactFlow,
-  getNodesBounds,
-  getViewportForBounds,
   type Connection,
   type Edge,
-  type EdgeProps,
-  type EdgeTypes,
   type Node,
-  type NodeProps,
-  type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
   ChevronDown,
   ChevronUp,
-  Cloud,
-  Cpu,
-  Download,
   Globe,
-  HardDrive,
   Map as MapIcon,
-  Monitor,
   Network,
-  Phone,
-  Printer,
-  Radio,
-  Router,
-  Server,
-  Shield,
-  Video,
-  Wifi,
   Settings2,
   Trash2,
 } from "lucide-react";
-import { toPng, toSvg } from "html-to-image";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
+
+import { nodeTypes, edgeTypes, iconByType } from "./components/custom-nodes";
+import {
+  toFlowNodes,
+  toFlowEdges,
+  autoLayout,
+  autoLayoutWithCustomDimensions,
+  generatePortPreset,
+  bandwidthShort,
+  edgeStyleByLinkType,
+  nodeColorByType,
+  exportDiagramPng,
+  exportDiagramSvg,
+  type FlowNodeData,
+  type DetailedNodeData,
+} from "./components/map-utils";
+import { MapToolbar } from "./components/map-toolbar";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,792 +88,6 @@ import type {
   VlanDefinitionCreate,
 } from "@/types";
 
-type FlowNodeData = Record<string, unknown> & {
-  label: string;
-  ip: string;
-  type: TypeEquipement;
-};
-
-export type DetailedNodeData = FlowNodeData & {
-  equipementId: number;
-  ports: PortDefinition[];
-  connectedPortIds: string[];
-  portConnectionInfo: Record<string, { equipName: string; portName: string }>;
-  vlanColorMap?: Record<number, string>;
-  onPortClick?: (equipementId: number, port: PortDefinition, position?: { x: number; y: number }) => void;
-};
-
-type DeviceNodeType = Node<FlowNodeData, "device">;
-type DetailedNodeType = Node<DetailedNodeData, "detailed">;
-
-const iconByType: Record<TypeEquipement, typeof Server> = {
-  reseau: Network,
-  serveur: Monitor,
-  firewall: Shield,
-  equipement: Server,
-  switch: Network,
-  router: Router,
-  access_point: Wifi,
-  printer: Printer,
-  camera: Video,
-  nas: HardDrive,
-  hyperviseur: Cpu,
-  telephone: Phone,
-  iot: Radio,
-  cloud_gateway: Cloud,
-};
-
-const edgeStyleByLinkType: Record<string, { stroke: string; strokeDasharray?: string }> = {
-  ethernet: { stroke: "#6b7280" },
-  fiber: { stroke: "#f59e0b" },
-  wifi: { stroke: "#3b82f6", strokeDasharray: "6 3" },
-  vpn: { stroke: "#22c55e", strokeDasharray: "6 3" },
-  wan: { stroke: "#a855f7" },
-  mpls: { stroke: "#0ea5e9" },
-  sdwan: { stroke: "#f472b6" },
-  serial: { stroke: "#78716c" },
-  other: { stroke: "#9ca3af", strokeDasharray: "4 4" },
-};
-
-const nodeColorByType: Record<TypeEquipement, string> = {
-  firewall: "#ef4444",
-  switch: "#3b82f6",
-  reseau: "#3b82f6",
-  router: "#8b5cf6",
-  serveur: "#22c55e",
-  access_point: "#06b6d4",
-  printer: "#78716c",
-  camera: "#f59e0b",
-  nas: "#14b8a6",
-  hyperviseur: "#6366f1",
-  telephone: "#ec4899",
-  iot: "#f97316",
-  cloud_gateway: "#0ea5e9",
-  equipement: "#6b7280",
-};
-
-const bandwidthShort: Record<string, string> = {
-  "100 Mbps": "100M",
-  "1 Gbps": "1G",
-  "2.5 Gbps": "2.5G",
-  "5 Gbps": "5G",
-  "10 Gbps": "10G",
-  "25 Gbps": "25G",
-};
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function toPosition(value: unknown): { x: number; y: number } | undefined {
-  if (!isObject(value)) return undefined;
-  const x = value.x;
-  const y = value.y;
-  if (typeof x !== "number" || typeof y !== "number") return undefined;
-  return { x, y };
-}
-
-function toFlowNodes(map: NetworkMap): Node<FlowNodeData>[] {
-  return map.nodes.map((n) => {
-    const saved = toPosition(n.position);
-    return {
-      id: n.id,
-      type: "device",
-      data: {
-        label: n.label,
-        ip: n.ip_address,
-        type: n.type_equipement,
-      },
-      position: saved ?? { x: 0, y: 0 },
-    };
-  });
-}
-
-function toFlowEdges(map: NetworkMap): Edge[] {
-  return map.edges.map((e) => {
-    const srcIf = typeof e.metadata.source_interface === "string" ? e.metadata.source_interface : "";
-    const tgtIf = typeof e.metadata.target_interface === "string" ? e.metadata.target_interface : "";
-    const linkType = typeof e.metadata.link_type === "string" ? e.metadata.link_type : "ethernet";
-    const bw = typeof e.metadata.bandwidth === "string" ? e.metadata.bandwidth : "";
-
-    const parts: string[] = [];
-    if (srcIf && tgtIf) {
-      parts.push(`${srcIf} ↔ ${tgtIf}`);
-    } else if (srcIf || tgtIf) {
-      parts.push(srcIf || tgtIf);
-    }
-    if (bw) {
-      parts.push(bandwidthShort[bw] ?? bw);
-    }
-    const label = parts.length > 0 ? parts.join(" • ") : linkType;
-
-    const edgeStyle = edgeStyleByLinkType[linkType] ?? edgeStyleByLinkType.other;
-
-    return {
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      type: "parallel",
-      label,
-      style: { stroke: edgeStyle.stroke, strokeWidth: 2, strokeDasharray: edgeStyle.strokeDasharray },
-      data: { linkId: e.link_id },
-    };
-  });
-}
-
-function autoLayout(nodes: Node<FlowNodeData>[], edges: Edge[], direction: "TB" | "LR" = "TB"): Node<FlowNodeData>[] {
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: direction, ranksep: 90, nodesep: 70 });
-
-  nodes.forEach((node) => {
-    g.setNode(node.id, { width: 180, height: 64 });
-  });
-  edges.forEach((edge) => {
-    g.setEdge(edge.source, edge.target);
-  });
-  dagre.layout(g);
-
-  return nodes.map((node) => {
-    const p = g.node(node.id);
-    if (!p || typeof p.x !== "number" || typeof p.y !== "number") return node;
-    return {
-      ...node,
-      position: { x: p.x - 90, y: p.y - 32 },
-    };
-  });
-}
-
-function DeviceNode({ data }: NodeProps<DeviceNodeType>) {
-  const nodeData = data as FlowNodeData;
-  const Icon = iconByType[nodeData.type] ?? Server;
-  const borderColor = nodeColorByType[nodeData.type] ?? "#6b7280";
-  return (
-    <div
-      className="rounded-md border bg-card px-3 py-2 shadow-sm min-w-[180px] relative"
-      style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
-    >
-      <Handle type="target" position={Position.Top} className="!w-2 !h-2" />
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4" style={{ color: borderColor }} />
-        <span className="text-sm font-medium truncate">{nodeData.label}</span>
-      </div>
-      <div className="text-xs text-muted-foreground mt-1 font-mono">{nodeData.ip}</div>
-      <Handle type="source" position={Position.Bottom} className="!w-2 !h-2" />
-    </div>
-  );
-}
-
-function DetailedEquipmentNode({ data }: NodeProps<DetailedNodeType>) {
-  const nodeData = data as DetailedNodeData;
-  const Icon = iconByType[nodeData.type] ?? Server;
-  const borderColor = nodeColorByType[nodeData.type] ?? "#6b7280";
-
-  const portsRow0 = (nodeData.ports || []).filter(p => p.row === 0).sort((a, b) => a.index - b.index);
-  const portsRow1 = (nodeData.ports || []).filter(p => p.row === 1).sort((a, b) => a.index - b.index);
-
-  const portColorMap: Record<string, string> = {
-    ethernet: "#6b7280",
-    sfp: "#3b82f6",
-    "sfp+": "#8b5cf6",
-    console: "#f97316",
-    mgmt: "#22c55e",
-  };
-
-  const renderPort = (port: PortDefinition) => {
-    const isConnected = nodeData.connectedPortIds?.includes(port.id);
-    let bgColor = portColorMap[port.type] ?? "#6b7280";
-    const connInfo = nodeData.portConnectionInfo?.[port.id];
-    
-    let title = connInfo
-      ? `${port.name} → ${connInfo.equipName}${connInfo.portName ? ` (${connInfo.portName})` : ""}`
-      : port.name;
-
-    const vlanColors = nodeData.vlanColorMap || {};
-    let borderStyle = isConnected ? "ring-2 ring-primary z-10" : "";
-    const extraStyle: React.CSSProperties = {};
-
-    if (port.untaggedVlan) {
-      title += `
-VLAN natif: ${port.untaggedVlan}`;
-    }
-    if (port.taggedVlans && port.taggedVlans.length > 0) {
-      title += `
-VLANs taggés: ${port.taggedVlans.join(", ")}`;
-    }
-
-    if (port.taggedVlans && port.taggedVlans.length > 0) {
-      const colors = port.taggedVlans.map(v => vlanColors[v] || "#ccc");
-      if (colors.length === 1) {
-        extraStyle.backgroundImage = `repeating-linear-gradient(45deg, ${colors[0]}, ${colors[0]} 4px, transparent 4px, transparent 8px)`;
-      } else {
-        const stops = colors.map((c, i) => `${c} ${(i * 100) / colors.length}%, ${c} ${((i + 1) * 100) / colors.length}%`).join(", ");
-        extraStyle.backgroundImage = `linear-gradient(to right, ${stops})`;
-      }
-      bgColor = "transparent";
-      if (port.untaggedVlan) {
-         borderStyle = "border-2 z-10";
-         extraStyle.borderColor = vlanColors[port.untaggedVlan] || "#000";
-      }
-    } else if (port.untaggedVlan) {
-      bgColor = vlanColors[port.untaggedVlan] || "#ccc";
-    }
-
-    const innerLabel = connInfo
-      ? `${connInfo.equipName}${connInfo.portName ? ` · ${connInfo.portName}` : ""}`
-      : null;
-
-    return (
-      <div 
-        key={port.id}
-        title={title}
-        className={`nodrag rounded-[2px] flex items-center justify-center overflow-hidden transition-colors ${borderStyle}`}
-        style={{
-          backgroundColor: bgColor,
-          minWidth: 28,
-          height: 22,
-          padding: innerLabel ? "0 3px" : 0,
-          width: innerLabel ? "auto" : 28,
-          cursor: "pointer",
-          ...extraStyle
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          nodeData.onPortClick?.(nodeData.equipementId, port, { x: e.clientX, y: e.clientY });
-        }}
-      >
-        <Handle type="target" id={`port-${port.id}-in`} position={Position.Top} className="!w-1 !h-1 !min-w-0 !min-h-0 opacity-0" />
-        <Handle type="source" id={`port-${port.id}`} position={Position.Bottom} className="!w-1 !h-1 !min-w-0 !min-h-0 opacity-0" />
-        {innerLabel && (
-          <span className="text-[6px] leading-tight text-white font-medium whitespace-nowrap select-none pointer-events-none">
-            {innerLabel}
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  return (
-    <div
-      className="rounded-md border bg-card p-3 shadow-sm min-w-[180px] flex flex-col gap-3"
-      style={{ borderLeftWidth: 4, borderLeftColor: borderColor }}
-    >
-      <div>
-        <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4" style={{ color: borderColor }} />
-          <span className="text-sm font-medium truncate">{nodeData.label}</span>
-        </div>
-        <div className="text-xs text-muted-foreground mt-1 font-mono">{nodeData.ip}</div>
-      </div>
-
-      <div className="flex flex-col gap-1 mx-auto bg-muted/30 p-1.5 rounded-md border border-border/50">
-        {portsRow0.length > 0 && (
-          <div className="flex gap-1 justify-center flex-wrap">
-            {portsRow0.map(renderPort)}
-          </div>
-        )}
-        {portsRow1.length > 0 && (
-          <div className="flex gap-1 justify-center flex-wrap">
-            {portsRow1.map(renderPort)}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const PARALLEL_EDGE_SPACING = 35;
-
-function ParallelEdge({
-  id,
-  source,
-  target,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  label,
-  markerEnd,
-  style,
-}: EdgeProps) {
-  const { getEdges } = useReactFlow();
-
-  const { path, labelX, labelY } = useMemo(() => {
-    const siblings = getEdges().filter(
-      (e) =>
-        (e.source === source && e.target === target) ||
-        (e.source === target && e.target === source),
-    );
-
-    let offset = 0;
-    if (siblings.length > 1) {
-      const sorted = siblings.map((e) => e.id).sort();
-      const idx = sorted.indexOf(id);
-      const mid = (siblings.length - 1) / 2;
-      offset = (idx - mid) * PARALLEL_EDGE_SPACING;
-    }
-
-    // Orthogonal (90° angle) routing with rounded corners
-    // Offset shifts the horizontal segment vertically to separate parallel edges
-    const midY = (sourceY + targetY) / 2 + offset;
-    const r = 8;
-
-    const dy1 = midY - sourceY;
-    const dy2 = targetY - midY;
-    const dxMid = targetX - sourceX;
-
-    let d: string;
-    if (Math.abs(dxMid) < 1 && Math.abs(offset) < 1) {
-      d = `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
-    } else if (Math.abs(dxMid) < 1) {
-      // Same X but needs offset — jog out and back
-      const jog = offset > 0 ? PARALLEL_EDGE_SPACING : -PARALLEL_EDGE_SPACING;
-      const cr = Math.min(r, Math.abs(dy1) / 2, Math.abs(dy2) / 2, Math.abs(jog) / 2);
-      const signJ = jog > 0 ? 1 : -1;
-      const signY1 = dy1 > 0 ? 1 : -1;
-      const signY2 = dy2 > 0 ? 1 : -1;
-      d = [
-        `M ${sourceX},${sourceY}`,
-        `L ${sourceX},${midY - signY1 * cr}`,
-        `Q ${sourceX},${midY} ${sourceX + signJ * cr},${midY}`,
-        `L ${sourceX + jog - signJ * cr},${midY}`,
-        `Q ${sourceX + jog},${midY} ${sourceX + jog},${midY + signY2 * cr}`,
-        `L ${sourceX + jog},${midY + (targetY - midY) / 2 - signY2 * cr}`,
-        `Q ${sourceX + jog},${midY + (targetY - midY) / 2} ${sourceX + jog - signJ * cr},${midY + (targetY - midY) / 2}`,
-        `L ${targetX + signJ * cr},${midY + (targetY - midY) / 2}`,
-        `Q ${targetX},${midY + (targetY - midY) / 2} ${targetX},${midY + (targetY - midY) / 2 + signY2 * cr}`,
-        `L ${targetX},${targetY}`,
-      ].join(" ");
-    } else {
-      const cr = Math.min(r, Math.abs(dy1) / 2, Math.abs(dy2) / 2, Math.abs(dxMid) / 2);
-      const signX = dxMid > 0 ? 1 : -1;
-      const signY1 = dy1 > 0 ? 1 : -1;
-      const signY2 = dy2 > 0 ? 1 : -1;
-
-      d = [
-        `M ${sourceX},${sourceY}`,
-        `L ${sourceX},${midY - signY1 * cr}`,
-        `Q ${sourceX},${midY} ${sourceX + signX * cr},${midY}`,
-        `L ${targetX - signX * cr},${midY}`,
-        `Q ${targetX},${midY} ${targetX},${midY + signY2 * cr}`,
-        `L ${targetX},${targetY}`,
-      ].join(" ");
-    }
-
-    const lx = (sourceX + targetX) / 2;
-    const ly = midY;
-
-    return { path: d, labelX: lx, labelY: ly };
-  }, [id, source, target, sourceX, sourceY, targetX, targetY, getEdges]);
-
-  return (
-    <>
-      <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} />
-      {label && (
-        <foreignObject
-          x={labelX - 60}
-          y={labelY - 10}
-          width={120}
-          height={20}
-          className="pointer-events-none overflow-visible"
-        >
-          <div className="flex items-center justify-center h-full">
-            <span className="bg-background/90 border border-border rounded px-1.5 py-0.5 text-[10px] font-medium text-foreground whitespace-nowrap leading-none">
-              {label}
-            </span>
-          </div>
-        </foreignObject>
-      )}
-    </>
-  );
-}
-
-const nodeTypes: NodeTypes = { device: DeviceNode, detailed: memo(DetailedEquipmentNode) };
-const edgeTypes: EdgeTypes = { parallel: ParallelEdge };
-
-/**
- * Generates pre-configured port arrays for common network equipment.
- * Port IDs auto-generate as: {type_short}-{row}-{index}
- * Port names auto-generate as: {TypeLabel} {global_index+1}
- * 
- * Supported presets:
- * - "24×GigE+4×SFP+" → 24 GigE 1Gbps + 4 SFP+ 10Gbps (28 total)
- * - "48×GigE+4×SFP+" → 48 GigE 1Gbps + 4 SFP+ 10Gbps (52 total)
- * - "8×SFP+10G" → 8 SFP+ 10Gbps (8 total)
- * - "4×SFP28-25G" → 4 SFP+ 25Gbps (4 total, all row 0)
- */
-function generatePortPreset(presetType: string): PortDefinition[] {
-  const ports: PortDefinition[] = [];
-  
-  switch (presetType) {
-    case "24×GigE+4×SFP+": {
-      // 24× GigE 1Gbps: 12 on row 0, 12 on row 1
-      let globalIdx = 1;
-      for (let row = 0; row < 2; row++) {
-        for (let i = 0; i < 12; i++) {
-          ports.push({
-            id: `ge-${row}-${i}`,
-            name: `GigE ${globalIdx}`,
-            type: "ethernet",
-            speed: "1 Gbps",
-            row,
-            index: i,
-          });
-          globalIdx++;
-        }
-      }
-      // 4× SFP+ 10Gbps: 2 on row 0 indices 12-13, 2 on row 1 indices 12-13
-      ports.push({
-        id: "sfp-0-12",
-        name: "SFP+ 25",
-        type: "sfp+",
-        speed: "10 Gbps",
-        row: 0,
-        index: 12,
-      });
-      ports.push({
-        id: "sfp-0-13",
-        name: "SFP+ 26",
-        type: "sfp+",
-        speed: "10 Gbps",
-        row: 0,
-        index: 13,
-      });
-      ports.push({
-        id: "sfp-1-12",
-        name: "SFP+ 27",
-        type: "sfp+",
-        speed: "10 Gbps",
-        row: 1,
-        index: 12,
-      });
-      ports.push({
-        id: "sfp-1-13",
-        name: "SFP+ 28",
-        type: "sfp+",
-        speed: "10 Gbps",
-        row: 1,
-        index: 13,
-      });
-      break;
-    }
-    
-    case "48×GigE+4×SFP+": {
-      // 48× GigE 1Gbps: 24 on row 0, 24 on row 1
-      let globalIdx = 1;
-      for (let row = 0; row < 2; row++) {
-        for (let i = 0; i < 24; i++) {
-          ports.push({
-            id: `ge-${row}-${i}`,
-            name: `GigE ${globalIdx}`,
-            type: "ethernet",
-            speed: "1 Gbps",
-            row,
-            index: i,
-          });
-          globalIdx++;
-        }
-      }
-      // 4× SFP+ 10Gbps: 2 on row 0 indices 24-25, 2 on row 1 indices 24-25
-      ports.push({
-        id: "sfp-0-24",
-        name: "SFP+ 49",
-        type: "sfp+",
-        speed: "10 Gbps",
-        row: 0,
-        index: 24,
-      });
-      ports.push({
-        id: "sfp-0-25",
-        name: "SFP+ 50",
-        type: "sfp+",
-        speed: "10 Gbps",
-        row: 0,
-        index: 25,
-      });
-      ports.push({
-        id: "sfp-1-24",
-        name: "SFP+ 51",
-        type: "sfp+",
-        speed: "10 Gbps",
-        row: 1,
-        index: 24,
-      });
-      ports.push({
-        id: "sfp-1-25",
-        name: "SFP+ 52",
-        type: "sfp+",
-        speed: "10 Gbps",
-        row: 1,
-        index: 25,
-      });
-      break;
-    }
-    
-    case "8×SFP+10G": {
-      // 8× SFP+ 10Gbps: 4 on row 0, 4 on row 1
-      let globalIdx = 1;
-      for (let row = 0; row < 2; row++) {
-        for (let i = 0; i < 4; i++) {
-          ports.push({
-            id: `sfp-${row}-${i}`,
-            name: `SFP+ ${globalIdx}`,
-            type: "sfp+",
-            speed: "10 Gbps",
-            row,
-            index: i,
-          });
-          globalIdx++;
-        }
-      }
-      break;
-    }
-    
-    case "4×SFP28-25G": {
-      // 4× SFP+ 25Gbps: all on row 0
-      for (let i = 0; i < 4; i++) {
-        ports.push({
-          id: `sfp-0-${i}`,
-          name: `SFP+ ${i + 1}`,
-          type: "sfp+",
-          speed: "25 Gbps",
-          row: 0,
-          index: i,
-        });
-      }
-      break;
-    }
-    
-    case "1×Ethernet": {
-      ports.push({
-        id: "eth-0-0",
-        name: "Eth 1",
-        type: "ethernet",
-        speed: "1 Gbps",
-        row: 0,
-        index: 0,
-      });
-      break;
-    }
-
-    case "2×Ethernet": {
-      for (let i = 0; i < 2; i++) {
-        ports.push({
-          id: `eth-0-${i}`,
-          name: `Eth ${i + 1}`,
-          type: "ethernet",
-          speed: "1 Gbps",
-          row: 0,
-          index: i,
-        });
-      }
-      break;
-    }
-
-    case "4×Ethernet": {
-      for (let i = 0; i < 4; i++) {
-        ports.push({
-          id: `eth-0-${i}`,
-          name: `Eth ${i + 1}`,
-          type: "ethernet",
-          speed: "1 Gbps",
-          row: 0,
-          index: i,
-        });
-      }
-      break;
-    }
-
-    case "2×Ethernet+1×Mgmt": {
-      for (let i = 0; i < 2; i++) {
-        ports.push({
-          id: `eth-0-${i}`,
-          name: `Eth ${i + 1}`,
-          type: "ethernet",
-          speed: "1 Gbps",
-          row: 0,
-          index: i,
-        });
-      }
-      ports.push({
-        id: "mgmt-0-2",
-        name: "Mgmt",
-        type: "mgmt",
-        speed: "1 Gbps",
-        row: 0,
-        index: 2,
-      });
-      break;
-    }
-
-    case "4×Ethernet+1×Mgmt": {
-      for (let i = 0; i < 4; i++) {
-        ports.push({
-          id: `eth-0-${i}`,
-          name: `Eth ${i + 1}`,
-          type: "ethernet",
-          speed: "1 Gbps",
-          row: 0,
-          index: i,
-        });
-      }
-      ports.push({
-        id: "mgmt-0-4",
-        name: "Mgmt",
-        type: "mgmt",
-        speed: "1 Gbps",
-        row: 0,
-        index: 4,
-      });
-      break;
-    }
-
-    case "8×Ethernet+1×Mgmt": {
-      for (let i = 0; i < 4; i++) {
-        ports.push({
-          id: `eth-0-${i}`,
-          name: `Eth ${i + 1}`,
-          type: "ethernet",
-          speed: "1 Gbps",
-          row: 0,
-          index: i,
-        });
-      }
-      for (let i = 0; i < 4; i++) {
-        ports.push({
-          id: `eth-1-${i}`,
-          name: `Eth ${i + 5}`,
-          type: "ethernet",
-          speed: "1 Gbps",
-          row: 1,
-          index: i,
-        });
-      }
-      ports.push({
-        id: "mgmt-0-4",
-        name: "Mgmt",
-        type: "mgmt",
-        speed: "1 Gbps",
-        row: 0,
-        index: 4,
-      });
-      break;
-    }
-
-    case "2×Ethernet+2×SFP+": {
-      for (let i = 0; i < 2; i++) {
-        ports.push({
-          id: `eth-0-${i}`,
-          name: `Eth ${i + 1}`,
-          type: "ethernet",
-          speed: "1 Gbps",
-          row: 0,
-          index: i,
-        });
-      }
-      for (let i = 0; i < 2; i++) {
-        ports.push({
-          id: `sfp-0-${i + 2}`,
-          name: `SFP+ ${i + 1}`,
-          type: "sfp+",
-          speed: "10 Gbps",
-          row: 0,
-          index: i + 2,
-        });
-      }
-      break;
-    }
-
-    default:
-      console.warn(`Unknown preset type: ${presetType}`);
-  }
-  
-  return ports;
-}
-
-async function exportDiagramPng(flowElement: HTMLElement, nodes: Node[]): Promise<void> {
-  const imageWidth = 1024;
-  const imageHeight = 768;
-  const padding = 50;
-
-  const nodesBounds = getNodesBounds(nodes);
-  const viewport = getViewportForBounds(
-    nodesBounds,
-    imageWidth,
-    imageHeight,
-    0.5,
-    2,
-    padding / 100
-  );
-
-  const viewportElement = flowElement.querySelector(".react-flow__viewport") as HTMLElement;
-  if (!viewportElement) {
-    console.error("React Flow viewport element not found");
-    return;
-  }
-
-  try {
-    const dataUrl = await toPng(viewportElement, {
-      width: imageWidth,
-      height: imageHeight,
-      style: {
-        width: String(imageWidth),
-        height: String(imageHeight),
-        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-      },
-    });
-
-    const link = document.createElement("a");
-    link.href = dataUrl;
-    link.download = `network-diagram-${new Date().toISOString().split("T")[0]}.png`;
-    link.click();
-  } catch (error) {
-    console.error("Error exporting PNG:", error);
-    toast.error("Erreur lors de l'export PNG");
-  }
-}
-
-async function exportDiagramSvg(flowElement: HTMLElement, nodes: Node[]): Promise<void> {
-  const imageWidth = 1024;
-  const imageHeight = 768;
-  const padding = 50;
-
-  const nodesBounds = getNodesBounds(nodes);
-  const viewport = getViewportForBounds(
-    nodesBounds,
-    imageWidth,
-    imageHeight,
-    0.5,
-    2,
-    padding / 100
-  );
-
-  const viewportElement = flowElement.querySelector(".react-flow__viewport") as HTMLElement;
-  if (!viewportElement) {
-    console.error("React Flow viewport element not found");
-    return;
-  }
-
-  try {
-    const dataUrl = await toSvg(viewportElement, {
-      width: imageWidth,
-      height: imageHeight,
-      style: {
-        width: String(imageWidth),
-        height: String(imageHeight),
-        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-      },
-    });
-
-    const link = document.createElement("a");
-    link.href = dataUrl;
-    link.download = `network-diagram-${new Date().toISOString().split("T")[0]}.svg`;
-    link.click();
-  } catch (error) {
-    console.error("Error exporting SVG:", error);
-    toast.error("Erreur lors de l'export SVG");
-  }
-}
 
 export default function NetworkMapPage() {
   const { resolvedTheme } = useTheme();
@@ -1395,37 +601,6 @@ export default function NetworkMapPage() {
     setDetailedEdges(detailedEdgesArray);
   }, [setDetailedNodes, setDetailedEdges, layoutDirection]);
 
-  function autoLayoutWithCustomDimensions(
-    nodes: Node<DetailedNodeData | FlowNodeData>[],
-    edges: Edge[],
-    direction: "TB" | "LR" = "TB"
-  ): Node<DetailedNodeData | FlowNodeData>[] {
-    const g = new dagre.graphlib.Graph();
-    g.setDefaultEdgeLabel(() => ({}));
-    g.setGraph({ rankdir: direction, ranksep: 120, nodesep: 80 });
-
-    nodes.forEach((node) => {
-      if (node.type === "detailed") {
-        g.setNode(node.id, { width: 250, height: 180 });
-      } else {
-        g.setNode(node.id, { width: 180, height: 80 });
-      }
-    });
-    edges.forEach((edge) => {
-      g.setEdge(edge.source, edge.target);
-    });
-    dagre.layout(g);
-
-    return nodes.map((node) => {
-      const p = g.node(node.id);
-      if (!p || typeof p.x !== "number" || typeof p.y !== "number") return node;
-      return {
-        ...node,
-        position: { x: p.x, y: p.y },
-      };
-    });
-  }
-
   useEffect(() => {
     const run = async () => {
       setLoading(true);
@@ -1865,44 +1040,21 @@ export default function NetworkMapPage() {
           </TabsList>
 
           <TabsContent value="site" className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => handleAutoLayout()}>Auto-layout</Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  const next = layoutDirection === "TB" ? "LR" : "TB";
-                  setLayoutDirection(next);
-                  handleAutoLayout(next);
-                }}
-              >
-                {layoutDirection === "TB" ? "↓ Vertical" : "→ Horizontal"}
-              </Button>
-              <Button variant="outline" onClick={handleSaveLayout}>Sauvegarder layout</Button>
-              <Button onClick={() => { resetLinkForm(); setLinkDialogOpen(true); }}>Ajouter un lien</Button>
-               {selectedSiteId && (
-                 <Button variant="outline" onClick={() => loadSiteMap(selectedSiteId)}>
-                   Recharger
-                 </Button>
-               )}
-               <Button
-                 variant="outline"
-                 onClick={() => {
-                   if (siteFlowRef.current) exportDiagramPng(siteFlowRef.current, nodes);
-                 }}
-               >
-                 <Download className="h-4 w-4 mr-2" />
-                 Export PNG
-               </Button>
-               <Button
-                 variant="outline"
-                 onClick={() => {
-                   if (siteFlowRef.current) exportDiagramSvg(siteFlowRef.current, nodes);
-                 }}
-               >
-                 <Download className="h-4 w-4 mr-2" />
-                 Export SVG
-               </Button>
-            </div>
+            <MapToolbar
+              tab="site"
+              layoutDirection={layoutDirection}
+              onAutoLayout={(dir) => handleAutoLayout(dir)}
+              onToggleDirection={() => {
+                const next = layoutDirection === "TB" ? "LR" : "TB";
+                setLayoutDirection(next);
+                handleAutoLayout(next);
+              }}
+              onSaveLayout={handleSaveLayout}
+              onAddLink={() => { resetLinkForm(); setLinkDialogOpen(true); }}
+              onReload={() => { if (selectedSiteId) loadSiteMap(selectedSiteId); }}
+              onExportPng={() => { if (siteFlowRef.current) exportDiagramPng(siteFlowRef.current, nodes); }}
+              onExportSvg={() => { if (siteFlowRef.current) exportDiagramSvg(siteFlowRef.current, nodes); }}
+            />
 
             <div ref={siteFlowRef}>
               <Card>
@@ -1931,32 +1083,22 @@ export default function NetworkMapPage() {
           </TabsContent>
 
           <TabsContent value="overview" className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => { resetSiteConnForm(); setSiteConnDialogOpen(true); }}>Ajouter une connexion</Button>
-              {selectedEntrepriseId && (
-                <Button variant="outline" onClick={() => loadOverview(selectedEntrepriseId)}>
-                  Recharger
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (overviewFlowRef.current) exportDiagramPng(overviewFlowRef.current, overviewNodes);
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export PNG
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (overviewFlowRef.current) exportDiagramSvg(overviewFlowRef.current, overviewNodes);
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export SVG
-              </Button>
-            </div>
+            <MapToolbar
+              tab="overview"
+              layoutDirection={layoutDirection}
+              onAutoLayout={(dir) => handleAutoLayout(dir)}
+              onToggleDirection={() => {
+                const next = layoutDirection === "TB" ? "LR" : "TB";
+                setLayoutDirection(next);
+                handleAutoLayout(next);
+              }}
+              onSaveLayout={handleSaveLayout}
+              onAddLink={() => { resetLinkForm(); setLinkDialogOpen(true); }}
+              onReload={() => { if (selectedEntrepriseId) loadOverview(selectedEntrepriseId); }}
+              onExportPng={() => { if (overviewFlowRef.current) exportDiagramPng(overviewFlowRef.current, overviewNodes); }}
+              onExportSvg={() => { if (overviewFlowRef.current) exportDiagramSvg(overviewFlowRef.current, overviewNodes); }}
+              onAddSiteConnection={() => { resetSiteConnForm(); setSiteConnDialogOpen(true); }}
+            />
 
             <div ref={overviewFlowRef}>
               <Card>
@@ -1992,44 +1134,35 @@ export default function NetworkMapPage() {
           </TabsContent>
 
           <TabsContent value="detailed" className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => {
+            <MapToolbar
+              tab="detailed"
+              layoutDirection={layoutDirection}
+              onAutoLayout={(dir) => handleAutoLayout(dir)}
+              onToggleDirection={() => {
+                const next = layoutDirection === "TB" ? "LR" : "TB";
+                setLayoutDirection(next);
+                handleAutoLayout(next);
+              }}
+              onSaveLayout={handleSaveLayout}
+              onAddLink={() => { resetLinkForm(); setLinkDialogOpen(true); }}
+              onReload={() => { if (selectedSiteId) loadSiteMap(selectedSiteId); }}
+              onExportPng={() => { if (siteFlowRef.current) exportDiagramPng(siteFlowRef.current, nodes); }}
+              onExportSvg={() => { if (siteFlowRef.current) exportDiagramSvg(siteFlowRef.current, nodes); }}
+              onAutoLayoutDetailed={() => {
                 const layoutedNodes = autoLayoutWithCustomDimensions(detailedNodes, detailedEdges, layoutDirection);
-    setDetailedNodes(layoutedNodes);
-              }}>
-                Auto-layout
-              </Button>
-              <Button variant="outline" onClick={() => handleSaveDetailedLayout()}>
-                Sauvegarder layout
-              </Button>
-              <Button variant="outline" onClick={() => {
+                setDetailedNodes(layoutedNodes);
+              }}
+              onSaveDetailedLayout={() => handleSaveDetailedLayout()}
+              onReloadDetailed={() => {
                 if (!selectedSiteId) {
                   toast.error("Aucun site sélectionné");
                   return;
                 }
                 loadDetailedView(selectedSiteId);
-              }}>
-                Recharger
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (detailedFlowRef.current) exportDiagramPng(detailedFlowRef.current, detailedNodes);
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Exporter PNG
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (detailedFlowRef.current) exportDiagramSvg(detailedFlowRef.current, detailedNodes);
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Exporter SVG
-              </Button>
-            </div>
+              }}
+              onExportDetailedPng={() => { if (detailedFlowRef.current) exportDiagramPng(detailedFlowRef.current, detailedNodes); }}
+              onExportDetailedSvg={() => { if (detailedFlowRef.current) exportDiagramSvg(detailedFlowRef.current, detailedNodes); }}
+            />
 
             <div ref={detailedFlowRef}>
               <Card>
