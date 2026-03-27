@@ -466,14 +466,15 @@ export default function NetworkMapPage() {
     let vlans: VlanDefinition[] = [];
     try { vlans = await vlansApi.list(siteId); setSiteVlans(vlans); } catch { /* VLANs not available yet */ }
 
-    const equipmentDetailsPromises = data.nodes.map((node) => 
-      equipementsApi.get(node.equipement_id)
+    const equipmentDetailsResults = await Promise.allSettled(
+      data.nodes.map((node) => equipementsApi.get(node.equipement_id))
     );
-    const equipmentDetails = await Promise.all(equipmentDetailsPromises);
 
     const equipmentMap = new Map<number, Equipement>();
-    equipmentDetails.forEach((eq) => {
-      equipmentMap.set(eq.id, eq);
+    equipmentDetailsResults.forEach((result) => {
+      if (result.status === "fulfilled") {
+        equipmentMap.set(result.value.id, result.value);
+      }
     });
 
     const connectedPortIds = new Set<string>();
