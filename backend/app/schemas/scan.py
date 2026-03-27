@@ -487,6 +487,7 @@ class Monkey365ExportFormat(str, Enum):
 class Monkey365ConfigSchema(BaseModel):
     spo_sites: list[str] = Field(default_factory=list, description="SharePoint sites to scan (e.g., https://domain.sharepoint.com)")
     export_to: list[Monkey365ExportFormat] = Field(default_factory=lambda: [Monkey365ExportFormat.JSON, Monkey365ExportFormat.HTML], description="Formats d'export : JSON, HTML, CSV")
+    device_code: bool = Field(default=False, description="Utiliser Device Code Flow au lieu de l'auth interactive")
 
     @field_validator("export_to", mode="after")
     @classmethod

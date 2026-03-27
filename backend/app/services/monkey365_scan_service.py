@@ -188,6 +188,7 @@ class Monkey365ScanService:
                 output_dir=result.output_path or "./monkey365_output",
                 spo_sites=config.spo_sites,
                 export_to=config.export_to,
+                device_code=config.device_code,
             )
 
             executor = Monkey365Executor(executor_config, settings.MONKEY365_PATH or None, allow_auto_clone=settings.MONKEY365_AUTO_CLONE)

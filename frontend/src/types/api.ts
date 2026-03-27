@@ -952,6 +952,7 @@ export interface PingCastleResultRead extends PingCastleResultSummary {
 export interface Monkey365Config {
   spo_sites?: string[];
   export_to?: string[];
+  device_code?: boolean;
 }
 
 export interface Monkey365ScanCreate {

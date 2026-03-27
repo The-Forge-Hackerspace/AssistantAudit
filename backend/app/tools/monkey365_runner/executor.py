@@ -26,6 +26,7 @@ class Monkey365Config:
     output_dir: str = "./monkey365_output"
     spo_sites: list[str] = field(default_factory=list)
     export_to: list[str] = field(default_factory=lambda: ["JSON", "HTML"])
+    device_code: bool = False
 
 
 class Monkey365Executor:
@@ -163,11 +164,15 @@ class Monkey365Executor:
         param_lines = [
             "    Instance        = 'Microsoft365';",
             f"    Collect         = @({collect_items});",
-            "    PromptBehavior  = 'SelectAccount';",
             "    IncludeEntraID  = $true;",
-            "    ForceMSALDesktop = $true;",
             f"    ExportTo        = @({export_to});",
         ]
+
+        if self.config.device_code:
+            param_lines.append("    DeviceCode      = $true;")
+        else:
+            param_lines.append("    PromptBehavior  = 'SelectAccount';")
+            param_lines.append("    ForceMSALDesktop = $true;")
 
         if self.config.spo_sites:
             sites = ", ".join(f"'{_escape_ps_string(s)}'" for s in self.config.spo_sites)
@@ -209,16 +214,19 @@ Invoke-Monkey365 @param -Verbose
         log_file = output_path / "monkey365.log"
         script = self.build_script(scan_id, log_path=log_file)
 
-        params_snapshot = {
+        params_snapshot: dict[str, object] = {
             "scan_id": scan_id,
             "Instance": "Microsoft365",
             "Collect": self.COLLECT_MODULES,
-            "PromptBehavior": "SelectAccount",
             "IncludeEntraID": True,
-            "ForceMSALDesktop": True,
             "ExportTo": self.config.export_to,
             "SpoSites": self.config.spo_sites or [],
         }
+        if self.config.device_code:
+            params_snapshot["DeviceCode"] = True
+        else:
+            params_snapshot["PromptBehavior"] = "SelectAccount"
+            params_snapshot["ForceMSALDesktop"] = True
         (output_path / "scan_params.json").write_text(
             json.dumps(params_snapshot, indent=2),
             encoding="utf-8",
