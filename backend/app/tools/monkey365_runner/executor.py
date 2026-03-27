@@ -255,16 +255,36 @@ Invoke-Monkey365 @param -Verbose
             ]
             logger.info("[MONKEY365] Running PowerShell with args: %s", powershell_command)
 
-            # stdin/stdout/stderr all inherited — MSAL browser popup stays visible.
-            # All PS output is captured via Start-Transcript in the script itself,
-            # which records every stream (Write-Host, Write-Verbose, errors, output).
-            result = subprocess.run(
-                powershell_command,
-                timeout=3600,
-                cwd=self.monkey365_path.parent,
-                env=env,
-            )
-            returncode = result.returncode
+            if self.config.device_code:
+                # Device Code mode: MSAL prints the code to stdout (no popup).
+                # Start-Transcript does NOT capture .NET MSAL output, so we
+                # pipe stdout+stderr and write each line to monkey365.log ourselves.
+                proc = subprocess.Popen(
+                    powershell_command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    cwd=self.monkey365_path.parent,
+                    env=env,
+                )
+                with open(log_file, "w", encoding="utf-8") as lf:
+                    assert proc.stdout is not None
+                    for raw_line in proc.stdout:
+                        decoded = raw_line.decode("utf-8", errors="replace")
+                        lf.write(decoded)
+                        lf.flush()
+                proc.wait(timeout=3600)
+                returncode = proc.returncode
+            else:
+                # Interactive mode: stdin/stdout/stderr inherited so MSAL
+                # browser popup stays visible. Logs via Start-Transcript.
+                result = subprocess.run(
+                    powershell_command,
+                    timeout=3600,
+                    cwd=self.monkey365_path.parent,
+                    env=env,
+                )
+                returncode = result.returncode
+
             ps_stdout = log_file.read_text(encoding="utf-8", errors="replace") if log_file.exists() else ""
             ps_stderr = ""
 
