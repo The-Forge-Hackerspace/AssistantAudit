@@ -135,12 +135,15 @@ async def cancel_monkey365_scan(
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
 ):
-    """Force l'arrêt d'un scan bloqué en statut RUNNING."""
+    """Force l'arrêt d'un scan en cours : tue le process PowerShell et met le status à CANCELLED."""
     result = Monkey365ScanService.get_scan(db, result_id)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
-    if result.status != Monkey365ScanStatus.RUNNING:
+    if result.status not in (Monkey365ScanStatus.RUNNING, Monkey365ScanStatus.AUTHENTICATING):
         raise HTTPException(400, "Ce scan n'est pas en cours d'exécution")
+
+    # Kill the PowerShell process if still running
+    Monkey365ScanService.kill_scan_process(result_id)
 
     result.status = Monkey365ScanStatus.CANCELLED
     result.completed_at = datetime.now(timezone.utc)
