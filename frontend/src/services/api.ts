@@ -59,6 +59,9 @@ import type {
   VlanDefinition,
   VlanDefinitionCreate,
   VlanDefinitionUpdate,
+  Agent,
+  AgentCreateRequest,
+  AgentCreateResponse,
 } from "@/types";
 
 // ── Auth ──
@@ -572,6 +575,24 @@ export const vlansApi = {
 
   async delete(vlanDefId: number): Promise<{ message: string }> {
     const { data } = await api.delete(`/network-map/vlans/${vlanDefId}`);
+    return data;
+  },
+};
+
+// ── Agents ──
+export const agentsApi = {
+  async list(): Promise<Agent[]> {
+    const { data } = await api.get<Agent[]>("/agents/");
+    return data;
+  },
+
+  async create(payload: AgentCreateRequest): Promise<AgentCreateResponse> {
+    const { data } = await api.post<AgentCreateResponse>("/agents/create", payload);
+    return data;
+  },
+
+  async revoke(agentUuid: string): Promise<{ detail: string }> {
+    const { data } = await api.delete<{ detail: string }>(`/agents/${agentUuid}`);
     return data;
   },
 };

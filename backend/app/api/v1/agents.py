@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ...core.config import get_settings
 from ...core.database import get_db
@@ -75,9 +75,27 @@ def list_agents(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_auditeur),
 ):
-    """Liste les agents du technicien connecte."""
-    agents = db.query(Agent).filter(Agent.user_id == current_user.id).all()
-    return agents
+    """Liste les agents. Admin voit tous les agents, auditeur voit les siens."""
+    query = db.query(Agent).options(joinedload(Agent.owner))
+    if current_user.role != "admin":
+        query = query.filter(Agent.user_id == current_user.id)
+    agents = query.all()
+    return [
+        AgentResponse(
+            id=a.id,
+            agent_uuid=a.agent_uuid,
+            name=a.name,
+            status=a.status,
+            last_seen=a.last_seen,
+            last_ip=a.last_ip,
+            allowed_tools=a.allowed_tools,
+            os_info=a.os_info,
+            agent_version=a.agent_version,
+            owner_name=a.owner.full_name if a.owner else None,
+            created_at=a.created_at,
+        )
+        for a in agents
+    ]
 
 
 @router.delete("/{agent_uuid}", status_code=200)

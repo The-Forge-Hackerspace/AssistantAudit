@@ -299,7 +299,7 @@ function DetailedEquipmentNode({ data }: NodeProps<DetailedNodeType>) {
 
     const vlanColors = nodeData.vlanColorMap || {};
     let borderStyle = isConnected ? "ring-2 ring-primary z-10" : "";
-    let extraStyle: React.CSSProperties = {};
+    const extraStyle: React.CSSProperties = {};
 
     if (port.untaggedVlan) {
       title += `

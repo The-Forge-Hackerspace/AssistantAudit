@@ -992,3 +992,52 @@ export interface Monkey365ImportResult {
   controls_mapped: number;
   controls_total: number;
 }
+
+// ── Agents ──
+export type AgentStatus = "pending" | "active" | "revoked" | "offline";
+
+export interface Agent {
+  id: number;
+  agent_uuid: string;
+  name: string;
+  status: AgentStatus;
+  last_seen: string | null;
+  last_ip: string | null;
+  allowed_tools: string[];
+  os_info: string | null;
+  agent_version: string | null;
+  owner_name: string | null;
+  created_at: string;
+}
+
+export interface AgentCreateRequest {
+  name: string;
+  allowed_tools?: string[];
+}
+
+export interface AgentCreateResponse {
+  agent_uuid: string;
+  enrollment_code: string;
+  expires_at: string;
+}
+
+export type AgentTaskStatus = "pending" | "dispatched" | "running" | "completed" | "failed" | "cancelled";
+
+export interface AgentTask {
+  id: number;
+  task_uuid: string;
+  agent_id: number;
+  owner_id: number;
+  audit_id: number | null;
+  tool: string;
+  parameters: Record<string, unknown>;
+  status: AgentTaskStatus;
+  progress: number;
+  status_message: string | null;
+  result_summary: Record<string, unknown> | null;
+  error_message: string | null;
+  created_at: string;
+  dispatched_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}

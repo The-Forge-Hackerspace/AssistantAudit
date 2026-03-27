@@ -48,6 +48,7 @@ import {
   Map,
   Cloud,
   Users2,
+  Bot,
 } from "lucide-react";
 
 interface NavItem {
@@ -55,6 +56,7 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
+  roles?: string[];
 }
 
 interface NavGroup {
@@ -100,6 +102,7 @@ const navItems: NavGroup[] = [
   {
     label: "Administration",
     items: [
+      { title: "Agents", href: "/agents", icon: Bot, roles: ["admin", "auditeur"] },
       { title: "Utilisateurs", href: "/utilisateurs", icon: Users2, adminOnly: true },
     ],
   },
@@ -146,7 +149,11 @@ function AppSidebar() {
       <SidebarContent>
         {navItems.map((group) => {
           const visibleItems = group.items.filter(
-            (item) => !item.adminOnly || user?.role === "admin"
+            (item) => {
+              if (item.roles) return user?.role && item.roles.includes(user.role);
+              if (item.adminOnly) return user?.role === "admin";
+              return true;
+            }
           );
           if (visibleItems.length === 0) return null;
           return (
