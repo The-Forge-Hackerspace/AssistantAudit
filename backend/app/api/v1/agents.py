@@ -117,11 +117,11 @@ def revoke_agent(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_auditeur),
 ):
-    """Revoque un agent. Retourne 404 si pas trouve (meme s'il appartient a un autre user)."""
-    agent = db.query(Agent).filter(
-        Agent.agent_uuid == agent_uuid,
-        Agent.user_id == current_user.id,
-    ).first()
+    """Revoque un agent. Admin peut revoquer n'importe quel agent, auditeur seulement les siens."""
+    query = db.query(Agent).filter(Agent.agent_uuid == agent_uuid)
+    if current_user.role != "admin":
+        query = query.filter(Agent.user_id == current_user.id)
+    agent = query.first()
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent introuvable")
 
