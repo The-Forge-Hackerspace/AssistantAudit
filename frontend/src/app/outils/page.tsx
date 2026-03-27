@@ -9,7 +9,6 @@ import {
   Wrench,
   ArrowRight,
   ShieldCheck,
-  Castle,
   Map,
   Cloud,
 } from "lucide-react";
@@ -72,13 +71,13 @@ const tools = [
     bgColor: "bg-indigo-500/10",
   },
   {
-    title: "PingCastle",
+    title: "ORADAD (ANSSI)",
     description:
-      "Audit avancé Active Directory avec PingCastle : analyse healthcheck, scores de risque, règles de sécurité et terminal interactif.",
-    icon: Castle,
-    href: "/outils/pingcastle",
-    color: "text-red-500",
-    bgColor: "bg-red-500/10",
+      "Collecte Active Directory avec ORADAD et analyse de sécurité selon le référentiel ANSSI : niveaux de conformité, recommandations et rapport détaillé.",
+    icon: ShieldCheck,
+    href: "/outils/oradad",
+    color: "text-green-500",
+    bgColor: "bg-green-500/10",
   },
   {
     title: "Monkey365",

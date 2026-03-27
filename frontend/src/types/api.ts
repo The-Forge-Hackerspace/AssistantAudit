@@ -1025,6 +1025,43 @@ export interface AgentCreateResponse {
 
 export type AgentTaskStatus = "pending" | "dispatched" | "running" | "completed" | "failed" | "cancelled";
 
+// ── ORADAD ──
+export interface OradadTask {
+  id: number;
+  task_uuid: string;
+  agent_name: string | null;
+  status: AgentTaskStatus;
+  progress: number;
+  created_at: string | null;
+  completed_at: string | null;
+  has_report: boolean;
+}
+
+export interface AnssiCheckResult {
+  vuln_id: string;
+  title: string;
+  category: string;
+  level: number;
+  status: "pass" | "fail" | "warning" | "not_checked";
+  description: string;
+  recommendation: string;
+  evidence: string | null;
+  details: Record<string, unknown> | null;
+}
+
+export interface AnssiReport {
+  findings: AnssiCheckResult[];
+  score: number;
+  level: number;
+  stats: {
+    total_checks: number;
+    passed: number;
+    failed: number;
+    warning: number;
+    not_checked: number;
+  };
+}
+
 export interface AgentTask {
   id: number;
   task_uuid: string;

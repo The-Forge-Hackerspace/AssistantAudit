@@ -62,6 +62,8 @@ import type {
   Agent,
   AgentCreateRequest,
   AgentCreateResponse,
+  OradadTask,
+  AnssiReport,
 } from "@/types";
 
 // ── Auth ──
@@ -579,6 +581,24 @@ export const vlansApi = {
   },
 };
 
+// ── ORADAD ──
+export const oradadApi = {
+  async listTasks(): Promise<OradadTask[]> {
+    const { data } = await api.get<OradadTask[]>("/oradad/tasks");
+    return data;
+  },
+
+  async analyze(taskUuid: string): Promise<AnssiReport> {
+    const { data } = await api.post<AnssiReport>(`/oradad/analyze/${taskUuid}`);
+    return data;
+  },
+
+  async getReport(taskUuid: string): Promise<AnssiReport> {
+    const { data } = await api.get<AnssiReport>(`/oradad/report/${taskUuid}`);
+    return data;
+  },
+};
+
 // ── Agents ──
 export const agentsApi = {
   async list(): Promise<Agent[]> {
@@ -593,6 +613,16 @@ export const agentsApi = {
 
   async revoke(agentUuid: string): Promise<{ detail: string }> {
     const { data } = await api.delete<{ detail: string }>(`/agents/${agentUuid}`);
+    return data;
+  },
+
+  async dispatch(payload: {
+    agent_uuid: string;
+    tool: string;
+    parameters?: Record<string, unknown>;
+    audit_id?: number;
+  }): Promise<Record<string, unknown>> {
+    const { data } = await api.post("/agents/tasks/dispatch", payload);
     return data;
   },
 };

@@ -19,6 +19,7 @@ from .network_map import router as network_map_router
 from .websocket import router as websocket_router
 from .agents import router as agents_router
 from .files import router as files_router
+from .oradad import router as oradad_router
 from .users import router as users_router
 
 api_router = APIRouter()
@@ -38,5 +39,6 @@ api_router.include_router(tools_router)
 api_router.include_router(pingcastle_ws_router)
 api_router.include_router(websocket_router)
 api_router.include_router(agents_router)
+api_router.include_router(oradad_router)
 api_router.include_router(files_router, prefix="/files", tags=["Fichiers chiffrés"])
 api_router.include_router(users_router, prefix="/users", tags=["Utilisateurs"])
