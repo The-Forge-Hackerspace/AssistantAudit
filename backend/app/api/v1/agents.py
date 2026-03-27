@@ -70,7 +70,7 @@ def create_agent(
     )
 
 
-@router.get("/", response_model=list[AgentResponse])
+@router.get("/")
 def list_agents(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_auditeur),
@@ -94,7 +94,7 @@ def list_agents(
             owner_name=a.owner.full_name if a.owner else None,
             revoked_at=a.revoked_at,
             created_at=a.created_at,
-        )
+        ).model_dump()
         for a in agents
     ]
 
