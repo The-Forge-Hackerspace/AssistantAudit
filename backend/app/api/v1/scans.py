@@ -6,7 +6,7 @@ import logging
 import math
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
@@ -21,6 +21,7 @@ from ...schemas.scan import (
     ScanHostDecision,
 )
 from ...schemas.common import PaginatedResponse, MessageResponse
+from ...core.task_runner import get_task_runner
 from ...services import scan_service
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,6 @@ router = APIRouter()
 )
 async def launch_scan(
     payload: ScanCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),
 ):
@@ -78,7 +78,8 @@ async def launch_scan(
         )
 
         # Lancer l'exécution en arrière-plan
-        background_tasks.add_task(
+        task_runner = get_task_runner()
+        task_runner.submit(
             scan_service.execute_scan_background,
             scan_id=scan.id,
             site_id=payload.site_id,

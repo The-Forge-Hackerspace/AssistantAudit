@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,7 @@ from ....schemas.scan import (
     Monkey365StreamingScanResponse,
 )
 from ....schemas.common import MessageResponse
+from ....core.task_runner import get_task_runner
 from ....services.monkey365_scan_service import Monkey365ScanService
 from ....services.assessment_service import AssessmentService
 
@@ -34,7 +35,6 @@ router = APIRouter()
 @router.post("/monkey365/run", response_model=Monkey365ScanResultSummary, status_code=201)
 async def launch_monkey365_scan(
     request: Monkey365ScanCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
 ):
@@ -54,14 +54,15 @@ async def launch_monkey365_scan(
         logger.exception("Unexpected error launching monkey365 scan")
         raise HTTPException(500, f"Erreur interne: {e}")
 
-    background_tasks.add_task(
+    task_runner = get_task_runner()
+    task_runner.submit(
         Monkey365ScanService.execute_scan_background,
         result.id,
         request.config.model_dump(),
     )
     logger.info(
-        f"Monkey365 scan #{result.id} lancé en background "
-        f"(entreprise={request.entreprise_id})"
+        "Monkey365 scan #%s lancé en background (entreprise=%s)",
+        result.id, request.entreprise_id,
     )
     return result
 

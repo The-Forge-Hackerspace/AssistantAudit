@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ....core.database import get_db
@@ -8,6 +8,7 @@ from ....core.deps import get_current_auditeur
 from ....models.user import User
 from ....schemas.scan import PingCastleCreate, PingCastleResultSummary, PingCastleResultRead, PrefillResult
 from ....schemas.common import MessageResponse
+from ....core.task_runner import get_task_runner
 from ....services.pingcastle_service import (
     create_pending_pingcastle,
     execute_pingcastle_background,
@@ -24,7 +25,6 @@ router = APIRouter()
 @router.post("/pingcastle", response_model=PingCastleResultSummary)
 def launch_pingcastle(
     params: PingCastleCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
 ):
@@ -43,7 +43,8 @@ def launch_pingcastle(
     except ValueError as e:
         raise HTTPException(404, str(e))
 
-    background_tasks.add_task(
+    task_runner = get_task_runner()
+    task_runner.submit(
         execute_pingcastle_background,
         result_id=pc_result.id,
         password=params.password,

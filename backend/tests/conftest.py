@@ -76,19 +76,25 @@ def client(db_session):
     """Provide FastAPI TestClient - lazy loads app"""
     # Import here to avoid loading at conftest import time
     from app.core.database import get_db
+    from app.core.task_runner import SyncTaskRunner, set_task_runner
     from app.main import create_app
-    
+
+    # Use synchronous task runner in tests so background tasks
+    # complete before assertions run.
+    set_task_runner(SyncTaskRunner())
+
     # Create app
     app = create_app()
     app.dependency_overrides[get_db] = lambda: db_session
-    
+
     # Return test client
     test_client = TestClient(app)
-    
+
     yield test_client
-    
+
     # Cleanup
     app.dependency_overrides.clear()
+    set_task_runner(SyncTaskRunner())
 
 
 # ────────────────────────────────────────────────────────────────────────

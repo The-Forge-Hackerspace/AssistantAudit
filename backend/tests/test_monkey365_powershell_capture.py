@@ -12,6 +12,21 @@ from unittest.mock import MagicMock, patch
 from app.tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor
 
 
+def _mock_popen(returncode=0, *, write_log_content=None, output_dir=None):
+    """Create a MagicMock that behaves like subprocess.Popen for interactive mode."""
+    mock_proc = MagicMock()
+    mock_proc.returncode = returncode
+
+    def wait_side_effect(timeout=None):
+        # Simulate Start-Transcript writing to monkey365.log
+        if write_log_content is not None and output_dir is not None:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            (output_dir / "monkey365.log").write_text(write_log_content, encoding="utf-8")
+
+    mock_proc.wait = MagicMock(side_effect=wait_side_effect)
+    return mock_proc
+
+
 def test_powershell_output_captured_to_file(tmp_path):
     output_dir = tmp_path / "scan_1"
     output_dir.mkdir(parents=True)
@@ -25,12 +40,10 @@ def test_powershell_output_captured_to_file(tmp_path):
 
     log_content = "Monkey365 scan completed successfully\nResults written to disk\n"
 
-    def run_side_effect(*args, **kwargs):
-        (output_dir / "monkey365.log").write_text(log_content, encoding="utf-8")
-        return MagicMock(returncode=0)
-
-    with patch('subprocess.run') as mock_run:
-        mock_run.side_effect = run_side_effect
+    with patch('subprocess.Popen') as mock_popen:
+        mock_popen.return_value = _mock_popen(
+            returncode=0, write_log_content=log_content, output_dir=output_dir
+        )
 
         executor.run_scan("scan_1")
 
@@ -61,12 +74,10 @@ def test_powershell_output_captured_on_failure(tmp_path):
 
     log_content = "Starting scan...\nFATAL ERROR: Authentication failed\n"
 
-    def run_side_effect(*args, **kwargs):
-        (output_dir / "monkey365.log").write_text(log_content, encoding="utf-8")
-        return MagicMock(returncode=1)
-
-    with patch('subprocess.run') as mock_run:
-        mock_run.side_effect = run_side_effect
+    with patch('subprocess.Popen') as mock_popen:
+        mock_popen.return_value = _mock_popen(
+            returncode=1, write_log_content=log_content, output_dir=output_dir
+        )
 
         executor.run_scan("scan_failed")
 
@@ -91,12 +102,8 @@ def test_powershell_output_empty_stdout_stderr(tmp_path):
 
     executor = Monkey365Executor(config, str(monkey365_path.parent))
 
-    with patch('subprocess.run') as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="",
-            stderr=""
-        )
+    with patch('subprocess.Popen') as mock_popen:
+        mock_popen.return_value = _mock_popen(returncode=0)
 
         executor.run_scan("scan_empty")
 
@@ -123,12 +130,10 @@ def test_powershell_output_json_format_valid(tmp_path):
     # Start-Transcript captures all PS streams in a single log file
     log_content = 'Output with "quotes" and\nnewlines\nError with \'apostrophes\' and\ttabs\n'
 
-    def run_side_effect(*args, **kwargs):
-        (output_dir / "monkey365.log").write_text(log_content, encoding="utf-8")
-        return MagicMock(returncode=0)
-
-    with patch('subprocess.run') as mock_run:
-        mock_run.side_effect = run_side_effect
+    with patch('subprocess.Popen') as mock_popen:
+        mock_popen.return_value = _mock_popen(
+            returncode=0, write_log_content=log_content, output_dir=output_dir
+        )
 
         executor.run_scan("scan_json")
 
@@ -151,44 +156,38 @@ def test_run_scan_uses_execution_policy_bypass(tmp_path):
 
     executor = Monkey365Executor(config, str(monkey365_path.parent))
 
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout="[]", stderr="")
+    with patch("subprocess.Popen") as mock_popen:
+        mock_popen.return_value = _mock_popen(returncode=0)
         executor.run_scan("scan_policy")
 
-    command_args = mock_run.call_args.args[0]
+    command_args = mock_popen.call_args.args[0]
     assert "-ExecutionPolicy" in command_args
     assert "Bypass" in command_args
 
 
-def test_powershell_raw_output_not_copied_to_archive(tmp_path):
-    from unittest.mock import patch as _patch
-    from app.services.monkey365_scan_service import Monkey365ScanService
+def test_powershell_raw_output_not_in_findings(tmp_path):
+    """powershell_raw_output.json is an internal file and should not be parsed as findings."""
+    output_dir = tmp_path / "scan_archive"
+    output_dir.mkdir(parents=True)
 
-    scan_id = "test-archive-scan"
+    config = Monkey365Config(output_dir=str(output_dir))
+    monkey365_path = tmp_path / "Invoke-Monkey365.ps1"
+    monkey365_path.write_text("# Mock", encoding="utf-8")
 
-    monkey365_base = tmp_path / "monkey365_tool"
-    monkey365_base.mkdir()
-    monkey_reports = monkey365_base / "monkey-reports" / scan_id
-    monkey_reports.mkdir(parents=True)
+    executor = Monkey365Executor(config, str(monkey365_path.parent))
 
-    raw_output_file = monkey_reports / "powershell_raw_output.json"
-    other_result_file = monkey_reports / "result.json"
-    nested_dir = monkey_reports / "nested"
+    # Create internal + real result files
+    (output_dir / "powershell_raw_output.json").write_text(
+        json.dumps({"stdout": "data", "stderr": "", "returncode": 0})
+    )
+    (output_dir / "result.json").write_text('[{"status": "ok"}]')
+    nested_dir = output_dir / "nested"
     nested_dir.mkdir()
-    nested_file = nested_dir / "nested_result.json"
+    (nested_dir / "nested_result.json").write_text('[{"nested": true}]')
 
-    raw_output_file.write_text(json.dumps({"stdout": "data", "stderr": "", "returncode": 0}))
-    other_result_file.write_text('{"status": "ok"}')
-    nested_file.write_text('{"nested": true}')
-
-    dest = tmp_path / "output"
-    dest.mkdir(parents=True)
-
-    Monkey365ScanService.move_results_to_output(monkey_reports, dest)
-
-    assert not (dest / "powershell_raw_output.json").exists(), \
-        "powershell_raw_output.json must not be copied to the output"
-    assert (dest / "result.json").exists(), \
-        "result.json should be present in the output"
-    assert (dest / "nested" / "nested_result.json").exists(), \
-        "nested files should be preserved in the output"
+    results = executor._parse_output_files("scan_archive")
+    names = [r.get("status") or r.get("nested") for r in results]
+    assert "ok" in names
+    assert True in names
+    # Internal file should not be included
+    assert not any(r.get("stdout") == "data" for r in results)
