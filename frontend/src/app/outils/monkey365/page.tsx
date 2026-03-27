@@ -78,8 +78,7 @@ export default function Monkey365Page() {
   const [siteInput, setSiteInput] = useState("");
   const [deviceCode, setDeviceCode] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const lastDeviceCodeRef = useRef<string | null>(null);
-  const lastDeviceCodeToastIdRef = useRef<string | number | null>(null);
+  const [activeDeviceCode, setActiveDeviceCode] = useState<{ url: string; code: string } | null>(null);
 
   const [scans, setScans] = useState<Monkey365ScanResultSummary[]>([]);
   const [selectedScan, setSelectedScan] = useState<Monkey365ScanResultDetail | null>(null);
@@ -199,42 +198,18 @@ export default function Monkey365Page() {
     if (!selectedScan) { setScanLogs(null); }
   }, [selectedScan?.id]);
 
-  // Persistent toast when a device code appears in logs
+  // Track the latest device code from logs for the sticky banner
   useEffect(() => {
-    if (!scanLogs) return;
+    if (!scanLogs) { setActiveDeviceCode(null); return; }
     const dcPattern = /open the page (https?:\/\/[^\s]+) and enter the code ([A-Z0-9]{4,12}) to/i;
     const dcFallback = /(https?:\/\/(?:microsoft\.com|aka\.ms|login\.microsoftonline\.com)\/device\S*)\s.*?(?:code[:\s]+)([A-Z0-9\-]{4,12})/i;
+    let found: { url: string; code: string } | null = null;
     for (const raw of scanLogs.lines) {
       const line = raw.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
       const m = dcPattern.exec(line) || dcFallback.exec(line);
-      if (m) {
-        const [, url, code] = m;
-        if (lastDeviceCodeRef.current !== code) {
-          if (lastDeviceCodeToastIdRef.current) {
-            toast.dismiss(lastDeviceCodeToastIdRef.current);
-          }
-          lastDeviceCodeRef.current = code;
-          const toastId = toast(
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">Authentification requise</p>
-              <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline text-sm">{url}</a>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-2xl font-bold">{code}</span>
-                <button
-                  onClick={async () => { await navigator.clipboard.writeText(code); toast.success("Code copié !"); }}
-                  className="rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2 py-1"
-                >
-                  Copier le code
-                </button>
-              </div>
-            </div>,
-            { duration: Infinity },
-          );
-          lastDeviceCodeToastIdRef.current = toastId;
-        }
-        break;
-      }
+      if (m) found = { url: m[1], code: m[2] };
     }
+    setActiveDeviceCode(found);
   }, [scanLogs]);
 
   // Centralized per-scan poll: fetch detail + logs together every 2s while running
@@ -824,7 +799,30 @@ export default function Monkey365Page() {
                           : "Aucun log disponible"}
                       </p>
                     ) : (
-                      <div className="bg-gray-950 rounded p-3 max-h-96 overflow-y-auto font-mono text-xs">
+                      <div className="bg-gray-950 rounded p-3 max-h-96 overflow-y-auto font-mono text-xs relative">
+                        {activeDeviceCode && (
+                          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded bg-indigo-600 px-3 py-2 mb-2 text-white shadow-lg">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Smartphone className="size-5 shrink-0" />
+                              <a href={activeDeviceCode.url} target="_blank" rel="noopener noreferrer" className="text-indigo-200 underline text-xs truncate">
+                                {activeDeviceCode.url}
+                              </a>
+                              <span className="font-mono text-2xl font-bold tracking-wider shrink-0">{activeDeviceCode.code}</span>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                await navigator.clipboard.writeText(activeDeviceCode.code);
+                                setCopiedCode(activeDeviceCode.code);
+                                toast.success("Code copié !");
+                                setTimeout(() => setCopiedCode(null), 2000);
+                              }}
+                              className="shrink-0 flex items-center gap-1 rounded bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 font-medium"
+                            >
+                              {copiedCode === activeDeviceCode.code ? <Check className="size-3" /> : <Copy className="size-3" />}
+                              {copiedCode === activeDeviceCode.code ? "Copié !" : "Copier le code"}
+                            </button>
+                          </div>
+                        )}
                         {scanLogs.lines.map((line, i) => {
                           // Strip leftover ANSI escape codes
                           const clean = line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
