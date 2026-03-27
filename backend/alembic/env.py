@@ -52,6 +52,9 @@ def run_migrations_online() -> None:
         with context.begin_transaction():
             context.run_migrations()
 
+        # SQLAlchemy 2.0 requires explicit commit (no autocommit)
+        connection.commit()
+
         if is_sqlite:
             connection.execute(sa.text("PRAGMA foreign_keys=ON"))
 
