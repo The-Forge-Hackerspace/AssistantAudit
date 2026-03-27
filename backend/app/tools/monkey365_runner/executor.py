@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -19,6 +20,13 @@ class Monkey365ExecutionError(RuntimeError):
 
 def _escape_ps_string(value: str) -> str:
     return value.replace("'", "''")
+
+
+_ANSI_RE = re.compile(r"\x1B\[[0-9;]*[a-zA-Z]")
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
 
 
 @dataclass
@@ -180,12 +188,12 @@ class Monkey365Executor:
 
         param_block = "\n".join(param_lines)
 
-        # Start-Transcript captures ALL PS streams: Write-Host (stream 6),
-        # Write-Verbose (stream 4), Write-Warning (3), Write-Error (2), output (1).
-        # This is far more complete than redirecting subprocess stdout/stderr.
+        # In device code mode, stdout is piped and written to the log file by
+        # run_scan() directly — Start-Transcript would conflict (file lock).
+        # In interactive mode, Start-Transcript captures all PS streams.
         transcript_start = ""
         transcript_stop = ""
-        if log_path:
+        if log_path and not self.config.device_code:
             safe_log = _escape_ps_string(str(log_path))
             transcript_start = f"Start-Transcript -Path '{safe_log}' -Force | Out-Null"
             transcript_stop = "Stop-Transcript | Out-Null"
@@ -269,7 +277,7 @@ Invoke-Monkey365 @param -Verbose
                 with open(log_file, "w", encoding="utf-8") as lf:
                     assert proc.stdout is not None
                     for raw_line in proc.stdout:
-                        decoded = raw_line.decode("utf-8", errors="replace")
+                        decoded = _strip_ansi(raw_line.decode("utf-8", errors="replace"))
                         lf.write(decoded)
                         lf.flush()
                 proc.wait(timeout=3600)
