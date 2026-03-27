@@ -6,7 +6,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import cast
+from typing import Callable, cast
 
 logger = logging.getLogger(__name__)
 # Derived from this file's location: backend/app/tools/monkey365_runner/executor.py
@@ -48,6 +48,10 @@ class Monkey365Executor:
         self.monkey365_base_dir: Path = self.monkey365_path.parent
         self.output_dir = Path(self.config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        # Exposed so callers (e.g. scan service) can register/kill the process.
+        self.current_process: subprocess.Popen[bytes] | None = None
+        # Optional callback invoked when the PowerShell process starts.
+        self.on_process_start: Callable[[subprocess.Popen[bytes]], None] | None = None
 
     def _resolve_path(self, path: str | None) -> Path:
         if path:
@@ -186,6 +190,11 @@ class Monkey365Executor:
             sites = ", ".join(f"'{_escape_ps_string(s)}'" for s in self.config.spo_sites)
             param_lines.append(f"    SpoSites        = @({sites});")
 
+        # Pass -OutDir so Monkey365 writes reports to a scan-specific directory
+        # instead of the default monkey-reports/ under the install dir.
+        safe_outdir = _escape_ps_string(str(self.output_dir))
+        param_lines.append(f"    OutDir          = '{safe_outdir}';")
+
         param_block = "\n".join(param_lines)
 
         # In device code mode, stdout is piped and written to the log file by
@@ -274,6 +283,9 @@ Invoke-Monkey365 @param -Verbose
                     cwd=self.monkey365_path.parent,
                     env=env,
                 )
+                self.current_process = proc
+                if self.on_process_start:
+                    self.on_process_start(proc)
                 with open(log_file, "w", encoding="utf-8") as lf:
                     assert proc.stdout is not None
                     for raw_line in proc.stdout:
@@ -285,13 +297,16 @@ Invoke-Monkey365 @param -Verbose
             else:
                 # Interactive mode: stdin/stdout/stderr inherited so MSAL
                 # browser popup stays visible. Logs via Start-Transcript.
-                result = subprocess.run(
+                proc = subprocess.Popen(
                     powershell_command,
-                    timeout=3600,
                     cwd=self.monkey365_path.parent,
                     env=env,
                 )
-                returncode = result.returncode
+                self.current_process = proc
+                if self.on_process_start:
+                    self.on_process_start(proc)
+                proc.wait(timeout=3600)
+                returncode = proc.returncode
 
             ps_stdout = log_file.read_text(encoding="utf-8", errors="replace") if log_file.exists() else ""
             ps_stderr = ""

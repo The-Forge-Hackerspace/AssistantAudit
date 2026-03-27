@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import subprocess
 import threading
 import uuid
 import shutil
@@ -20,8 +21,10 @@ from ..tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-_scan_locks: dict[str, threading.Lock] = {}
-_lock_registry_lock = threading.Lock()
+# Registry of running scan processes: result_id → subprocess.Popen
+# Used by cancel_scan to kill the PowerShell process.
+_running_processes: dict[int, subprocess.Popen[bytes]] = {}
+_process_registry_lock = threading.Lock()
 
 
 class DBSession(Protocol):
@@ -88,70 +91,30 @@ class Monkey365ScanService:
         return result
 
     @staticmethod
-    def _snapshot_report_dirs(monkey365_base: Path) -> set[str]:
-        """Return names of existing subdirs in monkey-reports/ before a scan."""
-        reports_dir = monkey365_base / "monkey-reports"
-        if not reports_dir.exists():
-            return set()
-        return {d.name for d in reports_dir.iterdir() if d.is_dir()}
+    def register_process(result_id: int, proc: subprocess.Popen[bytes]) -> None:
+        """Register a running PowerShell process for a scan (enables cancel)."""
+        with _process_registry_lock:
+            _running_processes[result_id] = proc
 
     @staticmethod
-    def _find_new_report_dir(
-        monkey365_base: Path, before_snapshot: set[str]
-    ) -> Path | None:
-        """Find the new directory Monkey365 created during the scan."""
-        reports_dir = monkey365_base / "monkey-reports"
-        if not reports_dir.exists():
-            return None
-        for d in reports_dir.iterdir():
-            if d.is_dir() and d.name not in before_snapshot:
-                return d
-        return None
+    def unregister_process(result_id: int) -> None:
+        """Remove a process from the registry after it completes."""
+        with _process_registry_lock:
+            _running_processes.pop(result_id, None)
 
     @staticmethod
-    def move_results_to_output(source_path: Path, dest_path: Path) -> None:
-        """
-        Move Monkey365 report files from source_path into dest_path.
-
-        source_path: the monkey-reports/{MONKEY_GUID}/ directory Monkey365 created.
-        dest_path:   the scan output_path (data/{slug}/Cloud/M365/{scan_id}/).
-
-        Files are merged into dest_path preserving sub-directory structure.
-        powershell_raw_output.json is skipped (large, not useful).
-        Source directory is removed after move.
-        """
-        dest_path.mkdir(parents=True, exist_ok=True)
-
-        if source_path.exists():
-            for item in source_path.rglob("*"):
-                if item.is_file():
-                    if item.name == "powershell_raw_output.json":
-                        continue
-
-                    rel_path = item.relative_to(source_path)
-                    target_file = dest_path / rel_path
-                    target_file.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(item), str(target_file))
-                    logger.info("[MONKEY365] Moved %s → %s", item.name, target_file)
-
-            try:
-                shutil.rmtree(source_path)
-                logger.info("[MONKEY365] Cleaned up source: %s", source_path)
-            except OSError as exc:
-                logger.warning("[MONKEY365] Could not remove source: %s — %s", source_path, exc)
-        else:
-            logger.warning("[MONKEY365] Source not found: %s", source_path)
-
-        logger.info("[MONKEY365] Results moved to %s", dest_path)
-
-    @staticmethod
-    def _get_scan_lock(monkey365_base: Path) -> threading.Lock:
-        """Return (or create) the per-instance lock for monkey365_base."""
-        key = str(monkey365_base)
-        with _lock_registry_lock:
-            if key not in _scan_locks:
-                _scan_locks[key] = threading.Lock()
-            return _scan_locks[key]
+    def kill_scan_process(result_id: int) -> bool:
+        """Kill the PowerShell process for a scan. Returns True if a process was found and killed."""
+        with _process_registry_lock:
+            proc = _running_processes.pop(result_id, None)
+        if proc is None:
+            return False
+        try:
+            proc.kill()
+            logger.info("[MONKEY365] Killed process PID %s for scan #%s", proc.pid, result_id)
+        except OSError as exc:
+            logger.warning("[MONKEY365] Could not kill PID %s: %s", proc.pid, exc)
+        return True
 
     @staticmethod
     def _count_json_findings(output_path: Path) -> int:
@@ -193,33 +156,24 @@ class Monkey365ScanService:
 
             executor = Monkey365Executor(executor_config, settings.MONKEY365_PATH or None, allow_auto_clone=settings.MONKEY365_AUTO_CLONE)
 
-            # Derive base dir from the executor's resolved path so it stays in sync
-            # even when MONKEY365_PATH is unset and the executor falls back to DEFAULT_MONKEY365_DIR.
-            monkey365_base = executor.monkey365_base_dir
-            with Monkey365ScanService._get_scan_lock(monkey365_base):
-                dirs_before = Monkey365ScanService._snapshot_report_dirs(monkey365_base)
+            # No global lock — each scan writes to its own OutDir via -OutDir.
+            # Register a process callback so cancel can kill pwsh.
+            executor.on_process_start = lambda proc: Monkey365ScanService.register_process(result_id, proc)
+            try:
                 run_result = executor.run_scan(result.scan_id)
-                new_report_dir = Monkey365ScanService._find_new_report_dir(
-                    monkey365_base, dirs_before
-                )
+            finally:
+                Monkey365ScanService.unregister_process(result_id)
 
             if run_result.get("status") == "success":
                 final_status = Monkey365ScanStatus.SUCCESS
                 completed_at = datetime.now(timezone.utc)
 
-                if new_report_dir:
-                    dest = Path(result.output_path) if result.output_path else None
-                    if dest:
-                        Monkey365ScanService.move_results_to_output(new_report_dir, dest)
-                        findings_count = Monkey365ScanService._count_json_findings(dest)
-                        logger.info("[MONKEY365] Scan #%s results moved to %s", result_id, dest)
-                    else:
-                        logger.warning("[MONKEY365] Scan #%s: output_path non défini, résultats non déplacés", result_id)
-                else:
-                    logger.warning(
-                        "[MONKEY365] Scan #%s succeeded but no new report dir found in %s/monkey-reports/",
-                        result_id, monkey365_base,
-                    )
+                # With -OutDir, Monkey365 writes reports directly to output_path.
+                # Count findings from the JSON files in the output directory.
+                dest = Path(result.output_path) if result.output_path else None
+                if dest and dest.exists():
+                    findings_count = Monkey365ScanService._count_json_findings(dest)
+                    logger.info("[MONKEY365] Scan #%s completed, %d findings in %s", result_id, findings_count, dest)
 
                 meta = {
                     "scan_id": result.scan_id,
