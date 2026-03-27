@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ..models.agent import Agent
 from ..models.agent_task import AgentTask
 from ..models.audit import Audit
+from ..models.oradad_config import OradadConfig
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,15 @@ def dispatch_task(
             status_code=403,
             detail=f"Outil '{tool}' non autorise pour cet agent",
         )
+
+    # Injection du XML config pour les taches ORADAD
+    if tool in ("oradad", "config-oradad") and parameters.get("config_id"):
+        config = db.query(OradadConfig).filter(
+            OradadConfig.id == parameters["config_id"],
+        ).first()
+        if config is None:
+            raise HTTPException(status_code=404, detail="Profil de configuration introuvable")
+        parameters = {**parameters, "config_xml": config.to_xml()}
 
     # Creation de la tache
     task = AgentTask(

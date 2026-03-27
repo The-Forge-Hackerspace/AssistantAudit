@@ -57,7 +57,7 @@ class Agent(Base):
 
     # Outils autorises
     allowed_tools: Mapped[list] = mapped_column(
-        JSON, nullable=False, default=lambda: ["nmap", "oradad", "ad_collector"]
+        JSON, nullable=False, default=lambda: ["nmap", "oradad", "config-oradad", "ad_collector"]
     )
 
     # Metadonnees

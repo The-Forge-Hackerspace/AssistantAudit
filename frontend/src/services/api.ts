@@ -63,6 +63,8 @@ import type {
   AgentCreateRequest,
   AgentCreateResponse,
   OradadTask,
+  OradadConfig,
+  OradadConfigCreate,
   AnssiReport,
 } from "@/types";
 
@@ -596,6 +598,26 @@ export const oradadApi = {
   async getReport(taskUuid: string): Promise<AnssiReport> {
     const { data } = await api.get<AnssiReport>(`/oradad/report/${taskUuid}`);
     return data;
+  },
+
+  // Config profiles
+  async listConfigs(): Promise<OradadConfig[]> {
+    const { data } = await api.get<OradadConfig[]>("/oradad/configs");
+    return data;
+  },
+
+  async createConfig(payload: OradadConfigCreate): Promise<OradadConfig> {
+    const { data } = await api.post<OradadConfig>("/oradad/configs", payload);
+    return data;
+  },
+
+  async updateConfig(id: number, payload: Partial<OradadConfigCreate>): Promise<OradadConfig> {
+    const { data } = await api.put<OradadConfig>(`/oradad/configs/${id}`, payload);
+    return data;
+  },
+
+  async deleteConfig(id: number): Promise<void> {
+    await api.delete(`/oradad/configs/${id}`);
   },
 };
 
