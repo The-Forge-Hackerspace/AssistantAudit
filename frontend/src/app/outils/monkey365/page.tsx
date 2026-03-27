@@ -11,6 +11,9 @@ import {
   X,
   Plus,
   FileText,
+  Copy,
+  Check,
+  Smartphone,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -35,6 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -68,10 +72,12 @@ export default function Monkey365Page() {
   const [scanLogs, setScanLogs] = useState<Monkey365ScanLogs | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Simplified config - only 2 fields
+  // Simplified config
   const [spoSites, setSpoSites] = useState<string[]>([]);
   const [exportFormats, setExportFormats] = useState<string[]>(["JSON", "HTML"]);
   const [siteInput, setSiteInput] = useState("");
+  const [deviceCode, setDeviceCode] = useState(false);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const [scans, setScans] = useState<Monkey365ScanResultSummary[]>([]);
   const [selectedScan, setSelectedScan] = useState<Monkey365ScanResultDetail | null>(null);
@@ -262,11 +268,16 @@ export default function Monkey365Page() {
       `$param = @{`,
       `    Instance        = 'Microsoft365';`,
       `    Collect         = @('ExchangeOnline', 'MicrosoftTeams', 'Purview', 'SharePointOnline', 'AdminPortal');`,
-      `    PromptBehavior  = 'SelectAccount';`,
       `    IncludeEntraID  = $true;`,
-      `    ForceMSALDesktop = $true;`,
       `    ExportTo        = @('${exportFormats.join("', '")}');`,
     ];
+
+    if (deviceCode) {
+      params.push(`    DeviceCode      = $true;`);
+    } else {
+      params.push(`    PromptBehavior  = 'SelectAccount';`);
+      params.push(`    ForceMSALDesktop = $true;`);
+    }
 
     if (spoSites.length > 0) {
       params.push(`    SpoSites        = @('${spoSites.join("', '")}')`);
@@ -289,6 +300,7 @@ export default function Monkey365Page() {
       const config: Monkey365Config = {
         spo_sites: spoSites.length > 0 ? spoSites : undefined,
         export_to: exportFormats,
+        device_code: deviceCode || undefined,
       };
 
       const payload: Monkey365ScanCreate = {
@@ -400,7 +412,7 @@ export default function Monkey365Page() {
         <Alert className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
           <AlertTriangle className="size-4 text-blue-600 dark:text-blue-400" />
           <AlertDescription className="text-blue-800 dark:text-blue-300">
-            Mode simplifié : INTERACTIVE auth (navigateur), collecte des 5 modules M365 standard, export JSON + HTML.
+            Collecte des 5 modules M365 standard. Auth interactive (navigateur) ou Device Code (code appareil).
           </AlertDescription>
         </Alert>
 
@@ -492,15 +504,29 @@ export default function Monkey365Page() {
                   </div>
                 </div>
 
+                {/* Device Code toggle */}
+                <div className="flex items-center justify-between rounded border p-4">
+                  <div className="flex items-center gap-3">
+                    <Smartphone className="size-5 text-muted-foreground" />
+                    <div>
+                      <Label className="text-sm font-medium">Mode Device Code</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Authentification via code appareil — pour les sessions sans navigateur
+                      </p>
+                    </div>
+                  </div>
+                  <Switch checked={deviceCode} onCheckedChange={setDeviceCode} />
+                </div>
+
                 {/* Fixed Parameters Info */}
                 <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-800 flex flex-col gap-2 text-sm">
                   <p className="font-semibold">Paramètres fixés :</p>
                   <ul className="list-disc list-inside flex flex-col gap-1 text-gray-700 dark:text-gray-300">
                     <li>Instance: Microsoft365</li>
-                    <li>Authentification: INTERACTIVE (navigateur)</li>
+                    <li>Authentification: {deviceCode ? "DEVICE CODE (code appareil)" : "INTERACTIVE (navigateur)"}</li>
                     <li>Modules: ExchangeOnline, MicrosoftTeams, Purview, SharePointOnline, AdminPortal</li>
                     <li>IncludeEntraID: $true</li>
-                    <li>ForceMSALDesktop: $true (MSAL interactive desktop auth)</li>
+                    {!deviceCode && <li>ForceMSALDesktop: $true (MSAL interactive desktop auth)</li>}
                   </ul>
                 </div>
 
@@ -759,11 +785,40 @@ export default function Monkey365Page() {
                       </p>
                     ) : (
                       <div className="bg-gray-950 rounded p-3 max-h-96 overflow-y-auto font-mono text-xs">
-                        {scanLogs.lines.map((line, i) => (
-                          <div key={i} className="text-gray-200 leading-5 whitespace-pre-wrap break-all">
-                            {line || "\u00a0"}
-                          </div>
-                        ))}
+                        {scanLogs.lines.map((line, i) => {
+                          const dcMatch = line.match(/(https?:\/\/(?:microsoft\.com|aka\.ms)\/devicelogin).*?(?:code[:\s]+)([A-Z0-9\-]{6,12})/i);
+                          if (dcMatch) {
+                            const codeValue = dcMatch[2];
+                            return (
+                              <div key={i} className="flex items-center gap-2 rounded bg-indigo-950/60 border border-indigo-500/30 px-2 py-1.5 my-1">
+                                <div className="flex-1 text-indigo-200 leading-5 whitespace-pre-wrap break-all">
+                                  <span>{line.slice(0, dcMatch.index)}</span>
+                                  <span>{dcMatch[1]}</span>
+                                  <span>{line.slice((dcMatch.index ?? 0) + dcMatch[1].length, line.indexOf(codeValue))}</span>
+                                  <span className="text-xl font-bold text-white tracking-wider">{codeValue}</span>
+                                  <span>{line.slice(line.indexOf(codeValue) + codeValue.length)}</span>
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    await navigator.clipboard.writeText(codeValue);
+                                    setCopiedCode(codeValue);
+                                    toast.success("Code copié");
+                                    setTimeout(() => setCopiedCode(null), 2000);
+                                  }}
+                                  className="shrink-0 flex items-center gap-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2 py-1"
+                                >
+                                  {copiedCode === codeValue ? <Check className="size-3" /> : <Copy className="size-3" />}
+                                  {copiedCode === codeValue ? "Copié" : "Copier"}
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={i} className="text-gray-200 leading-5 whitespace-pre-wrap break-all">
+                              {line || "\u00a0"}
+                            </div>
+                          );
+                        })}
                         <div ref={logsEndRef} />
                       </div>
                     )}
