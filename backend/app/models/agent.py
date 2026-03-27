@@ -64,6 +64,9 @@ class Agent(Base):
     os_info: Mapped[str | None] = mapped_column(String(255))  # "Windows 11 Pro 23H2"
     agent_version: Mapped[str | None] = mapped_column(String(20))  # "1.0.0"
 
+    # Revocation
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False

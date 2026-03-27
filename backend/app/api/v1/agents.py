@@ -92,6 +92,7 @@ def list_agents(
             os_info=a.os_info,
             agent_version=a.agent_version,
             owner_name=a.owner.full_name if a.owner else None,
+            revoked_at=a.revoked_at,
             created_at=a.created_at,
         )
         for a in agents
@@ -113,8 +114,10 @@ def revoke_agent(
         raise HTTPException(status_code=404, detail="Agent introuvable")
 
     agent.status = "revoked"
+    agent.revoked_at = datetime.now(timezone.utc)
     db.commit()
     logger.info(f"Agent revoked: uuid={agent_uuid}, user={current_user.id}")
+    # TODO: scheduled purge — delete agents where revoked_at < now() - 30 days
     return {"detail": "Agent revoque"}
 
 
