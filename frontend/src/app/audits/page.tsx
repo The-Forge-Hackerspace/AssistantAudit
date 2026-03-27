@@ -477,11 +477,11 @@ function AuditListView({
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="create-nom">Nom du projet *</Label>
-                <Input id="create-nom" value={form.nom_projet} onChange={(e) => setForm({ ...form, nom_projet: e.target.value })} placeholder="ex: Audit Infra Q1 2026" />
+                <Input id="create-nom" value={form.nom_projet} onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, nom_projet: value })); }} placeholder="ex: Audit Infra Q1 2026" />
               </div>
               <div className="flex flex-col gap-2">
                 <Label>Entreprise *</Label>
-                <Select value={form.entreprise_id ? String(form.entreprise_id) : ""} onValueChange={(v) => setForm({ ...form, entreprise_id: Number(v) })}>
+                <Select value={form.entreprise_id ? String(form.entreprise_id) : ""} onValueChange={(v) => setForm(prev => ({ ...prev, entreprise_id: Number(v) }))}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner une entreprise" /></SelectTrigger>
                   <SelectContent><SelectGroup>{entreprises.map((e) => (<SelectItem key={e.id} value={String(e.id)}>{e.nom}</SelectItem>))}</SelectGroup></SelectContent>
                 </Select>
@@ -489,20 +489,20 @@ function AuditListView({
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="create-objectifs">Objectifs de l&apos;audit</Label>
-              <Textarea id="create-objectifs" value={form.objectifs || ""} onChange={(e) => setForm({ ...form, objectifs: e.target.value })} placeholder="Décrire les objectifs principaux de cet audit..." rows={3} />
+              <Textarea id="create-objectifs" value={form.objectifs || ""} onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, objectifs: value })); }} placeholder="Décrire les objectifs principaux de cet audit..." rows={3} />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="create-limites">Limites / Périmètre</Label>
-              <Textarea id="create-limites" value={form.limites || ""} onChange={(e) => setForm({ ...form, limites: e.target.value })} placeholder="Définir le périmètre et les limites de l'audit..." rows={2} />
+              <Textarea id="create-limites" value={form.limites || ""} onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, limites: value })); }} placeholder="Définir le périmètre et les limites de l'audit..." rows={2} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="create-hypotheses">Hypothèses</Label>
-                <Textarea id="create-hypotheses" value={form.hypotheses || ""} onChange={(e) => setForm({ ...form, hypotheses: e.target.value })} placeholder="Hypothèses de travail..." rows={2} />
+                <Textarea id="create-hypotheses" value={form.hypotheses || ""} onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, hypotheses: value })); }} placeholder="Hypothèses de travail..." rows={2} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="create-risques">Risques initiaux identifiés</Label>
-                <Textarea id="create-risques" value={form.risques_initiaux || ""} onChange={(e) => setForm({ ...form, risques_initiaux: e.target.value })} placeholder="Risques identifiés en amont..." rows={2} />
+                <Textarea id="create-risques" value={form.risques_initiaux || ""} onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, risques_initiaux: value })); }} placeholder="Risques identifiés en amont..." rows={2} />
               </div>
             </div>
           </div>
@@ -525,11 +525,11 @@ function AuditListView({
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-nom">Nom du projet *</Label>
-                <Input id="edit-nom" value={form.nom_projet} onChange={(e) => setForm({ ...form, nom_projet: e.target.value })} />
+                <Input id="edit-nom" value={form.nom_projet} onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, nom_projet: value })); }} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label>Statut</Label>
-                <Select value={form.status || "NOUVEAU"} onValueChange={(v) => setForm({ ...form, status: v as AuditStatus })}>
+                <Select value={form.status || "NOUVEAU"} onValueChange={(v) => setForm(prev => ({ ...prev, status: v as AuditStatus }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -544,20 +544,20 @@ function AuditListView({
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="edit-objectifs">Objectifs</Label>
-              <Textarea id="edit-objectifs" value={form.objectifs || ""} onChange={(e) => setForm({ ...form, objectifs: e.target.value })} rows={3} />
+              <Textarea id="edit-objectifs" value={form.objectifs || ""} onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, objectifs: value })); }} rows={3} />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="edit-limites">Limites / Périmètre</Label>
-              <Textarea id="edit-limites" value={form.limites || ""} onChange={(e) => setForm({ ...form, limites: e.target.value })} rows={2} />
+              <Textarea id="edit-limites" value={form.limites || ""} onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, limites: value })); }} rows={2} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-hypotheses">Hypothèses</Label>
-                <Textarea id="edit-hypotheses" value={form.hypotheses || ""} onChange={(e) => setForm({ ...form, hypotheses: e.target.value })} rows={2} />
+                <Textarea id="edit-hypotheses" value={form.hypotheses || ""} onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, hypotheses: value })); }} rows={2} />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-risques">Risques initiaux</Label>
-                <Textarea id="edit-risques" value={form.risques_initiaux || ""} onChange={(e) => setForm({ ...form, risques_initiaux: e.target.value })} rows={2} />
+                <Textarea id="edit-risques" value={form.risques_initiaux || ""} onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, risques_initiaux: value })); }} rows={2} />
               </div>
             </div>
           </div>
@@ -615,7 +615,9 @@ function AuditDetailView({
     try {
       const updated = await auditsApi.update(audit.id, { status: newStatus });
       onAuditUpdated(updated);
-    } catch { /* ignore */ }
+    } catch {
+      toast.error("Erreur lors du changement de statut");
+    }
   };
 
   const StatusIcon = STATUS_ICONS[audit.status];
@@ -776,7 +778,9 @@ function CampaignsTab({ auditId, entrepriseId }: { auditId: number; entrepriseId
     try {
       const res = await campaignsApi.list(1, 100, auditId);
       setCampaigns(res.items);
-    } catch { /* ignore */ } finally {
+    } catch {
+      toast.error("Erreur lors du chargement des campagnes");
+    } finally {
       setLoading(false);
     }
   }, [auditId]);
@@ -808,7 +812,9 @@ function CampaignsTab({ auditId, entrepriseId }: { auditId: number; entrepriseId
         await campaignsApi.update(id, { status: newStatus });
       }
       loadCampaigns();
-    } catch { /* ignore */ }
+    } catch {
+      toast.error("Erreur lors du changement de statut de la campagne");
+    }
   };
 
   const formatDate = (d: string) => {
@@ -990,7 +996,9 @@ function CampaignDetail({
       ]);
       setCampaign(c);
       setScore(s);
-    } catch { /* ignore */ } finally {
+    } catch {
+      toast.error("Erreur lors du chargement de la campagne");
+    } finally {
       setLoading(false);
     }
   }, [campaignId]);
@@ -1309,7 +1317,9 @@ function AssessmentControlResults({
       });
       setEditingId(null);
       onResultUpdated();
-    } catch { /* ignore */ } finally {
+    } catch {
+      toast.error("Erreur lors de la sauvegarde de l'évaluation");
+    } finally {
       setSaving(false);
     }
   };
@@ -1396,7 +1406,7 @@ function AssessmentControlResults({
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label>Statut de conformité *</Label>
-              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v as ComplianceStatus })}>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm(prev => ({ ...prev, status: v as ComplianceStatus }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -1414,7 +1424,7 @@ function AssessmentControlResults({
               <Textarea
                 id="result-evidence"
                 value={editForm.evidence}
-                onChange={(e) => setEditForm({ ...editForm, evidence: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setEditForm(prev => ({ ...prev, evidence: value })); }}
                 placeholder="Captures d'écran, commandes exécutées, résultats..."
                 rows={3}
               />
@@ -1424,7 +1434,7 @@ function AssessmentControlResults({
               <Textarea
                 id="result-comment"
                 value={editForm.comment}
-                onChange={(e) => setEditForm({ ...editForm, comment: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setEditForm(prev => ({ ...prev, comment: value })); }}
                 placeholder="Observations de l'auditeur..."
                 rows={2}
               />
@@ -1434,7 +1444,7 @@ function AssessmentControlResults({
               <Textarea
                 id="result-remediation"
                 value={editForm.remediation_note}
-                onChange={(e) => setEditForm({ ...editForm, remediation_note: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setEditForm(prev => ({ ...prev, remediation_note: value })); }}
                 placeholder="Actions recommandées pour la mise en conformité..."
                 rows={2}
               />

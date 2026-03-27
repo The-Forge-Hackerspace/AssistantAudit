@@ -426,7 +426,7 @@ function FrameworkDetail({
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      /* ignore */
+      toast.error("Erreur lors de l'export du référentiel");
     }
   };
 

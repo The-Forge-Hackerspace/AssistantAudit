@@ -511,7 +511,7 @@ function EquipementsContent() {
               <Label>Site *</Label>
               <Select
                 value={form.site_id ? String(form.site_id) : ""}
-                onValueChange={(v) => setForm({ ...form, site_id: Number(v) })}
+                onValueChange={(v) => setForm(prev => ({ ...prev, site_id: Number(v) }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un site" />
@@ -533,7 +533,7 @@ function EquipementsContent() {
               <Select
                 value={form.type_equipement}
                 onValueChange={(v) =>
-                  setForm({ ...form, type_equipement: v as TypeEquipement })
+                  setForm(prev => ({ ...prev, type_equipement: v as TypeEquipement }))
                 }
               >
                 <SelectTrigger>
@@ -557,7 +557,7 @@ function EquipementsContent() {
                 <Input
                   id="create-ip"
                   value={form.ip_address}
-                  onChange={(e) => setForm({ ...form, ip_address: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, ip_address: value })); }}
                   placeholder="192.168.1.1"
                   className="font-mono"
                 />
@@ -567,7 +567,7 @@ function EquipementsContent() {
                 <Input
                   id="create-hostname"
                   value={form.hostname}
-                  onChange={(e) => setForm({ ...form, hostname: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, hostname: value })); }}
                   placeholder="SRV-DC01"
                 />
               </div>
@@ -579,7 +579,7 @@ function EquipementsContent() {
                 <Input
                   id="create-fabricant"
                   value={form.fabricant}
-                  onChange={(e) => setForm({ ...form, fabricant: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, fabricant: value })); }}
                   placeholder="Dell, HP, Fortinet..."
                 />
               </div>
@@ -588,7 +588,7 @@ function EquipementsContent() {
                 <Input
                   id="create-os"
                   value={form.os_detected}
-                  onChange={(e) => setForm({ ...form, os_detected: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, os_detected: value })); }}
                   placeholder="Windows Server 2022, FortiOS 7.4..."
                 />
               </div>
@@ -603,7 +603,7 @@ function EquipementsContent() {
                   <Input
                     id="create-firmware"
                     value={(form as Record<string, unknown>).firmware_version as string || ""}
-                    onChange={(e) => setForm({ ...form, firmware_version: e.target.value })}
+                    onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, firmware_version: value })); }}
                     placeholder="ex: IOS 15.2, ArubaOS 8.10..."
                   />
                 </div>
@@ -618,7 +618,7 @@ function EquipementsContent() {
                   <Input
                     id="create-os-detail"
                     value={(form as Record<string, unknown>).os_version_detail as string || ""}
-                    onChange={(e) => setForm({ ...form, os_version_detail: e.target.value })}
+                    onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, os_version_detail: value })); }}
                     placeholder="ex: Windows Server 2022 Datacenter Build 20348"
                   />
                 </div>
@@ -627,7 +627,7 @@ function EquipementsContent() {
                   <Input
                     id="create-modele"
                     value={(form as Record<string, unknown>).modele_materiel as string || ""}
-                    onChange={(e) => setForm({ ...form, modele_materiel: e.target.value })}
+                    onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, modele_materiel: value })); }}
                     placeholder="ex: Dell PowerEdge R740"
                   />
                 </div>
@@ -642,7 +642,7 @@ function EquipementsContent() {
                   <Input
                     id="create-license"
                     value={(form as Record<string, unknown>).license_status as string || ""}
-                    onChange={(e) => setForm({ ...form, license_status: e.target.value })}
+                    onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, license_status: value })); }}
                     placeholder="ex: Active, Expired, Trial..."
                   />
                 </div>
@@ -654,7 +654,7 @@ function EquipementsContent() {
                       type="number"
                       value={(form as Record<string, unknown>).vpn_users_count as number ?? 0}
                       onChange={(e) =>
-                        setForm({ ...form, vpn_users_count: parseInt(e.target.value) || 0 })
+                        { const value = parseInt(e.target.value) || 0; setForm(prev => ({ ...prev, vpn_users_count: value })); }
                       }
                     />
                   </div>
@@ -665,7 +665,7 @@ function EquipementsContent() {
                       type="number"
                       value={(form as Record<string, unknown>).rules_count as number ?? 0}
                       onChange={(e) =>
-                        setForm({ ...form, rules_count: parseInt(e.target.value) || 0 })
+                        { const value = parseInt(e.target.value) || 0; setForm(prev => ({ ...prev, rules_count: value })); }
                       }
                     />
                   </div>
@@ -678,7 +678,7 @@ function EquipementsContent() {
               <Textarea
                 id="create-notes"
                 value={form.notes_audit || ""}
-                onChange={(e) => setForm({ ...form, notes_audit: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, notes_audit: value })); }}
                 placeholder="Observations, remarques..."
                 rows={3}
               />
@@ -728,7 +728,7 @@ function EquipementsContent() {
                 <Input
                   id="edit-hostname"
                   value={form.hostname}
-                  onChange={(e) => setForm({ ...form, hostname: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, hostname: value })); }}
                   placeholder="SRV-DC01"
                 />
               </div>
@@ -737,7 +737,7 @@ function EquipementsContent() {
                 <Input
                   id="edit-fabricant"
                   value={form.fabricant}
-                  onChange={(e) => setForm({ ...form, fabricant: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, fabricant: value })); }}
                   placeholder="Dell, HP..."
                 />
               </div>
@@ -748,7 +748,7 @@ function EquipementsContent() {
               <Input
                 id="edit-os"
                 value={form.os_detected}
-                onChange={(e) => setForm({ ...form, os_detected: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, os_detected: value })); }}
                 placeholder="Windows Server 2022..."
               />
             </div>
@@ -762,7 +762,7 @@ function EquipementsContent() {
                   <Input
                     id="edit-firmware"
                     value={(form as Record<string, unknown>).firmware_version as string || ""}
-                    onChange={(e) => setForm({ ...form, firmware_version: e.target.value })}
+                    onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, firmware_version: value })); }}
                   />
                 </div>
               </div>
@@ -776,7 +776,7 @@ function EquipementsContent() {
                   <Input
                     id="edit-os-detail"
                     value={(form as Record<string, unknown>).os_version_detail as string || ""}
-                    onChange={(e) => setForm({ ...form, os_version_detail: e.target.value })}
+                    onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, os_version_detail: value })); }}
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -784,7 +784,7 @@ function EquipementsContent() {
                   <Input
                     id="edit-modele"
                     value={(form as Record<string, unknown>).modele_materiel as string || ""}
-                    onChange={(e) => setForm({ ...form, modele_materiel: e.target.value })}
+                    onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, modele_materiel: value })); }}
                   />
                 </div>
               </div>
@@ -798,7 +798,7 @@ function EquipementsContent() {
                   <Input
                     id="edit-license"
                     value={(form as Record<string, unknown>).license_status as string || ""}
-                    onChange={(e) => setForm({ ...form, license_status: e.target.value })}
+                    onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, license_status: value })); }}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -809,7 +809,7 @@ function EquipementsContent() {
                       type="number"
                       value={(form as Record<string, unknown>).vpn_users_count as number ?? 0}
                       onChange={(e) =>
-                        setForm({ ...form, vpn_users_count: parseInt(e.target.value) || 0 })
+                        { const value = parseInt(e.target.value) || 0; setForm(prev => ({ ...prev, vpn_users_count: value })); }
                       }
                     />
                   </div>
@@ -820,7 +820,7 @@ function EquipementsContent() {
                       type="number"
                       value={(form as Record<string, unknown>).rules_count as number ?? 0}
                       onChange={(e) =>
-                        setForm({ ...form, rules_count: parseInt(e.target.value) || 0 })
+                        { const value = parseInt(e.target.value) || 0; setForm(prev => ({ ...prev, rules_count: value })); }
                       }
                     />
                   </div>
@@ -833,7 +833,7 @@ function EquipementsContent() {
               <Textarea
                 id="edit-notes"
                 value={form.notes_audit || ""}
-                onChange={(e) => setForm({ ...form, notes_audit: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, notes_audit: value })); }}
                 placeholder="Observations, remarques..."
                 rows={3}
               />
