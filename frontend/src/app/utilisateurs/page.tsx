@@ -471,7 +471,10 @@ export default function UtilisateursPage() {
               <Input
                 id="create-fullname"
                 value={createForm.full_name}
-                onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setCreateForm(prev => ({ ...prev, full_name: value }));
+                }}
                 placeholder="Jean Dupont"
               />
             </div>
@@ -481,7 +484,10 @@ export default function UtilisateursPage() {
                 <Input
                   id="create-username"
                   value={createForm.username}
-                  onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCreateForm(prev => ({ ...prev, username: value }));
+                  }}
                   placeholder="jdupont"
                 />
               </div>
@@ -491,7 +497,10 @@ export default function UtilisateursPage() {
                   id="create-email"
                   type="email"
                   value={createForm.email}
-                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCreateForm(prev => ({ ...prev, email: value }));
+                  }}
                   placeholder="jean@exemple.com"
                 />
               </div>
@@ -503,7 +512,10 @@ export default function UtilisateursPage() {
                   id="create-password"
                   type={showCreatePassword ? "text" : "password"}
                   value={createForm.password}
-                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCreateForm(prev => ({ ...prev, password: value }));
+                  }}
                   placeholder="Minimum 8 caractères"
                   className="pr-10"
                 />
@@ -526,7 +538,7 @@ export default function UtilisateursPage() {
               <Label htmlFor="create-role">Rôle</Label>
               <Select
                 value={createForm.role}
-                onValueChange={(value) => setCreateForm({ ...createForm, role: value as UserRole })}
+                onValueChange={(value) => setCreateForm(prev => ({ ...prev, role: value as UserRole }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -574,7 +586,10 @@ export default function UtilisateursPage() {
               <Input
                 id="edit-fullname"
                 value={editForm.full_name || ""}
-                onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEditForm(prev => ({ ...prev, full_name: value }));
+                }}
                 placeholder="Jean Dupont"
               />
             </div>
@@ -584,7 +599,10 @@ export default function UtilisateursPage() {
                 id="edit-email"
                 type="email"
                 value={editForm.email || ""}
-                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEditForm(prev => ({ ...prev, email: value }));
+                }}
                 placeholder="jean@exemple.com"
               />
             </div>
@@ -621,7 +639,7 @@ export default function UtilisateursPage() {
               <Label htmlFor="edit-role">Rôle</Label>
               <Select
                 value={editForm.role || "auditeur"}
-                onValueChange={(value) => setEditForm({ ...editForm, role: value as UserRole })}
+                onValueChange={(value) => setEditForm(prev => ({ ...prev, role: value as UserRole }))}
               >
                 <SelectTrigger>
                   <SelectValue />
