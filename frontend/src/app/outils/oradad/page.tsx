@@ -174,16 +174,18 @@ function DomainRow({
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <Label className="text-xs">Serveur / IP du DC *</Label>
+          <Label htmlFor={`domain-server-${index}`} className="text-xs">Serveur / IP du DC *</Label>
           <Input
+            id={`domain-server-${index}`}
             placeholder="192.168.1.10 ou dc01.client.local"
             value={domain.server}
             onChange={(e) => onChange(index, "server", e.target.value)}
           />
         </div>
         <div className="flex flex-col gap-1">
-          <Label className="text-xs">Port LDAP</Label>
+          <Label htmlFor={`domain-port-${index}`} className="text-xs">Port LDAP</Label>
           <Input
+            id={`domain-port-${index}`}
             type="number"
             min={1}
             max={65535}
@@ -193,33 +195,37 @@ function DomainRow({
           />
         </div>
         <div className="flex flex-col gap-1 md:col-span-2">
-          <Label className="text-xs">Nom du domaine *</Label>
+          <Label htmlFor={`domain-name-${index}`} className="text-xs">Nom du domaine *</Label>
           <Input
+            id={`domain-name-${index}`}
             placeholder="client.local"
             value={domain.domain_name}
             onChange={(e) => onChange(index, "domain_name", e.target.value)}
           />
         </div>
         <div className="flex flex-col gap-1">
-          <Label className="text-xs">Nom d&apos;utilisateur *</Label>
+          <Label htmlFor={`domain-username-${index}`} className="text-xs">Nom d&apos;utilisateur *</Label>
           <Input
+            id={`domain-username-${index}`}
             placeholder="auditeur"
             value={domain.username}
             onChange={(e) => onChange(index, "username", e.target.value)}
           />
         </div>
         <div className="flex flex-col gap-1">
-          <Label className="text-xs">Domaine utilisateur *</Label>
+          <Label htmlFor={`domain-userdomain-${index}`} className="text-xs">Domaine utilisateur *</Label>
           <Input
+            id={`domain-userdomain-${index}`}
             placeholder="CLIENT"
             value={domain.user_domain}
             onChange={(e) => onChange(index, "user_domain", e.target.value)}
           />
         </div>
         <div className="flex flex-col gap-1 md:col-span-2">
-          <Label className="text-xs">Mot de passe *</Label>
+          <Label htmlFor={`domain-password-${index}`} className="text-xs">Mot de passe *</Label>
           <div className="flex gap-2">
             <Input
+              id={`domain-password-${index}`}
               type={showPassword ? "text" : "password"}
               placeholder="••••••"
               value={domain.password}
@@ -229,10 +235,11 @@ function DomainRow({
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
             >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {showPassword ? <EyeOff data-icon /> : <Eye data-icon />}
             </Button>
           </div>
         </div>
@@ -244,7 +251,6 @@ function DomainRow({
 // ── Page ──
 export default function OradadPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
 
   // Agents
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -274,7 +280,8 @@ export default function OradadPage() {
   const [cfgOutputMla, setCfgOutputMla] = useState(true);
   const [cfgSleepTime, setCfgSleepTime] = useState("0");
   const [cfgShowAdvanced, setCfgShowAdvanced] = useState(false);
-  const [cfgDomains, setCfgDomains] = useState<DomainEntry[]>([{ ...EMPTY_DOMAIN }]);
+  const [cfgDomains, setCfgDomains] = useState<(DomainEntry & { _key: number })[]>([{ ...EMPTY_DOMAIN, _key: 0 }]);
+  const [domainKeyCounter, setDomainKeyCounter] = useState(1);
 
   // Launch form — simplified: agent + config (required) + domain override
   const [selectedAgentUuid, setSelectedAgentUuid] = useState<string>("");
@@ -378,7 +385,8 @@ export default function OradadPage() {
   };
 
   const handleAddDomain = () => {
-    setCfgDomains((prev) => [...prev, { ...EMPTY_DOMAIN }]);
+    setCfgDomains((prev) => [...prev, { ...EMPTY_DOMAIN, _key: domainKeyCounter }]);
+    setDomainKeyCounter((c) => c + 1);
   };
 
   const handleRemoveDomain = (index: number) => {
@@ -399,7 +407,8 @@ export default function OradadPage() {
     setCfgOutputMla(true);
     setCfgSleepTime("0");
     setCfgShowAdvanced(false);
-    setCfgDomains([{ ...EMPTY_DOMAIN }]);
+    setCfgDomains([{ ...EMPTY_DOMAIN, _key: 0 }]);
+    setDomainKeyCounter(1);
     setShowConfigDialog(true);
   };
 
@@ -416,11 +425,11 @@ export default function OradadPage() {
     setCfgOutputMla(config.output_mla);
     setCfgSleepTime(String(config.sleep_time));
     setCfgShowAdvanced(false);
-    setCfgDomains(
-      config.explicit_domains && config.explicit_domains.length > 0
-        ? config.explicit_domains.map((d) => ({ ...d }))
-        : [{ ...EMPTY_DOMAIN }]
-    );
+    const domains = config.explicit_domains && config.explicit_domains.length > 0
+      ? config.explicit_domains.map((d, i) => ({ ...d, _key: i }))
+      : [{ ...EMPTY_DOMAIN, _key: 0 }];
+    setCfgDomains(domains);
+    setDomainKeyCounter(domains.length);
     setShowConfigDialog(true);
   };
 
@@ -672,7 +681,7 @@ export default function OradadPage() {
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="flex flex-col gap-2">
-                <Label>Agent *</Label>
+                <Label htmlFor="launch-agent">Agent *</Label>
                 {loadingAgents ? (
                   <Skeleton className="h-10 w-full" />
                 ) : oradadAgents.length === 0 ? (
@@ -681,7 +690,7 @@ export default function OradadPage() {
                   </p>
                 ) : (
                   <Select value={selectedAgentUuid} onValueChange={setSelectedAgentUuid}>
-                    <SelectTrigger>
+                    <SelectTrigger id="launch-agent">
                       <SelectValue placeholder="Sélectionner un agent" />
                     </SelectTrigger>
                     <SelectContent>
@@ -697,9 +706,9 @@ export default function OradadPage() {
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                <Label>Profil de configuration *</Label>
+                <Label htmlFor="launch-config">Profil de configuration *</Label>
                 <Select value={selectedConfigId} onValueChange={setSelectedConfigId}>
-                  <SelectTrigger>
+                  <SelectTrigger id="launch-config">
                     <SelectValue placeholder="Sélectionner un profil" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1034,21 +1043,21 @@ export default function OradadPage() {
             {/* Auto-detect toggles */}
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-0.5">
-                <Label>Détection automatique du domaine</Label>
+                <Label htmlFor="cfg-auto-domain">Détection automatique du domaine</Label>
                 <span className="text-xs text-muted-foreground">
                   Activer uniquement si l&apos;agent est joint au domaine cible
                 </span>
               </div>
-              <Switch checked={cfgAutoGetDomain} onCheckedChange={setCfgAutoGetDomain} />
+              <Switch id="cfg-auto-domain" checked={cfgAutoGetDomain} onCheckedChange={setCfgAutoGetDomain} />
             </div>
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-0.5">
-                <Label>Détection automatique des trusts</Label>
+                <Label htmlFor="cfg-auto-trusts">Détection automatique des trusts</Label>
                 <span className="text-xs text-muted-foreground">
                   Activer uniquement si l&apos;agent est joint au domaine cible
                 </span>
               </div>
-              <Switch checked={cfgAutoGetTrusts} onCheckedChange={setCfgAutoGetTrusts} />
+              <Switch id="cfg-auto-trusts" checked={cfgAutoGetTrusts} onCheckedChange={setCfgAutoGetTrusts} />
             </div>
 
             {/* ── Target domains — central section, shown when auto-detect is OFF ── */}
@@ -1070,7 +1079,7 @@ export default function OradadPage() {
                   </div>
                   {cfgDomains.map((d, i) => (
                     <DomainRow
-                      key={i}
+                      key={d._key}
                       domain={d}
                       index={i}
                       onChange={handleDomainChange}
@@ -1086,9 +1095,9 @@ export default function OradadPage() {
 
             {/* Collection parameters */}
             <div className="flex flex-col gap-2">
-              <Label>Niveau de collecte</Label>
+              <Label htmlFor="cfg-level">Niveau de collecte</Label>
               <Select value={cfgLevel} onValueChange={setCfgLevel}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="cfg-level"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value="1">1 — Minimal</SelectItem>
@@ -1100,9 +1109,9 @@ export default function OradadPage() {
               </Select>
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Attributs confidentiels</Label>
+              <Label htmlFor="cfg-confidential">Attributs confidentiels</Label>
               <Select value={cfgConfidential} onValueChange={setCfgConfidential}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="cfg-confidential"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value="0">Ne pas collecter</SelectItem>
@@ -1113,16 +1122,16 @@ export default function OradadPage() {
               </Select>
             </div>
             <div className="flex items-center justify-between">
-              <Label>Collecter le SYSVOL</Label>
-              <Switch checked={cfgProcessSysvol} onCheckedChange={setCfgProcessSysvol} />
+              <Label htmlFor="cfg-sysvol">Collecter le SYSVOL</Label>
+              <Switch id="cfg-sysvol" checked={cfgProcessSysvol} onCheckedChange={setCfgProcessSysvol} />
             </div>
             <div className="flex items-center justify-between">
-              <Label>Sortie fichiers texte</Label>
-              <Switch checked={cfgOutputFiles} onCheckedChange={setCfgOutputFiles} />
+              <Label htmlFor="cfg-output-files">Sortie fichiers texte</Label>
+              <Switch id="cfg-output-files" checked={cfgOutputFiles} onCheckedChange={setCfgOutputFiles} />
             </div>
             <div className="flex items-center justify-between">
-              <Label>Sortie archive MLA</Label>
-              <Switch checked={cfgOutputMla} onCheckedChange={setCfgOutputMla} />
+              <Label htmlFor="cfg-output-mla">Sortie archive MLA</Label>
+              <Switch id="cfg-output-mla" checked={cfgOutputMla} onCheckedChange={setCfgOutputMla} />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="cfg-sleep">Délai entre requêtes (secondes)</Label>
