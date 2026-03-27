@@ -1026,6 +1026,15 @@ export interface AgentCreateResponse {
 export type AgentTaskStatus = "pending" | "dispatched" | "running" | "completed" | "failed" | "cancelled";
 
 // ── ORADAD ──
+export interface DomainEntry {
+  server: string;
+  port: number;
+  domain_name: string;
+  username: string;
+  user_domain: string;
+  password: string;
+}
+
 export interface OradadConfig {
   id: number;
   name: string;
@@ -1038,7 +1047,7 @@ export interface OradadConfig {
   output_files: boolean;
   output_mla: boolean;
   sleep_time: number;
-  explicit_domains: Array<{ server: string; port: number; domain_name: string }> | null;
+  explicit_domains: DomainEntry[] | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -1054,7 +1063,7 @@ export interface OradadConfigCreate {
   output_files?: boolean;
   output_mla?: boolean;
   sleep_time?: number;
-  explicit_domains?: Array<{ server: string; port: number; domain_name: string }> | null;
+  explicit_domains?: DomainEntry[] | null;
 }
 
 export interface OradadTask {

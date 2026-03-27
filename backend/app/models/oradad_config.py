@@ -1,13 +1,17 @@
 """
 Modele OradadConfig — Profil de configuration pour ORADAD (ANSSI).
 Stocke les parametres du fichier config-oradad.xml.
+Les domaines explicites (avec credentials) sont chiffres via EncryptedText.
 """
+import json
 from datetime import datetime, timezone
+from xml.sax.saxutils import escape as xml_escape
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
+from ..core.encryption import EncryptedText
 
 
 def _utcnow() -> datetime:
@@ -34,9 +38,9 @@ class OradadConfig(Base):
         Integer, ForeignKey("users.id"), nullable=False, index=True
     )
 
-    # Parametres de collecte
-    auto_get_domain: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    auto_get_trusts: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Parametres de collecte — auto-detect OFF par defaut (technicien hors domaine)
+    auto_get_domain: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    auto_get_trusts: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     level: Mapped[int] = mapped_column(Integer, default=4, nullable=False)
     confidential: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
@@ -51,8 +55,9 @@ class OradadConfig(Base):
     # Performance
     sleep_time: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    # Domaines explicites [{server, port, domain_name}]
-    explicit_domains: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Domaines explicites — chiffre car contient les credentials
+    # Format JSON : [{server, port, domain_name, username, user_domain, password}]
+    explicit_domains: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -68,19 +73,59 @@ class OradadConfig(Base):
     def __repr__(self) -> str:
         return f"<OradadConfig(id={self.id}, name='{self.name}')>"
 
+    def get_domains_list(self) -> list[dict]:
+        """Parse le champ explicit_domains (JSON string chiffre) en liste de dicts."""
+        if not self.explicit_domains:
+            return []
+        if isinstance(self.explicit_domains, list):
+            return self.explicit_domains
+        try:
+            return json.loads(self.explicit_domains)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def set_domains_list(self, domains: list[dict] | None) -> None:
+        """Serialise la liste de domaines en JSON string pour stockage chiffre."""
+        if not domains:
+            self.explicit_domains = None
+        else:
+            self.explicit_domains = json.dumps(domains, ensure_ascii=False)
+
+    def get_domains_masked(self) -> list[dict]:
+        """Retourne les domaines avec mots de passe masques (pour API responses)."""
+        domains = self.get_domains_list()
+        return [
+            {
+                "server": d.get("server", ""),
+                "port": d.get("port", 389),
+                "domain_name": d.get("domain_name", ""),
+                "username": d.get("username", ""),
+                "user_domain": d.get("user_domain", ""),
+                "password": "••••••" if d.get("password") else "",
+            }
+            for d in domains
+        ]
+
     def to_xml(self) -> str:
-        """Genere le contenu XML config-oradad.xml."""
+        """Genere le contenu XML config-oradad.xml avec credentials en clair."""
+        domains = self.get_domains_list()
         domains_xml = ""
-        if self.explicit_domains:
-            for d in self.explicit_domains:
-                server = d.get("server", "")
+        if domains:
+            for d in domains:
+                server = xml_escape(d.get("server", ""))
                 port = d.get("port", 389)
-                domain_name = d.get("domain_name", "")
+                domain_name = xml_escape(d.get("domain_name", ""))
+                username = xml_escape(d.get("username", ""))
+                user_domain = xml_escape(d.get("user_domain", ""))
+                password = xml_escape(d.get("password", ""))
                 domains_xml += f"""
       <Domain>
         <Server>{server}</Server>
         <Port>{port}</Port>
         <DomainName>{domain_name}</DomainName>
+        <User>{username}</User>
+        <UserDomain>{user_domain}</UserDomain>
+        <Password>{password}</Password>
       </Domain>"""
 
         return f"""<?xml version="1.0" encoding="UTF-8"?>
