@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 class AgentCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     allowed_tools: list[str] = Field(
-        default=["nmap", "oradad", "ad_collector"]
+        default=["nmap", "oradad", "config-oradad", "ad_collector"]
     )
     target_user_id: Optional[int] = None
 

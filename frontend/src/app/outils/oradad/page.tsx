@@ -12,6 +12,10 @@ import {
   XCircle,
   HelpCircle,
   RefreshCw,
+  Settings,
+  Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,13 +45,33 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
 import { agentsApi, oradadApi } from "@/services/api";
 import { cn } from "@/lib/utils";
-import type { Agent, OradadTask, AnssiReport, AnssiCheckResult } from "@/types";
+import type { Agent, OradadTask, OradadConfig, AnssiReport, AnssiCheckResult } from "@/types";
 
 // ── Constants ──
 const ANSSI_LEVELS: Record<number, { label: string; color: string; bg: string }> = {
@@ -111,10 +135,33 @@ export default function OradadPage() {
   const [tasks, setTasks] = useState<OradadTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
 
+  // Configs
+  const [configs, setConfigs] = useState<OradadConfig[]>([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(true);
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<OradadConfig | null>(null);
+  const [deleteConfigTarget, setDeleteConfigTarget] = useState<OradadConfig | null>(null);
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  // Config form fields
+  const [cfgName, setCfgName] = useState("");
+  const [cfgAutoGetDomain, setCfgAutoGetDomain] = useState(true);
+  const [cfgAutoGetTrusts, setCfgAutoGetTrusts] = useState(true);
+  const [cfgLevel, setCfgLevel] = useState("4");
+  const [cfgConfidential, setCfgConfidential] = useState("0");
+  const [cfgProcessSysvol, setCfgProcessSysvol] = useState(true);
+  const [cfgSysvolFilter, setCfgSysvolFilter] = useState("");
+  const [cfgOutputFiles, setCfgOutputFiles] = useState(false);
+  const [cfgOutputMla, setCfgOutputMla] = useState(true);
+  const [cfgSleepTime, setCfgSleepTime] = useState("0");
+  const [cfgShowAdvanced, setCfgShowAdvanced] = useState(false);
+
   // Launch form
   const [selectedAgentUuid, setSelectedAgentUuid] = useState<string>("");
+  const [selectedConfigId, setSelectedConfigId] = useState<string>("__none__");
   const [domain, setDomain] = useState("");
-  const [collectConfidential, setCollectConfidential] = useState(false);
+  const [outputFiles, setOutputFiles] = useState(false);
+  const [confidential, setConfidential] = useState(false);
   const [launching, setLaunching] = useState(false);
 
   // Report view
@@ -123,9 +170,11 @@ export default function OradadPage() {
   const [loadingReport, setLoadingReport] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
 
-  // Filter agents to only those with "oradad" in allowed_tools and active
+  // Filter agents to show those with "oradad" or "config-oradad" tools
   const oradadAgents = useMemo(
-    () => agents.filter((a) => a.status === "active" && a.allowed_tools.includes("oradad")),
+    () => agents.filter(
+      (a) => a.status === "active" && (a.allowed_tools.includes("oradad") || a.allowed_tools.includes("config-oradad"))
+    ),
     [agents]
   );
 
@@ -152,10 +201,22 @@ export default function OradadPage() {
     }
   }, []);
 
+  const fetchConfigs = useCallback(async () => {
+    try {
+      const data = await oradadApi.listConfigs();
+      setConfigs(data);
+    } catch {
+      // non-blocking
+    } finally {
+      setLoadingConfigs(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchAgents();
     fetchTasks();
-  }, [fetchAgents, fetchTasks]);
+    fetchConfigs();
+  }, [fetchAgents, fetchTasks, fetchConfigs]);
 
   // Poll running tasks
   useEffect(() => {
@@ -167,10 +228,7 @@ export default function OradadPage() {
 
   // ── Launch collect ──
   const handleLaunch = async () => {
-    if (!selectedAgentUuid) {
-      toast.error("Sélectionnez un agent");
-      return;
-    }
+    if (!selectedAgentUuid) return;
     setLaunching(true);
     try {
       await agentsApi.dispatch({
@@ -178,18 +236,143 @@ export default function OradadPage() {
         tool: "oradad",
         parameters: {
           domain: domain || undefined,
-          collect_confidential: collectConfidential,
+          output_files: outputFiles ? 1 : 0,
+          confidential: confidential ? 1 : 0,
+          config_id: selectedConfigId !== "__none__" ? Number(selectedConfigId) : undefined,
         },
       });
       toast.success("Collecte ORADAD lancée");
       setDomain("");
-      setCollectConfidential(false);
-      await fetchTasks();
+      setOutputFiles(false);
+      setConfidential(false);
+      setTimeout(fetchTasks, 1000);
     } catch {
       toast.error("Erreur lors du lancement de la collecte");
     } finally {
       setLaunching(false);
     }
+  };
+
+  const handleConfigOradad = async () => {
+    if (!selectedAgentUuid) return;
+    setLaunching(true);
+    try {
+      await agentsApi.dispatch({
+        agent_uuid: selectedAgentUuid,
+        tool: "config-oradad",
+        parameters: {
+          domain: domain || undefined,
+          output_files: outputFiles ? 1 : 0,
+          confidential: confidential ? 1 : 0,
+          config_id: selectedConfigId !== "__none__" ? Number(selectedConfigId) : undefined,
+        },
+      });
+      toast.success("Configuration ORADAD lancée");
+      setDomain("");
+      setOutputFiles(false);
+      setConfidential(false);
+      setTimeout(fetchTasks, 1000);
+    } catch {
+      toast.error("Erreur lors du lancement de la configuration");
+    } finally {
+      setLaunching(false);
+    }
+  };
+  // ── Config CRUD ──
+  const openNewConfig = () => {
+    setEditingConfig(null);
+    setCfgName("");
+    setCfgAutoGetDomain(true);
+    setCfgAutoGetTrusts(true);
+    setCfgLevel("4");
+    setCfgConfidential("0");
+    setCfgProcessSysvol(true);
+    setCfgSysvolFilter("");
+    setCfgOutputFiles(false);
+    setCfgOutputMla(true);
+    setCfgSleepTime("0");
+    setCfgShowAdvanced(false);
+    setShowConfigDialog(true);
+  };
+
+  const openEditConfig = (config: OradadConfig) => {
+    setEditingConfig(config);
+    setCfgName(config.name);
+    setCfgAutoGetDomain(config.auto_get_domain);
+    setCfgAutoGetTrusts(config.auto_get_trusts);
+    setCfgLevel(String(config.level));
+    setCfgConfidential(String(config.confidential));
+    setCfgProcessSysvol(config.process_sysvol);
+    setCfgSysvolFilter(config.sysvol_filter || "");
+    setCfgOutputFiles(config.output_files);
+    setCfgOutputMla(config.output_mla);
+    setCfgSleepTime(String(config.sleep_time));
+    setCfgShowAdvanced(false);
+    setShowConfigDialog(true);
+  };
+
+  const handleSaveConfig = async () => {
+    if (!cfgName.trim()) {
+      toast.error("Le nom du profil est requis");
+      return;
+    }
+    setSavingConfig(true);
+    const payload = {
+      name: cfgName.trim(),
+      auto_get_domain: cfgAutoGetDomain,
+      auto_get_trusts: cfgAutoGetTrusts,
+      level: Number(cfgLevel),
+      confidential: Number(cfgConfidential),
+      process_sysvol: cfgProcessSysvol,
+      sysvol_filter: cfgSysvolFilter || null,
+      output_files: cfgOutputFiles,
+      output_mla: cfgOutputMla,
+      sleep_time: Number(cfgSleepTime),
+    };
+    try {
+      if (editingConfig) {
+        await oradadApi.updateConfig(editingConfig.id, payload);
+        toast.success("Profil mis à jour");
+      } else {
+        await oradadApi.createConfig(payload);
+        toast.success("Profil créé");
+      }
+      setShowConfigDialog(false);
+      await fetchConfigs();
+    } catch {
+      toast.error("Erreur lors de la sauvegarde du profil");
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleDeleteConfig = async () => {
+    if (!deleteConfigTarget) return;
+    try {
+      await oradadApi.deleteConfig(deleteConfigTarget.id);
+      toast.success("Profil supprimé");
+      if (selectedConfigId === String(deleteConfigTarget.id)) {
+        setSelectedConfigId("__none__");
+      }
+      await fetchConfigs();
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    } finally {
+      setDeleteConfigTarget(null);
+    }
+  };
+
+  const LEVEL_LABELS: Record<string, string> = {
+    "1": "Minimal",
+    "2": "Standard",
+    "3": "Détaillé",
+    "4": "Complet",
+  };
+
+  const CONFIDENTIAL_LABELS: Record<string, string> = {
+    "0": "Ne pas collecter",
+    "1": "Avec limites",
+    "2": "Sans limites",
   };
 
   // ── View report ──
@@ -265,6 +448,75 @@ export default function OradadPage() {
         </div>
       </div>
 
+      {/* ── Config profiles section ── */}
+      <Accordion type="single" collapsible>
+        <AccordionItem value="configs" className="rounded-lg border">
+          <AccordionTrigger className="px-6 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Settings className="size-5" />
+              <span className="font-semibold">Profils de configuration</span>
+              <Badge variant="secondary" className="text-xs">{configs.length}</Badge>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-6 pb-4">
+            {loadingConfigs ? (
+              <Skeleton className="h-20 w-full" />
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={openNewConfig}>
+                    <Plus data-icon="inline-start" />
+                    Nouveau profil
+                  </Button>
+                </div>
+                {configs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Aucun profil. Les paramètres par défaut seront utilisés.
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nom</TableHead>
+                        <TableHead>Niveau</TableHead>
+                        <TableHead>Confidentiel</TableHead>
+                        <TableHead>SYSVOL</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {configs.map((cfg) => (
+                        <TableRow key={cfg.id}>
+                          <TableCell className="font-medium">{cfg.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{LEVEL_LABELS[String(cfg.level)] || cfg.level}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{CONFIDENTIAL_LABELS[String(cfg.confidential)] || cfg.confidential}</Badge>
+                          </TableCell>
+                          <TableCell>{cfg.process_sysvol ? "Oui" : "Non"}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="sm" onClick={() => openEditConfig(cfg)}>
+                                <Pencil data-icon="inline-start" />
+                                Modifier
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleteConfigTarget(cfg)}>
+                                <Trash2 data-icon="inline-start" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
       {/* ── Launch section ── */}
       <Card>
         <CardHeader>
@@ -275,7 +527,7 @@ export default function OradadPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="flex flex-col gap-2">
                 <Label>Agent</Label>
                 {loadingAgents ? (
@@ -302,6 +554,24 @@ export default function OradadPage() {
                 )}
               </div>
               <div className="flex flex-col gap-2">
+                <Label>Profil de configuration</Label>
+                <Select value={selectedConfigId} onValueChange={setSelectedConfigId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Par défaut" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="__none__">Par défaut</SelectItem>
+                      {configs.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name} (Niv. {c.level})
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="oradad-domain">Domaine (optionnel)</Label>
                 <Input
                   id="oradad-domain"
@@ -311,15 +581,23 @@ export default function OradadPage() {
                 />
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <Checkbox
-                  checked={collectConfidential}
-                  onCheckedChange={(v) => setCollectConfidential(v === true)}
+                  checked={outputFiles}
+                  onCheckedChange={(v) => setOutputFiles(v === true)}
+                />
+                <span className="text-sm">Exporter aussi les fichiers texte</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={confidential}
+                  onCheckedChange={(v) => setConfidential(v === true)}
                 />
                 <span className="text-sm">Collecter les attributs confidentiels</span>
               </label>
-              <div className="flex-1" />
+            </div>
+            <div className="flex gap-2">
               <Button
                 onClick={handleLaunch}
                 disabled={launching || !selectedAgentUuid}
@@ -330,6 +608,18 @@ export default function OradadPage() {
                   <Play data-icon="inline-start" />
                 )}
                 Lancer la collecte
+              </Button>
+              <Button
+                onClick={handleConfigOradad}
+                disabled={launching || !selectedAgentUuid}
+                variant="outline"
+              >
+                {launching ? (
+                  <Loader2 data-icon="inline-start" className="animate-spin" />
+                ) : (
+                  <Settings data-icon="inline-start" />
+                )}
+                Configurer ORADAD
               </Button>
             </div>
           </div>
@@ -604,6 +894,120 @@ export default function OradadPage() {
           </CardContent>
         </Card>
       )}
+      {/* ── Config dialog ── */}
+      <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingConfig ? "Modifier le profil" : "Nouveau profil"}</DialogTitle>
+            <DialogDescription>
+              Configurez les paramètres de collecte ORADAD.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="cfg-name">Nom du profil</Label>
+              <Input id="cfg-name" value={cfgName} onChange={(e) => setCfgName(e.target.value)} placeholder="ex : Config standard" />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Détection automatique du domaine</Label>
+              <Switch checked={cfgAutoGetDomain} onCheckedChange={setCfgAutoGetDomain} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Détection automatique des trusts</Label>
+              <Switch checked={cfgAutoGetTrusts} onCheckedChange={setCfgAutoGetTrusts} />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label>Niveau de collecte</Label>
+              <Select value={cfgLevel} onValueChange={setCfgLevel}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="1">1 — Minimal</SelectItem>
+                    <SelectItem value="2">2 — Standard</SelectItem>
+                    <SelectItem value="3">3 — Détaillé</SelectItem>
+                    <SelectItem value="4">4 — Complet</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label>Attributs confidentiels</Label>
+              <Select value={cfgConfidential} onValueChange={setCfgConfidential}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="0">Ne pas collecter</SelectItem>
+                    <SelectItem value="1">Avec limites</SelectItem>
+                    <SelectItem value="2">Sans limites</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Collecter le SYSVOL</Label>
+              <Switch checked={cfgProcessSysvol} onCheckedChange={setCfgProcessSysvol} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Sortie fichiers texte</Label>
+              <Switch checked={cfgOutputFiles} onCheckedChange={setCfgOutputFiles} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Sortie archive MLA</Label>
+              <Switch checked={cfgOutputMla} onCheckedChange={setCfgOutputMla} />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="cfg-sleep">Délai entre requêtes (secondes)</Label>
+              <Input id="cfg-sleep" type="number" min="0" value={cfgSleepTime} onChange={(e) => setCfgSleepTime(e.target.value)} />
+            </div>
+
+            {/* Advanced */}
+            <Button variant="ghost" size="sm" className="self-start" onClick={() => setCfgShowAdvanced(!cfgShowAdvanced)}>
+              <ChevronDown data-icon="inline-start" className={cn("transition-transform", cfgShowAdvanced && "rotate-180")} />
+              Avancé
+            </Button>
+            {cfgShowAdvanced && (
+              <div className="flex flex-col gap-2">
+                <Label>Filtre SYSVOL</Label>
+                <Textarea
+                  rows={4}
+                  value={cfgSysvolFilter}
+                  onChange={(e) => setCfgSysvolFilter(e.target.value)}
+                  placeholder="*.bat;*.vbs;*.ps1;..."
+                  className="font-mono text-xs"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfigDialog(false)}>Annuler</Button>
+            <Button onClick={handleSaveConfig} disabled={savingConfig}>
+              {savingConfig && <Loader2 data-icon="inline-start" className="animate-spin" />}
+              {editingConfig ? "Enregistrer" : "Créer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete config confirmation ── */}
+      <AlertDialog open={!!deleteConfigTarget} onOpenChange={(open) => !open && setDeleteConfigTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le profil ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le profil « {deleteConfigTarget?.name} » sera supprimé définitivement.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfig}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
