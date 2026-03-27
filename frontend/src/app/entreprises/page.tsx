@@ -460,7 +460,7 @@ export default function EntreprisesPage() {
                 <Input
                   id="create-nom"
                   value={form.nom}
-                  onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, nom: value })); }}
                   placeholder="Nom de l'entreprise"
                 />
               </div>
@@ -469,7 +469,7 @@ export default function EntreprisesPage() {
                 <Input
                   id="create-siret"
                   value={form.siret}
-                  onChange={(e) => setForm({ ...form, siret: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, siret: value })); }}
                   placeholder="12345678901234"
                   maxLength={14}
                 />
@@ -481,7 +481,7 @@ export default function EntreprisesPage() {
                 <Input
                   id="create-secteur"
                   value={form.secteur_activite}
-                  onChange={(e) => setForm({ ...form, secteur_activite: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, secteur_activite: value })); }}
                   placeholder="ex: Finance, Santé, Industrie..."
                 />
               </div>
@@ -490,7 +490,7 @@ export default function EntreprisesPage() {
                 <Input
                   id="create-adresse"
                   value={form.adresse}
-                  onChange={(e) => setForm({ ...form, adresse: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, adresse: value })); }}
                   placeholder="Adresse du siège"
                 />
               </div>
@@ -501,7 +501,7 @@ export default function EntreprisesPage() {
                 id="create-presentation"
                 className="min-h-[80px]"
                 value={form.presentation_desc}
-                onChange={(e) => setForm({ ...form, presentation_desc: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, presentation_desc: value })); }}
                 placeholder="Description de l'entreprise..."
               />
             </div>
@@ -511,7 +511,7 @@ export default function EntreprisesPage() {
                 id="create-contraintes"
                 className="min-h-[60px]"
                 value={form.contraintes_reglementaires}
-                onChange={(e) => setForm({ ...form, contraintes_reglementaires: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, contraintes_reglementaires: value })); }}
                 placeholder="RGPD, PCI-DSS, ISO 27001..."
               />
             </div>
@@ -594,7 +594,7 @@ export default function EntreprisesPage() {
                 <Input
                   id="edit-nom"
                   value={form.nom}
-                  onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, nom: value })); }}
                   placeholder="Nom de l'entreprise"
                 />
               </div>
@@ -603,7 +603,7 @@ export default function EntreprisesPage() {
                 <Input
                   id="edit-siret"
                   value={form.siret}
-                  onChange={(e) => setForm({ ...form, siret: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, siret: value })); }}
                   placeholder="12345678901234"
                   maxLength={14}
                 />
@@ -615,7 +615,7 @@ export default function EntreprisesPage() {
                 <Input
                   id="edit-secteur"
                   value={form.secteur_activite}
-                  onChange={(e) => setForm({ ...form, secteur_activite: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, secteur_activite: value })); }}
                   placeholder="ex: Finance, Santé, Industrie..."
                 />
               </div>
@@ -624,7 +624,7 @@ export default function EntreprisesPage() {
                 <Input
                   id="edit-adresse"
                   value={form.adresse}
-                  onChange={(e) => setForm({ ...form, adresse: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, adresse: value })); }}
                   placeholder="Adresse du siège"
                 />
               </div>
@@ -635,7 +635,7 @@ export default function EntreprisesPage() {
                 id="edit-presentation"
                 className="min-h-[80px]"
                 value={form.presentation_desc}
-                onChange={(e) => setForm({ ...form, presentation_desc: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, presentation_desc: value })); }}
                 placeholder="Description de l'entreprise..."
               />
             </div>
@@ -645,7 +645,7 @@ export default function EntreprisesPage() {
                 id="edit-contraintes"
                 className="min-h-[60px]"
                 value={form.contraintes_reglementaires}
-                onChange={(e) => setForm({ ...form, contraintes_reglementaires: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, contraintes_reglementaires: value })); }}
                 placeholder="RGPD, PCI-DSS, ISO 27001..."
               />
             </div>

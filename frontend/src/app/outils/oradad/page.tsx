@@ -542,7 +542,7 @@ export default function OradadPage() {
     try {
       const data = await oradadApi.analyze(selectedTask.task_uuid);
       setReport(data);
-      setSelectedTask({ ...selectedTask, has_report: true });
+      setSelectedTask(prev => prev ? { ...prev, has_report: true } : prev);
       setTasks((prev) =>
         prev.map((t) =>
           t.task_uuid === selectedTask.task_uuid ? { ...t, has_report: true } : t

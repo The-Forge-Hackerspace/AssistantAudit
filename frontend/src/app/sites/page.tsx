@@ -465,7 +465,7 @@ function SitesContent() {
               <Label>Entreprise *</Label>
               <Select
                 value={form.entreprise_id ? String(form.entreprise_id) : ""}
-                onValueChange={(v) => setForm({ ...form, entreprise_id: Number(v) })}
+                onValueChange={(v) => setForm(prev => ({ ...prev, entreprise_id: Number(v) }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner une entreprise" />
@@ -486,7 +486,7 @@ function SitesContent() {
               <Input
                 id="create-site-nom"
                 value={form.nom}
-                onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, nom: value })); }}
                 placeholder="ex: Siège social, Datacenter Paris, Agence Lyon..."
               />
             </div>
@@ -495,7 +495,7 @@ function SitesContent() {
               <Textarea
                 id="create-site-description"
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, description: value })); }}
                 placeholder="Décrivez l'activité ou la fonction de ce site..."
                 rows={3}
               />
@@ -505,7 +505,7 @@ function SitesContent() {
               <Input
                 id="create-site-adresse"
                 value={form.adresse}
-                onChange={(e) => setForm({ ...form, adresse: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, adresse: value })); }}
                 placeholder="Adresse complète du site"
               />
             </div>
@@ -541,7 +541,7 @@ function SitesContent() {
               <Input
                 id="edit-site-nom"
                 value={form.nom}
-                onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, nom: value })); }}
                 placeholder="ex: Siège social, Datacenter Paris, Agence Lyon..."
               />
             </div>
@@ -550,7 +550,7 @@ function SitesContent() {
               <Textarea
                 id="edit-site-description"
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, description: value })); }}
                 placeholder="Décrivez l'activité ou la fonction de ce site..."
                 rows={3}
               />
@@ -560,7 +560,7 @@ function SitesContent() {
               <Input
                 id="edit-site-adresse"
                 value={form.adresse}
-                onChange={(e) => setForm({ ...form, adresse: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, adresse: value })); }}
                 placeholder="Adresse complète du site"
               />
             </div>

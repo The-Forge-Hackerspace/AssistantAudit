@@ -836,7 +836,7 @@ function EvaluationControlRow({
                           ? cn(COMPLIANCE_COLORS[s], "ring-2 ring-offset-1 ring-primary/30")
                           : "border-gray-200 hover:bg-muted/50"
                       )}
-                      onClick={() => setForm({ ...form, status: s })}
+                      onClick={() => setForm(prev => ({ ...prev, status: s }))}
                     >
                       <Icon className="size-4" />
                       <span className="text-[10px] font-medium leading-tight text-center">
@@ -865,7 +865,7 @@ function EvaluationControlRow({
             </Label>
             <Textarea
               value={form.evidence}
-              onChange={(e) => setForm({ ...form, evidence: e.target.value })}
+              onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, evidence: value })); }}
               placeholder="Commandes exécutées, résultats observés…"
               className="text-sm min-h-[80px]"
             />
@@ -886,7 +886,7 @@ function EvaluationControlRow({
             </Label>
             <Textarea
               value={form.comment}
-              onChange={(e) => setForm({ ...form, comment: e.target.value })}
+              onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, comment: value })); }}
               placeholder="Observations de l'auditeur…"
               className="text-sm min-h-[60px]"
             />
@@ -906,7 +906,7 @@ function EvaluationControlRow({
             )}
             <Textarea
               value={form.remediation_note}
-              onChange={(e) => setForm({ ...form, remediation_note: e.target.value })}
+              onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, remediation_note: value })); }}
               placeholder="Actions recommandées pour la mise en conformité…"
               className="text-sm min-h-[60px]"
             />
