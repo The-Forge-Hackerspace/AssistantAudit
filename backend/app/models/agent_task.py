@@ -64,6 +64,9 @@ class AgentTask(Base):
     agent: Mapped["Agent"] = relationship(back_populates="tasks")  # type: ignore[name-defined]
     owner: Mapped["User"] = relationship()  # type: ignore[name-defined]
     audit: Mapped["Audit"] = relationship()  # type: ignore[name-defined]
+    artifacts: Mapped[list["TaskArtifact"]] = relationship(  # type: ignore[name-defined]
+        back_populates="task", cascade="all, delete-orphan", lazy="selectin"
+    )
 
     def __repr__(self) -> str:
         return f"<AgentTask(id={self.id}, tool='{self.tool}', status='{self.status}')>"

@@ -60,6 +60,9 @@ class EnrollResponse(BaseModel):
     agent_token: str
     client_cert_pem: str
     client_key_pem: str
+    ca_cert_pem: str = ""
+    allowed_tools: list[str] = []
+    agent_name: str = ""
 
 
 class AgentResponse(BaseModel):
@@ -98,3 +101,24 @@ class TaskResponse(BaseModel):
     dispatched_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+
+
+# ── Artifacts ──────────────────────────────────────────────────────────
+
+
+class ArtifactUploadResponse(BaseModel):
+    file_id: int
+    filename: str
+    size: int
+
+
+class ArtifactRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    file_uuid: str
+    original_filename: str
+    mime_type: str
+    file_size: int
+    uploaded_at: datetime
+    download_url: str = ""

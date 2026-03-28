@@ -48,6 +48,7 @@ from .ad_audit_result import ADAuditResultModel, ADAuditStatus
 from .monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
 from .agent import Agent
 from .agent_task import AgentTask
+from .task_artifact import TaskArtifact
 from .anssi_checklist import AnssiCheckpoint
 
 __all__ = [
@@ -100,5 +101,6 @@ __all__ = [
     "Monkey365ScanStatus",
     "Agent",
     "AgentTask",
+    "TaskArtifact",
     "AnssiCheckpoint",
 ]

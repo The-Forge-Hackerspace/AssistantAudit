@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 
 from ...core.config import get_settings
@@ -20,10 +20,13 @@ from ...core.security import (
 from ...models.agent import Agent
 from ...models.agent_task import AgentTask
 from ...models.user import User
+from ...models.task_artifact import TaskArtifact
 from ...schemas.agent import (
     AgentCreateRequest,
     AgentCreateResponse,
     AgentResponse,
+    ArtifactRead,
+    ArtifactUploadResponse,
     EnrollRequest,
     EnrollResponse,
     HeartbeatRequest,
@@ -203,12 +206,21 @@ def enroll_agent(
     matched_agent.last_ip = request.client.host if request.client else None
     db.commit()
 
+    # Lire le certificat CA pour que l'agent puisse valider le serveur en mTLS
+    ca_cert_pem = ""
+    ca_cert_path = Path(settings.CA_CERT_PATH)
+    if ca_cert_path.exists():
+        ca_cert_pem = ca_cert_path.read_text(encoding="utf-8")
+
     logger.info(f"Agent enrolled: uuid={matched_agent.agent_uuid}")
     return EnrollResponse(
         agent_uuid=matched_agent.agent_uuid,
         agent_token=agent_token,
         client_cert_pem=cert_pem.decode("utf-8") if cert_pem else "",
         client_key_pem=key_pem.decode("utf-8") if key_pem else "",
+        ca_cert_pem=ca_cert_pem,
+        allowed_tools=matched_agent.allowed_tools or [],
+        agent_name=matched_agent.name or "",
     )
 
 
@@ -357,3 +369,129 @@ async def submit_task_result(
     })
 
     return {"detail": "OK"}
+
+
+# ── Artifacts ─────────────────────────────────────────────────────────
+
+MAX_ARTIFACT_SIZE = 100 * 1024 * 1024  # 100 MB
+
+
+@router.post("/tasks/{task_uuid}/artifacts", response_model=ArtifactUploadResponse, status_code=201)
+def upload_artifact(
+    task_uuid: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_agent: Agent = Depends(get_current_agent),
+):
+    """
+    Upload un fichier resultat (artifact) pour une tache.
+    Auth agent — l'agent uploade apres execution.
+    """
+    # Verifier que la tache existe et appartient a cet agent
+    task = db.query(AgentTask).filter(
+        AgentTask.task_uuid == task_uuid,
+        AgentTask.agent_id == current_agent.id,
+    ).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tache introuvable")
+
+    if task.status == "cancelled":
+        raise HTTPException(status_code=400, detail="Tache annulee — upload refuse")
+
+    # Lire le contenu avec limite de taille
+    chunks = []
+    total_size = 0
+    while True:
+        chunk = file.file.read(8192)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > MAX_ARTIFACT_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Fichier trop volumineux (>{MAX_ARTIFACT_SIZE // (1024*1024)} Mo)",
+            )
+        chunks.append(chunk)
+    content = b"".join(chunks)
+
+    if not content:
+        raise HTTPException(status_code=400, detail="Fichier vide")
+
+    # Chiffrer avec envelope encryption
+    from ...core.file_encryption import EnvelopeEncryption
+    envelope = EnvelopeEncryption()
+    encrypted_data, encrypted_dek, dek_nonce = envelope.encrypt_file(content)
+
+    # Stocker sur disque
+    import uuid as uuid_mod
+    file_uuid = str(uuid_mod.uuid4())
+    blobs_dir = Path(settings.DATA_DIR) / "blobs"
+    blobs_dir.mkdir(parents=True, exist_ok=True)
+    file_path = blobs_dir / f"{file_uuid}.enc"
+    file_path.write_bytes(encrypted_data)
+
+    # Creer l'artifact en base
+    original_name = file.filename or "artifact"
+    artifact = TaskArtifact(
+        agent_task_id=task.id,
+        file_uuid=file_uuid,
+        original_filename=original_name,
+        stored_filename=f"{file_uuid}.enc",
+        mime_type=file.content_type or "application/octet-stream",
+        file_size=len(content),
+        encrypted_dek=encrypted_dek if encrypted_dek else None,
+        dek_nonce=dek_nonce if dek_nonce else None,
+        kek_version=1 if envelope.enabled else None,
+    )
+    db.add(artifact)
+    db.commit()
+    db.refresh(artifact)
+
+    logger.info(
+        f"Artifact uploaded: task={task_uuid}, file={original_name} "
+        f"({len(content)} bytes), agent={current_agent.agent_uuid}"
+    )
+    return ArtifactUploadResponse(
+        file_id=artifact.id,
+        filename=original_name,
+        size=len(content),
+    )
+
+
+@router.get("/tasks/{task_uuid}/artifacts", response_model=list[ArtifactRead])
+def list_artifacts(
+    task_uuid: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_auditeur),
+):
+    """
+    Liste les artifacts d'une tache.
+    Auth auditeur — le technicien consulte les resultats.
+    Verifie ownership via agent -> owner_id.
+    """
+    task = db.query(AgentTask).filter(AgentTask.task_uuid == task_uuid).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tache introuvable")
+
+    # Verifier ownership : la tache appartient au user via owner_id
+    if task.owner_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=404, detail="Tache introuvable")
+
+    artifacts = (
+        db.query(TaskArtifact)
+        .filter(TaskArtifact.agent_task_id == task.id)
+        .order_by(TaskArtifact.uploaded_at.desc())
+        .all()
+    )
+    return [
+        ArtifactRead(
+            id=a.id,
+            file_uuid=a.file_uuid,
+            original_filename=a.original_filename,
+            mime_type=a.mime_type,
+            file_size=a.file_size,
+            uploaded_at=a.uploaded_at,
+            download_url=f"/api/v1/agents/tasks/{task_uuid}/artifacts/{a.id}/download",
+        )
+        for a in artifacts
+    ]
