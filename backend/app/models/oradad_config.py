@@ -113,7 +113,7 @@ class OradadConfig(Base):
         if domains:
             for d in domains:
                 server = xml_escape(d.get("server", ""))
-                port = d.get("port", 389)
+                port = int(d.get("port", 389))
                 domain_name = xml_escape(d.get("domain_name", ""))
                 username = xml_escape(d.get("username", ""))
                 user_domain = xml_escape(d.get("user_domain", ""))
@@ -139,7 +139,7 @@ class OradadConfig(Base):
   </General>
   <SYSVOL>
     <Process>{str(self.process_sysvol).lower()}</Process>
-    <Filter>{self.sysvol_filter or DEFAULT_SYSVOL_FILTER}</Filter>
+    <Filter>{xml_escape(self.sysvol_filter or DEFAULT_SYSVOL_FILTER)}</Filter>
   </SYSVOL>
   <Output>
     <Files>{str(self.output_files).lower()}</Files>

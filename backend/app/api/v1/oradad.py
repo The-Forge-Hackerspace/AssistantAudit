@@ -24,12 +24,12 @@ router = APIRouter(prefix="/oradad", tags=["ORADAD"])
 
 
 class DomainEntry(BaseModel):
-    server: str = Field(..., min_length=1, description="IP ou FQDN du DC")
+    server: str = Field(..., min_length=1, max_length=255, description="IP ou FQDN du DC")
     port: int = Field(default=389, ge=1, le=65535)
-    domain_name: str = Field(..., min_length=1, description="ex: client.local")
-    username: str = Field(..., min_length=1, description="ex: auditeur")
-    user_domain: str = Field(..., min_length=1, description="ex: CLIENT")
-    password: str = Field(..., min_length=1)
+    domain_name: str = Field(..., min_length=1, max_length=255, description="ex: client.local")
+    username: str = Field(..., min_length=1, max_length=255, description="ex: auditeur")
+    user_domain: str = Field(..., min_length=1, max_length=255, description="ex: CLIENT")
+    password: str = Field(..., min_length=1, max_length=1000)
 
 
 class DomainEntryResponse(BaseModel):
@@ -48,11 +48,11 @@ class OradadConfigCreate(BaseModel):
     level: int = Field(default=4, ge=1, le=4)
     confidential: int = Field(default=0, ge=0, le=2)
     process_sysvol: bool = True
-    sysvol_filter: Optional[str] = None
+    sysvol_filter: Optional[str] = Field(default=None, max_length=2000)
     output_files: bool = False
     output_mla: bool = True
-    sleep_time: int = Field(default=0, ge=0)
-    explicit_domains: Optional[list[DomainEntry]] = None
+    sleep_time: int = Field(default=0, ge=0, le=3600)
+    explicit_domains: Optional[list[DomainEntry]] = Field(default=None, max_length=50)
 
 
 class OradadConfigUpdate(BaseModel):
@@ -62,7 +62,7 @@ class OradadConfigUpdate(BaseModel):
     level: Optional[int] = Field(default=None, ge=1, le=4)
     confidential: Optional[int] = Field(default=None, ge=0, le=2)
     process_sysvol: Optional[bool] = None
-    sysvol_filter: Optional[str] = None
+    sysvol_filter: Optional[str] = Field(default=None, max_length=2000)
     output_files: Optional[bool] = None
     output_mla: Optional[bool] = None
     sleep_time: Optional[int] = Field(default=None, ge=0)

@@ -506,17 +506,43 @@ class Monkey365AuthMethod(str, Enum):
 class Monkey365StreamingScanCreate(BaseModel):
     """Parametres pour lancer un scan Monkey365 streaming avec Device Code Flow."""
     entreprise_id: int = Field(..., description="ID de l'entreprise")
-    tenant_id: str = Field(..., min_length=1, description="Azure AD tenant ID")
+    tenant_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        pattern=r"^[a-zA-Z0-9\-._]+$",
+        description="Azure AD tenant ID (UUID ou nom de domaine)",
+    )
     auth_method: Monkey365AuthMethod = Field(
         default=Monkey365AuthMethod.DEVICE_CODE,
         description="Methode d'authentification",
     )
-    subscriptions: list[str] = Field(default_factory=list, description="Azure subscriptions a auditer")
-    ruleset: str = Field(default="cis", description="Ruleset (cis, etc.)")
+    subscriptions: list[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description="Azure subscriptions a auditer",
+    )
+    ruleset: str = Field(
+        default="cis",
+        max_length=50,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Ruleset (cis, etc.)",
+    )
     config: Monkey365ConfigSchema = Field(
         default_factory=Monkey365ConfigSchema,
         description="Configuration Monkey365 (spo_sites, export_to)",
     )
+
+    @field_validator("subscriptions")
+    @classmethod
+    def validate_subscriptions(cls, v: list[str]) -> list[str]:
+        """Valide que chaque subscription est un identifiant safe (UUID ou slug)."""
+        import re
+        safe = re.compile(r"^[a-zA-Z0-9\-._]+$")
+        for sub in v:
+            if not sub or len(sub) > 255 or not safe.match(sub):
+                raise ValueError(f"Subscription invalide: {sub!r}")
+        return v
 
 
 class Monkey365StreamingScanResponse(BaseModel):

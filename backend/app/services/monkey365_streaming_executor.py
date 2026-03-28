@@ -170,7 +170,7 @@ class Monkey365StreamingExecutor:
         from pathlib import Path
         monkey365_dir = str(Path(monkey365_path).parent).replace("'", "''")
 
-        subs_str = ", ".join(f"'{s}'" for s in subscriptions) if subscriptions else ""
+        subs_str = ", ".join(f"'{s.replace(chr(39), chr(39)*2)}'" for s in subscriptions) if subscriptions else ""
 
         auth_param = ""
         if auth_method == AuthMethod.DEVICE_CODE:
