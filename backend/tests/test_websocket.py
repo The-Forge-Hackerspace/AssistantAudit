@@ -46,25 +46,25 @@ def _clear_global_ws_manager():
 class TestUserWebSocket:
     def test_connect_user_valid_token(self, client, admin_user):
         token = create_access_token(subject=admin_user.id)
-        with client.websocket_connect(f"/api/v1/ws/user?token={token}") as ws:
+        with client.websocket_connect(f"/ws/user?token={token}") as ws:
             ws.send_json({"command": "ping"})
             resp = ws.receive_json()
             assert resp["type"] == "pong"
 
     def test_connect_user_invalid_token(self, client):
         with pytest.raises(Exception):
-            with client.websocket_connect("/api/v1/ws/user?token=invalid.jwt") as ws:
+            with client.websocket_connect("/ws/user?token=invalid.jwt") as ws:
                 ws.receive_json()
 
     def test_connect_user_no_token(self, client):
         with pytest.raises(Exception):
-            with client.websocket_connect("/api/v1/ws/user") as ws:
+            with client.websocket_connect("/ws/user") as ws:
                 ws.receive_json()
 
     def test_connect_user_agent_token_rejected(self, client):
         token = create_agent_token(agent_uuid="fake", owner_id=1)
         with pytest.raises(Exception):
-            with client.websocket_connect(f"/api/v1/ws/user?token={token}") as ws:
+            with client.websocket_connect(f"/ws/user?token={token}") as ws:
                 ws.receive_json()
 
 
@@ -87,7 +87,7 @@ class TestAgentWebSocket:
         db_session.commit()
 
         token = create_agent_token(agent_uuid="agent-ws-test", owner_id=admin_user.id)
-        with client.websocket_connect(f"/api/v1/ws/agent?token={token}") as ws:
+        with client.websocket_connect(f"/ws/agent?token={token}") as ws:
             ws.send_json({"type": "heartbeat"})
             resp = ws.receive_json()
             assert resp["type"] == "heartbeat_ack"
@@ -95,12 +95,12 @@ class TestAgentWebSocket:
     def test_connect_agent_user_token_rejected(self, client, admin_user):
         token = create_access_token(subject=admin_user.id)
         with pytest.raises(Exception):
-            with client.websocket_connect(f"/api/v1/ws/agent?token={token}") as ws:
+            with client.websocket_connect(f"/ws/agent?token={token}") as ws:
                 ws.receive_json()
 
     def test_connect_agent_no_token(self, client):
         with pytest.raises(Exception):
-            with client.websocket_connect("/api/v1/ws/agent") as ws:
+            with client.websocket_connect("/ws/agent") as ws:
                 ws.receive_json()
 
 
@@ -182,7 +182,7 @@ class TestBuffering:
 
         # Reconnect — buffered events should be replayed
         token = create_access_token(subject=user_id)
-        with client.websocket_connect(f"/api/v1/ws/user?token={token}") as ws:
+        with client.websocket_connect(f"/ws/user?token={token}") as ws:
             ev1 = ws.receive_json()
             ev2 = ws.receive_json()
             assert ev1["type"] == "event_1"
