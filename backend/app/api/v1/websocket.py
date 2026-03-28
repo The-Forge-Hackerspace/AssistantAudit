@@ -14,6 +14,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["WebSocket"])
 
+# Taille max d'un message WS entrant (16 Ko — largement suffisant pour des commandes JSON)
+_MAX_WS_MESSAGE_SIZE = 16 * 1024
+
+
+async def _receive_json_safe(websocket: WebSocket) -> dict | None:
+    """Recoit un message JSON avec validation de taille."""
+    raw = await websocket.receive_text()
+    if len(raw) > _MAX_WS_MESSAGE_SIZE:
+        logger.warning(f"WS message too large ({len(raw)} bytes), ignoring")
+        return None
+    import json
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
 
 @router.websocket("/ws/user")
 async def ws_user(websocket: WebSocket, token: str = ""):
@@ -31,7 +47,9 @@ async def ws_user(websocket: WebSocket, token: str = ""):
 
     try:
         while True:
-            data = await websocket.receive_json()
+            data = await _receive_json_safe(websocket)
+            if data is None:
+                continue
             # Commandes du frontend (cancel_scan, etc.)
             cmd = data.get("command")
             if cmd == "ping":
@@ -58,27 +76,30 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
     if agent_uuid is None:
         return
 
+    # owner_id de confiance : extrait du JWT a la connexion, pas du message client
+    trusted_owner_id = ws_manager.get_agent_owner(agent_uuid)
+
     try:
         while True:
-            data = await websocket.receive_json()
+            data = await _receive_json_safe(websocket)
+            if data is None:
+                continue
             msg_type = data.get("type")
 
             if msg_type == "heartbeat":
                 await websocket.send_json({"type": "heartbeat_ack", "data": {}})
 
             elif msg_type in ("task_status", "task_progress"):
-                # Forward vers le user proprietaire de l'agent
-                owner_id = data.get("owner_id")
-                if owner_id is not None:
+                # Forward vers le owner de confiance (JWT), ignore owner_id client
+                if trusted_owner_id is not None:
                     await ws_manager.send_to_user(
-                        int(owner_id), msg_type, data.get("data", {})
+                        trusted_owner_id, msg_type, data.get("data", {})
                     )
 
             elif msg_type == "task_result":
-                owner_id = data.get("owner_id")
-                if owner_id is not None:
+                if trusted_owner_id is not None:
                     await ws_manager.send_to_user(
-                        int(owner_id), "task_result", data.get("data", {})
+                        trusted_owner_id, "task_result", data.get("data", {})
                     )
 
     except WebSocketDisconnect:

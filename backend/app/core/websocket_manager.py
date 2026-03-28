@@ -25,6 +25,7 @@ class ConnectionManager:
     def __init__(self) -> None:
         self.user_connections: dict[int, WebSocket] = {}
         self.agent_connections: dict[str, WebSocket] = {}
+        self.agent_owners: dict[str, int] = {}  # agent_uuid -> owner_id (from JWT, trusted)
         self.user_event_buffer: dict[int, list[tuple[datetime, dict]]] = {}
 
     # ── User connections ──────────────────────────────────────────────
@@ -91,14 +92,22 @@ class ConnectionManager:
             return None
 
         agent_uuid = payload["sub"]
+        owner_id = payload.get("owner_id")
         await websocket.accept()
         self.agent_connections[agent_uuid] = websocket
-        logger.info(f"WebSocket agent connected: uuid={agent_uuid}")
+        if owner_id is not None:
+            self.agent_owners[agent_uuid] = int(owner_id)
+        logger.info(f"WebSocket agent connected: uuid={agent_uuid}, owner={owner_id}")
         return agent_uuid
 
     def disconnect_agent(self, agent_uuid: str) -> None:
         self.agent_connections.pop(agent_uuid, None)
+        self.agent_owners.pop(agent_uuid, None)
         logger.info(f"WebSocket agent disconnected: uuid={agent_uuid}")
+
+    def get_agent_owner(self, agent_uuid: str) -> int | None:
+        """Retourne l'owner_id de confiance (JWT) pour un agent connecte."""
+        return self.agent_owners.get(agent_uuid)
 
     async def send_to_agent(self, agent_uuid: str, event_type: str, data: dict) -> None:
         """Envoie un evenement a un agent. Pas de buffer (l'agent gere sa reconnexion)."""
