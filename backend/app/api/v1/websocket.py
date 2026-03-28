@@ -175,7 +175,49 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                     )
 
     except WebSocketDisconnect:
-        ws_manager.disconnect_agent(agent_uuid)
+        await _handle_agent_disconnect(agent_uuid, trusted_owner_id)
     except Exception:
         logger.exception(f"WebSocket agent error: uuid={agent_uuid}")
-        ws_manager.disconnect_agent(agent_uuid)
+        await _handle_agent_disconnect(agent_uuid, trusted_owner_id)
+
+
+async def _handle_agent_disconnect(agent_uuid: str, owner_id: int | None) -> None:
+    """Nettoie a la deconnexion : marque les taches running comme failed."""
+    from datetime import datetime, timezone
+    from ...core.database import SessionLocal
+    from ...models.agent import Agent
+    from ...models.agent_task import AgentTask
+
+    ws_manager.disconnect_agent(agent_uuid)
+
+    try:
+        db = SessionLocal()
+        agent = db.query(Agent).filter(Agent.agent_uuid == agent_uuid).first()
+        if not agent:
+            return
+
+        orphans = db.query(AgentTask).filter(
+            AgentTask.agent_id == agent.id,
+            AgentTask.status.in_(["running", "dispatched", "pending"]),
+        ).all()
+
+        now = datetime.now(timezone.utc)
+        for task in orphans:
+            task.status = "failed"
+            task.error_message = "Agent deconnecte pendant l'execution"
+            task.completed_at = now
+            logger.warning("Orphan task marked failed: %s (agent %s)", task.task_uuid, agent_uuid)
+
+            # Notifier le frontend
+            if owner_id is not None:
+                await ws_manager.send_to_user(owner_id, "task_status", {
+                    "task_uuid": task.task_uuid,
+                    "status": "failed",
+                    "error_message": "Agent deconnecte pendant l'execution",
+                })
+
+        db.commit()
+    except Exception:
+        logger.exception("Failed to handle orphan tasks for agent %s", agent_uuid)
+    finally:
+        db.close()
