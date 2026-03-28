@@ -88,7 +88,9 @@ const WS_BASE =
 // ── Helpers ──
 function formatRelativeTime(dateStr: string | null): string {
   if (!dateStr) return "Jamais";
-  const date = new Date(dateStr);
+  // Le serveur stocke en UTC mais SQLite peut retourner sans suffix Z
+  const normalized = dateStr.endsWith("Z") || dateStr.includes("+") ? dateStr : dateStr + "Z";
+  const date = new Date(normalized);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);
@@ -105,7 +107,8 @@ function formatRelativeTime(dateStr: string | null): string {
 
 function daysUntilPurge(revokedAt: string | null): number {
   if (!revokedAt) return PURGE_DAYS;
-  const revoked = new Date(revokedAt);
+  const norm = revokedAt.endsWith("Z") || revokedAt.includes("+") ? revokedAt : revokedAt + "Z";
+  const revoked = new Date(norm);
   const purgeDate = new Date(revoked.getTime() + PURGE_DAYS * 24 * 60 * 60 * 1000);
   const now = new Date();
   return Math.max(0, Math.ceil((purgeDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));

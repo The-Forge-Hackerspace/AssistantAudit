@@ -1,10 +1,10 @@
 """
 Schemas Agent : gestion des agents et taches.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 
 # ── Requetes ──────────────────────────────────────────────────────────
@@ -81,6 +81,16 @@ class AgentResponse(BaseModel):
     revoked_at: Optional[datetime] = None
     created_at: datetime
 
+    @field_serializer("last_seen", "revoked_at", "created_at")
+    @classmethod
+    def serialize_utc(cls, v: datetime | None) -> str | None:
+        """Force le suffixe Z sur les datetimes — SQLite retourne des naive datetimes."""
+        if v is None:
+            return None
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat()
+
 
 class TaskResponse(BaseModel):
     model_config = {"from_attributes": True}
@@ -101,6 +111,15 @@ class TaskResponse(BaseModel):
     dispatched_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+
+    @field_serializer("created_at", "dispatched_at", "started_at", "completed_at")
+    @classmethod
+    def serialize_utc(cls, v: datetime | None) -> str | None:
+        if v is None:
+            return None
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat()
 
 
 # ── Artifacts ──────────────────────────────────────────────────────────
