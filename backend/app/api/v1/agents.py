@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from ...core.config import get_settings
 from ...core.database import get_db
 from ...core.deps import get_current_agent, get_current_auditeur
+from ...core.rate_limit import enroll_rate_limiter
 from ...core.security import (
     create_agent_token,
     create_enrollment_token,
@@ -145,7 +146,11 @@ def enroll_agent(
     """
     Enrolle un agent avec un code d'enrollment.
     PAS d'auth JWT — l'agent n'en a pas encore.
+    Rate-limited pour eviter le brute-force sur les codes.
     """
+    enroll_rate_limiter.check(request)
+    enroll_rate_limiter.record_attempt(request)
+
     # Chercher un agent pending avec un token non utilise
     pending_agents = db.query(Agent).filter(
         Agent.status == "pending",
