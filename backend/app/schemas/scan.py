@@ -3,7 +3,7 @@ Schémas Pydantic pour les scans réseau (Nmap) et les outils intégrés.
 """
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 from ..models.equipement import EQUIPEMENT_TYPE_VALUES
@@ -24,9 +24,11 @@ class ScanCreate(BaseModel):
         pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._:/\-]{0,254}$",
         examples=["192.168.1.0/24", "10.0.0.1", "server.local"],
     )
-    scan_type: str = Field("discovery", description="discovery | port_scan | full | custom")
-    custom_args: Optional[str] = Field(None, description="Arguments Nmap personnalisés (mode custom)")
-    notes: Optional[str] = None
+    scan_type: Literal["discovery", "port_scan", "full", "custom"] = Field(
+        "discovery", description="Type de scan Nmap"
+    )
+    custom_args: Optional[str] = Field(None, max_length=2000, description="Arguments Nmap personnalises (mode custom)")
+    notes: Optional[str] = Field(None, max_length=2000)
 
 
 class ScanPortRead(BaseModel):
@@ -271,16 +273,18 @@ class PrefillResult(BaseModel):
 class CollectCreate(BaseModel):
     """Paramètres pour lancer une collecte SSH ou WinRM."""
     equipement_id: int
-    method: str = Field(..., description="ssh ou winrm")
-    target_host: str = Field(..., description="IP ou hostname du serveur")
-    target_port: int = Field(22, description="Port SSH (22) ou WinRM (5985/5986)")
-    username: str = Field(..., description="Utilisateur de connexion")
-    password: Optional[str] = Field(None, description="Mot de passe")
-    private_key: Optional[str] = Field(None, description="Clé privée SSH (PEM)")
-    passphrase: Optional[str] = Field(None, description="Passphrase de la clé privée")
+    method: Literal["ssh", "winrm"] = Field(..., description="Methode de collecte")
+    target_host: str = Field(..., max_length=255, description="IP ou hostname du serveur")
+    target_port: int = Field(22, ge=1, le=65535, description="Port SSH (22) ou WinRM (5985/5986)")
+    username: str = Field(..., max_length=255, description="Utilisateur de connexion")
+    password: Optional[str] = Field(None, max_length=1000, description="Mot de passe")
+    private_key: Optional[str] = Field(None, description="Cle privee SSH (PEM)")
+    passphrase: Optional[str] = Field(None, max_length=500, description="Passphrase de la cle privee")
     use_ssl: bool = Field(False, description="WinRM: utiliser HTTPS (port 5986)")
-    transport: str = Field("ntlm", description="WinRM: méthode d'auth (ntlm, kerberos, basic)")
-    device_profile: str = Field("linux_server", description="Profil collecte SSH: linux_server, opnsense, stormshield, fortigate")
+    transport: Literal["ntlm", "kerberos", "basic"] = Field("ntlm", description="WinRM: methode d'auth")
+    device_profile: Literal["linux_server", "opnsense", "stormshield", "fortigate"] = Field(
+        "linux_server", description="Profil collecte SSH"
+    )
 
 
 class CollectResultSummary(BaseModel):
@@ -334,15 +338,15 @@ class CollectResultRead(BaseModel):
 # ─── Audit Active Directory (LDAP) ────────────────────────────
 
 class ADAuditCreate(BaseModel):
-    """Paramètres pour lancer un audit AD."""
-    equipement_id: Optional[int] = Field(None, description="Équipement (DC) associé")
-    target_host: str = Field(..., description="IP ou hostname du contrôleur de domaine")
-    target_port: int = Field(389, description="Port LDAP (389) ou LDAPS (636)")
+    """Parametres pour lancer un audit AD."""
+    equipement_id: Optional[int] = Field(None, description="Equipement (DC) associe")
+    target_host: str = Field(..., max_length=255, description="IP ou hostname du controleur de domaine")
+    target_port: int = Field(389, ge=1, le=65535, description="Port LDAP (389) ou LDAPS (636)")
     use_ssl: bool = Field(False, description="Utiliser LDAPS (SSL)")
-    username: str = Field(..., description="Utilisateur pour la connexion LDAP")
-    password: str = Field(..., description="Mot de passe")
-    domain: str = Field(..., description="Nom du domaine AD (ex: corp.local)")
-    auth_method: str = Field("ntlm", description="Méthode d'auth : ntlm ou simple")
+    username: str = Field(..., max_length=255, description="Utilisateur pour la connexion LDAP")
+    password: str = Field(..., max_length=1000, description="Mot de passe")
+    domain: str = Field(..., max_length=255, description="Nom du domaine AD (ex: corp.local)")
+    auth_method: Literal["ntlm", "simple"] = Field("ntlm", description="Methode d'auth LDAP")
 
 
 class ADAuditFindingRead(BaseModel):
