@@ -152,11 +152,13 @@ def enroll_agent(
     enroll_rate_limiter.record_attempt(request)
 
     # Chercher un agent pending avec un token non utilise
+    # with_for_update() verrouille les lignes pour eviter la race condition
+    # ou deux requetes concurrentes enrollent le meme agent
     pending_agents = db.query(Agent).filter(
         Agent.status == "pending",
         Agent.enrollment_used == False,  # noqa: E712
         Agent.enrollment_token_hash.isnot(None),
-    ).all()
+    ).with_for_update().all()
 
     matched_agent = None
     for agent in pending_agents:

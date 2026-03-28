@@ -128,7 +128,15 @@ class Monkey365StreamingExecutor:
         # Attendre la fin du process
         assert self.process.stderr is not None
         stderr_data = await self.process.stderr.read()
-        await self.process.wait()
+        try:
+            await asyncio.wait_for(self.process.wait(), timeout=3600)
+        except asyncio.TimeoutError:
+            self.process.terminate()
+            await self.ws_callback("scan_error", {
+                "scan_id": self.scan_id,
+                "error": "Timeout (1h) depasse — scan arrete",
+            })
+            return {"status": "timeout", "scan_id": self.scan_id, "error": "Timeout 1h exceeded"}
 
         if self.process.returncode != 0:
             error = stderr_data.decode("utf-8", errors="replace")[:500]
