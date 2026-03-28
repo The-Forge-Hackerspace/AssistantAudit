@@ -91,9 +91,13 @@ def create_app() -> FastAPI:
 
     # ── Security Headers Middleware ────────────────────────────────────────
     class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-        """Ajoute les en-têtes de sécurité HTTP à chaque réponse."""
+        """Ajoute les en-tetes de securite HTTP a chaque reponse.
+        Skip les WebSocket (BaseHTTPMiddleware ne supporte pas le protocole WS)."""
 
         async def dispatch(self, request: Request, call_next):
+            # BaseHTTPMiddleware casse les WebSocket — les laisser passer directement
+            if request.scope.get("type") == "websocket":
+                return await call_next(request)
             response: Response = await call_next(request)
             response.headers["X-Content-Type-Options"] = "nosniff"
             response.headers["X-Frame-Options"] = "DENY"
