@@ -13,7 +13,6 @@ from .assessments import router as assessments_router
 from .attachments import router as attachments_router
 from .scans import router as scans_router
 from .tools import router as tools_router
-from .pingcastle_terminal import router as pingcastle_ws_router
 from .health import router as health_router
 from .network_map import router as network_map_router
 from .websocket import router as websocket_router
@@ -36,7 +35,6 @@ api_router.include_router(attachments_router, prefix="/attachments", tags=["Piè
 api_router.include_router(scans_router, prefix="/scans", tags=["Scanner réseau"])
 api_router.include_router(network_map_router, prefix="/network-map", tags=["Cartographie réseau"])
 api_router.include_router(tools_router)
-api_router.include_router(pingcastle_ws_router)
 api_router.include_router(websocket_router)
 api_router.include_router(agents_router)
 api_router.include_router(oradad_router)

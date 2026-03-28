@@ -7,7 +7,7 @@
     Gère automatiquement :
     - Vérification des prérequis (Python, Node.js, PowerShell 7+, Git)
     - Configuration de l'environnement (.env)
-    - Téléchargement/mise à jour des outils (PingCastle, Monkey365)
+    - Téléchargement/mise à jour des outils (Monkey365)
     - Initialisation de la base de données
     - Démarrage des services backend et frontend
     - Rotation des logs
@@ -271,111 +271,6 @@ function Setup-GitTool {
     }
     
     return $true
-}
-
-function Update-PingCastle {
-    <#
-    .SYNOPSIS
-        Met à jour PingCastle via PingCastleAutoUpdater.exe
-    #>
-    param(
-        [string]$TargetDir,
-        [string]$EnvVarName = "PINGCASTLE_PATH",
-        [string]$ExecutableName = "PingCastle.exe"
-    )
-    
-    $autoUpdaterPath = Join-Path $TargetDir "PingCastleAutoUpdater.exe"
-    $pingCastlePath = Join-Path $TargetDir $ExecutableName
-    
-    # Vérifier si PingCastle est déjà installé
-    if (-not (Test-Path $TargetDir)) {
-        Write-Warn "Dossier PingCastle non trouvé: $TargetDir"
-        Write-Warn "Veuillez télécharger PingCastle depuis: https://github.com/netwrix/pingcastle/releases/latest"
-        Write-Warn "Puis extraire dans: $TargetDir"
-        return $false
-    }
-    
-    if (-not (Test-Path $pingCastlePath)) {
-        Write-Warn "PingCastle.exe non trouvé dans: $TargetDir"
-        Write-Warn "Veuillez télécharger PingCastle depuis: https://github.com/netwrix/pingcastle/releases/latest"
-        return $false
-    }
-    
-    # Si AutoUpdater disponible, l'utiliser pour la mise à jour
-    if (Test-Path $autoUpdaterPath) {
-        Write-Log "Vérification des mises à jour PingCastle via AutoUpdater..."
-        
-        try {
-            $args = @()
-            if ($DevMode) {
-                # En mode dev, utiliser --dry-run pour prévisualiser
-                $args += "--dry-run"
-                Write-Verbose-Custom "Exécution: PingCastleAutoUpdater.exe --dry-run"
-            }
-            
-            Push-Location $TargetDir
-            $argumentList = $args -join ' '
-            $stdoutFile = Join-Path -Path $TargetDir -ChildPath "PingCastleAutoUpdater_stdout.log"
-            $stderrFile = Join-Path -Path $TargetDir -ChildPath "PingCastleAutoUpdater_stderr.log"
-            try {
-                $process = Start-Process -FilePath ".\PingCastleAutoUpdater.exe" `
-                                          -ArgumentList $argumentList `
-                                          -NoNewWindow `
-                                          -Wait `
-                                          -PassThru `
-                                          -RedirectStandardOutput $stdoutFile `
-                                          -RedirectStandardError $stderrFile
-                $updateOutput = ""
-                if (Test-Path $stdoutFile) {
-                    $updateOutput += Get-Content -Path $stdoutFile -Raw
-                    Remove-Item $stdoutFile -ErrorAction SilentlyContinue
-                }
-                if (Test-Path $stderrFile) {
-                    if ($updateOutput) { $updateOutput += [Environment]::NewLine }
-                    $updateOutput += Get-Content -Path $stderrFile -Raw
-                    Remove-Item $stderrFile -ErrorAction SilentlyContinue
-                }
-                $LASTEXITCODE = $process.ExitCode
-            } finally {
-                Pop-Location
-            }
-            
-            if ($LASTEXITCODE -eq 0) {
-                if ($DevMode -and $updateOutput -match "dry-run") {
-                    Write-Ok "PingCastle AutoUpdater (mode aperçu) - OK"
-                } else {
-                    Write-Ok "PingCastle mis à jour avec succès"
-                }
-                if ($DevMode -and $updateOutput) {
-                    Write-Verbose-Custom "Output: $updateOutput"
-                }
-            } else {
-                Write-Verbose-Custom "AutoUpdater exit code: $LASTEXITCODE"
-                if ($updateOutput -match "already.*up.*to.*date|déjà.*jour") {
-                    Write-Ok "PingCastle déjà à jour"
-                } else {
-                    Write-Warn "Erreur lors de la mise à jour PingCastle"
-                    if ($DevMode -and $updateOutput) {
-                        Write-Host $updateOutput -ForegroundColor Yellow
-                    }
-                }
-            }
-        } catch {
-            Write-Warn "Erreur lors de l'exécution de PingCastleAutoUpdater: $_"
-        }
-    } else {
-        Write-Verbose-Custom "PingCastleAutoUpdater.exe non trouvé - pas de mise à jour automatique"
-        Write-Ok "PingCastle trouvé (mise à jour manuelle requise)"
-    }
-    
-    # Vérifier et mettre à jour .env
-    if (Test-Path $pingCastlePath) {
-        Write-Verbose-Custom "PingCastle.exe trouvé: $pingCastlePath"
-        Update-EnvVariable -Name $EnvVarName -Value $pingCastlePath
-        return $true
-    }
-    
-    return $false
 }
 
 function Update-ToolFromGitHub {
@@ -841,7 +736,6 @@ SECRET_KEY=$secretKey
 DATABASE_URL=sqlite:///instance/assistantaudit.db
 LOG_LEVEL=INFO
 NMAP_TIMEOUT=600
-PINGCASTLE_TIMEOUT=300
 "@ | Set-Content -Path $envFile
         Write-Ok ".env minimal créé"
     }
@@ -876,22 +770,6 @@ if (-not (Test-Path $ToolsDir)) {
 # ═══════════════════════════════════════════════════════════
 
 Write-Log "Vérification des outils externes..."
-
-# ── PingCastle Setup ──
-# Utilise PingCastleAutoUpdater.exe pour les mises à jour automatiques
-$pingCastleDir = Join-Path $ToolsDir "pingcastle"
-$pingCastleExe = "PingCastle.exe"
-
-# Afficher un message si ancien clone Git détecté
-if (Test-Path (Join-Path $pingCastleDir ".git")) {
-    Write-Warn "Ancien clone Git de PingCastle détecté dans $pingCastleDir"
-    Write-Warn "Plus besoin de Git - PingCastleAutoUpdater.exe gère les mises à jour"
-    Write-Warn "Vous pouvez supprimer le dossier .git pour libérer de l'espace"
-}
-
-Update-PingCastle -TargetDir $pingCastleDir `
-    -EnvVarName "PINGCASTLE_PATH" `
-    -ExecutableName $pingCastleExe | Out-Null
 
 # ── Monkey365 Setup ──
 # Télécharge depuis GitHub Releases (ZIP léger au lieu du clone Git)

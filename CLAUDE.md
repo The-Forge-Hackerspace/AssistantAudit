@@ -5,7 +5,7 @@
 
 ## OVERVIEW
 
-IT security auditing platform. FastAPI backend (Python 3.13), Next.js 16 frontend (React 19 + TypeScript), 12 YAML compliance frameworks auto-synced to SQLite, 7 integrated audit tools (Nmap, SSL checker, SSH/WinRM collectors, AD auditor, ORADAD, Monkey365, config parsers).
+IT security auditing platform. FastAPI backend (Python 3.13), Next.js 16 frontend (React 19 + TypeScript), 12 YAML compliance frameworks auto-synced to SQLite, 6 integrated audit tools (Nmap, SSL checker, SSH/WinRM collectors, AD auditor, ORADAD, Monkey365, config parsers).
 
 - **Backend:** `http://localhost:8000` — Swagger UI at `/docs`, ReDoc at `/redoc`
 - **Frontend:** `http://localhost:3000`
@@ -98,7 +98,7 @@ These decisions are final. Do NOT deviate without explicit approval.
 
 3. **Three roles: admin, auditeur, lecteur** — Not two. `auditeur` = the one who owns agents and dispatches tasks. `lecteur` = read-only. Do NOT simplify to "technician".
 
-4. **ORADAD replaces PingCastle** — The AD audit tool is ORADAD (ANSSI), not PingCastle. ORADAD is a data collector (LDAP dump → .tar of TSV files), not an analyzer. Analysis is done server-side by the AI. Do NOT reference PingCastle in new code.
+4. **ORADAD is the AD tool** — The AD audit tool is ORADAD (ANSSI). ORADAD is a data collector (LDAP dump → .tar of TSV files), not an analyzer. Analysis is done server-side by the AI. PingCastle code was fully removed.
 
 5. **Envelope encryption for files** — Files on disk are encrypted with per-file DEK (AES-256-GCM), DEK encrypted with KEK. Never store files in plaintext in production. See `core/file_encryption.py`.
 
@@ -163,7 +163,6 @@ These decisions are final. Do NOT deviate without explicit approval.
 | `CA_KEY_PATH` | `certs/ca.key` | mTLS CA private key path |
 | `MONKEY365_PATH` | `""` | Absolute path to `Invoke-Monkey365.ps1` |
 | `MONKEY365_ARCHIVE_PATH` | `/data/enterprise/Cloud/M365` | Archive base for scan results |
-| `PINGCASTLE_PATH` | `""` | **DEPRECATED** — use ORADAD instead |
 | `LOG_LEVEL` | `INFO` | `DEBUG` in dev |
 | `CORS_ORIGINS` | `localhost:3000,5173` | Comma-separated allowed origins |
 
@@ -193,7 +192,7 @@ These decisions are final. Do NOT deviate without explicit approval.
 - **NEVER return 403 for ownership checks** — return 404 to avoid revealing existence of resources
 - **NEVER skip the double verification on task dispatch** — check audit ownership AND agent ownership AND allowed_tools
 - **NEVER put agent code in this repo** — agent daemon lives in `AssistantAudit-Agent`
-- **NEVER reference PingCastle in new code** — the AD tool is ORADAD (ANSSI)
+- **NEVER add PingCastle code** — it was fully removed; the AD tool is ORADAD (ANSSI)
 - **NEVER deploy with empty `ENCRYPTION_KEY` or `FILE_ENCRYPTION_KEY`** — passthrough mode is dev-only
 
 ## KNOWN TECHNICAL DEBT

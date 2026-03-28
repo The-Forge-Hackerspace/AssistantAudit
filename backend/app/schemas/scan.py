@@ -416,66 +416,6 @@ class ADAuditResultRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ─── PingCastle ────────────────────────────────────────────────
-
-class PingCastleCreate(BaseModel):
-    """Paramètres pour lancer un audit PingCastle."""
-    equipement_id: Optional[int] = Field(None, description="Équipement (DC) associé")
-    target_host: str = Field(..., description="IP ou hostname du contrôleur de domaine")
-    domain: str = Field(..., description="Nom du domaine AD (ex: corp.local)")
-    username: str = Field(..., description="Utilisateur pour l'authentification (DOMAIN\\user)")
-    password: str = Field(..., description="Mot de passe")
-
-
-class PingCastleResultSummary(BaseModel):
-    """Résumé d'un audit PingCastle pour la liste."""
-    id: int
-    equipement_id: Optional[int] = None
-    status: str
-    target_host: str
-    domain: str
-    global_score: Optional[int] = None
-    maturity_level: Optional[int] = None
-    stale_objects_score: Optional[int] = None
-    privileged_accounts_score: Optional[int] = None
-    trust_score: Optional[int] = None
-    anomaly_score: Optional[int] = None
-    summary: Optional[dict] = None
-    error_message: Optional[str] = None
-    created_at: datetime
-    completed_at: Optional[datetime] = None
-    duration_seconds: Optional[int] = None
-
-    model_config = {"from_attributes": True}
-
-
-class PingCastleResultRead(BaseModel):
-    """Détail complet d'un audit PingCastle."""
-    id: int
-    equipement_id: Optional[int] = None
-    status: str
-    target_host: str
-    domain: str
-    username: str
-    global_score: Optional[int] = None
-    stale_objects_score: Optional[int] = None
-    privileged_accounts_score: Optional[int] = None
-    trust_score: Optional[int] = None
-    anomaly_score: Optional[int] = None
-    maturity_level: Optional[int] = None
-    risk_rules: Optional[list] = None
-    domain_info: Optional[dict] = None
-    findings: Optional[list] = None
-    summary: Optional[dict] = None
-    report_html_path: Optional[str] = None
-    error_message: Optional[str] = None
-    created_at: datetime
-    completed_at: Optional[datetime] = None
-    duration_seconds: Optional[int] = None
-
-    model_config = {"from_attributes": True}
-
-
 # ─── Monkey365 Audit ─────────────────────────────────────────
 
 class Monkey365ExportFormat(str, Enum):

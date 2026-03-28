@@ -47,12 +47,10 @@ data/
 monkey365_output/
 integrations/monkey365/
 
-# PingCastle
-tools/pingcastle/
-
-# Node (future frontend)
+# Node (frontend)
 node_modules/
 .next/
+frontend/tmp/
 
 # OS
 .DS_Store

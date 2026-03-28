@@ -92,9 +92,6 @@ class Equipement(Base):
     ad_audit_results: Mapped[list["ADAuditResultModel"]] = relationship(  # type: ignore[name-defined]
         back_populates="equipement", cascade="all, delete-orphan", lazy="selectin"
     )
-    pingcastle_results: Mapped[list["PingCastleResult"]] = relationship(  # type: ignore[name-defined]
-        back_populates="equipement", cascade="all, delete-orphan", lazy="selectin"
-    )
     source_links: Mapped[list["NetworkLink"]] = relationship(  # type: ignore[name-defined]
         back_populates="source_equipement",
         foreign_keys="NetworkLink.source_equipement_id",
