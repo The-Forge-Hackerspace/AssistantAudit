@@ -104,6 +104,8 @@ These decisions are final. Do NOT deviate without explicit approval.
 
 6. **Agent = separate repo** — The Windows agent daemon will live in `AssistantAudit-Agent`, not in this repo. This repo contains only the server and frontend.
 
+7. **RBAC par ressource prévu** — Système de permissions owner/write/read par audit et entreprise (table `ResourcePermission` : user_id, resource_type, resource_id, permission level). Non implémenté encore — chantier dédié après la création de l'agent. Actuellement 30+ endpoints n'ont pas d'isolation par owner_id. Pattern de référence dans `agents.py` et `oradad.py`.
+
 ## WHERE TO LOOK
 
 | Task | Location | Notes |
