@@ -76,7 +76,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { scansApi, sitesApi, agentsApi } from "@/services/api";
-import type { Agent, Scan, ScanSummary, ScanHost, Site, TypeEquipement } from "@/types";
+import type { Agent, AgentTask, TaskArtifact, Scan, ScanSummary, ScanHost, Site, TypeEquipement } from "@/types";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/skeletons";
 
@@ -169,6 +169,13 @@ function ScannerContent() {
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
   const agentLogsRef = useRef<HTMLDivElement>(null);
 
+  // Agent tasks (nmap via agents)
+  const [viewTab, setViewTab] = useState<"local" | "agent">("local");
+  const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
+  const [selectedTaskArtifacts, setSelectedTaskArtifacts] = useState<TaskArtifact[]>([]);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<AgentTask | null>(null);
+
   // ── Computed nmap command preview ──
   const commandPreview = useMemo(() => {
     const t = target || "<cible>";
@@ -216,6 +223,15 @@ function ScannerContent() {
     }
   }, []);
 
+  const fetchAgentTasks = useCallback(async () => {
+    try {
+      const tasks = await agentsApi.listTasks("nmap");
+      setAgentTasks(tasks);
+    } catch {
+      /* silent */
+    }
+  }, []);
+
   const nmapAgents = useMemo(
     () => agents.filter((a) => a.status === "active" && a.allowed_tools.includes("nmap")),
     [agents]
@@ -225,7 +241,8 @@ function ScannerContent() {
     fetchScans();
     fetchSites();
     fetchAgents();
-  }, [fetchScans, fetchSites, fetchAgents]);
+    fetchAgentTasks();
+  }, [fetchScans, fetchSites, fetchAgents, fetchAgentTasks]);
 
   // ── WebSocket: listen for agent task progress ──
   useEffect(() => {
@@ -450,6 +467,20 @@ function ScannerContent() {
   const getSiteName = (id: number) =>
     sites.find((s) => s.id === id)?.nom || `Site #${id}`;
 
+  const getAgentName = (agentId: number) =>
+    agents.find((a) => a.id === agentId)?.name || `Agent #${agentId}`;
+
+  const handleViewTask = async (task: AgentTask) => {
+    setSelectedTask(task);
+    setShowTaskDetail(true);
+    try {
+      const artifacts = await agentsApi.getTaskArtifacts(task.task_uuid);
+      setSelectedTaskArtifacts(artifacts);
+    } catch {
+      setSelectedTaskArtifacts([]);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -472,21 +503,124 @@ function ScannerContent() {
       {/* Scan list */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Historique des scans
-            {hasRunningScans && (
-              <Badge className="gap-1 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400 text-xs">
-                <Loader2 className="size-3 animate-spin" />
-                {scans.filter((s) => s.statut === "running").length} en cours
-              </Badge>
-            )}
-          </CardTitle>
-          <CardDescription>
-            {scans.length} scan(s) enregistré(s)
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Historique des scans
+                {hasRunningScans && (
+                  <Badge className="gap-1 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400 text-xs">
+                    <Loader2 className="size-3 animate-spin" />
+                    {scans.filter((s) => s.statut === "running").length} en cours
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                {viewTab === "local"
+                  ? `${scans.length} scan(s) local(aux)`
+                  : `${agentTasks.length} scan(s) agent`}
+              </CardDescription>
+            </div>
+            <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as "local" | "agent")}>
+              <TabsList>
+                <TabsTrigger value="local" className="gap-1.5">
+                  <Server className="size-3" />
+                  Local ({scans.length})
+                </TabsTrigger>
+                <TabsTrigger value="agent" className="gap-1.5">
+                  <Monitor className="size-3" />
+                  Agent ({agentTasks.length})
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {viewTab === "agent" ? (
+            /* ── Agent tasks table ── */
+            agentTasks.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Monitor className="size-12 mx-auto mb-4 opacity-40" />
+                <p>Aucun scan agent</p>
+                <p className="text-sm">Lancez un scan en mode &quot;Agent distant&quot;</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Cible</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Agent</TableHead>
+                    <TableHead>Progression</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {agentTasks.map((task) => {
+                    const params = task.parameters as Record<string, string>;
+                    return (
+                      <TableRow key={task.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {new Date(
+                            task.created_at.endsWith("Z") || task.created_at.includes("+")
+                              ? task.created_at
+                              : task.created_at + "Z"
+                          ).toLocaleDateString("fr-FR", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <ScanStatusBadge
+                            statut={task.status === "completed" ? "completed" : task.status === "failed" ? "failed" : "running"}
+                            errorMessage={task.error_message}
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {params?.target || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {SCAN_TYPE_LABELS[params?.scan_type || "discovery"] || params?.scan_type || "—"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{getAgentName(task.agent_id)}</TableCell>
+                        <TableCell>
+                          {task.status === "running" ? (
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 w-16 bg-blue-100 dark:bg-blue-900/30 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-blue-500 rounded-full transition-all"
+                                  style={{ width: `${task.progress}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground">{task.progress}%</span>
+                            </div>
+                          ) : task.status === "completed" ? (
+                            <span className="text-xs text-green-600">100%</span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleViewTask(task)}
+                            disabled={task.status === "pending"}
+                          >
+                            <Eye />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )
+          ) : loading ? (
             <TableSkeleton rows={3} cols={7} />
           ) : scans.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -849,6 +983,83 @@ function ScannerContent() {
           </CardContent>
         </Card>
       )}
+
+      {/* Agent task detail dialog */}
+      <Dialog open={showTaskDetail} onOpenChange={setShowTaskDetail}>
+        <DialogContent className="sm:max-w-lg">
+          {selectedTask && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Monitor className="size-5" />
+                  Scan agent — {(selectedTask.parameters as Record<string, string>)?.target || "—"}
+                </DialogTitle>
+                <DialogDescription>
+                  Agent : {getAgentName(selectedTask.agent_id)} — Statut : {selectedTask.status}
+                  {selectedTask.error_message && (
+                    <span className="text-destructive block mt-1">{selectedTask.error_message}</span>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Result summary */}
+              {selectedTask.result_summary && (
+                <div className="rounded-lg bg-zinc-950 p-3 max-h-[200px] overflow-y-auto">
+                  <div className="text-zinc-400 text-xs mb-1">Résumé</div>
+                  <pre className="text-zinc-300 text-xs font-mono whitespace-pre-wrap">
+                    {JSON.stringify(selectedTask.result_summary, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {/* Artifacts */}
+              {selectedTaskArtifacts.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">
+                    Fichiers résultat ({selectedTaskArtifacts.length})
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    {selectedTaskArtifacts.map((artifact) => (
+                      <div
+                        key={artifact.id}
+                        className="flex items-center justify-between p-2 rounded border bg-muted/50"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Download className="size-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm font-mono truncate">
+                            {artifact.original_filename}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            ({Math.round(artifact.file_size / 1024)} Ko)
+                          </span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            window.open(
+                              `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}${artifact.download_url}`,
+                              "_blank"
+                            );
+                          }}
+                        >
+                          <Download className="size-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedTaskArtifacts.length === 0 && selectedTask.status === "completed" && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Aucun fichier résultat uploadé par l&apos;agent
+                </p>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Detail dialog */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>

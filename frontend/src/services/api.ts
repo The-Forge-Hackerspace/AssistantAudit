@@ -57,6 +57,8 @@ import type {
   VlanDefinitionCreate,
   VlanDefinitionUpdate,
   Agent,
+  AgentTask,
+  TaskArtifact,
   AgentCreateRequest,
   AgentCreateResponse,
   OradadTask,
@@ -642,6 +644,17 @@ export const agentsApi = {
     audit_id?: number;
   }): Promise<Record<string, unknown>> {
     const { data } = await api.post("/agents/tasks/dispatch", payload);
+    return data;
+  },
+
+  async listTasks(tool?: string): Promise<AgentTask[]> {
+    const params = tool ? { tool } : {};
+    const { data } = await api.get<AgentTask[]>("/agents/tasks", { params });
+    return data;
+  },
+
+  async getTaskArtifacts(taskUuid: string): Promise<TaskArtifact[]> {
+    const { data } = await api.get<TaskArtifact[]>(`/agents/tasks/${taskUuid}/artifacts`);
     return data;
   },
 };

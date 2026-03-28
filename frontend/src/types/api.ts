@@ -955,6 +955,35 @@ export interface AgentCreateResponse {
 
 export type AgentTaskStatus = "pending" | "dispatched" | "running" | "completed" | "failed" | "cancelled";
 
+export interface AgentTask {
+  id: number;
+  task_uuid: string;
+  agent_id: number;
+  owner_id: number;
+  audit_id: number | null;
+  tool: string;
+  parameters: Record<string, unknown>;
+  status: AgentTaskStatus;
+  progress: number;
+  status_message: string | null;
+  result_summary: Record<string, unknown> | null;
+  error_message: string | null;
+  created_at: string;
+  dispatched_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface TaskArtifact {
+  id: number;
+  file_uuid: string;
+  original_filename: string;
+  mime_type: string;
+  file_size: number;
+  uploaded_at: string;
+  download_url: string;
+}
+
 // ── ORADAD ──
 export interface DomainEntry {
   server: string;

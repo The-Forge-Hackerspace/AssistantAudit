@@ -79,10 +79,11 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
     # owner_id de confiance : extrait du JWT a la connexion, pas du message client
     trusted_owner_id = ws_manager.get_agent_owner(agent_uuid)
 
-    # Pour les updates last_seen en base
+    # Pour les updates en base (heartbeat last_seen + task status)
     from datetime import datetime, timezone
     from ...core.database import SessionLocal
     from ...models.agent import Agent
+    from ...models.agent_task import AgentTask
 
     try:
         while True:
@@ -114,16 +115,63 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                     db.close()
 
             elif msg_type in ("task_status", "task_progress"):
-                # Forward vers le owner de confiance (JWT), ignore owner_id client
+                ws_data = data.get("data", {})
+                # Persister le changement de status en base
+                if msg_type == "task_status" and ws_data.get("task_uuid"):
+                    try:
+                        db = SessionLocal()
+                        task = db.query(AgentTask).filter(
+                            AgentTask.task_uuid == ws_data["task_uuid"],
+                        ).first()
+                        if task:
+                            new_status = ws_data.get("status")
+                            if new_status:
+                                task.status = new_status
+                            if new_status == "running" and task.started_at is None:
+                                task.started_at = datetime.now(timezone.utc)
+                            if new_status in ("completed", "failed", "cancelled"):
+                                task.completed_at = datetime.now(timezone.utc)
+                                if new_status == "completed":
+                                    task.progress = 100
+                            if ws_data.get("error_message"):
+                                task.error_message = ws_data["error_message"]
+                            db.commit()
+                    except Exception:
+                        logger.exception("Failed to persist task_status for %s", ws_data.get("task_uuid"))
+                    finally:
+                        db.close()
+                # Forward vers le owner
                 if trusted_owner_id is not None:
                     await ws_manager.send_to_user(
-                        trusted_owner_id, msg_type, data.get("data", {})
+                        trusted_owner_id, msg_type, ws_data
                     )
 
             elif msg_type == "task_result":
+                ws_data = data.get("data", {})
+                # Persister le result en base
+                if ws_data.get("task_uuid"):
+                    try:
+                        db = SessionLocal()
+                        task = db.query(AgentTask).filter(
+                            AgentTask.task_uuid == ws_data["task_uuid"],
+                        ).first()
+                        if task:
+                            task.status = "completed"
+                            task.progress = 100
+                            task.completed_at = datetime.now(timezone.utc)
+                            if ws_data.get("result_summary"):
+                                task.result_summary = ws_data["result_summary"]
+                            if ws_data.get("error_message"):
+                                task.error_message = ws_data["error_message"]
+                                task.status = "failed"
+                            db.commit()
+                    except Exception:
+                        logger.exception("Failed to persist task_result for %s", ws_data.get("task_uuid"))
+                    finally:
+                        db.close()
                 if trusted_owner_id is not None:
                     await ws_manager.send_to_user(
-                        trusted_owner_id, "task_result", data.get("data", {})
+                        trusted_owner_id, "task_result", ws_data
                     )
 
     except WebSocketDisconnect:

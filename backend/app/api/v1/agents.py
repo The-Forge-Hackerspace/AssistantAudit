@@ -255,6 +255,22 @@ def refresh_agent_token(
     return {"agent_token": new_token}
 
 
+@router.get("/tasks", response_model=list[TaskResponse])
+def list_tasks(
+    tool: str | None = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_auditeur),
+):
+    """Liste les taches agent du user courant (admin voit tout). Filtrable par tool."""
+    query = db.query(AgentTask)
+    if current_user.role != "admin":
+        query = query.filter(AgentTask.owner_id == current_user.id)
+    if tool:
+        query = query.filter(AgentTask.tool == tool)
+    tasks = query.order_by(AgentTask.created_at.desc()).limit(100).all()
+    return tasks
+
+
 # ── Routes taches ─────────────────────────────────────────────────────
 
 
