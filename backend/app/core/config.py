@@ -82,6 +82,16 @@ class Settings(BaseSettings):
                 "SECRET_KEY trop courte en production (min 32 caractères). "
                 "Générez-en une avec : python -c 'import secrets; print(secrets.token_urlsafe(64))'"
             )
+        if is_safe_env and not self.ENCRYPTION_KEY:
+            raise ValueError(
+                "ENCRYPTION_KEY doit etre defini en production (64 hex chars = 256 bits). "
+                "Generez avec : python -c 'import os; print(os.urandom(32).hex())'"
+            )
+        if is_safe_env and not self.FILE_ENCRYPTION_KEY:
+            raise ValueError(
+                "FILE_ENCRYPTION_KEY doit etre defini en production (64 hex chars = 256 bits). "
+                "Generez avec : python -c 'import os; print(os.urandom(32).hex())'"
+            )
 
     # --- CORS ---
     CORS_ALLOW_METHODS: list[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]

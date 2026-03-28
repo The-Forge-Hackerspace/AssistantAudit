@@ -2,6 +2,7 @@
 Securite : hashing de mots de passe, gestion JWT (user + agent), enrollment.
 """
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -135,4 +136,6 @@ def verify_enrollment_token(code: str, stored_hash: str, expiration: datetime) -
     exp = expiration if expiration.tzinfo else expiration.replace(tzinfo=timezone.utc)
     if now > exp:
         return False
-    return hashlib.sha256(code.encode()).hexdigest() == stored_hash
+    return hmac.compare_digest(
+        hashlib.sha256(code.encode()).hexdigest(), stored_hash
+    )
