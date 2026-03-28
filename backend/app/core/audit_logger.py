@@ -37,6 +37,10 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request and log audit information"""
+        # BaseHTTPMiddleware casse les WebSocket — les laisser passer
+        if request.scope.get("type") == "websocket":
+            return await call_next(request)
+
         # Generate request ID
         request_id = str(uuid.uuid4())
         LogContext.set_request_id(request_id)
