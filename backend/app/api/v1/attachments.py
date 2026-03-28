@@ -19,7 +19,8 @@ from ...core.config import get_settings
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_auditeur
 from ...models.user import User
-from ...models.assessment import ControlResult, Assessment
+from ...models.assessment import ControlResult, Assessment, AssessmentCampaign
+from ...models.audit import Audit
 from ...models.equipement import Equipement
 from ...models.site import Site
 from ...models.entreprise import Entreprise
@@ -28,6 +29,30 @@ from ...schemas.attachment import AttachmentRead
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _get_attachment_with_ownership(
+    db: Session, attachment_id: int, user: User
+) -> Attachment:
+    """
+    Recupere un Attachment avec verification d'ownership via la chaine :
+    Attachment -> ControlResult -> Assessment -> Campaign -> Audit -> owner_id.
+    Admins voient tout. Retourne 404 (pas 403) si non trouve.
+    """
+    query = db.query(Attachment).filter(Attachment.id == attachment_id)
+    if user.role != "admin":
+        query = (
+            query
+            .join(ControlResult, Attachment.control_result_id == ControlResult.id)
+            .join(Assessment, ControlResult.assessment_id == Assessment.id)
+            .join(AssessmentCampaign, Assessment.campaign_id == AssessmentCampaign.id)
+            .join(Audit, AssessmentCampaign.audit_id == Audit.id)
+            .filter(Audit.owner_id == user.id)
+        )
+    att = query.first()
+    if att is None:
+        raise HTTPException(status_code=404, detail="Piece jointe introuvable")
+    return att
 
 # Extensions autorisées
 ALLOWED_EXTENSIONS = {
@@ -236,20 +261,18 @@ async def list_attachments(
 async def download_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    """Télécharge un fichier joint."""
-    att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
-    if not att:
-        raise HTTPException(status_code=404, detail="Pièce jointe introuvable")
+    """Telecharge un fichier joint (avec verification d'ownership)."""
+    att = _get_attachment_with_ownership(db, attachment_id, current_user)
 
     settings = get_settings()
     base_data = Path(settings.FRAMEWORKS_DIR).parent / "data"
     file_path = (base_data / att.file_path).resolve()
 
-    # Protection contre le path traversal
+    # Protection contre le path traversal — 404 pour ne pas reveler l'existence
     if not file_path.is_relative_to(base_data.resolve()):
-        raise HTTPException(status_code=403, detail="Accès interdit")
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable sur le disque")
@@ -267,12 +290,10 @@ async def download_attachment(
 async def preview_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    """Prévisualise un fichier (image ou texte) inline dans le navigateur."""
-    att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
-    if not att:
-        raise HTTPException(status_code=404, detail="Pièce jointe introuvable")
+    """Previsualise un fichier (image ou texte) inline dans le navigateur."""
+    att = _get_attachment_with_ownership(db, attachment_id, current_user)
 
     if att.mime_type not in PREVIEWABLE_IMAGE_TYPES and att.mime_type not in PREVIEWABLE_TEXT_TYPES:
         raise HTTPException(
@@ -284,9 +305,9 @@ async def preview_attachment(
     base_data = Path(settings.FRAMEWORKS_DIR).parent / "data"
     file_path = (base_data / att.file_path).resolve()
 
-    # Protection contre le path traversal
+    # Protection contre le path traversal — 404 pour ne pas reveler l'existence
     if not file_path.is_relative_to(base_data.resolve()):
-        raise HTTPException(status_code=403, detail="Accès interdit")
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable sur le disque")
@@ -307,19 +328,17 @@ async def delete_attachment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),
 ):
-    """Supprime une pièce jointe (fichier + entrée BDD)."""
-    att = db.query(Attachment).filter(Attachment.id == attachment_id).first()
-    if not att:
-        raise HTTPException(status_code=404, detail="Pièce jointe introuvable")
+    """Supprime une piece jointe (fichier + entree BDD) avec verification d'ownership."""
+    att = _get_attachment_with_ownership(db, attachment_id, current_user)
 
     # Supprimer le fichier physique
     settings = get_settings()
     base_data = Path(settings.FRAMEWORKS_DIR).parent / "data"
     file_path = (base_data / att.file_path).resolve()
 
-    # Protection contre le path traversal
+    # Protection contre le path traversal — 404 pour ne pas reveler l'existence
     if not file_path.is_relative_to(base_data.resolve()):
-        raise HTTPException(status_code=403, detail="Accès interdit")
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
 
     if file_path.exists():
         file_path.unlink()
