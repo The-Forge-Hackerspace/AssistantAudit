@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Monitor, Globe, Upload } from "lucide-react";
+import { Download, Monitor, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -80,9 +81,10 @@ interface AgentTaskDetailProps {
 export function AgentTaskDetail({ task, open, onOpenChange, agentName }: AgentTaskDetailProps) {
   const [artifacts, setArtifacts] = useState<TaskArtifact[]>([]);
   const [importing, setImporting] = useState(false);
+  const [selectedIps, setSelectedIps] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!task || !open) { setArtifacts([]); return; }
+    if (!task || !open) { setArtifacts([]); setSelectedIps(new Set()); return; }
     agentsApi.getTaskArtifacts(task.task_uuid).then(setArtifacts).catch(() => setArtifacts([]));
   }, [task, open]);
 
@@ -106,15 +108,34 @@ export function AgentTaskDetail({ task, open, onOpenChange, agentName }: AgentTa
     return "serveur";
   };
 
+  const toggleHost = (ip: string) => {
+    setSelectedIps((prev) => {
+      const next = new Set(prev);
+      if (next.has(ip)) next.delete(ip); else next.add(ip);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIps.size === hosts.filter((h) => h.ip).length) {
+      setSelectedIps(new Set());
+    } else {
+      setSelectedIps(new Set(hosts.filter((h) => h.ip).map((h) => h.ip)));
+    }
+  };
+
+  const allSelected = hosts.length > 0 && selectedIps.size === hosts.filter((h) => h.ip).length;
+
   const handleImportEquipments = async () => {
-    if (!siteId || hosts.length === 0) {
-      toast.error("Aucun hote a importer ou site non defini");
+    if (!siteId || selectedIps.size === 0) {
+      toast.error("Selectionnez au moins un hote a importer");
       return;
     }
     setImporting(true);
     let created = 0;
     let skipped = 0;
-    for (const host of hosts) {
+    const hostsToImport = hosts.filter((h) => h.ip && selectedIps.has(h.ip));
+    for (const host of hostsToImport) {
       if (!host.ip) continue;
       try {
         await equipementsApi.create({
@@ -183,15 +204,33 @@ export function AgentTaskDetail({ task, open, onOpenChange, agentName }: AgentTa
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold">Hotes decouverts</h4>
               {siteId && task.status === "completed" && (
-                <Button size="sm" variant="outline" onClick={handleImportEquipments} disabled={importing}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleImportEquipments}
+                  disabled={importing || selectedIps.size === 0}
+                >
                   <Upload data-icon="inline-start" />
-                  {importing ? "Import..." : "Importer les equipements"}
+                  {importing
+                    ? "Import..."
+                    : selectedIps.size > 0
+                      ? `Importer ${selectedIps.size} equipement(s)`
+                      : "Selectionner des hotes"}
                 </Button>
               )}
             </div>
             <Table>
               <TableHeader>
                 <TableRow>
+                  {siteId && task.status === "completed" && (
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={allSelected}
+                        onCheckedChange={toggleAll}
+                        aria-label="Tout selectionner"
+                      />
+                    </TableHead>
+                  )}
                   <TableHead>IP</TableHead>
                   <TableHead>Hostname</TableHead>
                   <TableHead>MAC</TableHead>
@@ -202,7 +241,20 @@ export function AgentTaskDetail({ task, open, onOpenChange, agentName }: AgentTa
               </TableHeader>
               <TableBody>
                 {hosts.map((host, i) => (
-                  <TableRow key={i}>
+                  <TableRow
+                    key={i}
+                    className={selectedIps.has(host.ip) ? "bg-primary/5" : ""}
+                  >
+                    {siteId && task.status === "completed" && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIps.has(host.ip)}
+                          onCheckedChange={() => toggleHost(host.ip)}
+                          disabled={!host.ip}
+                          aria-label={`Selectionner ${host.ip}`}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="font-mono font-semibold whitespace-nowrap">{host.ip || "—"}</TableCell>
                     <TableCell className="whitespace-nowrap">{host.hostname || "—"}</TableCell>
                     <TableCell className="font-mono text-xs whitespace-nowrap">{host.mac || "—"}</TableCell>
