@@ -73,9 +73,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { scansApi, sitesApi } from "@/services/api";
-import type { Scan, ScanSummary, ScanHost, Site, TypeEquipement } from "@/types";
+import { scansApi, sitesApi, agentsApi } from "@/services/api";
+import type { Agent, Scan, ScanSummary, ScanHost, Site, TypeEquipement } from "@/types";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/skeletons";
 
@@ -160,6 +161,14 @@ function ScannerContent() {
   const [customArgs, setCustomArgs] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Agent mode
+  const [scanMode, setScanMode] = useState<"local" | "agent">("local");
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedAgentUuid, setSelectedAgentUuid] = useState("");
+  const [agentTaskUuid, setAgentTaskUuid] = useState<string | null>(null);
+  const [agentLogs, setAgentLogs] = useState<string[]>([]);
+  const agentLogsRef = useRef<HTMLDivElement>(null);
+
   // ── Computed nmap command preview ──
   const commandPreview = useMemo(() => {
     const t = target || "<cible>";
@@ -198,10 +207,81 @@ function ScannerContent() {
     }
   }, []);
 
+  const fetchAgents = useCallback(async () => {
+    try {
+      const list = await agentsApi.list();
+      setAgents(list);
+    } catch {
+      /* silent — agents feature is optional */
+    }
+  }, []);
+
+  const nmapAgents = useMemo(
+    () => agents.filter((a) => a.status === "active" && a.allowed_tools.includes("nmap")),
+    [agents]
+  );
+
   useEffect(() => {
     fetchScans();
     fetchSites();
-  }, [fetchScans, fetchSites]);
+    fetchAgents();
+  }, [fetchScans, fetchSites, fetchAgents]);
+
+  // ── WebSocket: listen for agent task progress ──
+  useEffect(() => {
+    if (!agentTaskUuid) return;
+    const token = document.cookie.match(/aa_access_token=([^;]+)/)?.[1];
+    if (!token) return;
+
+    const wsUrl = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/user?token=${token}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "task_status" && msg.data?.task_uuid === agentTaskUuid) {
+          const status = msg.data.status as string;
+          setAgentLogs((prev) => [...prev, `[STATUS] ${status}`]);
+          if (status === "completed" || status === "failed") {
+            setAgentLogs((prev) => [
+              ...prev,
+              status === "completed"
+                ? "[DONE] Scan terminé avec succès"
+                : `[ERREUR] ${msg.data.error_message || "Échec du scan"}`,
+            ]);
+            fetchScans();
+          }
+        }
+        if (msg.type === "task_progress" && msg.data?.task_uuid === agentTaskUuid) {
+          const lines = msg.data.output_lines as string[] | undefined;
+          if (lines?.length) {
+            setAgentLogs((prev) => [...prev, ...lines]);
+          }
+        }
+        if (msg.type === "task_result" && msg.data?.task_uuid === agentTaskUuid) {
+          setAgentLogs((prev) => [...prev, "[RESULT] Résultats reçus"]);
+          fetchScans();
+        }
+      } catch {
+        /* ignore parse errors */
+      }
+    };
+
+    ws.onerror = () => {
+      setAgentLogs((prev) => [...prev, "[WS] Erreur de connexion WebSocket"]);
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [agentTaskUuid, fetchScans]);
+
+  // Auto-scroll agent logs
+  useEffect(() => {
+    if (agentLogsRef.current) {
+      agentLogsRef.current.scrollTop = agentLogsRef.current.scrollHeight;
+    }
+  }, [agentLogs]);
 
   // ── Polling: refresh every 3s while scans are running ──
   useEffect(() => {
@@ -233,7 +313,44 @@ function ScannerContent() {
       toast.error("Veuillez saisir les arguments Nmap personnalisés");
       return;
     }
-    // Close dialog immediately
+
+    // ── Agent mode: dispatch to remote agent ──
+    if (scanMode === "agent") {
+      if (!selectedAgentUuid) {
+        toast.error("Veuillez sélectionner un agent");
+        return;
+      }
+      setShowLaunch(false);
+      try {
+        const res = await agentsApi.dispatch({
+          agent_uuid: selectedAgentUuid,
+          tool: "nmap",
+          parameters: {
+            target,
+            scan_type: scanType,
+            custom_args: scanType === "custom" ? customArgs.trim() : undefined,
+            site_id: siteId,
+            nom: nom.trim() || undefined,
+          },
+        });
+        const taskUuid = (res as { task_uuid?: string }).task_uuid;
+        if (taskUuid) {
+          setAgentTaskUuid(taskUuid);
+          setAgentLogs(["[DISPATCH] Tâche nmap envoyée à l'agent — en attente d'exécution..."]);
+        }
+        toast.success("Scan dispatché vers l'agent distant");
+        resetForm();
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { data?: { detail?: string } } };
+        const msg =
+          axiosErr?.response?.data?.detail ||
+          (err instanceof Error ? err.message : "Erreur lors du dispatch");
+        toast.error(msg);
+      }
+      return;
+    }
+
+    // ── Local mode: nmap on server ──
     setShowLaunch(false);
     try {
       await scansApi.launch({
@@ -262,6 +379,8 @@ function ScannerContent() {
     setCustomArgs("");
     setNotes("");
     setScanType("discovery");
+    setScanMode("local");
+    setSelectedAgentUuid("");
   };
 
   // ── View detail ──
@@ -495,6 +614,71 @@ function ScannerContent() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4">
+            {/* Execution mode: Local / Agent */}
+            <div>
+              <Label className="mb-1.5 block">Exécution</Label>
+              <Tabs
+                value={scanMode}
+                onValueChange={(v) => setScanMode(v as "local" | "agent")}
+              >
+                <TabsList className="w-full">
+                  <TabsTrigger value="local" className="flex-1 gap-1.5">
+                    <Server className="size-3.5" />
+                    Local (serveur)
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="agent"
+                    className="flex-1 gap-1.5"
+                    disabled={nmapAgents.length === 0}
+                  >
+                    <Monitor className="size-3.5" />
+                    Agent distant
+                    {nmapAgents.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">
+                        {nmapAgents.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {scanMode === "agent" && nmapAgents.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Aucun agent avec l&apos;outil nmap disponible
+                </p>
+              )}
+            </div>
+
+            {/* Agent selector (only in agent mode) */}
+            {scanMode === "agent" && nmapAgents.length > 0 && (
+              <div>
+                <Label>Agent *</Label>
+                <Select
+                  value={selectedAgentUuid}
+                  onValueChange={setSelectedAgentUuid}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {nmapAgents.map((a) => (
+                        <SelectItem key={a.agent_uuid} value={a.agent_uuid}>
+                          <div className="flex items-center gap-2">
+                            <span>{a.name}</span>
+                            {a.last_ip && (
+                              <span className="text-muted-foreground text-xs">
+                                ({a.last_ip})
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Nom du scan */}
             <div>
               <Label>Nom du scan (optionnel)</Label>
@@ -616,6 +800,55 @@ function ScannerContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Agent task logs */}
+      {agentTaskUuid && agentLogs.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Terminal className="size-4" />
+              Logs agent — tâche nmap
+              <Badge variant="outline" className="font-mono text-xs">
+                {agentTaskUuid.slice(0, 8)}
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto"
+                onClick={() => {
+                  setAgentTaskUuid(null);
+                  setAgentLogs([]);
+                }}
+              >
+                <X className="size-3" />
+                Fermer
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              ref={agentLogsRef}
+              className="bg-zinc-950 rounded-lg p-4 max-h-[300px] overflow-y-auto font-mono text-xs leading-relaxed"
+            >
+              {agentLogs.map((line, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "whitespace-pre-wrap",
+                    line.startsWith("[ERREUR]") && "text-red-400",
+                    line.startsWith("[DONE]") && "text-green-400",
+                    line.startsWith("[STATUS]") && "text-yellow-400",
+                    line.startsWith("[DISPATCH]") && "text-blue-400",
+                    !line.startsWith("[") && "text-zinc-300"
+                  )}
+                >
+                  {line}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Detail dialog */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
