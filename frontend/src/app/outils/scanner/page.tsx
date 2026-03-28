@@ -375,6 +375,16 @@ function ScannerContent() {
     setShowTaskDetail(true);
   };
 
+  const handleDeleteTask = async (taskUuid: string) => {
+    try {
+      await agentsApi.deleteTask(taskUuid);
+      toast.success("Tache supprimee");
+      fetchAgentTasks();
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    }
+  };
+
   // Filtered scans by entreprise
   const filteredScans = useMemo(() => {
     if (!filterEntrepriseId) return scans;
@@ -513,16 +523,8 @@ function ScannerContent() {
                             errorMessage={task.error_message}
                           />
                         </TableCell>
-                        <TableCell>
-                          {params?.entreprise_id
-                            ? getEntrepriseName(Number(params.entreprise_id))
-                            : "—"}
-                        </TableCell>
-                        <TableCell>
-                          {params?.site_id
-                            ? getSiteName(Number(params.site_id))
-                            : "—"}
-                        </TableCell>
+                        <TableCell>{task.entreprise_name || "—"}</TableCell>
+                        <TableCell>{task.site_name || "—"}</TableCell>
                         <TableCell className="font-mono text-sm">
                           {params?.target || "—"}
                         </TableCell>
@@ -548,14 +550,41 @@ function ScannerContent() {
                           ) : null}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewTask(task)}
-                            disabled={task.status === "pending"}
-                          >
-                            <Eye />
-                          </Button>
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewTask(task)}
+                              disabled={task.status === "pending"}
+                            >
+                              <Eye />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={task.status === "running"}
+                                >
+                                  <Trash2 className="text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Supprimer cette tache ?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Cette tache et ses resultats seront definitivement supprimes.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteTask(task.task_uuid)}>
+                                    Supprimer
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

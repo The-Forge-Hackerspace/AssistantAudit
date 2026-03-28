@@ -255,20 +255,72 @@ def refresh_agent_token(
     return {"agent_token": new_token}
 
 
-@router.get("/tasks", response_model=list[TaskResponse])
+@router.get("/tasks")
 def list_tasks(
     tool: str | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_auditeur),
 ):
-    """Liste les taches agent du user courant (admin voit tout). Filtrable par tool."""
+    """Liste les taches agent du user courant (admin voit tout). Filtrable par tool.
+    Enrichit chaque tache avec site_name et entreprise_name resolus depuis les parametres."""
+    from ...models.site import Site
+    from ...models.entreprise import Entreprise
+
     query = db.query(AgentTask)
     if current_user.role != "admin":
         query = query.filter(AgentTask.owner_id == current_user.id)
     if tool:
         query = query.filter(AgentTask.tool == tool)
     tasks = query.order_by(AgentTask.created_at.desc()).limit(100).all()
-    return tasks
+
+    # Batch-resolve site and entreprise names
+    site_ids = set()
+    for t in tasks:
+        sid = (t.parameters or {}).get("site_id")
+        if sid:
+            site_ids.add(int(sid))
+    sites_map: dict[int, tuple[str, int | None]] = {}
+    if site_ids:
+        for s in db.query(Site).filter(Site.id.in_(site_ids)).all():
+            sites_map[s.id] = (s.nom, s.entreprise_id)
+    ent_ids = {eid for _, eid in sites_map.values() if eid}
+    ent_map: dict[int, str] = {}
+    if ent_ids:
+        for e in db.query(Entreprise).filter(Entreprise.id.in_(ent_ids)).all():
+            ent_map[e.id] = e.nom
+
+    result = []
+    for t in tasks:
+        d = TaskResponse.model_validate(t).model_dump()
+        sid = (t.parameters or {}).get("site_id")
+        if sid and int(sid) in sites_map:
+            site_name, ent_id = sites_map[int(sid)]
+            d["site_name"] = site_name
+            d["entreprise_name"] = ent_map.get(ent_id, "") if ent_id else ""
+        else:
+            d["site_name"] = ""
+            d["entreprise_name"] = ""
+        result.append(d)
+    return result
+
+
+@router.delete("/tasks/{task_uuid}", status_code=200)
+def delete_task(
+    task_uuid: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_auditeur),
+):
+    """Supprime une tache agent. Ownership verifiee."""
+    task = db.query(AgentTask).filter(AgentTask.task_uuid == task_uuid).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Tache introuvable")
+    if task.owner_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=404, detail="Tache introuvable")
+    if task.status == "running":
+        raise HTTPException(status_code=400, detail="Impossible de supprimer une tache en cours")
+    db.delete(task)
+    db.commit()
+    return {"detail": "Tache supprimee"}
 
 
 # ── Routes taches ─────────────────────────────────────────────────────
