@@ -1,13 +1,13 @@
 # AssistantAudit — Project Knowledge Base
 
-**Last updated:** 2026-03-26
+**Last updated:** 2026-03-28
 
 
 ## OVERVIEW
 
 IT security auditing platform. FastAPI backend (Python 3.13), Next.js 16 frontend (React 19 + TypeScript), 12 YAML compliance frameworks auto-synced to SQLite, 6 integrated audit tools (Nmap, SSL checker, SSH/WinRM collectors, AD auditor, ORADAD, Monkey365, config parsers).
 
-- **Backend:** `http://localhost:8000` — Swagger UI at `/docs`, ReDoc at `/redoc`
+- **Backend:** `http://localhost:8000` — Swagger UI at `/docs`, ReDoc at `/redoc` (disabled in production)
 - **Frontend:** `http://localhost:3000`
 - **Database:** SQLite at `backend/instance/assistantaudit.db` (dev) — PostgreSQL in production
 - **Architecture spec:** `ARCHITECTURE.md` at root — the source of truth for the v2 migration
@@ -164,16 +164,16 @@ These decisions are final. Do NOT deviate without explicit approval.
 | `CA_CERT_PATH` | `certs/ca.pem` | mTLS CA certificate path |
 | `CA_KEY_PATH` | `certs/ca.key` | mTLS CA private key path |
 | `MONKEY365_PATH` | `""` | Absolute path to `Invoke-Monkey365.ps1` |
-| `MONKEY365_ARCHIVE_PATH` | `/data/enterprise/Cloud/M365` | Archive base for scan results |
 | `LOG_LEVEL` | `INFO` | `DEBUG` in dev |
 | `CORS_ORIGINS` | `localhost:3000,5173` | Comma-separated allowed origins |
 
 ## WORKFLOW RULES — ALWAYS DO THESE
 
-- **ALWAYS commit after completing a step or major change** — format: `feat: <description> (step N)` for migration steps, `fix: <description>` for bug fixes, `test: <description>` for test-only changes. Never leave work uncommitted between steps.
+- **ALWAYS commit after completing a step or major change** — format: `feat`/`fix`/`test`/`refactor`/`security`/`chore`/`docs`. Never leave work uncommitted between steps.
 - **ALWAYS run tests after each modification** — if a test breaks, fix it before continuing
 - **ALWAYS show the diff summary before moving to the next step** — wait for validation
 - **ALWAYS read ARCHITECTURE.md before any structural change**
+- **ALWAYS run the POST-BUILD EVALUATION after each frontend chantier** — start app, test visually, fix before commit
 
 ## ANTI-PATTERNS — NEVER DO THESE
 
@@ -199,26 +199,61 @@ These decisions are final. Do NOT deviate without explicit approval.
 
 ## KNOWN TECHNICAL DEBT
 
-- `executor.py:11` hardcodes `D:\AssistantAudit` fallback path — must be derived from settings
-- `executor.py:210-218` uses `stdout=None, stderr=None` — PowerShell errors are invisible to the app
-- SSH private keys transmitted as plaintext in API request bodies (`schemas/scan.py`)
-- `.env` was committed to git; verify it is excluded and remove from history if needed
-- `data/` directory may contain real company names in git history
-- `network-map/page.tsx` is ~2,900 lines — needs component extraction
-- CORS origins hardcoded as defaults in `config.py` — should be required from environment in production
-- Rate limiter is in-process only — breaks with multiple uvicorn workers
-- No frontend tests (no jest/vitest/playwright configured)
-- Monkey365 requires interactive desktop MSAL auth — **resolved in v2 via Device Code Flow** (see ARCHITECTURE.md §8)
-- `uploaded_by` on Attachment is `String(200)` — should be FK to `users.id` (deferred to future migration)
-- `owner_id` on audits/scans/ad_audit_results is nullable — needs backfill script for existing data
-- JSON columns on `ad_audit_result` (dc_list, domain_admins, etc.) contain sensitive data but are not yet encrypted — planned `EncryptedJSON` type
+### CRITIQUE (avant mise en production)
+
+- **`.env` dans l'historique git** — nécessite `git filter-repo` + rotation de TOUTES les clés (SECRET_KEY, ENCRYPTION_KEY, FILE_ENCRYPTION_KEY)
+- **`agent_tasks.parameters` stocke les credentials AD en clair** (JSON non chiffré) — besoin d'un type `EncryptedJSON`
+- **30+ endpoints sans isolation par owner_id** (audits, entreprises, sites, équipements, scans) — RBAC par ressource planifié (table `ResourcePermission` : user_id, resource_type, resource_id, permission). Pattern de référence dans `agents.py` et `oradad.py`
+- **Endpoint `/auth/refresh` manquant** — les tokens de 15 min ne sont pas renouvelables
+
+### ELEVE (rapidement après la prod)
+
+- **38 routes (42%) accèdent directement à la DB** sans passer par un service — créer AuditService, EntrepriseService, SiteService, EquipementService, AgentService, NetworkMapService
+- **121 occurrences du pattern `if not X: raise 404`** — migrer vers `get_or_404()` (helper créé dans `core/helpers.py`, appliqué sur `audits.py` comme démo)
+- **`rotate_kek.py` est un stub** — implémenter la rotation KEK complète (Attachment n'a pas encore les colonnes encrypted_dek/dek_nonce/kek_version)
+- **Ownership check FK chain dupliqué 3 fois** (attachments.py, file_service.py x2) — centraliser quand le RBAC sera implémenté
+- **15 opérations fichier sans try/except** — créer un helper `atomic_write()`
+- **`chmod 600` sur `ca.key`** en déploiement Linux — pas de vérification de permissions au démarrage
+- **~20 schemas avec champs status/role en `str` au lieu de `Literal`/`Enum`** — pattern démontré dans `ScanCreate`, `CollectCreate`, `ADAuditCreate`
+- **`test_api.py` fragile** — dépend de l'ordre d'exécution (rate limiter partagé entre tests)
+- **Services manquants de tests** : scan_service, collect_service, ad_audit_service, config_analysis_service, task_service
+- **`network-map/page.tsx`** toujours ~2900 lignes — needs component extraction
+
+### MOYEN (amélioration continue)
+
+- `uploaded_by` sur Attachment est `String(200)` — devrait être FK vers `users.id`
+- `owner_id` sur audits/scans/ad_audit_results est nullable — backfill nécessaire
+- JSON columns sensibles non chiffrés (`dc_list`, `domain_admins` sur `ad_audit_result`) — `EncryptedJSON` planifié
+- CRUD copié-collé dans entreprises/sites/equipements/audits (25+ endpoints quasi-identiques)
+- Services retournent un mix de types (SQLAlchemy models, dicts, primitifs) — standardiser
+- Messages d'erreur mix FR/EN dans tools/*
+- Rate limiting WebSocket absent
+- Buffers WS non nettoyés pour users inactifs
+- Pas de complexité mot de passe au-delà de 8 caractères
+- Pas de tests frontend (jest/vitest/playwright)
+- `max_length` manquant sur ~100 champs `str` dans les schemas output
+- Rate limiter in-process — breaks avec multiple uvicorn workers
+- SSH private keys transmises en plaintext dans les request bodies
+- CORS origins hardcodées comme défaut dans `config.py`
+
+## COMPLETED
+
+- [x] 12 backend migration steps (500+ tests passing)
+- [x] 4 frontend chantiers (users, agents, ORADAD, Monkey365 device code)
+- [x] Frontend audit shadcn/ui v4 + React 19 conformity
+- [x] Sub-component extraction from monolithic pages (except network-map)
+- [x] Complete PingCastle removal (code + models + routes + frontend + migration)
+- [x] Security audit 8/8 — 8 critiques fixed, 13 eleves fixed
+- [x] Dev practices audit 4/4 — 50 tests added, 928 dead lines removed
+- [x] Dependencies pinned and CVEs patched (cryptography, ecdsa, requests, npm)
+- [x] Security headers middleware (CSP, HSTS, X-Frame-Options, Referrer-Policy)
+- [x] Swagger/ReDoc disabled in production
 
 ## NOTES
 
 - Default admin credentials are printed by `init_db.py` / `start.ps1` — change on first login
 - Monkey365 requires PowerShell 7+ (`pwsh`) in PATH on Windows
-- No Docker — despite README references, no Dockerfile exists
+- No Docker — no Dockerfile exists
 - No CI build/test pipeline — `.github/workflows/` contains squad triage only
-- `ARCHITECTURE.md` is the spec for the v2 migration — Claude Code should read it before any structural work
-- Commit format for migration steps: `feat: <description> (step N)`
+- `ARCHITECTURE.md` is the spec for the v2 migration — read before any structural work
 - Each migration step should be a separate commit for easy rollback
