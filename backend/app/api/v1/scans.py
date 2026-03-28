@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur
+from ...core.deps import get_current_user, get_current_auditeur, PaginationParams
 from ...models.user import User
 from ...models.site import Site
 from ...schemas.scan import (
@@ -119,21 +119,20 @@ async def preview_nmap_command(
 )
 async def list_scans(
     site_id: Optional[int] = Query(None, description="Filtrer par site"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
     """Liste les scans réseau, optionnellement filtrés par site."""
     items, total = scan_service.list_scans(
-        db, site_id=site_id, skip=(page - 1) * page_size, limit=page_size
+        db, site_id=site_id, skip=pagination.offset, limit=pagination.page_size
     )
     return PaginatedResponse(
         items=items,
         total=total,
-        page=page,
-        page_size=page_size,
-        pages=math.ceil(total / page_size) if total > 0 else 1,
+        page=pagination.page,
+        page_size=pagination.page_size,
+        pages=math.ceil(total / pagination.page_size) if total > 0 else 1,
     )
 
 

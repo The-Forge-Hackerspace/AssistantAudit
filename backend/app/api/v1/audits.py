@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
+from ...core.helpers import get_or_404
 from ...models.audit import Audit, AuditStatus
 from ...models.entreprise import Entreprise
 from ...models.user import User
@@ -44,10 +45,7 @@ async def create_audit(
     _: User = Depends(get_current_auditeur),
 ):
     """Crée un nouveau projet d'audit"""
-    # Vérifier que l'entreprise existe
-    entreprise = db.get(Entreprise, body.entreprise_id)
-    if not entreprise:
-        raise HTTPException(status_code=404, detail="Entreprise introuvable")
+    get_or_404(db, Entreprise, body.entreprise_id)
     audit = Audit(
         nom_projet=body.nom_projet,
         entreprise_id=body.entreprise_id,
@@ -68,9 +66,7 @@ async def get_audit(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    audit = db.get(Audit, audit_id)
-    if not audit:
-        raise HTTPException(status_code=404, detail="Audit introuvable")
+    audit = get_or_404(db, Audit, audit_id)
     return AuditDetail(
         id=audit.id,
         nom_projet=audit.nom_projet,
@@ -96,9 +92,7 @@ async def update_audit(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
 ):
-    audit = db.get(Audit, audit_id)
-    if not audit:
-        raise HTTPException(status_code=404, detail="Audit introuvable")
+    audit = get_or_404(db, Audit, audit_id)
 
     update_data = body.model_dump(exclude_unset=True)
     if "status" in update_data:
@@ -117,9 +111,7 @@ async def delete_audit(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ):
-    audit = db.get(Audit, audit_id)
-    if not audit:
-        raise HTTPException(status_code=404, detail="Audit introuvable")
+    audit = get_or_404(db, Audit, audit_id)
     db.delete(audit)
     db.commit()
     return MessageResponse(message=f"Audit '{audit.nom_projet}' supprimé")
