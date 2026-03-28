@@ -147,6 +147,10 @@ def create_app() -> FastAPI:
     from .api.v1.router import api_router
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+    # WebSocket monte a la racine (agent se connecte a /ws/agent, pas /api/v1/ws/agent)
+    from .api.v1.websocket import router as websocket_router
+    app.include_router(websocket_router)
+
     # ── Prometheus metrics endpoint ────────────────────────────────────────
     @app.get(
         "/metrics",

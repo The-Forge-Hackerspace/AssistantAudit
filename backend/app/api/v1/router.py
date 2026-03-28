@@ -35,7 +35,9 @@ api_router.include_router(attachments_router, prefix="/attachments", tags=["Piè
 api_router.include_router(scans_router, prefix="/scans", tags=["Scanner réseau"])
 api_router.include_router(network_map_router, prefix="/network-map", tags=["Cartographie réseau"])
 api_router.include_router(tools_router)
-api_router.include_router(websocket_router)
+# NOTE: websocket_router est monte directement sur l'app (pas sous /api/v1)
+# car l'agent se connecte a /ws/agent sans prefix API.
+# Voir main.py: app.include_router(websocket_router)
 api_router.include_router(agents_router)
 api_router.include_router(oradad_router)
 api_router.include_router(files_router, prefix="/files", tags=["Fichiers chiffrés"])
