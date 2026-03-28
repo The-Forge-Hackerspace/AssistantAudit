@@ -972,6 +972,9 @@ export interface AgentTask {
   dispatched_at: string | null;
   started_at: string | null;
   completed_at: string | null;
+  // Enrichis par le serveur (resolus depuis parameters.site_id)
+  site_name?: string;
+  entreprise_name?: string;
 }
 
 export interface TaskArtifact {
@@ -1059,23 +1062,4 @@ export interface AnssiReport {
     warning: number;
     not_checked: number;
   };
-}
-
-export interface AgentTask {
-  id: number;
-  task_uuid: string;
-  agent_id: number;
-  owner_id: number;
-  audit_id: number | null;
-  tool: string;
-  parameters: Record<string, unknown>;
-  status: AgentTaskStatus;
-  progress: number;
-  status_message: string | null;
-  result_summary: Record<string, unknown> | null;
-  error_message: string | null;
-  created_at: string;
-  dispatched_at: string | null;
-  started_at: string | null;
-  completed_at: string | null;
 }

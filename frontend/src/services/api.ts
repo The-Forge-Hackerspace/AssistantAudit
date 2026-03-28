@@ -653,6 +653,11 @@ export const agentsApi = {
     return data;
   },
 
+  async deleteTask(taskUuid: string): Promise<{ detail: string }> {
+    const { data } = await api.delete<{ detail: string }>(`/agents/tasks/${taskUuid}`);
+    return data;
+  },
+
   async getTaskArtifacts(taskUuid: string): Promise<TaskArtifact[]> {
     const { data } = await api.get<TaskArtifact[]>(`/agents/tasks/${taskUuid}/artifacts`);
     return data;
