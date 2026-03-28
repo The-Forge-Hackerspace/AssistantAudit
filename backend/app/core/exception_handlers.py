@@ -43,38 +43,38 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(SQLAlchemyError)
     async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):
-        """Gère les erreurs SQLAlchemy génériques."""
+        """Gere les erreurs SQLAlchemy generiques."""
         logger.error(f"SQLAlchemy error: {exc}")
-        detail = "Erreur de base de données"
-        if logger.isEnabledFor(logging.DEBUG):
-            detail = str(exc)
+        # Ne jamais exposer les details SQL au client
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": detail, "error_type": "database_error"},
+            content={"detail": "Erreur de base de donnees", "error_type": "database_error"},
         )
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
-        """Gestionnaire d'exception générique pour tous les autres erreurs non gérées."""
-        # Log l'erreur complète
+        """Gestionnaire d'exception generique pour tous les autres erreurs non gerees."""
         logger.error(
             f"Unhandled exception on {request.method} {request.url.path}",
             exc_info=exc,
         )
 
-        # En développement, retourner le stack trace; en production, un message générique
-        if logger.isEnabledFor(logging.DEBUG):
-            detail = str(exc)
-            traceback_str = traceback.format_exc()
+        # En dev (DEBUG), retourner le detail ; en production, message generique seul
+        from app.core.config import get_settings
+        _env = get_settings().ENV
+        if _env == "development":
+            content = {
+                "detail": str(exc),
+                "error_type": "internal_server_error",
+                "traceback": traceback.format_exc(),
+            }
         else:
-            detail = "Une erreur interne s'est produite. Cette erreur a été enregistrée."
-            traceback_str = None
+            content = {
+                "detail": "Une erreur interne s'est produite.",
+                "error_type": "internal_server_error",
+            }
 
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "detail": detail,
-                "error_type": "internal_server_error",
-                "traceback": traceback_str,
-            },
+            content=content,
         )

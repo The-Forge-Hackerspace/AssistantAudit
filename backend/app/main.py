@@ -74,6 +74,8 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """Factory pour créer l'application FastAPI"""
+    # Desactiver Swagger/ReDoc en production (surface d'attaque inutile)
+    is_prod = settings.ENV in ("production", "preprod", "staging")
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
@@ -81,8 +83,9 @@ def create_app() -> FastAPI:
             "Outil d'audit d'infrastructure IT — "
             "Référentiels, évaluations de conformité et outils intégrés."
         ),
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url=None if is_prod else "/docs",
+        redoc_url=None if is_prod else "/redoc",
+        openapi_url=None if is_prod else "/openapi.json",
         lifespan=lifespan,
     )
 
@@ -114,6 +117,9 @@ def create_app() -> FastAPI:
                 response.headers["Strict-Transport-Security"] = (
                     "max-age=31536000; includeSubDomains"
                 )
+            # Masquer les versions serveur (fingerprinting)
+            if "server" in response.headers:
+                del response.headers["server"]
             return response
 
     app.add_middleware(SecurityHeadersMiddleware)
