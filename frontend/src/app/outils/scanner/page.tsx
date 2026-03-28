@@ -75,10 +75,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { scansApi, sitesApi, agentsApi } from "@/services/api";
-import type { Agent, AgentTask, TaskArtifact, Scan, ScanSummary, ScanHost, Site, TypeEquipement } from "@/types";
+import { scansApi, sitesApi, agentsApi, entreprisesApi } from "@/services/api";
+import type { Agent, AgentTask, Entreprise, Scan, ScanSummary, ScanHost, Site, TypeEquipement } from "@/types";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/skeletons";
+import { LaunchScanDialog } from "./components/launch-scan-dialog";
+import { AgentTaskDetail } from "./components/agent-task-detail";
 
 // ── Scan type definitions with nmap args ──
 const SCAN_TYPES = [
@@ -147,45 +149,25 @@ function ScannerContent() {
   // ── State ──
   const [scans, setScans] = useState<ScanSummary[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
+  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedScan, setSelectedScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLaunch, setShowLaunch] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Launch form
-  const [nom, setNom] = useState("");
-  const [siteId, setSiteId] = useState<number>(0);
-  const [target, setTarget] = useState("");
-  const [scanType, setScanType] = useState<string>("discovery");
-  const [customArgs, setCustomArgs] = useState("");
-  const [notes, setNotes] = useState("");
-
   // Agent mode
-  const [scanMode, setScanMode] = useState<"local" | "agent">("local");
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [selectedAgentUuid, setSelectedAgentUuid] = useState("");
   const [agentTaskUuid, setAgentTaskUuid] = useState<string | null>(null);
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
   const agentLogsRef = useRef<HTMLDivElement>(null);
 
-  // Agent tasks (nmap via agents)
+  // History view
   const [viewTab, setViewTab] = useState<"local" | "agent">("local");
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
-  const [selectedTaskArtifacts, setSelectedTaskArtifacts] = useState<TaskArtifact[]>([]);
+  const [filterEntrepriseId, setFilterEntrepriseId] = useState<number>(0);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [selectedTask, setSelectedTask] = useState<AgentTask | null>(null);
-
-  // ── Computed nmap command preview ──
-  const commandPreview = useMemo(() => {
-    const t = target || "<cible>";
-    if (scanType === "custom") {
-      const args = customArgs.trim() || "<arguments>";
-      return `nmap ${args} ${t}`;
-    }
-    const scanDef = SCAN_TYPES.find((s) => s.value === scanType);
-    return `nmap ${scanDef?.args || "-sn"} ${t}`;
-  }, [target, scanType, customArgs]);
 
   // ── Has running scans? ──
   const hasRunningScans = useMemo(
@@ -207,42 +189,33 @@ function ScannerContent() {
 
   const fetchSites = useCallback(async () => {
     try {
-      const res = await sitesApi.list(1, 100);
+      const res = await sitesApi.list(1, 200);
       setSites(res.items);
-    } catch {
-      /* silent */
-    }
+    } catch { /* silent */ }
+  }, []);
+
+  const fetchEntreprises = useCallback(async () => {
+    try {
+      const res = await entreprisesApi.list(1, 100);
+      setEntreprises(res.items);
+    } catch { /* silent */ }
   }, []);
 
   const fetchAgents = useCallback(async () => {
-    try {
-      const list = await agentsApi.list();
-      setAgents(list);
-    } catch {
-      /* silent — agents feature is optional */
-    }
+    try { setAgents(await agentsApi.list()); } catch { /* silent */ }
   }, []);
 
   const fetchAgentTasks = useCallback(async () => {
-    try {
-      const tasks = await agentsApi.listTasks("nmap");
-      setAgentTasks(tasks);
-    } catch {
-      /* silent */
-    }
+    try { setAgentTasks(await agentsApi.listTasks("nmap")); } catch { /* silent */ }
   }, []);
-
-  const nmapAgents = useMemo(
-    () => agents.filter((a) => a.status === "active" && a.allowed_tools.includes("nmap")),
-    [agents]
-  );
 
   useEffect(() => {
     fetchScans();
     fetchSites();
+    fetchEntreprises();
     fetchAgents();
     fetchAgentTasks();
-  }, [fetchScans, fetchSites, fetchAgents, fetchAgentTasks]);
+  }, [fetchScans, fetchSites, fetchEntreprises, fetchAgents, fetchAgentTasks]);
 
   // ── WebSocket: listen for agent task progress ──
   useEffect(() => {
@@ -320,84 +293,12 @@ function ScannerContent() {
     };
   }, [hasRunningScans, fetchScans]);
 
-  // ── Launch scan (async — returns immediately) ──
-  const handleLaunch = async () => {
-    if (!siteId || !target) {
-      toast.error("Veuillez sélectionner un site et saisir une cible");
-      return;
-    }
-    if (scanType === "custom" && !customArgs.trim()) {
-      toast.error("Veuillez saisir les arguments Nmap personnalisés");
-      return;
-    }
-
-    // ── Agent mode: dispatch to remote agent ──
-    if (scanMode === "agent") {
-      if (!selectedAgentUuid) {
-        toast.error("Veuillez sélectionner un agent");
-        return;
-      }
-      setShowLaunch(false);
-      try {
-        const res = await agentsApi.dispatch({
-          agent_uuid: selectedAgentUuid,
-          tool: "nmap",
-          parameters: {
-            target,
-            scan_type: scanType,
-            custom_args: scanType === "custom" ? customArgs.trim() : undefined,
-            site_id: siteId,
-            nom: nom.trim() || undefined,
-          },
-        });
-        const taskUuid = (res as { task_uuid?: string }).task_uuid;
-        if (taskUuid) {
-          setAgentTaskUuid(taskUuid);
-          setAgentLogs(["[DISPATCH] Tâche nmap envoyée à l'agent — en attente d'exécution..."]);
-        }
-        toast.success("Scan dispatché vers l'agent distant");
-        resetForm();
-      } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { detail?: string } } };
-        const msg =
-          axiosErr?.response?.data?.detail ||
-          (err instanceof Error ? err.message : "Erreur lors du dispatch");
-        toast.error(msg);
-      }
-      return;
-    }
-
-    // ── Local mode: nmap on server ──
-    setShowLaunch(false);
-    try {
-      await scansApi.launch({
-        nom: nom.trim() || undefined,
-        site_id: siteId,
-        target,
-        scan_type: scanType as "discovery" | "port_scan" | "full" | "custom",
-        custom_args: scanType === "custom" ? customArgs.trim() : undefined,
-        notes: notes || undefined,
-      });
-      toast.success("Scan lancé — il s'exécute en arrière-plan");
-      resetForm();
-      fetchScans();
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: string } } };
-      const msg =
-        axiosErr?.response?.data?.detail ||
-        (err instanceof Error ? err.message : "Erreur lors du lancement du scan");
-      toast.error(msg);
-    }
-  };
-
-  const resetForm = () => {
-    setNom("");
-    setTarget("");
-    setCustomArgs("");
-    setNotes("");
-    setScanType("discovery");
-    setScanMode("local");
-    setSelectedAgentUuid("");
+  // Launch callbacks
+  const handleLocalLaunched = () => { fetchScans(); };
+  const handleAgentDispatched = (taskUuid: string) => {
+    setAgentTaskUuid(taskUuid);
+    setAgentLogs(["[DISPATCH] Tache nmap envoyee a l'agent — en attente d'execution..."]);
+    fetchAgentTasks();
   };
 
   // ── View detail ──
@@ -464,22 +365,30 @@ function ScannerContent() {
     }
   };
 
-  const getSiteName = (id: number) =>
-    sites.find((s) => s.id === id)?.nom || `Site #${id}`;
+  const getSiteName = (id: number) => sites.find((s) => s.id === id)?.nom || `Site #${id}`;
+  const getEntrepriseName = (id: number) => entreprises.find((e) => e.id === id)?.nom || `Entreprise #${id}`;
+  const getEntrepriseIdForSite = (siteId: number) => sites.find((s) => s.id === siteId)?.entreprise_id || 0;
+  const getAgentName = (agentId: number) => agents.find((a) => a.id === agentId)?.name || `Agent #${agentId}`;
 
-  const getAgentName = (agentId: number) =>
-    agents.find((a) => a.id === agentId)?.name || `Agent #${agentId}`;
-
-  const handleViewTask = async (task: AgentTask) => {
+  const handleViewTask = (task: AgentTask) => {
     setSelectedTask(task);
     setShowTaskDetail(true);
-    try {
-      const artifacts = await agentsApi.getTaskArtifacts(task.task_uuid);
-      setSelectedTaskArtifacts(artifacts);
-    } catch {
-      setSelectedTaskArtifacts([]);
-    }
   };
+
+  // Filtered scans by entreprise
+  const filteredScans = useMemo(() => {
+    if (!filterEntrepriseId) return scans;
+    const siteIds = new Set(sites.filter((s) => s.entreprise_id === filterEntrepriseId).map((s) => s.id));
+    return scans.filter((s) => siteIds.has(s.site_id));
+  }, [scans, filterEntrepriseId, sites]);
+
+  const filteredAgentTasks = useMemo(() => {
+    if (!filterEntrepriseId) return agentTasks;
+    return agentTasks.filter((t) => {
+      const params = t.parameters as Record<string, unknown>;
+      return params?.entreprise_id === filterEntrepriseId;
+    });
+  }, [agentTasks, filterEntrepriseId]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -503,41 +412,63 @@ function ScannerContent() {
       {/* Scan list */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Historique des scans
-                {hasRunningScans && (
-                  <Badge className="gap-1 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400 text-xs">
-                    <Loader2 className="size-3 animate-spin" />
-                    {scans.filter((s) => s.statut === "running").length} en cours
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                {viewTab === "local"
-                  ? `${scans.length} scan(s) local(aux)`
-                  : `${agentTasks.length} scan(s) agent`}
-              </CardDescription>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Historique des scans
+                  {hasRunningScans && (
+                    <Badge className="gap-1 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400 text-xs">
+                      <Loader2 className="size-3 animate-spin" />
+                      {scans.filter((s) => s.statut === "running").length} en cours
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {viewTab === "local"
+                    ? `${filteredScans.length} scan(s) local(aux)`
+                    : `${filteredAgentTasks.length} scan(s) agent`}
+                </CardDescription>
+              </div>
+              <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as "local" | "agent")}>
+                <TabsList>
+                  <TabsTrigger value="local" className="gap-1.5">
+                    <Server className="size-3" />
+                    Local ({filteredScans.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="agent" className="gap-1.5">
+                    <Monitor className="size-3" />
+                    Agent ({filteredAgentTasks.length})
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
-            <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as "local" | "agent")}>
-              <TabsList>
-                <TabsTrigger value="local" className="gap-1.5">
-                  <Server className="size-3" />
-                  Local ({scans.length})
-                </TabsTrigger>
-                <TabsTrigger value="agent" className="gap-1.5">
-                  <Monitor className="size-3" />
-                  Agent ({agentTasks.length})
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {/* Filtre entreprise */}
+            <div className="flex items-center gap-2">
+              <Label className="text-sm whitespace-nowrap">Filtrer par entreprise :</Label>
+              <Select
+                value={filterEntrepriseId ? String(filterEntrepriseId) : "all"}
+                onValueChange={(v) => setFilterEntrepriseId(v === "all" ? 0 : Number(v))}
+              >
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Toutes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">Toutes les entreprises</SelectItem>
+                    {entreprises.map((e) => (
+                      <SelectItem key={e.id} value={String(e.id)}>{e.nom}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           {viewTab === "agent" ? (
             /* ── Agent tasks table ── */
-            agentTasks.length === 0 ? (
+            filteredAgentTasks.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Monitor className="size-12 mx-auto mb-4 opacity-40" />
                 <p>Aucun scan agent</p>
@@ -549,6 +480,8 @@ function ScannerContent() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Statut</TableHead>
+                    <TableHead>Entreprise</TableHead>
+                    <TableHead>Site</TableHead>
                     <TableHead>Cible</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Agent</TableHead>
@@ -557,7 +490,7 @@ function ScannerContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {agentTasks.map((task) => {
+                  {filteredAgentTasks.map((task) => {
                     const params = task.parameters as Record<string, string>;
                     return (
                       <TableRow key={task.id}>
@@ -579,6 +512,16 @@ function ScannerContent() {
                             statut={task.status === "completed" ? "completed" : task.status === "failed" ? "failed" : "running"}
                             errorMessage={task.error_message}
                           />
+                        </TableCell>
+                        <TableCell>
+                          {params?.entreprise_id
+                            ? getEntrepriseName(Number(params.entreprise_id))
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {params?.site_id
+                            ? getSiteName(Number(params.site_id))
+                            : "—"}
                         </TableCell>
                         <TableCell className="font-mono text-sm">
                           {params?.target || "—"}
@@ -622,7 +565,7 @@ function ScannerContent() {
             )
           ) : loading ? (
             <TableSkeleton rows={3} cols={7} />
-          ) : scans.length === 0 ? (
+          ) : filteredScans.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Radar className="size-12 mx-auto mb-4 opacity-40" />
               <p>Aucun scan réalisé</p>
@@ -637,6 +580,7 @@ function ScannerContent() {
                   <TableHead>Nom</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Entreprise</TableHead>
                   <TableHead>Site</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Commande</TableHead>
@@ -647,7 +591,7 @@ function ScannerContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scans.map((scan) => (
+                {filteredScans.map((scan) => (
                   <TableRow key={scan.id} className={scan.statut === "running" ? "bg-primary/5" : ""}>
                     <TableCell className="font-medium max-w-[160px] truncate">
                       {scan.nom || (
@@ -666,6 +610,7 @@ function ScannerContent() {
                         minute: "2-digit",
                       })}
                     </TableCell>
+                    <TableCell>{getEntrepriseName(getEntrepriseIdForSite(scan.site_id))}</TableCell>
                     <TableCell>{getSiteName(scan.site_id)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
@@ -738,202 +683,13 @@ function ScannerContent() {
         </CardContent>
       </Card>
 
-      {/* Launch dialog */}
-      <Dialog open={showLaunch} onOpenChange={setShowLaunch}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Lancer un scan réseau</DialogTitle>
-            <DialogDescription>
-              Configurez les paramètres du scan Nmap
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-4">
-            {/* Execution mode: Local / Agent */}
-            <div>
-              <Label className="mb-1.5 block">Exécution</Label>
-              <Tabs
-                value={scanMode}
-                onValueChange={(v) => setScanMode(v as "local" | "agent")}
-              >
-                <TabsList className="w-full">
-                  <TabsTrigger value="local" className="flex-1 gap-1.5">
-                    <Server className="size-3.5" />
-                    Local (serveur)
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="agent"
-                    className="flex-1 gap-1.5"
-                    disabled={nmapAgents.length === 0}
-                  >
-                    <Monitor className="size-3.5" />
-                    Agent distant
-                    {nmapAgents.length > 0 && (
-                      <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">
-                        {nmapAgents.length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              {scanMode === "agent" && nmapAgents.length === 0 && (
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  Aucun agent avec l&apos;outil nmap disponible
-                </p>
-              )}
-            </div>
-
-            {/* Agent selector (only in agent mode) */}
-            {scanMode === "agent" && nmapAgents.length > 0 && (
-              <div>
-                <Label>Agent *</Label>
-                <Select
-                  value={selectedAgentUuid}
-                  onValueChange={setSelectedAgentUuid}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un agent" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {nmapAgents.map((a) => (
-                        <SelectItem key={a.agent_uuid} value={a.agent_uuid}>
-                          <div className="flex items-center gap-2">
-                            <span>{a.name}</span>
-                            {a.last_ip && (
-                              <span className="text-muted-foreground text-xs">
-                                ({a.last_ip})
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Nom du scan */}
-            <div>
-              <Label>Nom du scan (optionnel)</Label>
-              <Input
-                value={nom}
-                onChange={(e) => setNom(e.target.value)}
-                placeholder="Ex : VLAN 10 - MGT, DMZ Serveurs…"
-              />
-            </div>
-
-            {/* Site */}
-            <div>
-              <Label>Site *</Label>
-              <Select
-                value={siteId ? String(siteId) : ""}
-                onValueChange={(v) => setSiteId(Number(v))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un site" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {sites.map((s) => (
-                      <SelectItem key={s.id} value={String(s.id)}>
-                        {s.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Cible */}
-            <div>
-              <Label>Cible (IP, plage CIDR) *</Label>
-              <Input
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                placeholder="192.168.1.0/24"
-              />
-            </div>
-
-            {/* Type de scan */}
-            <div>
-              <Label>Type de scan</Label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                {SCAN_TYPES.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => setScanType(type.value)}
-                    className={cn(
-                      "text-left p-3 rounded-lg border-2 transition-colors",
-                      scanType === type.value
-                        ? "border-primary bg-primary/5"
-                        : "border-muted hover:border-muted-foreground/30"
-                    )}
-                  >
-                    <div className="font-medium text-sm">{type.label}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {type.description}
-                    </div>
-                    {type.args && (
-                      <code className="text-[10px] text-muted-foreground font-mono mt-1 block">
-                        {type.args}
-                      </code>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom args (only shown for custom type) */}
-            {scanType === "custom" && (
-              <div>
-                <Label>Arguments Nmap personnalisés *</Label>
-                <Input
-                  value={customArgs}
-                  onChange={(e) => setCustomArgs(e.target.value)}
-                  placeholder="-sV -p 22,80,443 --script vuln"
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Saisissez les arguments nmap sans la cible (elle sera ajoutée automatiquement)
-                </p>
-              </div>
-            )}
-
-            {/* Nmap command preview */}
-            <div className="rounded-lg bg-zinc-950 p-3 mt-2">
-              <div className="flex items-center gap-2 text-zinc-400 text-xs mb-1">
-                <Terminal className="size-3" />
-                Commande qui sera exécutée
-              </div>
-              <code className="text-green-400 text-sm font-mono break-all">
-                $ {commandPreview}
-              </code>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <Label>Notes (optionnel)</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Notes sur ce scan…"
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLaunch(false)}>
-              Annuler
-            </Button>
-            <Button onClick={handleLaunch}>
-              <Play data-icon="inline-start" />
-              Lancer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Launch dialog (extracted component) */}
+      <LaunchScanDialog
+        open={showLaunch}
+        onOpenChange={setShowLaunch}
+        onLaunched={handleLocalLaunched}
+        onAgentDispatched={handleAgentDispatched}
+      />
 
       {/* Agent task logs */}
       {agentTaskUuid && agentLogs.length > 0 && (
@@ -984,82 +740,13 @@ function ScannerContent() {
         </Card>
       )}
 
-      {/* Agent task detail dialog */}
-      <Dialog open={showTaskDetail} onOpenChange={setShowTaskDetail}>
-        <DialogContent className="sm:max-w-lg">
-          {selectedTask && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Monitor className="size-5" />
-                  Scan agent — {(selectedTask.parameters as Record<string, string>)?.target || "—"}
-                </DialogTitle>
-                <DialogDescription>
-                  Agent : {getAgentName(selectedTask.agent_id)} — Statut : {selectedTask.status}
-                  {selectedTask.error_message && (
-                    <span className="text-destructive block mt-1">{selectedTask.error_message}</span>
-                  )}
-                </DialogDescription>
-              </DialogHeader>
-
-              {/* Result summary */}
-              {selectedTask.result_summary && (
-                <div className="rounded-lg bg-zinc-950 p-3 max-h-[200px] overflow-y-auto">
-                  <div className="text-zinc-400 text-xs mb-1">Résumé</div>
-                  <pre className="text-zinc-300 text-xs font-mono whitespace-pre-wrap">
-                    {JSON.stringify(selectedTask.result_summary, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-              {/* Artifacts */}
-              {selectedTaskArtifacts.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">
-                    Fichiers résultat ({selectedTaskArtifacts.length})
-                  </h4>
-                  <div className="flex flex-col gap-2">
-                    {selectedTaskArtifacts.map((artifact) => (
-                      <div
-                        key={artifact.id}
-                        className="flex items-center justify-between p-2 rounded border bg-muted/50"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Download className="size-4 text-muted-foreground shrink-0" />
-                          <span className="text-sm font-mono truncate">
-                            {artifact.original_filename}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            ({Math.round(artifact.file_size / 1024)} Ko)
-                          </span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            window.open(
-                              `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}${artifact.download_url}`,
-                              "_blank"
-                            );
-                          }}
-                        >
-                          <Download className="size-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedTaskArtifacts.length === 0 && selectedTask.status === "completed" && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Aucun fichier résultat uploadé par l&apos;agent
-                </p>
-              )}
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Agent task detail (extracted component) */}
+      <AgentTaskDetail
+        task={selectedTask}
+        open={showTaskDetail}
+        onOpenChange={setShowTaskDetail}
+        agentName={selectedTask ? getAgentName(selectedTask.agent_id) : ""}
+      />
 
       {/* Detail dialog */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
