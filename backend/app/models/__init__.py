@@ -45,7 +45,6 @@ from .attachment import Attachment
 from .config_analysis import ConfigAnalysis
 from .collect_result import CollectResult, CollectMethod, CollectStatus
 from .ad_audit_result import ADAuditResultModel, ADAuditStatus
-from .pingcastle_result import PingCastleResult, PingCastleStatus
 from .monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
 from .agent import Agent
 from .agent_task import AgentTask
@@ -97,8 +96,6 @@ __all__ = [
     "CollectStatus",
     "ADAuditResultModel",
     "ADAuditStatus",
-    "PingCastleResult",
-    "PingCastleStatus",
     "Monkey365ScanResult",
     "Monkey365ScanStatus",
     "Agent",
