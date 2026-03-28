@@ -57,11 +57,18 @@ class _RateLimiter:
                 del self._blocked[ip]
 
     def _get_client_ip(self, request: Request) -> str:
-        """Extrait l'IP du client (supporte X-Forwarded-For derrière reverse proxy)."""
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            # Premier IP = client réel
-            return forwarded.split(",")[0].strip()
+        """
+        Extrait l'IP du client.
+        X-Forwarded-For n'est utilise qu'en production (derriere un reverse proxy
+        de confiance). En dev, on utilise toujours l'IP directe pour eviter
+        le spoofing du header.
+        """
+        from .config import get_settings
+        _settings = get_settings()
+        if _settings.ENV in ("production", "preprod", "staging"):
+            forwarded = request.headers.get("X-Forwarded-For")
+            if forwarded:
+                return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
     def check(self, request: Request) -> None:
@@ -124,5 +131,6 @@ class _RateLimiter:
             self._blocked.pop(ip, None)
 
 
-# Singleton global
+# Singletons globaux
 login_rate_limiter = _RateLimiter()
+enroll_rate_limiter = _RateLimiter()  # protege /agents/enroll contre le brute-force
