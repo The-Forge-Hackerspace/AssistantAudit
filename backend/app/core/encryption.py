@@ -9,9 +9,12 @@ Format stocke en base : hex(nonce_12B || ciphertext || tag_16B)
 La cle ENCRYPTION_KEY est une variable d'environnement distincte de SECRET_KEY.
 """
 import json
+import logging
 import os
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import Text
 from sqlalchemy.types import TypeDecorator
 
@@ -82,11 +85,18 @@ class EncryptedText(TypeDecorator):
             return value  # Mode dev : pas de chiffrement
         return cipher.decrypt(value)
 
+    _warned_no_key = False
+
     @staticmethod
     def _get_cipher() -> AES256GCMCipher | None:
         """Retourne le cipher si ENCRYPTION_KEY est configuree, sinon None."""
         from app.core.config import get_settings
         key = get_settings().ENCRYPTION_KEY
         if not key:
+            if not EncryptedText._warned_no_key:
+                logger.warning(
+                    "ENCRYPTION_KEY non configuree — colonnes sensibles stockees en clair (dev only)"
+                )
+                EncryptedText._warned_no_key = True
             return None
         return AES256GCMCipher(key)
