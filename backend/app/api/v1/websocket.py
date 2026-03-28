@@ -79,6 +79,11 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
     # owner_id de confiance : extrait du JWT a la connexion, pas du message client
     trusted_owner_id = ws_manager.get_agent_owner(agent_uuid)
 
+    # Pour les updates last_seen en base
+    from datetime import datetime, timezone
+    from ...core.database import SessionLocal
+    from ...models.agent import Agent
+
     try:
         while True:
             data = await _receive_json_safe(websocket)
@@ -88,6 +93,25 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
 
             if msg_type == "heartbeat":
                 await websocket.send_json({"type": "heartbeat_ack", "data": {}})
+                # Mettre a jour last_seen en base
+                try:
+                    db = SessionLocal()
+                    agent = db.query(Agent).filter(Agent.agent_uuid == agent_uuid).first()
+                    if agent:
+                        agent.last_seen = datetime.now(timezone.utc)
+                        hb_data = data.get("data", {})
+                        if hb_data.get("agent_version"):
+                            agent.agent_version = hb_data["agent_version"]
+                        if hb_data.get("os_info"):
+                            agent.os_info = hb_data["os_info"]
+                        client_host = websocket.client.host if websocket.client else None
+                        if client_host:
+                            agent.last_ip = client_host
+                        db.commit()
+                except Exception:
+                    logger.exception("Failed to update last_seen for agent %s", agent_uuid)
+                finally:
+                    db.close()
 
             elif msg_type in ("task_status", "task_progress"):
                 # Forward vers le owner de confiance (JWT), ignore owner_id client
