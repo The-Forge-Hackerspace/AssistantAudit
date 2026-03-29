@@ -7,8 +7,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session, selectinload
 
+from ..core.helpers import get_or_404
 from ..models.assessment import (
     AssessmentCampaign,
     Assessment,
@@ -27,13 +29,43 @@ logger = logging.getLogger(__name__)
 
 class AssessmentService:
 
+    @staticmethod
+    def _check_audit_access(
+        db: Session, audit_id: int, user_id: int | None, is_admin: bool,
+    ) -> None:
+        """Verifie l'acces a un audit. 404 si non autorise."""
+        if is_admin or user_id is None:
+            return
+        audit = get_or_404(db, Audit, audit_id)
+        if audit.owner_id != user_id:
+            raise HTTPException(status_code=404, detail="Ressource introuvable")
+
+    @staticmethod
+    def _check_campaign_access(
+        db: Session, campaign: AssessmentCampaign, user_id: int | None, is_admin: bool,
+    ) -> None:
+        """Verifie l'acces via Campaign → Audit."""
+        AssessmentService._check_audit_access(db, campaign.audit_id, user_id, is_admin)
+
+    @staticmethod
+    def _check_assessment_access(
+        db: Session, assessment: Assessment, user_id: int | None, is_admin: bool,
+    ) -> None:
+        """Verifie l'acces via Assessment → Campaign → Audit."""
+        campaign = db.get(AssessmentCampaign, assessment.campaign_id)
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Ressource introuvable")
+        AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
+
     # --- Campagnes ---
 
     @staticmethod
     def create_campaign(
-        db: Session, name: str, audit_id: int, description: str = None
+        db: Session, name: str, audit_id: int, description: str = None,
+        user_id: int | None = None, is_admin: bool = False,
     ) -> AssessmentCampaign:
         """Crée une nouvelle campagne d'évaluation"""
+        AssessmentService._check_audit_access(db, audit_id, user_id, is_admin)
         campaign = AssessmentCampaign(
             name=name,
             description=description,
@@ -47,33 +79,51 @@ class AssessmentService:
         return campaign
 
     @staticmethod
-    def get_campaign(db: Session, campaign_id: int) -> Optional[AssessmentCampaign]:
-        return db.get(AssessmentCampaign, campaign_id)
+    def get_campaign(
+        db: Session, campaign_id: int,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> Optional[AssessmentCampaign]:
+        campaign = db.get(AssessmentCampaign, campaign_id)
+        if campaign:
+            AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
+        return campaign
 
     @staticmethod
     def list_campaigns(
-        db: Session, audit_id: int = None, offset: int = 0, limit: int = 20
+        db: Session, audit_id: int = None, offset: int = 0, limit: int = 20,
+        user_id: int | None = None, is_admin: bool = False,
     ) -> tuple[list[AssessmentCampaign], int]:
         """
         List assessment campaigns with pagination.
         Optimized to avoid N+1 queries by eagerly loading assessments.
         """
+        if audit_id:
+            AssessmentService._check_audit_access(db, audit_id, user_id, is_admin)
+
         query = db.query(AssessmentCampaign).options(
             selectinload(AssessmentCampaign.assessments),
             selectinload(AssessmentCampaign.audit),
         )
         if audit_id:
             query = query.filter(AssessmentCampaign.audit_id == audit_id)
+        elif user_id is not None and not is_admin:
+            query = query.join(Audit, AssessmentCampaign.audit_id == Audit.id).filter(
+                Audit.owner_id == user_id
+            )
         total = query.count()
         campaigns = query.order_by(AssessmentCampaign.created_at.desc()).offset(offset).limit(limit).all()
         return campaigns, total
 
     @staticmethod
-    def update_campaign(db: Session, campaign_id: int, data) -> AssessmentCampaign:
+    def update_campaign(
+        db: Session, campaign_id: int, data,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> AssessmentCampaign:
         """Met à jour une campagne (nom, description, statut)"""
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
             raise ValueError(f"Campagne {campaign_id} introuvable")
+        AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
         update_data = data.model_dump(exclude_unset=True)
 
         # Si le statut change vers in_progress ou completed, déléguer aux méthodes dédiées
@@ -92,11 +142,15 @@ class AssessmentService:
         return campaign
 
     @staticmethod
-    def start_campaign(db: Session, campaign_id: int) -> AssessmentCampaign:
+    def start_campaign(
+        db: Session, campaign_id: int,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> AssessmentCampaign:
         """Démarre une campagne et passe les équipements associés en EN_COURS."""
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
             raise ValueError(f"Campagne {campaign_id} introuvable")
+        AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
         campaign.status = CampaignStatus.IN_PROGRESS
         campaign.started_at = datetime.now(timezone.utc)
 
@@ -112,11 +166,15 @@ class AssessmentService:
         return campaign
 
     @staticmethod
-    def complete_campaign(db: Session, campaign_id: int) -> AssessmentCampaign:
+    def complete_campaign(
+        db: Session, campaign_id: int,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> AssessmentCampaign:
         """Termine une campagne et met à jour le statut des équipements."""
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
             raise ValueError(f"Campagne {campaign_id} introuvable")
+        AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
         campaign.status = CampaignStatus.COMPLETED
         campaign.completed_at = datetime.now(timezone.utc)
 
@@ -140,11 +198,15 @@ class AssessmentService:
         return campaign
 
     @staticmethod
-    def delete_campaign(db: Session, campaign_id: int) -> None:
+    def delete_campaign(
+        db: Session, campaign_id: int,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> None:
         """Supprime une campagne et tous ses assessments/résultats associés."""
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
             raise ValueError(f"Campagne {campaign_id} introuvable")
+        AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
         db.delete(campaign)
         db.commit()
         logger.info(f"Campagne supprimée : id={campaign_id} '{campaign.name}'")
@@ -158,6 +220,8 @@ class AssessmentService:
         equipement_id: int,
         framework_id: int,
         assessed_by: str | None = None,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Assessment:
         """
         Crée un assessment : lie un équipement à un framework dans une campagne.
@@ -167,6 +231,7 @@ class AssessmentService:
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
             raise ValueError(f"Campagne {campaign_id} introuvable")
+        AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
 
         equipement = db.get(Equipement, equipement_id)
         if not equipement:
@@ -225,15 +290,25 @@ class AssessmentService:
         return assessment
 
     @staticmethod
-    def get_assessment(db: Session, assessment_id: int) -> Optional[Assessment]:
-        return db.get(Assessment, assessment_id)
+    def get_assessment(
+        db: Session, assessment_id: int,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> Optional[Assessment]:
+        assessment = db.get(Assessment, assessment_id)
+        if assessment:
+            AssessmentService._check_assessment_access(db, assessment, user_id, is_admin)
+        return assessment
 
     @staticmethod
-    def delete_assessment(db: Session, assessment_id: int) -> None:
+    def delete_assessment(
+        db: Session, assessment_id: int,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> None:
         """Supprime un assessment et tous ses résultats de contrôle / pièces jointes."""
         assessment = db.get(Assessment, assessment_id)
         if not assessment:
             raise ValueError(f"Assessment {assessment_id} introuvable")
+        AssessmentService._check_assessment_access(db, assessment, user_id, is_admin)
         db.delete(assessment)
         db.commit()
         logger.info(f"Assessment supprimé : id={assessment_id}")
@@ -249,11 +324,16 @@ class AssessmentService:
         comment: str = None,
         remediation_note: str = None,
         assessed_by: str | None = None,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> ControlResult:
         """Met à jour le résultat d'un contrôle"""
         result = db.get(ControlResult, result_id)
         if not result:
             raise ValueError(f"ControlResult {result_id} introuvable")
+        assessment = db.get(Assessment, result.assessment_id)
+        if assessment:
+            AssessmentService._check_assessment_access(db, assessment, user_id, is_admin)
 
         result.status = ComplianceStatus(status)
         if evidence is not None:
@@ -330,7 +410,10 @@ class AssessmentService:
         }
 
     @staticmethod
-    def get_assessment_score(db: Session, assessment_id: int) -> dict | None:
+    def get_assessment_score(
+        db: Session, assessment_id: int,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> dict | None:
         """
         Calculate compliance score for an assessment.
         Optimized to eagerly load control results.
@@ -338,13 +421,17 @@ class AssessmentService:
         assessment = db.query(Assessment).options(
             selectinload(Assessment.results).selectinload(ControlResult.control),
         ).filter(Assessment.id == assessment_id).first()
-        
+
         if not assessment:
             return None
+        AssessmentService._check_assessment_access(db, assessment, user_id, is_admin)
         return AssessmentService.compute_score(assessment.results)
 
     @staticmethod
-    def get_campaign_score(db: Session, campaign_id: int) -> dict | None:
+    def get_campaign_score(
+        db: Session, campaign_id: int,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> dict | None:
         """
         Calculate compliance score for a campaign (aggregated across all assessments).
         Optimized to eagerly load assessment results.
@@ -355,6 +442,7 @@ class AssessmentService:
 
         if not campaign:
             return None
+        AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
         all_results = []
         for assessment in campaign.assessments:
             all_results.extend(assessment.results)

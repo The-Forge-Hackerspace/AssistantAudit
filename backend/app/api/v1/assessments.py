@@ -26,6 +26,10 @@ from ...services.monkey365_service import Monkey365Service
 router = APIRouter()
 
 
+def _rbac(current_user: User) -> tuple[int, bool]:
+    return current_user.id, current_user.role == "admin"
+
+
 # --- Campagnes ---
 
 @router.get("/campaigns", response_model=PaginatedResponse[CampaignSummary])
@@ -33,11 +37,13 @@ def list_campaigns(
     audit_id: int = None,
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les campagnes d'évaluation"""
+    uid, adm = _rbac(current_user)
     campaigns, total = AssessmentService.list_campaigns(
-        db, audit_id=audit_id, offset=pagination.offset, limit=pagination.page_size
+        db, audit_id=audit_id, offset=pagination.offset, limit=pagination.page_size,
+        user_id=uid, is_admin=adm,
     )
     items = []
     for c in campaigns:
@@ -63,11 +69,13 @@ def list_campaigns(
 def create_campaign(
     body: CampaignCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Crée une nouvelle campagne d'évaluation"""
+    uid, adm = _rbac(current_user)
     campaign = AssessmentService.create_campaign(
-        db, name=body.name, audit_id=body.audit_id, description=body.description
+        db, name=body.name, audit_id=body.audit_id, description=body.description,
+        user_id=uid, is_admin=adm,
     )
     return CampaignSummary(
         id=campaign.id,
@@ -84,10 +92,11 @@ def create_campaign(
 def get_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Détail d'une campagne avec ses assessments"""
-    campaign = AssessmentService.get_campaign(db, campaign_id)
+    uid, adm = _rbac(current_user)
+    campaign = AssessmentService.get_campaign(db, campaign_id, user_id=uid, is_admin=adm)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campagne introuvable")
     return campaign
@@ -98,11 +107,14 @@ def update_campaign(
     campaign_id: int,
     body: CampaignUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Met à jour une campagne (nom, description, statut)"""
+    uid, adm = _rbac(current_user)
     try:
-        campaign = AssessmentService.update_campaign(db, campaign_id, body)
+        campaign = AssessmentService.update_campaign(
+            db, campaign_id, body, user_id=uid, is_admin=adm,
+        )
         return CampaignSummary(
             id=campaign.id,
             name=campaign.name,
@@ -120,11 +132,12 @@ def update_campaign(
 def start_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Démarre une campagne"""
+    uid, adm = _rbac(current_user)
     try:
-        AssessmentService.start_campaign(db, campaign_id)
+        AssessmentService.start_campaign(db, campaign_id, user_id=uid, is_admin=adm)
         return MessageResponse(message="Campagne démarrée")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -134,11 +147,12 @@ def start_campaign(
 def complete_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Termine une campagne"""
+    uid, adm = _rbac(current_user)
     try:
-        AssessmentService.complete_campaign(db, campaign_id)
+        AssessmentService.complete_campaign(db, campaign_id, user_id=uid, is_admin=adm)
         return MessageResponse(message="Campagne terminée")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -148,11 +162,12 @@ def complete_campaign(
 def delete_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Supprime une campagne et toutes ses évaluations"""
+    uid, adm = _rbac(current_user)
     try:
-        AssessmentService.delete_campaign(db, campaign_id)
+        AssessmentService.delete_campaign(db, campaign_id, user_id=uid, is_admin=adm)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -169,6 +184,7 @@ def create_assessment(
     """Crée un assessment (évaluation d'un équipement selon un référentiel)"""
     if not campaign_id:
         raise HTTPException(status_code=400, detail="campaign_id est requis en query param")
+    uid, adm = _rbac(current_user)
     try:
         assessment = AssessmentService.create_assessment(
             db,
@@ -176,6 +192,7 @@ def create_assessment(
             equipement_id=body.equipement_id,
             framework_id=body.framework_id,
             assessed_by=current_user.username,
+            user_id=uid, is_admin=adm,
         )
         return assessment
     except ValueError as e:
@@ -186,10 +203,11 @@ def create_assessment(
 def get_assessment(
     assessment_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Détail d'un assessment avec tous ses résultats de contrôle"""
-    assessment = AssessmentService.get_assessment(db, assessment_id)
+    uid, adm = _rbac(current_user)
+    assessment = AssessmentService.get_assessment(db, assessment_id, user_id=uid, is_admin=adm)
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment introuvable")
     return assessment
@@ -199,11 +217,12 @@ def get_assessment(
 def delete_assessment(
     assessment_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Supprime un assessment et tous ses résultats"""
+    uid, adm = _rbac(current_user)
     try:
-        AssessmentService.delete_assessment(db, assessment_id)
+        AssessmentService.delete_assessment(db, assessment_id, user_id=uid, is_admin=adm)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -218,6 +237,7 @@ def update_control_result(
     current_user: User = Depends(get_current_auditeur),
 ):
     """Met à jour le résultat d'un contrôle"""
+    uid, adm = _rbac(current_user)
     try:
         AssessmentService.update_control_result(
             db,
@@ -227,6 +247,7 @@ def update_control_result(
             comment=body.comment,
             remediation_note=body.remediation_note,
             assessed_by=current_user.username,
+            user_id=uid, is_admin=adm,
         )
         return MessageResponse(message="Résultat mis à jour")
     except ValueError as e:
@@ -239,10 +260,11 @@ def update_control_result(
 def get_assessment_score(
     assessment_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Calcule le score de conformité d'un assessment"""
-    result = AssessmentService.get_assessment_score(db, assessment_id)
+    uid, adm = _rbac(current_user)
+    result = AssessmentService.get_assessment_score(db, assessment_id, user_id=uid, is_admin=adm)
     if result is None:
         raise HTTPException(status_code=404, detail="Assessment introuvable")
     return ScoreResponse(**result)
@@ -252,10 +274,11 @@ def get_assessment_score(
 def get_campaign_score(
     campaign_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Calcule le score de conformité agrégé d'une campagne"""
-    result = AssessmentService.get_campaign_score(db, campaign_id)
+    uid, adm = _rbac(current_user)
+    result = AssessmentService.get_campaign_score(db, campaign_id, user_id=uid, is_admin=adm)
     if result is None:
         raise HTTPException(status_code=404, detail="Campagne introuvable")
     return ScoreResponse(**result)
@@ -268,7 +291,7 @@ def simulate_m365_scan(
     assessment_id: int,
     body: M365ScanSimulateRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """
     Simule un scan Monkey365 en injectant des findings manuels.
