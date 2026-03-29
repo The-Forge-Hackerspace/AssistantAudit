@@ -34,7 +34,7 @@ router = APIRouter()
     status_code=status.HTTP_202_ACCEPTED,
     summary="Lancer un scan réseau (asynchrone)",
 )
-async def launch_scan(
+def launch_scan(
     payload: ScanCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),
@@ -101,7 +101,7 @@ async def launch_scan(
     "/preview-command",
     summary="Aperçu de la commande Nmap",
 )
-async def preview_nmap_command(
+def preview_nmap_command(
     scan_type: str = Query(..., description="Type de scan"),
     target: str = Query("", description="Cible"),
     custom_args: Optional[str] = Query(None, description="Arguments custom"),
@@ -117,7 +117,7 @@ async def preview_nmap_command(
     response_model=PaginatedResponse[ScanSummary],
     summary="Lister les scans",
 )
-async def list_scans(
+def list_scans(
     site_id: Optional[int] = Query(None, description="Filtrer par site"),
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
@@ -141,7 +141,7 @@ async def list_scans(
     response_model=ScanRead,
     summary="Détails d'un scan",
 )
-async def get_scan(
+def get_scan(
     scan_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -158,7 +158,7 @@ async def get_scan(
     response_model=MessageResponse,
     summary="Supprimer un scan",
 )
-async def delete_scan(
+def delete_scan(
     scan_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -176,7 +176,7 @@ async def delete_scan(
     response_model=ScanHostRead,
     summary="Décider du sort d'un host découvert",
 )
-async def decide_host(
+def decide_host(
     host_id: int,
     payload: ScanHostDecision,
     db: Session = Depends(get_db),
@@ -212,7 +212,7 @@ async def decide_host(
     response_model=ScanHostRead,
     summary="Lier un host à un équipement existant",
 )
-async def link_host(
+def link_host(
     host_id: int,
     equipement_id: int,
     db: Session = Depends(get_db),
@@ -231,7 +231,7 @@ async def link_host(
     response_model=MessageResponse,
     summary="Importer tous les hosts en attente",
 )
-async def import_all_hosts(
+def import_all_hosts(
     scan_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),

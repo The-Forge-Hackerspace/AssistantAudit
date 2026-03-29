@@ -27,7 +27,7 @@ router = APIRouter()
 
 
 @router.post("/config-analysis", response_model=ConfigUploadResponse)
-async def analyze_config(
+def analyze_config(
     file: UploadFile = File(...),
     equipement_id: int | None = Form(None),
     db: Session = Depends(get_db),
@@ -45,7 +45,7 @@ async def analyze_config(
     from ....core.config import get_settings
     _settings = get_settings()
     max_bytes = _settings.MAX_CONFIG_UPLOAD_SIZE_MB * 1024 * 1024
-    raw = await file.read(max_bytes + 1)  # lire 1 octet de plus pour détecter
+    raw = file.file.read(max_bytes + 1)  # lire 1 octet de plus pour détecter
     if len(raw) > max_bytes:
         raise HTTPException(
             413,

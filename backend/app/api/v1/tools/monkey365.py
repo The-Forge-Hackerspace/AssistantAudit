@@ -33,7 +33,7 @@ router = APIRouter()
 
 
 @router.post("/monkey365/run", response_model=Monkey365ScanResultSummary, status_code=201)
-async def launch_monkey365_scan(
+def launch_monkey365_scan(
     request: Monkey365ScanCreate,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
@@ -68,7 +68,7 @@ async def launch_monkey365_scan(
 
 
 @router.get("/monkey365/scans/{entreprise_id}", response_model=list[Monkey365ScanResultSummary])
-async def list_monkey365_scans(
+def list_monkey365_scans(
     entreprise_id: int,
     page: int = Query(1, ge=1, description="Numéro de page, commence à 1"),
     page_size: int = Query(50, ge=1, le=500, description="Nombre de résultats par page"),
@@ -85,7 +85,7 @@ async def list_monkey365_scans(
 
 
 @router.get("/monkey365/scans/result/{result_id}", response_model=Monkey365ScanResultRead)
-async def get_monkey365_scan_result(
+def get_monkey365_scan_result(
     result_id: int,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
@@ -97,7 +97,7 @@ async def get_monkey365_scan_result(
 
 
 @router.get("/monkey365/scans/result/{result_id}/logs", response_model=Monkey365ScanLogs)
-async def get_monkey365_scan_logs(
+def get_monkey365_scan_logs(
     result_id: int,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
@@ -131,7 +131,7 @@ async def get_monkey365_scan_logs(
 
 
 @router.post("/monkey365/scans/{result_id}/cancel", response_model=Monkey365ScanResultSummary)
-async def cancel_monkey365_scan(
+def cancel_monkey365_scan(
     result_id: int,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
@@ -155,7 +155,7 @@ async def cancel_monkey365_scan(
 
 
 @router.get("/monkey365/scans/result/{result_id}/report")
-async def get_monkey365_scan_report(
+def get_monkey365_scan_report(
     result_id: int,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),
@@ -193,7 +193,7 @@ async def get_monkey365_scan_report(
 
 
 @router.post("/monkey365/scans/{result_id}/import-to-audit", response_model=Monkey365ImportResult, status_code=201)
-async def import_monkey365_to_audit(
+def import_monkey365_to_audit(
     result_id: int,
     request: Monkey365ImportRequest,
     db: Session = Depends(get_db),
@@ -281,7 +281,7 @@ async def launch_monkey365_streaming_scan(
 
 
 @router.delete("/monkey365/scans/{result_id}", response_model=MessageResponse)
-async def delete_monkey365_scan(
+def delete_monkey365_scan(
     result_id: int,
     db: Session = Depends(get_db),
     _current_user: User = Depends(get_current_auditeur),

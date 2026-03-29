@@ -20,7 +20,7 @@ settings = get_settings()
 
 
 @router.get("", response_model=PaginatedResponse[FrameworkSummary])
-async def list_frameworks(
+def list_frameworks(
     pagination: PaginationParams = Depends(),
     active_only: bool = True,
     db: Session = Depends(get_db),
@@ -40,7 +40,7 @@ async def list_frameworks(
 
 
 @router.get("/{framework_id}", response_model=FrameworkRead)
-async def get_framework(
+def get_framework(
     framework_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -53,7 +53,7 @@ async def get_framework(
 
 
 @router.get("/{framework_id}/versions", response_model=list[FrameworkSummary])
-async def list_framework_versions(
+def list_framework_versions(
     framework_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -67,7 +67,7 @@ async def list_framework_versions(
 
 
 @router.post("/{framework_id}/clone", response_model=FrameworkRead, status_code=status.HTTP_201_CREATED)
-async def clone_framework(
+def clone_framework(
     framework_id: int,
     body: FrameworkCloneRequest,
     db: Session = Depends(get_db),
@@ -84,7 +84,7 @@ async def clone_framework(
 
 
 @router.get("/{framework_id}/export")
-async def export_framework(
+def export_framework(
     framework_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -111,7 +111,7 @@ async def export_framework(
 
 
 @router.post("/sync", response_model=MessageResponse)
-async def sync_frameworks(
+def sync_frameworks(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ):
@@ -140,7 +140,7 @@ async def sync_frameworks(
 
 
 @router.post("", response_model=FrameworkRead, status_code=status.HTTP_201_CREATED)
-async def create_framework(
+def create_framework(
     body: FrameworkCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
@@ -171,7 +171,7 @@ async def create_framework(
 
 
 @router.put("/{framework_id}", response_model=FrameworkRead)
-async def update_framework(
+def update_framework(
     framework_id: int,
     body: FrameworkCreate,
     db: Session = Depends(get_db),
@@ -194,7 +194,7 @@ async def update_framework(
 
 
 @router.delete("/{framework_id}", response_model=MessageResponse)
-async def delete_framework(
+def delete_framework(
     framework_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
@@ -208,7 +208,7 @@ async def delete_framework(
 
 
 @router.post("/import", response_model=MessageResponse)
-async def import_all_frameworks(
+def import_all_frameworks(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ):
@@ -226,7 +226,7 @@ async def import_all_frameworks(
 
 
 @router.post("/import/{filename}", response_model=FrameworkRead)
-async def import_single_framework(
+def import_single_framework(
     filename: str,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),

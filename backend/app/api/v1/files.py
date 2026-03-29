@@ -41,7 +41,7 @@ _file_service = FileService()
     response_model=AttachmentRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def upload_file(
+def upload_file(
     control_result_id: int = Form(...),
     file: UploadFile = File(...),
     description: str = Form(default=None),
@@ -65,7 +65,7 @@ async def upload_file(
     chunks = []
     total_size = 0
     while True:
-        chunk = await file.read(8192)
+        chunk = file.file.read(8192)
         if not chunk:
             break
         total_size += len(chunk)
@@ -97,7 +97,7 @@ async def upload_file(
 
 
 @router.get("/download/{attachment_id}")
-async def download_file(
+def download_file(
     attachment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -119,7 +119,7 @@ async def download_file(
 
 
 @router.delete("/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_file(
+def delete_file(
     attachment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),

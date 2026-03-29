@@ -42,7 +42,7 @@ def _validate_link_endpoints_same_site(db: Session, site_id: int, source_id: int
 
 
 @router.get("/links", response_model=list[NetworkLinkRead])
-async def list_network_links(
+def list_network_links(
     site_id: int = Query(...),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -55,7 +55,7 @@ async def list_network_links(
 
 
 @router.get("/links/{link_id}", response_model=NetworkLinkRead)
-async def get_network_link(
+def get_network_link(
     link_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -67,7 +67,7 @@ async def get_network_link(
 
 
 @router.post("/links", response_model=NetworkLinkRead, status_code=status.HTTP_201_CREATED)
-async def create_network_link(
+def create_network_link(
     body: NetworkLinkCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -91,7 +91,7 @@ async def create_network_link(
 
 
 @router.put("/links/{link_id}", response_model=NetworkLinkRead)
-async def update_network_link(
+def update_network_link(
     link_id: int,
     body: NetworkLinkUpdate,
     db: Session = Depends(get_db),
@@ -110,7 +110,7 @@ async def update_network_link(
 
 
 @router.delete("/links/{link_id}", response_model=MessageResponse)
-async def delete_network_link(
+def delete_network_link(
     link_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -124,7 +124,7 @@ async def delete_network_link(
 
 
 @router.get("/site/{site_id}", response_model=NetworkMapRead)
-async def get_site_network_map(
+def get_site_network_map(
     site_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -185,7 +185,7 @@ async def get_site_network_map(
 
 
 @router.put("/site/{site_id}/layout", response_model=MessageResponse)
-async def save_site_network_layout(
+def save_site_network_layout(
     site_id: int,
     body: NetworkLayoutSaveRequest,
     db: Session = Depends(get_db),
@@ -211,7 +211,7 @@ async def save_site_network_layout(
 
 
 @router.get("/overview/{entreprise_id}", response_model=MultiSiteOverviewRead)
-async def get_multi_site_overview(
+def get_multi_site_overview(
     entreprise_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -252,7 +252,7 @@ async def get_multi_site_overview(
 
 
 @router.get("/site-connections", response_model=list[SiteConnectionRead])
-async def list_site_connections(
+def list_site_connections(
     entreprise_id: int = Query(...),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -264,7 +264,7 @@ async def list_site_connections(
 
 
 @router.get("/site-connections/{connection_id}", response_model=SiteConnectionRead)
-async def get_site_connection(
+def get_site_connection(
     connection_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -276,7 +276,7 @@ async def get_site_connection(
 
 
 @router.post("/site-connections", response_model=SiteConnectionRead, status_code=status.HTTP_201_CREATED)
-async def create_site_connection(
+def create_site_connection(
     body: SiteConnectionCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -319,7 +319,7 @@ async def create_site_connection(
 
 
 @router.put("/site-connections/{connection_id}", response_model=SiteConnectionRead)
-async def update_site_connection(
+def update_site_connection(
     connection_id: int,
     body: SiteConnectionUpdate,
     db: Session = Depends(get_db),
@@ -342,7 +342,7 @@ async def update_site_connection(
 
 
 @router.delete("/site-connections/{connection_id}", response_model=MessageResponse)
-async def delete_site_connection(
+def delete_site_connection(
     connection_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -358,7 +358,7 @@ async def delete_site_connection(
 # ── VLAN Definitions ──
 
 @router.get("/vlans", response_model=list[VlanDefinitionRead])
-async def list_vlans(
+def list_vlans(
     site_id: int = Query(...),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -370,7 +370,7 @@ async def list_vlans(
 
 
 @router.get("/vlans/{vlan_def_id}", response_model=VlanDefinitionRead)
-async def get_vlan(
+def get_vlan(
     vlan_def_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -382,7 +382,7 @@ async def get_vlan(
 
 
 @router.post("/vlans", response_model=VlanDefinitionRead, status_code=status.HTTP_201_CREATED)
-async def create_vlan(
+def create_vlan(
     body: VlanDefinitionCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -406,7 +406,7 @@ async def create_vlan(
 
 
 @router.put("/vlans/{vlan_def_id}", response_model=VlanDefinitionRead)
-async def update_vlan(
+def update_vlan(
     vlan_def_id: int,
     body: VlanDefinitionUpdate,
     db: Session = Depends(get_db),
@@ -432,7 +432,7 @@ async def update_vlan(
 
 
 @router.delete("/vlans/{vlan_def_id}", response_model=MessageResponse)
-async def delete_vlan(
+def delete_vlan(
     vlan_def_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
