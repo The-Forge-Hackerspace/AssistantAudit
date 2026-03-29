@@ -4,6 +4,7 @@ Service Entreprise : CRUD pour les entreprises et contacts.
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from ..core.audit_logger import log_access_denied
 from ..core.helpers import get_or_404, user_has_access_to_entreprise
 from ..models.audit import Audit
 from ..models.entreprise import Entreprise, Contact
@@ -46,6 +47,7 @@ class EntrepriseService:
         entreprise = get_or_404(db, Entreprise, entreprise_id)
         if user_id is not None and not is_admin:
             if not user_has_access_to_entreprise(db, entreprise_id, user_id):
+                log_access_denied(user_id, "Entreprise", entreprise_id)
                 raise HTTPException(status_code=404, detail="Entreprise introuvable")
         return entreprise
 
@@ -105,6 +107,7 @@ class EntrepriseService:
         entreprise = get_or_404(db, Entreprise, entreprise_id)
         if user_id is not None and not is_admin:
             if not user_has_access_to_entreprise(db, entreprise_id, user_id):
+                log_access_denied(user_id, "Entreprise", entreprise_id, action="update")
                 raise HTTPException(status_code=404, detail="Entreprise introuvable")
 
         update_data = data.model_dump(exclude_unset=True)

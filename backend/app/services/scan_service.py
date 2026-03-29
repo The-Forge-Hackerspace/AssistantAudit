@@ -11,6 +11,7 @@ from ..models.scan import ScanReseau, ScanHost, ScanPort
 from ..models.site import Site
 from ..models.equipement import Equipement, EQUIPEMENT_TYPE_VALUES
 from ..tools.nmap_scanner.scanner import NmapScanner, NmapScanResult
+from ..core.audit_logger import log_access_denied
 from ..core.database import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -310,6 +311,7 @@ def get_scan_with_hosts(
     """Récupère un scan avec ses hosts et ports. Vérifie ownership si owner_id fourni."""
     scan = db.get(ScanReseau, scan_id)
     if scan and owner_id is not None and not is_admin and scan.owner_id != owner_id:
+        log_access_denied(owner_id, "ScanReseau", scan_id)
         return None
     return scan
 
@@ -344,6 +346,7 @@ def delete_scan(
     if not scan:
         return False
     if owner_id is not None and not is_admin and scan.owner_id != owner_id:
+        log_access_denied(owner_id, "ScanReseau", scan_id, action="delete")
         return False
     db.delete(scan)
     db.commit()

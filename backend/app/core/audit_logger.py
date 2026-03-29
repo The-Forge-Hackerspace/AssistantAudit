@@ -253,3 +253,23 @@ class BusinessAuditLogger:
 
 # Singleton instance
 audit_logger = BusinessAuditLogger()
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Security: RBAC Access Denied Logger
+# ────────────────────────────────────────────────────────────────────────
+
+_security_logger = logging.getLogger("security")
+
+
+def log_access_denied(
+    user_id: int,
+    resource_type: str,
+    resource_id: int | str,
+    action: str = "read",
+) -> None:
+    """Log un échec d'ownership check pour monitoring sécurité."""
+    _security_logger.warning(
+        "access_denied: user=%s resource=%s/%s action=%s",
+        user_id, resource_type, resource_id, action,
+    )

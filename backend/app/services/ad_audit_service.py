@@ -10,6 +10,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from ..core.audit_logger import log_access_denied
 from ..models.ad_audit_result import ADAuditResultModel, ADAuditStatus
 from ..models.equipement import Equipement
 from ..models.assessment import Assessment, ControlResult, ComplianceStatus
@@ -217,6 +218,7 @@ def get_ad_audit_result(
     """Récupère le détail d'un audit AD. Vérifie ownership si owner_id fourni."""
     audit = db.get(ADAuditResultModel, audit_id)
     if audit and owner_id is not None and not is_admin and audit.owner_id != owner_id:
+        log_access_denied(owner_id, "ADAuditResult", audit_id)
         return None
     return audit
 
@@ -232,6 +234,7 @@ def delete_ad_audit_result(
     if not audit:
         return False
     if owner_id is not None and not is_admin and audit.owner_id != owner_id:
+        log_access_denied(owner_id, "ADAuditResult", audit_id, action="delete")
         return False
     db.delete(audit)
     db.commit()

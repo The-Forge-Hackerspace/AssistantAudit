@@ -4,6 +4,7 @@ Service Audit : CRUD pour les projets d'audit.
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from ..core.audit_logger import log_access_denied
 from ..core.helpers import get_or_404
 from ..models.audit import Audit, AuditStatus
 from ..models.entreprise import Entreprise
@@ -35,6 +36,7 @@ class AuditService:
         """Recupere un audit par ID. Si owner_id fourni, verifie l'appartenance."""
         audit = get_or_404(db, Audit, audit_id)
         if owner_id is not None and audit.owner_id != owner_id:
+            log_access_denied(owner_id, "Audit", audit_id)
             raise HTTPException(status_code=404, detail="Audit introuvable")
         return audit
 
@@ -63,6 +65,7 @@ class AuditService:
         """Met a jour un audit existant."""
         audit = get_or_404(db, Audit, audit_id)
         if owner_id is not None and audit.owner_id != owner_id:
+            log_access_denied(owner_id, "Audit", audit_id, action="update")
             raise HTTPException(status_code=404, detail="Audit introuvable")
 
         update_data = data.model_dump(exclude_unset=True)
@@ -80,6 +83,7 @@ class AuditService:
         """Supprime un audit. Retourne le nom du projet supprime."""
         audit = get_or_404(db, Audit, audit_id)
         if owner_id is not None and audit.owner_id != owner_id:
+            log_access_denied(owner_id, "Audit", audit_id, action="delete")
             raise HTTPException(status_code=404, detail="Audit introuvable")
         nom = audit.nom_projet
         db.delete(audit)

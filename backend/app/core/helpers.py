@@ -32,7 +32,11 @@ def check_owner(resource, owner_id: int, *, is_admin: bool = False) -> None:
         return
     resource_owner = getattr(resource, "owner_id", None) or getattr(resource, "user_id", None)
     if resource_owner != owner_id:
-        raise HTTPException(status_code=404, detail=f"{type(resource).__name__} introuvable")
+        from .audit_logger import log_access_denied
+        resource_type = type(resource).__name__
+        resource_id = getattr(resource, "id", "?")
+        log_access_denied(owner_id, resource_type, resource_id)
+        raise HTTPException(status_code=404, detail=f"{resource_type} introuvable")
 
 
 def user_has_access_to_entreprise(db: Session, entreprise_id: int, user_id: int) -> bool:
