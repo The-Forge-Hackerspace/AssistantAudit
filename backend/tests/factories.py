@@ -40,7 +40,7 @@ class UserFactory:
         db: Session,
         username: str = "testuser",
         email: str = "test@example.com",
-        password: str = "testpass123",
+        password: str = "TestPass123!",
         full_name: str = "Test User",
         role: str = "auditeur",
         is_active: bool = True,

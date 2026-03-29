@@ -82,6 +82,17 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 
+def validate_refresh_token(token: str) -> dict:
+    """
+    Decode un JWT et verifie que c'est un refresh token.
+    Retourne le payload ou raise JWTError si invalide/expire/mauvais type.
+    """
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    if payload.get("type") != "refresh":
+        raise JWTError("Type de token invalide : 'refresh' attendu")
+    return payload
+
+
 # --- Tokens agent (daemon Windows) ---
 
 def create_agent_token(agent_uuid: str, owner_id: int) -> str:

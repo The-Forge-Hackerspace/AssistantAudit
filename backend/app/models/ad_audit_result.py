@@ -13,7 +13,7 @@ from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
-from ..core.encryption import EncryptedText
+from ..core.encryption import EncryptedJSON, EncryptedText
 
 
 def _utcnow() -> datetime:
@@ -60,8 +60,8 @@ class ADAuditResultModel(Base):
     disabled_users: Mapped[int | None] = mapped_column(Integer)
 
     # Données collectées (JSON)
-    dc_list: Mapped[list | None] = mapped_column(JSON)
-    domain_admins: Mapped[list | None] = mapped_column(JSON)
+    dc_list: Mapped[list | None] = mapped_column(EncryptedJSON)
+    domain_admins: Mapped[list | None] = mapped_column(EncryptedJSON)
     enterprise_admins: Mapped[list | None] = mapped_column(JSON)
     schema_admins: Mapped[list | None] = mapped_column(JSON)
     inactive_users: Mapped[list | None] = mapped_column(JSON)

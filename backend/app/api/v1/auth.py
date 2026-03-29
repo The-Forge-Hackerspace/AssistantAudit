@@ -6,13 +6,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from jose import JWTError
+
 from ...core.config import get_settings
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_admin
 from ...core.rate_limit import login_rate_limiter
+from ...core.security import validate_refresh_token
 from ...models.user import User
 from ...schemas.user import (
     LoginRequest,
+    RefreshRequest,
     TokenResponse,
     UserCreate,
     UserRead,
@@ -85,6 +89,37 @@ async def login_json(request: Request, response: Response, body: LoginRequest, d
     tokens = AuthService.create_tokens(user)
     _clear_legacy_httponly_cookies(response)
     return tokens
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(
+    request: Request,
+    body: RefreshRequest,
+    db: Session = Depends(get_db),
+):
+    """Renouvelle les tokens a partir d'un refresh token valide."""
+    # Rate limiting (meme limiter que /login)
+    login_rate_limiter.check(request)
+    login_rate_limiter.record_attempt(request)
+
+    try:
+        payload = validate_refresh_token(body.refresh_token)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token invalide ou expire",
+        )
+
+    user_id = payload.get("sub")
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Utilisateur introuvable ou desactive",
+        )
+
+    login_rate_limiter.reset(request)
+    return AuthService.create_tokens(user)
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)

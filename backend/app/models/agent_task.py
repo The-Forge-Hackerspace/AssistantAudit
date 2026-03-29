@@ -6,6 +6,8 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
+
+from ..core.encryption import EncryptedJSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -40,7 +42,7 @@ class AgentTask(Base):
 
     # Quoi
     tool: Mapped[str] = mapped_column(String(50), nullable=False)
-    parameters: Mapped[dict] = mapped_column(JSON, nullable=False)
+    parameters: Mapped[dict] = mapped_column(EncryptedJSON, nullable=False)
 
     # Statut : pending, dispatched, running, completed, failed, cancelled
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)

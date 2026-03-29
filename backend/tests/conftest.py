@@ -108,7 +108,7 @@ def admin_user(db_session: Session) -> User:
     user = User(
         username="admin_test",
         email="admin@test.example.com",
-        password_hash=hash_password("admin_password_123"),
+        password_hash=hash_password("AdminPass123!"),
         full_name="Test Admin",
         role="admin",
         is_active=True,
@@ -125,7 +125,7 @@ def auditeur_user(db_session: Session) -> User:
     user = User(
         username="auditeur_test",
         email="auditeur@test.example.com",
-        password_hash=hash_password("auditeur_password_123"),
+        password_hash=hash_password("AuditeurPass1!"),
         full_name="Test Auditeur",
         role="auditeur",
         is_active=True,
@@ -142,7 +142,7 @@ def lecteur_user(db_session: Session) -> User:
     user = User(
         username="lecteur_test",
         email="lecteur@test.example.com",
-        password_hash=hash_password("lecteur_password_123"),
+        password_hash=hash_password("LecteurPass1!"),
         full_name="Test Lecteur",
         role="lecteur",
         is_active=True,

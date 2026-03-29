@@ -52,6 +52,57 @@ class AES256GCMCipher:
         return aesgcm.decrypt(nonce, ciphertext, None).decode("utf-8")
 
 
+class EncryptedJSON(TypeDecorator):
+    """
+    Type SQLAlchemy qui serialise en JSON puis chiffre/dechiffre automatiquement.
+
+    Usage :
+        parameters = Column(EncryptedJSON, nullable=False)
+
+    En Python on manipule des dict/list natifs, en base c'est chiffre.
+    Si ENCRYPTION_KEY est vide, les donnees sont stockees en JSON clair (mode dev).
+    """
+    impl = Text
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        """Python -> DB : json.dumps puis chiffre."""
+        if value is None:
+            return None
+        json_str = json.dumps(value, ensure_ascii=False)
+        cipher = self._get_cipher()
+        if cipher is None:
+            return json_str  # Mode dev : JSON clair
+        return cipher.encrypt(json_str)
+
+    def process_result_value(self, value, dialect):
+        """DB -> Python : dechiffre puis json.loads."""
+        if value is None:
+            return None
+        cipher = self._get_cipher()
+        if cipher is None:
+            json_str = value  # Mode dev : JSON clair
+        else:
+            json_str = cipher.decrypt(value)
+        return json.loads(json_str)
+
+    _warned_no_key = False
+
+    @staticmethod
+    def _get_cipher() -> AES256GCMCipher | None:
+        """Retourne le cipher si ENCRYPTION_KEY est configuree, sinon None."""
+        from app.core.config import get_settings
+        key = get_settings().ENCRYPTION_KEY
+        if not key:
+            if not EncryptedJSON._warned_no_key:
+                logger.warning(
+                    "ENCRYPTION_KEY non configuree — colonnes EncryptedJSON stockees en clair (dev only)"
+                )
+                EncryptedJSON._warned_no_key = True
+            return None
+        return AES256GCMCipher(key)
+
+
 class EncryptedText(TypeDecorator):
     """
     Type SQLAlchemy qui chiffre/dechiffre automatiquement les colonnes Text.

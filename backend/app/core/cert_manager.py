@@ -11,8 +11,12 @@ Usage :
     cert_pem, key_pem = mgr.sign_agent_cert(agent_uuid)
 """
 import hashlib
+import logging
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -24,6 +28,17 @@ class CertManager:
     def __init__(self, ca_cert_path: Path, ca_key_path: Path):
         self.ca_cert_path = Path(ca_cert_path)
         self.ca_key_path = Path(ca_key_path)
+
+        if self.ca_key_path.exists():
+            try:
+                mode = self.ca_key_path.stat().st_mode & 0o777
+                if mode != 0o600:
+                    logger.warning(
+                        "CA private key %s has insecure permissions %o, should be 600",
+                        self.ca_key_path, mode,
+                    )
+            except OSError:
+                pass
 
     @staticmethod
     def generate_ca(
@@ -79,6 +94,10 @@ class CertManager:
                 serialization.NoEncryption(),
             )
         )
+        try:
+            os.chmod(ca_key_path, 0o600)
+        except OSError:
+            pass  # Windows
 
     def sign_agent_cert(self, agent_uuid: str) -> tuple[bytes, bytes]:
         """
