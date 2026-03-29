@@ -2,18 +2,16 @@
 Routes API pour ORADAD — configuration, analyse et rapports ANSSI.
 """
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from ...core.database import get_db
 from ...core.deps import get_current_auditeur
-from ...models.agent_task import AgentTask
-from ...models.oradad_config import OradadConfig
-from ...services.oradad_analysis_service import OradadAnalysisService
+from ...services.oradad_config_service import OradadConfigService
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +84,7 @@ class OradadConfigResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
 
-def _config_to_response(config: OradadConfig) -> dict:
+def _config_to_response(config) -> dict:
     """Convertit un OradadConfig en dict de reponse avec mots de passe masques."""
     return {
         "id": config.id,
@@ -106,49 +104,6 @@ def _config_to_response(config: OradadConfig) -> dict:
     }
 
 
-# ── Helpers ──────────────────────────────────────────────────────────
-
-
-def _get_task_or_404(
-    db: Session,
-    task_uuid: str,
-    current_user,
-) -> AgentTask:
-    """Recupere une AgentTask oradad et verifie l'ownership."""
-    task = db.query(AgentTask).filter(
-        AgentTask.task_uuid == task_uuid,
-        AgentTask.tool == "oradad",
-    ).first()
-
-    if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tache ORADAD introuvable",
-        )
-
-    if task.owner_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tache ORADAD introuvable",
-        )
-
-    return task
-
-
-def _get_config_or_404(
-    db: Session,
-    config_id: int,
-    current_user,
-) -> OradadConfig:
-    """Recupere un OradadConfig et verifie l'ownership."""
-    config = db.query(OradadConfig).filter(OradadConfig.id == config_id).first()
-    if config is None:
-        raise HTTPException(status_code=404, detail="Profil de configuration introuvable")
-    if config.owner_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=404, detail="Profil de configuration introuvable")
-    return config
-
-
 # ── Config CRUD ──────────────────────────────────────────────────────
 
 
@@ -158,10 +113,9 @@ def list_configs(
     current_user=Depends(get_current_auditeur),
 ) -> list[OradadConfigResponse]:
     """Liste les profils de configuration ORADAD du user."""
-    query = db.query(OradadConfig)
-    if current_user.role != "admin":
-        query = query.filter(OradadConfig.owner_id == current_user.id)
-    configs = query.order_by(OradadConfig.created_at.desc()).all()
+    configs = OradadConfigService.list_configs(
+        db, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return [_config_to_response(c) for c in configs]
 
 
@@ -172,24 +126,7 @@ def create_config(
     current_user=Depends(get_current_auditeur),
 ) -> OradadConfigResponse:
     """Cree un profil de configuration ORADAD."""
-    config = OradadConfig(
-        name=body.name,
-        owner_id=current_user.id,
-        auto_get_domain=body.auto_get_domain,
-        auto_get_trusts=body.auto_get_trusts,
-        level=body.level,
-        confidential=body.confidential,
-        process_sysvol=body.process_sysvol,
-        sysvol_filter=body.sysvol_filter,
-        output_files=body.output_files,
-        output_mla=body.output_mla,
-        sleep_time=body.sleep_time,
-    )
-    if body.explicit_domains:
-        config.set_domains_list([d.model_dump() for d in body.explicit_domains])
-    db.add(config)
-    db.commit()
-    db.refresh(config)
+    config = OradadConfigService.create_config(db, body, owner_id=current_user.id)
     return _config_to_response(config)
 
 
@@ -201,33 +138,10 @@ def update_config(
     current_user=Depends(get_current_auditeur),
 ) -> OradadConfigResponse:
     """Met a jour un profil de configuration ORADAD."""
-    config = _get_config_or_404(db, config_id, current_user)
-    update_data = body.model_dump(exclude_unset=True)
-
-    # Traitement special pour explicit_domains (chiffre)
-    if "explicit_domains" in update_data:
-        domains_raw = update_data.pop("explicit_domains")
-        if domains_raw is not None:
-            # Fusionner avec les mots de passe existants si masques
-            existing_domains = config.get_domains_list()
-            new_domains = [d.model_dump() for d in body.explicit_domains]
-            for new_d in new_domains:
-                if new_d.get("password") == "••••••":
-                    # Chercher le domaine existant pour recuperer le vrai mot de passe
-                    for old_d in existing_domains:
-                        if (old_d.get("server") == new_d.get("server")
-                                and old_d.get("domain_name") == new_d.get("domain_name")):
-                            new_d["password"] = old_d.get("password", "")
-                            break
-            config.set_domains_list(new_domains)
-        else:
-            config.set_domains_list(None)
-
-    for field, value in update_data.items():
-        setattr(config, field, value)
-
-    db.commit()
-    db.refresh(config)
+    config = OradadConfigService.update_config(
+        db, config_id, body,
+        owner_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return _config_to_response(config)
 
 
@@ -238,9 +152,9 @@ def delete_config(
     current_user=Depends(get_current_auditeur),
 ):
     """Supprime un profil de configuration ORADAD."""
-    config = _get_config_or_404(db, config_id, current_user)
-    db.delete(config)
-    db.commit()
+    OradadConfigService.delete_config(
+        db, config_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return {"detail": "Profil supprime"}
 
 
@@ -251,7 +165,9 @@ def generate_config_xml(
     current_user=Depends(get_current_auditeur),
 ):
     """Genere le XML config-oradad.xml depuis un profil."""
-    config = _get_config_or_404(db, config_id, current_user)
+    config = OradadConfigService.get_config(
+        db, config_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return {"xml": config.to_xml()}
 
 
@@ -268,59 +184,10 @@ def analyze_oradad(
     Lance l'analyse ANSSI sur les resultats d'une tache ORADAD completee.
     Retourne le rapport ANSSI (findings + score).
     """
-    task = _get_task_or_404(db, task_uuid, current_user)
-
-    if task.status != "completed":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"La tache n'est pas terminee (status: {task.status})",
-        )
-
-    if task.result_summary and "anssi_report" in task.result_summary:
-        return task.result_summary["anssi_report"]
-
-    if not task.result_raw:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Aucune donnee brute disponible pour cette tache",
-        )
-
-    try:
-        raw_bytes = task.result_raw.encode("utf-8") if isinstance(task.result_raw, str) else task.result_raw
-        parsed_data = OradadAnalysisService.parse_oradad_tar(raw_bytes)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        )
-
-    findings = OradadAnalysisService.run_anssi_checks(db, parsed_data)
-    score = OradadAnalysisService.calculate_score(findings)
-
-    report = {
-        "findings": findings,
-        "score": score["score"],
-        "level": score["level"],
-        "stats": {
-            "total_checks": score["total_checks"],
-            "passed": score["passed"],
-            "failed": score["failed"],
-            "warning": score["warning"],
-            "not_checked": score["not_checked"],
-        },
-    }
-
-    summary = dict(task.result_summary) if task.result_summary else {}
-    summary["anssi_report"] = report
-    task.result_summary = summary
-    db.commit()
-
-    logger.info(
-        "Analyse ANSSI terminee pour la tache %s — score: %s, level: %s",
-        task_uuid, report["score"], report["level"],
+    task = OradadConfigService.get_task(
+        db, task_uuid, owner_id=current_user.id, is_admin=current_user.role == "admin",
     )
-
-    return report
+    return OradadConfigService.analyze(db, task)
 
 
 @router.get("/report/{task_uuid}")
@@ -330,7 +197,9 @@ def get_oradad_report(
     current_user=Depends(get_current_auditeur),
 ):
     """Retourne le rapport ANSSI d'une tache ORADAD deja analysee."""
-    task = _get_task_or_404(db, task_uuid, current_user)
+    task = OradadConfigService.get_task(
+        db, task_uuid, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    )
 
     if not task.result_summary or "anssi_report" not in task.result_summary:
         raise HTTPException(
@@ -347,10 +216,9 @@ def list_oradad_tasks(
     current_user=Depends(get_current_auditeur),
 ):
     """Liste les taches ORADAD."""
-    query = db.query(AgentTask).filter(AgentTask.tool == "oradad")
-    if current_user.role != "admin":
-        query = query.filter(AgentTask.owner_id == current_user.id)
-    tasks = query.order_by(AgentTask.created_at.desc()).all()
+    tasks = OradadConfigService.list_tasks(
+        db, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    )
 
     return [
         {
