@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=PaginatedResponse[AuditRead])
-async def list_audits(
+def list_audits(
     pagination: PaginationParams = Depends(),
     entreprise_id: int = None,
     db: Session = Depends(get_db),
@@ -39,7 +39,7 @@ async def list_audits(
 
 
 @router.post("", response_model=AuditRead, status_code=status.HTTP_201_CREATED)
-async def create_audit(
+def create_audit(
     body: AuditCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -61,7 +61,7 @@ async def create_audit(
 
 
 @router.get("/{audit_id}", response_model=AuditDetail)
-async def get_audit(
+def get_audit(
     audit_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -86,7 +86,7 @@ async def get_audit(
 
 
 @router.put("/{audit_id}", response_model=AuditRead)
-async def update_audit(
+def update_audit(
     audit_id: int,
     body: AuditUpdate,
     db: Session = Depends(get_db),
@@ -106,7 +106,7 @@ async def update_audit(
 
 
 @router.delete("/{audit_id}", response_model=MessageResponse)
-async def delete_audit(
+def delete_audit(
     audit_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),

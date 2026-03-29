@@ -78,7 +78,7 @@ def _equipement_to_read(eq: Equipement) -> EquipementRead:
 
 
 @router.get("", response_model=PaginatedResponse[EquipementSummary])
-async def list_equipements(
+def list_equipements(
     site_id: Optional[int] = None,
     entreprise_id: Optional[int] = None,
     type_equipement: Optional[str] = Query(default=None, pattern=TYPE_PATTERN),
@@ -115,7 +115,7 @@ async def list_equipements(
 
 
 @router.post("", response_model=EquipementRead, status_code=status.HTTP_201_CREATED)
-async def create_equipement(
+def create_equipement(
     body: EquipementCreate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
@@ -165,7 +165,7 @@ async def create_equipement(
 
 
 @router.get("/{equipement_id}", response_model=EquipementRead)
-async def get_equipement(
+def get_equipement(
     equipement_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -178,7 +178,7 @@ async def get_equipement(
 
 
 @router.put("/{equipement_id}", response_model=EquipementRead)
-async def update_equipement(
+def update_equipement(
     equipement_id: int,
     body: EquipementUpdate,
     db: Session = Depends(get_db),
@@ -213,7 +213,7 @@ async def update_equipement(
 
 
 @router.delete("/{equipement_id}", response_model=MessageResponse)
-async def delete_equipement(
+def delete_equipement(
     equipement_id: int,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
