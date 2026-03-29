@@ -184,6 +184,33 @@ def lecteur_headers(lecteur_user: User) -> dict:
 
 
 @pytest.fixture
+def second_auditeur_user(db_session: Session) -> User:
+    """Create a second auditeur user for isolation tests"""
+    user = User(
+        username="auditeur2_test",
+        email="auditeur2@test.example.com",
+        password_hash=hash_password("Auditeur2Pass1!"),
+        full_name="Test Auditeur 2",
+        role="auditeur",
+        is_active=True,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def second_auditeur_headers(second_auditeur_user: User) -> dict:
+    """Generate valid JWT headers for second auditeur user"""
+    token = create_access_token(subject=second_auditeur_user.id)
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+
+@pytest.fixture
 def invalid_token_headers() -> dict:
     """Generate invalid JWT headers"""
     return {

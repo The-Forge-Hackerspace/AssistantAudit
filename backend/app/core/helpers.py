@@ -21,3 +21,24 @@ def get_or_404(db: Session, model, item_id: int, detail: str | None = None):
             detail=detail or f"{model.__name__} introuvable",
         )
     return item
+
+
+def check_owner(resource, owner_id: int, *, is_admin: bool = False) -> None:
+    """
+    Verifie que la ressource appartient au user.
+    Admin bypass. Retourne 404 (pas 403) pour ne pas reveler l'existence.
+    """
+    if is_admin:
+        return
+    resource_owner = getattr(resource, "owner_id", None) or getattr(resource, "user_id", None)
+    if resource_owner != owner_id:
+        raise HTTPException(status_code=404, detail=f"{type(resource).__name__} introuvable")
+
+
+def user_has_access_to_entreprise(db: Session, entreprise_id: int, user_id: int) -> bool:
+    """Verifie si un user a au moins un audit lie a cette entreprise."""
+    from ..models.audit import Audit
+    return db.query(Audit).filter(
+        Audit.entreprise_id == entreprise_id,
+        Audit.owner_id == user_id,
+    ).first() is not None

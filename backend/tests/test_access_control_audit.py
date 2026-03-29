@@ -89,14 +89,14 @@ class TestAuditAccess:
         assert r.json()["total"] >= 1
 
     def test_lecteur_can_list_audits(self, client, lecteur_headers, audit):
-        """Lecteur peut lister les audits (get_current_user)."""
+        """Lecteur peut lister les audits (get_current_user) — voit uniquement les siens."""
         r = client.get("/api/v1/audits", headers=lecteur_headers)
         assert r.status_code == 200
 
-    def test_lecteur_can_get_audit_detail(self, client, lecteur_headers, audit):
-        """Lecteur peut voir le detail d'un audit (get_current_user)."""
+    def test_lecteur_cannot_get_other_audit_detail(self, client, lecteur_headers, audit):
+        """Lecteur ne voit pas l'audit d'un autre user (owner_id filtering)."""
         r = client.get(f"/api/v1/audits/{audit.id}", headers=lecteur_headers)
-        assert r.status_code == 200
+        assert r.status_code == 404
 
     def test_lecteur_cannot_create_audit(self, client, lecteur_headers, entreprise):
         """Lecteur ne peut pas creer d'audit (require_auditeur)."""
@@ -134,19 +134,16 @@ class TestAuditAccess:
 
 class TestAuditOwnership:
 
-    def test_audits_no_owner_filtering(self, client, auditeur_headers, auditeur2_headers, audit):
+    def test_audits_owner_filtering(self, client, auditeur_headers, auditeur2_headers, audit):
         """
-        FINDING: GET /audits ne filtre PAS par owner_id.
-        auditeur2 voit les audits de auditeur1.
-        Ce n'est pas forcement un bug (audits partages) mais doit etre documente.
+        FIXED: GET /audits filtre par owner_id.
+        auditeur2 ne voit PAS les audits de auditeur1.
         """
         r = client.get("/api/v1/audits", headers=auditeur2_headers)
         assert r.status_code == 200
-        # auditeur2 voit l'audit de auditeur1 — pas d'isolation
         items = r.json()["items"]
         audit_ids = [a["id"] for a in items]
-        # Ce test DOCUMENTE le comportement actuel
-        assert audit.id in audit_ids, "EXPECTED: audits are shared (no owner filtering)"
+        assert audit.id not in audit_ids, "audits should be filtered by owner_id"
 
 
 # ══════════════════════════════════════════════════════════════════════

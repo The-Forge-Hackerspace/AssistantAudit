@@ -19,11 +19,13 @@ def list_audits(
     pagination: PaginationParams = Depends(),
     entreprise_id: int = None,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les audits (paginé, filtrable par entreprise)"""
+    owner_id = None if current_user.role == "admin" else current_user.id
     items, total = AuditService.list_audits(
         db,
+        owner_id=owner_id,
         entreprise_id=entreprise_id,
         offset=pagination.offset,
         limit=pagination.page_size,
@@ -51,9 +53,10 @@ def create_audit(
 def get_audit(
     audit_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    audit = AuditService.get_audit(db, audit_id)
+    owner_id = None if current_user.role == "admin" else current_user.id
+    audit = AuditService.get_audit(db, audit_id, owner_id=owner_id)
     return AuditDetail(
         id=audit.id,
         nom_projet=audit.nom_projet,
@@ -77,9 +80,10 @@ def update_audit(
     audit_id: int,
     body: AuditUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
-    return AuditService.update_audit(db, audit_id, body)
+    owner_id = None if current_user.role == "admin" else current_user.id
+    return AuditService.update_audit(db, audit_id, body, owner_id=owner_id)
 
 
 @router.delete("/{audit_id}", response_model=MessageResponse)
