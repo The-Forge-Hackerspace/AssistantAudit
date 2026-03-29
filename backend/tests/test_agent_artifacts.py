@@ -157,7 +157,7 @@ class TestArtifactUpload:
 
     def test_upload_artifact_success(self, client, agent_headers, completed_task, tmp_path):
         """Agent uploade un artifact sur une tache completed → 201."""
-        with patch("app.api.v1.agents.settings") as mock_settings:
+        with patch("app.services.agent_service.settings") as mock_settings:
             mock_settings.DATA_DIR = str(tmp_path)
             mock_settings.CA_CERT_PATH = str(tmp_path / "nonexistent.pem")
             r = client.post(
@@ -173,7 +173,7 @@ class TestArtifactUpload:
 
     def test_upload_artifact_running_task(self, client, agent_headers, running_task, tmp_path):
         """Agent uploade un artifact sur une tache running → 201 (autorise)."""
-        with patch("app.api.v1.agents.settings") as mock_settings:
+        with patch("app.services.agent_service.settings") as mock_settings:
             mock_settings.DATA_DIR = str(tmp_path)
             mock_settings.CA_CERT_PATH = str(tmp_path / "nonexistent.pem")
             r = client.post(
@@ -203,7 +203,7 @@ class TestArtifactUpload:
 
     def test_upload_cancelled_task_400(self, client, agent_headers, cancelled_task, tmp_path):
         """Upload sur une tache annulee → 400."""
-        with patch("app.api.v1.agents.settings") as mock_settings:
+        with patch("app.services.agent_service.settings") as mock_settings:
             mock_settings.DATA_DIR = str(tmp_path)
             r = client.post(
                 f"/api/v1/agents/tasks/{cancelled_task.task_uuid}/artifacts",
@@ -215,7 +215,7 @@ class TestArtifactUpload:
     def test_upload_too_large_413(self, client, agent_headers, completed_task, tmp_path):
         """Fichier > 100MB → 413."""
         with patch("app.api.v1.agents.MAX_ARTIFACT_SIZE", 1024):  # 1KB limit for test
-            with patch("app.api.v1.agents.settings") as mock_settings:
+            with patch("app.services.agent_service.settings") as mock_settings:
                 mock_settings.DATA_DIR = str(tmp_path)
                 r = client.post(
                     f"/api/v1/agents/tasks/{completed_task.task_uuid}/artifacts",
@@ -235,7 +235,7 @@ class TestArtifactList:
     def test_list_artifacts_owner(self, client, agent_headers, owner_headers, completed_task, tmp_path):
         """Owner peut lister les artifacts de sa tache."""
         # Upload d'abord
-        with patch("app.api.v1.agents.settings") as mock_settings:
+        with patch("app.services.agent_service.settings") as mock_settings:
             mock_settings.DATA_DIR = str(tmp_path)
             mock_settings.CA_CERT_PATH = str(tmp_path / "nonexistent.pem")
             client.post(
@@ -310,7 +310,7 @@ class TestEnrichedEnrollment:
         ca_path.write_text("-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----\n")
 
         _, code = self._create_pending_agent(db_session, owner)
-        with patch("app.api.v1.agents.settings") as mock_settings:
+        with patch("app.services.agent_service.settings") as mock_settings:
             mock_settings.CA_CERT_PATH = str(ca_path)
             r = client.post("/api/v1/agents/enroll", json={"enrollment_code": code})
         assert r.status_code == 200
@@ -320,7 +320,7 @@ class TestEnrichedEnrollment:
     def test_enroll_response_ca_cert_empty_when_no_file(self, client, db_session, owner, tmp_path):
         """Enrollment retourne ca_cert_pem vide si le fichier n'existe pas."""
         _, code = self._create_pending_agent(db_session, owner)
-        with patch("app.api.v1.agents.settings") as mock_settings:
+        with patch("app.services.agent_service.settings") as mock_settings:
             mock_settings.CA_CERT_PATH = str(tmp_path / "nonexistent.pem")
             r = client.post("/api/v1/agents/enroll", json={"enrollment_code": code})
         assert r.status_code == 200

@@ -2,25 +2,15 @@
 Routes API pour la gestion des agents et le dispatch de taches.
 """
 import logging
-from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
-from ...core.config import get_settings
 from ...core.database import get_db
 from ...core.deps import get_current_agent, get_current_auditeur
-from ...core.rate_limit import enroll_rate_limiter
-from ...core.security import (
-    create_agent_token,
-    create_enrollment_token,
-    verify_enrollment_token,
-)
+from ...core.security import create_agent_token
 from ...models.agent import Agent
-from ...models.agent_task import AgentTask
 from ...models.user import User
-from ...models.task_artifact import TaskArtifact
 from ...schemas.agent import (
     AgentCreateRequest,
     AgentCreateResponse,
@@ -35,10 +25,12 @@ from ...schemas.agent import (
     TaskResultSubmit,
     TaskStatusUpdate,
 )
+from ...services.agent_service import AgentService
 from ...services.task_service import dispatch_task
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
+
+MAX_ARTIFACT_SIZE = 100 * 1024 * 1024  # 100 MB
 
 router = APIRouter(prefix="/agents", tags=["Agents"])
 
@@ -54,35 +46,13 @@ def create_agent(
 ):
     """Cree un agent et genere un code d'enrollment (valide 10 min).
     Admin peut creer pour un autre user via target_user_id."""
-    owner_id = current_user.id
-
-    if body.target_user_id is not None:
-        if current_user.role != "admin":
-            raise HTTPException(status_code=403, detail="Seul un admin peut attribuer un agent a un autre utilisateur")
-        target_user = db.query(User).filter(User.id == body.target_user_id).first()
-        if target_user is None or not target_user.is_active:
-            raise HTTPException(status_code=404, detail="Utilisateur introuvable")
-        owner_id = target_user.id
-
-    code, code_hash, expiration = create_enrollment_token()
-
-    agent = Agent(
-        name=body.name,
-        user_id=owner_id,
-        allowed_tools=body.allowed_tools,
-        enrollment_token_hash=code_hash,
-        enrollment_token_expires=expiration,
-        status="pending",
+    agent, code = AgentService.create_agent(
+        db, body, user_id=current_user.id, user_role=current_user.role,
     )
-    db.add(agent)
-    db.commit()
-    db.refresh(agent)
-
-    logger.info(f"Agent created: uuid={agent.agent_uuid}, owner={owner_id}, by={current_user.id}")
     return AgentCreateResponse(
         agent_uuid=agent.agent_uuid,
         enrollment_code=code,
-        expires_at=expiration,
+        expires_at=agent.enrollment_token_expires,
     )
 
 
@@ -92,10 +62,9 @@ def list_agents(
     current_user=Depends(get_current_auditeur),
 ):
     """Liste les agents. Admin voit tous les agents, auditeur voit les siens."""
-    query = db.query(Agent).options(joinedload(Agent.owner))
-    if current_user.role != "admin":
-        query = query.filter(Agent.user_id == current_user.id)
-    agents = query.all()
+    agents = AgentService.list_agents(
+        db, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return [
         AgentResponse(
             id=a.id,
@@ -122,17 +91,9 @@ def revoke_agent(
     current_user=Depends(get_current_auditeur),
 ):
     """Revoque un agent. Admin peut revoquer n'importe quel agent, auditeur seulement les siens."""
-    query = db.query(Agent).filter(Agent.agent_uuid == agent_uuid)
-    if current_user.role != "admin":
-        query = query.filter(Agent.user_id == current_user.id)
-    agent = query.first()
-    if agent is None:
-        raise HTTPException(status_code=404, detail="Agent introuvable")
-
-    agent.status = "revoked"
-    agent.revoked_at = datetime.now(timezone.utc)
-    db.commit()
-    logger.info(f"Agent revoked: uuid={agent_uuid}, user={current_user.id}")
+    AgentService.revoke_agent(
+        db, agent_uuid, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     # TODO: scheduled purge — delete agents where revoked_at < now() - 30 days
     return {"detail": "Agent revoque"}
 
@@ -151,77 +112,8 @@ def enroll_agent(
     PAS d'auth JWT — l'agent n'en a pas encore.
     Rate-limited pour eviter le brute-force sur les codes.
     """
-    enroll_rate_limiter.check(request)
-    enroll_rate_limiter.record_attempt(request)
-
-    # Chercher un agent pending avec un token non utilise
-    # with_for_update() verrouille les lignes pour eviter la race condition
-    # ou deux requetes concurrentes enrollent le meme agent
-    pending_agents = db.query(Agent).filter(
-        Agent.status == "pending",
-        Agent.enrollment_used == False,  # noqa: E712
-        Agent.enrollment_token_hash.isnot(None),
-    ).with_for_update().all()
-
-    matched_agent = None
-    for agent in pending_agents:
-        if verify_enrollment_token(
-            body.enrollment_code,
-            agent.enrollment_token_hash,
-            agent.enrollment_token_expires,
-        ):
-            matched_agent = agent
-            break
-
-    if matched_agent is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Code d'enrollment invalide ou expire",
-        )
-
-    # Generer le certificat client
-    cert_pem = b""
-    key_pem = b""
-    ca_cert_path = Path(settings.CA_CERT_PATH)
-    ca_key_path = Path(settings.CA_KEY_PATH)
-    if ca_cert_path.exists() and ca_key_path.exists():
-        from ...core.cert_manager import CertManager
-        mgr = CertManager(ca_cert_path, ca_key_path)
-        cert_pem, key_pem = mgr.sign_agent_cert(matched_agent.agent_uuid)
-
-        # Stocker le fingerprint et serial
-        matched_agent.cert_fingerprint = CertManager.get_cert_fingerprint(cert_pem)
-        matched_agent.cert_serial = CertManager.get_cert_serial(cert_pem)
-
-    # Generer le JWT agent
-    agent_token = create_agent_token(
-        agent_uuid=matched_agent.agent_uuid,
-        owner_id=matched_agent.user_id,
-    )
-
-    # Mettre a jour l'agent
-    matched_agent.status = "active"
-    matched_agent.enrollment_used = True
-    matched_agent.last_seen = datetime.now(timezone.utc)
-    matched_agent.last_ip = request.client.host if request.client else None
-    db.commit()
-
-    # Lire le certificat CA pour que l'agent puisse valider le serveur en mTLS
-    ca_cert_pem = ""
-    ca_cert_path = Path(settings.CA_CERT_PATH)
-    if ca_cert_path.exists():
-        ca_cert_pem = ca_cert_path.read_text(encoding="utf-8")
-
-    logger.info(f"Agent enrolled: uuid={matched_agent.agent_uuid}")
-    return EnrollResponse(
-        agent_uuid=matched_agent.agent_uuid,
-        agent_token=agent_token,
-        client_cert_pem=cert_pem.decode("utf-8") if cert_pem else "",
-        client_key_pem=key_pem.decode("utf-8") if key_pem else "",
-        ca_cert_pem=ca_cert_pem,
-        allowed_tools=matched_agent.allowed_tools or [],
-        agent_name=matched_agent.name or "",
-    )
+    result = AgentService.enroll_agent(db, body.enrollment_code, request)
+    return EnrollResponse(**result)
 
 
 @router.post("/heartbeat", status_code=200)
@@ -232,13 +124,7 @@ def agent_heartbeat(
     current_agent: Agent = Depends(get_current_agent),
 ):
     """Met a jour last_seen et les metadonnees de l'agent."""
-    current_agent.last_seen = datetime.now(timezone.utc)
-    current_agent.last_ip = request.client.host if request.client else None
-    if body.agent_version:
-        current_agent.agent_version = body.agent_version
-    if body.os_info:
-        current_agent.os_info = body.os_info
-    db.commit()
+    AgentService.update_agent_status(db, current_agent, body, request)
     return {"detail": "OK"}
 
 
@@ -263,45 +149,9 @@ def list_tasks(
 ):
     """Liste les taches agent du user courant (admin voit tout). Filtrable par tool.
     Enrichit chaque tache avec site_name et entreprise_name resolus depuis les parametres."""
-    from ...models.site import Site
-    from ...models.entreprise import Entreprise
-
-    query = db.query(AgentTask)
-    if current_user.role != "admin":
-        query = query.filter(AgentTask.owner_id == current_user.id)
-    if tool:
-        query = query.filter(AgentTask.tool == tool)
-    tasks = query.order_by(AgentTask.created_at.desc()).limit(100).all()
-
-    # Batch-resolve site and entreprise names
-    site_ids = set()
-    for t in tasks:
-        sid = (t.parameters or {}).get("site_id")
-        if sid:
-            site_ids.add(int(sid))
-    sites_map: dict[int, tuple[str, int | None]] = {}
-    if site_ids:
-        for s in db.query(Site).filter(Site.id.in_(site_ids)).all():
-            sites_map[s.id] = (s.nom, s.entreprise_id)
-    ent_ids = {eid for _, eid in sites_map.values() if eid}
-    ent_map: dict[int, str] = {}
-    if ent_ids:
-        for e in db.query(Entreprise).filter(Entreprise.id.in_(ent_ids)).all():
-            ent_map[e.id] = e.nom
-
-    result = []
-    for t in tasks:
-        d = TaskResponse.model_validate(t).model_dump()
-        sid = (t.parameters or {}).get("site_id")
-        if sid and int(sid) in sites_map:
-            site_name, ent_id = sites_map[int(sid)]
-            d["site_name"] = site_name
-            d["entreprise_name"] = ent_map.get(ent_id, "") if ent_id else ""
-        else:
-            d["site_name"] = ""
-            d["entreprise_name"] = ""
-        result.append(d)
-    return result
+    return AgentService.list_tasks(
+        db, user_id=current_user.id, is_admin=current_user.role == "admin", tool=tool,
+    )
 
 
 @router.delete("/tasks/{task_uuid}", status_code=200)
@@ -311,15 +161,9 @@ def delete_task(
     current_user=Depends(get_current_auditeur),
 ):
     """Supprime une tache agent. Ownership verifiee."""
-    task = db.query(AgentTask).filter(AgentTask.task_uuid == task_uuid).first()
-    if task is None:
-        raise HTTPException(status_code=404, detail="Tache introuvable")
-    if task.owner_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=404, detail="Tache introuvable")
-    if task.status == "running":
-        raise HTTPException(status_code=400, detail="Impossible de supprimer une tache en cours")
-    db.delete(task)
-    db.commit()
+    AgentService.delete_task(
+        db, task_uuid, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return {"detail": "Tache supprimee"}
 
 
@@ -365,29 +209,7 @@ async def update_task_status(
     current_agent: Agent = Depends(get_current_agent),
 ):
     """Met a jour le status/progress d'une tache. Auth agent."""
-    task = db.query(AgentTask).filter(
-        AgentTask.task_uuid == task_uuid,
-        AgentTask.agent_id == current_agent.id,
-    ).first()
-    if task is None:
-        raise HTTPException(status_code=404, detail="Tache introuvable")
-
-    now = datetime.now(timezone.utc)
-    task.status = body.status
-    if body.progress is not None:
-        task.progress = body.progress
-    if body.error_message is not None:
-        task.error_message = body.error_message
-
-    if body.status == "running" and task.started_at is None:
-        task.started_at = now
-    if body.status in ("completed", "failed", "cancelled"):
-        task.completed_at = now
-        if body.status == "completed":
-            task.progress = 100
-
-    task.status_message = f"Status: {body.status}"
-    db.commit()
+    task = AgentService.update_task_status(db, task_uuid, current_agent.id, body)
 
     # Notifier le user proprietaire via WebSocket
     from ...core.websocket_manager import ws_manager
@@ -408,25 +230,7 @@ async def submit_task_result(
     current_agent: Agent = Depends(get_current_agent),
 ):
     """Soumet les resultats d'une tache. Auth agent."""
-    task = db.query(AgentTask).filter(
-        AgentTask.task_uuid == task_uuid,
-        AgentTask.agent_id == current_agent.id,
-    ).first()
-    if task is None:
-        raise HTTPException(status_code=404, detail="Tache introuvable")
-
-    task.status = "completed"
-    task.progress = 100
-    task.completed_at = datetime.now(timezone.utc)
-    if body.result_summary is not None:
-        task.result_summary = body.result_summary
-    if body.result_raw is not None:
-        task.result_raw = body.result_raw
-    if body.error_message is not None:
-        task.error_message = body.error_message
-        task.status = "failed"
-
-    db.commit()
+    task = AgentService.submit_task_result(db, task_uuid, current_agent.id, body)
 
     # Notifier le user
     from ...core.websocket_manager import ws_manager
@@ -441,8 +245,6 @@ async def submit_task_result(
 
 # ── Artifacts ─────────────────────────────────────────────────────────
 
-MAX_ARTIFACT_SIZE = 100 * 1024 * 1024  # 100 MB
-
 
 @router.post("/tasks/{task_uuid}/artifacts", response_model=ArtifactUploadResponse, status_code=201)
 def upload_artifact(
@@ -455,17 +257,6 @@ def upload_artifact(
     Upload un fichier resultat (artifact) pour une tache.
     Auth agent — l'agent uploade apres execution.
     """
-    # Verifier que la tache existe et appartient a cet agent
-    task = db.query(AgentTask).filter(
-        AgentTask.task_uuid == task_uuid,
-        AgentTask.agent_id == current_agent.id,
-    ).first()
-    if task is None:
-        raise HTTPException(status_code=404, detail="Tache introuvable")
-
-    if task.status == "cancelled":
-        raise HTTPException(status_code=400, detail="Tache annulee — upload refuse")
-
     # Lire le contenu avec limite de taille
     chunks = []
     total_size = 0
@@ -485,43 +276,22 @@ def upload_artifact(
     if not content:
         raise HTTPException(status_code=400, detail="Fichier vide")
 
-    # Chiffrer avec envelope encryption
-    from ...core.file_encryption import EnvelopeEncryption
-    envelope = EnvelopeEncryption()
-    encrypted_data, encrypted_dek, dek_nonce = envelope.encrypt_file(content)
-
-    # Stocker sur disque
-    import uuid as uuid_mod
-    file_uuid = str(uuid_mod.uuid4())
-    blobs_dir = Path(settings.DATA_DIR) / "blobs"
-    blobs_dir.mkdir(parents=True, exist_ok=True)
-    file_path = blobs_dir / f"{file_uuid}.enc"
-    file_path.write_bytes(encrypted_data)
-
-    # Creer l'artifact en base
-    original_name = file.filename or "artifact"
-    artifact = TaskArtifact(
-        agent_task_id=task.id,
-        file_uuid=file_uuid,
-        original_filename=original_name,
-        stored_filename=f"{file_uuid}.enc",
-        mime_type=file.content_type or "application/octet-stream",
-        file_size=len(content),
-        encrypted_dek=encrypted_dek if encrypted_dek else None,
-        dek_nonce=dek_nonce if dek_nonce else None,
-        kek_version=1 if envelope.enabled else None,
+    artifact = AgentService.upload_artifact(
+        db,
+        task_uuid=task_uuid,
+        agent_id=current_agent.id,
+        content=content,
+        original_filename=file.filename or "artifact",
+        content_type=file.content_type or "application/octet-stream",
     )
-    db.add(artifact)
-    db.commit()
-    db.refresh(artifact)
 
     logger.info(
-        f"Artifact uploaded: task={task_uuid}, file={original_name} "
+        f"Artifact uploaded: task={task_uuid}, file={artifact.original_filename} "
         f"({len(content)} bytes), agent={current_agent.agent_uuid}"
     )
     return ArtifactUploadResponse(
         file_id=artifact.id,
-        filename=original_name,
+        filename=artifact.original_filename,
         size=len(content),
     )
 
@@ -537,19 +307,8 @@ def list_artifacts(
     Auth auditeur — le technicien consulte les resultats.
     Verifie ownership via agent -> owner_id.
     """
-    task = db.query(AgentTask).filter(AgentTask.task_uuid == task_uuid).first()
-    if task is None:
-        raise HTTPException(status_code=404, detail="Tache introuvable")
-
-    # Verifier ownership : la tache appartient au user via owner_id
-    if task.owner_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=404, detail="Tache introuvable")
-
-    artifacts = (
-        db.query(TaskArtifact)
-        .filter(TaskArtifact.agent_task_id == task.id)
-        .order_by(TaskArtifact.uploaded_at.desc())
-        .all()
+    artifacts = AgentService.list_artifacts(
+        db, task_uuid, user_id=current_user.id, is_admin=current_user.role == "admin",
     )
     return [
         ArtifactRead(
