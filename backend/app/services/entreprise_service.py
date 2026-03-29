@@ -4,7 +4,8 @@ Service Entreprise : CRUD pour les entreprises et contacts.
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from ..core.helpers import get_or_404
+from ..core.helpers import get_or_404, user_has_access_to_entreprise
+from ..models.audit import Audit
 from ..models.entreprise import Entreprise, Contact
 from ..schemas.entreprise import EntrepriseCreate, EntrepriseUpdate
 
@@ -13,23 +14,40 @@ class EntrepriseService:
 
     @staticmethod
     def list_entreprises(
-        db: Session, offset: int = 0, limit: int = 20,
+        db: Session,
+        offset: int = 0,
+        limit: int = 20,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> tuple[list[Entreprise], int]:
-        """Liste les entreprises avec pagination."""
-        total = db.query(Entreprise).count()
-        items = (
-            db.query(Entreprise)
-            .order_by(Entreprise.nom)
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
+        """Liste les entreprises avec pagination. Non-admin voit uniquement celles liees a ses audits."""
+        if user_id is not None and not is_admin:
+            entreprise_ids = (
+                db.query(Audit.entreprise_id)
+                .filter(Audit.owner_id == user_id)
+                .distinct()
+                .scalar_subquery()
+            )
+            query = db.query(Entreprise).filter(Entreprise.id.in_(entreprise_ids))
+        else:
+            query = db.query(Entreprise)
+        total = query.count()
+        items = query.order_by(Entreprise.nom).offset(offset).limit(limit).all()
         return items, total
 
     @staticmethod
-    def get_entreprise(db: Session, entreprise_id: int) -> Entreprise:
-        """Recupere une entreprise par ID."""
-        return get_or_404(db, Entreprise, entreprise_id)
+    def get_entreprise(
+        db: Session,
+        entreprise_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
+    ) -> Entreprise:
+        """Recupere une entreprise par ID. Non-admin doit avoir un audit lie."""
+        entreprise = get_or_404(db, Entreprise, entreprise_id)
+        if user_id is not None and not is_admin:
+            if not user_has_access_to_entreprise(db, entreprise_id, user_id):
+                raise HTTPException(status_code=404, detail="Entreprise introuvable")
+        return entreprise
 
     @staticmethod
     def create_entreprise(db: Session, data: EntrepriseCreate) -> Entreprise:
@@ -77,10 +95,17 @@ class EntrepriseService:
 
     @staticmethod
     def update_entreprise(
-        db: Session, entreprise_id: int, data: EntrepriseUpdate,
+        db: Session,
+        entreprise_id: int,
+        data: EntrepriseUpdate,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Entreprise:
-        """Met a jour une entreprise existante."""
+        """Met a jour une entreprise existante. Non-admin doit avoir un audit lie."""
         entreprise = get_or_404(db, Entreprise, entreprise_id)
+        if user_id is not None and not is_admin:
+            if not user_has_access_to_entreprise(db, entreprise_id, user_id):
+                raise HTTPException(status_code=404, detail="Entreprise introuvable")
 
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():

@@ -1,7 +1,7 @@
 """
-Tests RBAC — isolation des audits par owner_id.
+Tests RBAC — isolation des audits et entreprises par owner_id.
 
-Verifie que chaque auditeur ne voit que ses propres audits
+Verifie que chaque auditeur ne voit que ses propres audits/entreprises
 et que l'admin voit tout.
 """
 import pytest
@@ -128,3 +128,129 @@ class TestAuditIsolation:
         r = client.get("/api/v1/audits", headers=auditeur_headers)
         assert r.status_code == 200
         assert r.json()["total"] == 1
+
+
+# ══════════════════════════════════════════════════════════════════════
+# ENTREPRISE ISOLATION (acces implicite via audit ownership)
+# ══════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def entreprise_a(db_session):
+    """Entreprise liee uniquement aux audits de User A."""
+    e = Entreprise(nom="Entreprise A Only")
+    db_session.add(e)
+    db_session.commit()
+    db_session.refresh(e)
+    return e
+
+
+@pytest.fixture
+def entreprise_shared(db_session):
+    """Entreprise partagee entre User A et User B."""
+    e = Entreprise(nom="Entreprise Shared")
+    db_session.add(e)
+    db_session.commit()
+    db_session.refresh(e)
+    return e
+
+
+@pytest.fixture
+def audit_a_on_entreprise_a(db_session, auditeur_user, entreprise_a):
+    a = Audit(
+        nom_projet="Audit A on Ent A",
+        entreprise_id=entreprise_a.id,
+        owner_id=auditeur_user.id,
+    )
+    db_session.add(a)
+    db_session.commit()
+    return a
+
+
+@pytest.fixture
+def audit_a_on_shared(db_session, auditeur_user, entreprise_shared):
+    a = Audit(
+        nom_projet="Audit A on Shared",
+        entreprise_id=entreprise_shared.id,
+        owner_id=auditeur_user.id,
+    )
+    db_session.add(a)
+    db_session.commit()
+    return a
+
+
+@pytest.fixture
+def audit_b_on_shared(db_session, second_auditeur_user, entreprise_shared):
+    a = Audit(
+        nom_projet="Audit B on Shared",
+        entreprise_id=entreprise_shared.id,
+        owner_id=second_auditeur_user.id,
+    )
+    db_session.add(a)
+    db_session.commit()
+    return a
+
+
+class TestEntrepriseIsolation:
+
+    def test_user_a_sees_own_entreprise(
+        self, client, auditeur_headers, audit_a_on_entreprise_a, entreprise_a,
+    ):
+        """User A voit l'entreprise liee a son audit."""
+        r = client.get("/api/v1/entreprises", headers=auditeur_headers)
+        assert r.status_code == 200
+        noms = [e["nom"] for e in r.json()["items"]]
+        assert entreprise_a.nom in noms
+
+    def test_user_b_without_audit_sees_empty(
+        self, client, second_auditeur_headers, audit_a_on_entreprise_a,
+    ):
+        """User B sans audit ne voit pas l'entreprise de User A."""
+        r = client.get("/api/v1/entreprises", headers=second_auditeur_headers)
+        assert r.status_code == 200
+        assert r.json()["total"] == 0
+
+    def test_user_b_get_entreprise_a_returns_404(
+        self, client, second_auditeur_headers, audit_a_on_entreprise_a, entreprise_a,
+    ):
+        """User B GET entreprise de User A → 404."""
+        r = client.get(
+            f"/api/v1/entreprises/{entreprise_a.id}",
+            headers=second_auditeur_headers,
+        )
+        assert r.status_code == 404
+
+    def test_shared_entreprise_visible_by_both(
+        self, client, auditeur_headers, second_auditeur_headers,
+        audit_a_on_shared, audit_b_on_shared, entreprise_shared,
+    ):
+        """Entreprise partagee visible par les 2 users ayant un audit dessus."""
+        r_a = client.get("/api/v1/entreprises", headers=auditeur_headers)
+        r_b = client.get("/api/v1/entreprises", headers=second_auditeur_headers)
+        noms_a = [e["nom"] for e in r_a.json()["items"]]
+        noms_b = [e["nom"] for e in r_b.json()["items"]]
+        assert entreprise_shared.nom in noms_a
+        assert entreprise_shared.nom in noms_b
+
+    def test_admin_sees_all_entreprises(
+        self, client, admin_headers,
+        audit_a_on_entreprise_a, entreprise_a, entreprise_shared,
+    ):
+        """Admin voit toutes les entreprises."""
+        r = client.get("/api/v1/entreprises", headers=admin_headers)
+        assert r.status_code == 200
+        noms = [e["nom"] for e in r.json()["items"]]
+        assert entreprise_a.nom in noms
+        assert entreprise_shared.nom in noms
+
+    def test_any_auditeur_can_create_entreprise(
+        self, client, second_auditeur_headers,
+    ):
+        """Tout auditeur peut creer une entreprise (meme sans audit)."""
+        r = client.post(
+            "/api/v1/entreprises",
+            json={"nom": "Nouvelle Entreprise", "contacts": []},
+            headers=second_auditeur_headers,
+        )
+        assert r.status_code == 201
+        assert r.json()["nom"] == "Nouvelle Entreprise"
