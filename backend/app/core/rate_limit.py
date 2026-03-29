@@ -130,6 +130,12 @@ class _RateLimiter:
             self._attempts.pop(ip, None)
             self._blocked.pop(ip, None)
 
+    def reset_all(self) -> None:
+        """Remet tous les compteurs a zero (utilise dans les tests)."""
+        with self._lock:
+            self._attempts.clear()
+            self._blocked.clear()
+
 
 # Singletons globaux
 login_rate_limiter = _RateLimiter()

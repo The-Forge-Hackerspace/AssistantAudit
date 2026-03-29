@@ -1,51 +1,8 @@
 """
 Tests de base pour l'API AssistantAudit.
+Utilise les fixtures de conftest.py (DB in-memory, isolation par test).
 """
 import pytest
-from fastapi.testclient import TestClient
-
-from app.main import app
-from app.core.database import create_all_tables, drop_all_tables, SessionLocal
-from app.core.security import hash_password
-from app.models.user import User
-
-
-@pytest.fixture(scope="module", autouse=True)
-def setup_db():
-    """Setup : crée les tables et un user de test"""
-    create_all_tables()
-    db = SessionLocal()
-    existing = db.query(User).filter(User.username == "testadmin").first()
-    if not existing:
-        user = User(
-            username="testadmin",
-            email="test@test.com",
-            password_hash=hash_password("TestPass@2026"),
-            full_name="Test Admin",
-            role="admin",
-        )
-        db.add(user)
-        db.commit()
-    db.close()
-    yield
-    # Teardown si nécessaire
-
-
-@pytest.fixture
-def client():
-    return TestClient(app)
-
-
-@pytest.fixture
-def auth_headers(client):
-    """Obtient un token JWT pour les tests authentifiés"""
-    response = client.post(
-        "/api/v1/auth/login",
-        data={"username": "testadmin", "password": "TestPass@2026"},
-    )
-    assert response.status_code == 200
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
 
 
 # --- Health ---
@@ -58,10 +15,10 @@ def test_health(client):
 
 # --- Auth ---
 
-def test_login_success(client):
+def test_login_success(client, admin_user):
     response = client.post(
         "/api/v1/auth/login",
-        data={"username": "testadmin", "password": "TestPass@2026"},
+        data={"username": "admin_test", "password": "AdminPass123!"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -69,10 +26,10 @@ def test_login_success(client):
     assert data["token_type"] == "bearer"
 
 
-def test_login_success_with_email(client):
+def test_login_success_with_email(client, admin_user):
     response = client.post(
         "/api/v1/auth/login",
-        data={"username": "test@test.com", "password": "TestPass@2026"},
+        data={"username": "admin@test.example.com", "password": "AdminPass123!"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -80,25 +37,25 @@ def test_login_success_with_email(client):
     assert data["token_type"] == "bearer"
 
 
-def test_login_fail(client):
+def test_login_fail(client, admin_user):
     response = client.post(
         "/api/v1/auth/login",
-        data={"username": "testadmin", "password": "wrongpassword"},
+        data={"username": "admin_test", "password": "wrongpassword"},
     )
     assert response.status_code == 401
 
 
-def test_get_me(client, auth_headers):
-    response = client.get("/api/v1/auth/me", headers=auth_headers)
+def test_get_me(client, admin_headers, admin_user):
+    response = client.get("/api/v1/auth/me", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["username"] == "testadmin"
+    assert data["username"] == "admin_test"
     assert data["role"] == "admin"
 
 
 # --- Entreprises ---
 
-def test_create_entreprise(client, auth_headers):
+def test_create_entreprise(client, admin_headers):
     response = client.post(
         "/api/v1/entreprises",
         json={
@@ -109,7 +66,7 @@ def test_create_entreprise(client, auth_headers):
                 {"nom": "Jean Dupont", "email": "jean@test.com", "is_main_contact": True}
             ],
         },
-        headers=auth_headers,
+        headers=admin_headers,
     )
     assert response.status_code == 201
     data = response.json()
@@ -117,8 +74,14 @@ def test_create_entreprise(client, auth_headers):
     assert len(data["contacts"]) == 1
 
 
-def test_list_entreprises(client, auth_headers):
-    response = client.get("/api/v1/entreprises", headers=auth_headers)
+def test_list_entreprises(client, admin_headers):
+    # Creer une entreprise d'abord (DB in-memory vide)
+    client.post(
+        "/api/v1/entreprises",
+        json={"nom": "Liste Test", "adresse": "1 rue", "secteur_activite": "IT"},
+        headers=admin_headers,
+    )
+    response = client.get("/api/v1/entreprises", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["total"] >= 1
@@ -126,6 +89,6 @@ def test_list_entreprises(client, auth_headers):
 
 # --- Frameworks ---
 
-def test_list_frameworks(client, auth_headers):
-    response = client.get("/api/v1/frameworks", headers=auth_headers)
+def test_list_frameworks(client, admin_headers):
+    response = client.get("/api/v1/frameworks", headers=admin_headers)
     assert response.status_code == 200

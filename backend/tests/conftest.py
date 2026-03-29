@@ -221,3 +221,12 @@ def cleanup_after_test(db_session: Session):
     """Cleanup after each test"""
     yield
     # All test data is automatically rolled back with in-memory SQLite fixture
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiters():
+    """Reset les rate limiters entre chaque test pour eviter les 429 parasites."""
+    yield
+    from app.core.rate_limit import login_rate_limiter, enroll_rate_limiter
+    login_rate_limiter.reset_all()
+    enroll_rate_limiter.reset_all()
