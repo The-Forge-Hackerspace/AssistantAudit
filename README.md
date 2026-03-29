@@ -22,8 +22,8 @@ AssistantAudit centralise l'ensemble du cycle d'audit : collecte automatique de 
 | Backend | Python 3.13, FastAPI 0.115+, SQLAlchemy 2, Pydantic v2, Alembic |
 | Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn/ui |
 | Base de données | SQLite (développement) — PostgreSQL (production, planifié) |
-| Auth | JWT (access 15 min + refresh 7 jours), RBAC 3 niveaux |
-| Outils intégrés | Nmap, OpenSSL, Paramiko (SSH), pywinrm, ldap3, Monkey365 (PowerShell), PingCastle |
+| Auth | JWT + RBAC |
+| Outils intégrés | Nmap, OpenSSL, Paramiko (SSH), pywinrm, ldap3, Monkey365 (PowerShell) |
 
 ---
 
@@ -61,7 +61,7 @@ Swagger   : http://localhost:8000/docs
 ReDoc     : http://localhost:8000/redoc
 ```
 
-Les identifiants admin par défaut sont affichés dans le terminal au premier démarrage — à changer immédiatement.
+Les identifiants admin sont affichés dans le terminal au premier démarrage.
 
 ---
 
@@ -109,15 +109,11 @@ LOG_LEVEL=INFO
 # Outils (chemins absolus)
 MONKEY365_PATH=C:\path\to\Invoke-Monkey365.ps1
 MONKEY365_ARCHIVE_PATH=C:\data\monkey365
-PINGCASTLE_PATH=C:\path\to\PingCastle.exe
 
 # Timeouts (secondes)
 NMAP_TIMEOUT=600
-PINGCASTLE_TIMEOUT=300
 MONKEY365_TIMEOUT=600
 
-# Admin initial (optionnel — généré automatiquement sinon)
-ADMIN_PASSWORD=your-secure-password
 ```
 
 ---
@@ -131,13 +127,12 @@ Frontend (Next.js)
 REST API (FastAPI) — 45 endpoints, RBAC
     │
     ├── Services (logique métier)
-    │     ├── framework_service    — sync YAML ↔ DB (SHA-256)
+    │     ├── framework_service    — sync YAML ↔ DB
     │     ├── assessment_service   — campagnes, évaluations, scoring
     │     ├── monkey365_service    — scan M365, mapping vers contrôles
     │     ├── scan_service         — Nmap
     │     ├── collect_service      — SSH/WinRM (Linux, Windows, FortiGate, OPNsense)
     │     ├── ad_audit_service     — LDAP
-    │     ├── pingcastle_service   — PingCastle runner
     │     └── config_analysis_service — parse configs pare-feu
     │
     └── SQLAlchemy ORM → SQLite / PostgreSQL
@@ -182,7 +177,6 @@ Pour ajouter un référentiel : créer `frameworks/{REF_ID}.yaml` et redémarrer
 | **SSL Checker** | Analyse certificats TLS, protocoles | `openssl` |
 | **SSH/WinRM Collector** | Collecte config Linux, Windows, FortiGate, OPNsense, Stormshield | `paramiko`, `pywinrm` |
 | **AD Auditor** | Audit Active Directory via LDAP | `ldap3` |
-| **PingCastle** | Score de santé AD, rapport HTML | `PingCastle.exe` (Windows) |
 | **Monkey365** | Audit complet Microsoft 365 / Entra ID | `pwsh` + `Invoke-Monkey365.ps1` |
 | **Config Parser** | Analyse règles pare-feu FortiGate / OPNsense | — |
 
@@ -222,11 +216,9 @@ npm run lint
 
 ## Modèle de sécurité
 
-- **JWT** : access token 15 min + refresh token 7 jours
-- **RBAC** : `admin` > `auditeur` > `lecteur` (vérifié dans `core/deps.py`)
-- **Rate limiting** : 5 tentatives/minute sur `POST /auth/login`, blocage 5 min
+- **Auth** : JWT + RBAC (`admin` > `auditeur` > `lecteur`)
 - **Mots de passe** : hachés avec bcrypt
-- **Isolation** : pas de `shell=True` dans les appels subprocess, pas de chemins absolus codés en dur
+- **Isolation** : pas de `shell=True`, pas de chemins absolus codés en dur
 
 ---
 

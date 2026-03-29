@@ -479,125 +479,6 @@ Monkey365 supports 4 authentication methods:
 
 ---
 
-## 🚨 Known Issues & Technical Debt
-
-**Status:** Sprint 0 audit completed 2026-03-20. Issues categorized by severity with recommended remediation timeline.
-
-### 🚨 CRITICAL (Must Fix Before Production)
-
-- **[Frontend]** Dashboard chart colors hardcoded (#22c55e, #ef4444, etc.) — don't adapt to dark mode (Keaton-Jr)
-  - *Impact:* Poor UX contrast in dark mode; potential WCAG failure
-  - *Fix:* Use `useTheme()` hook to apply theme-aware colors
-  - *Effort:* 1-2 hours
-  
-- **[Frontend]** 4 icon buttons missing aria-labels in attachments section (eye, download, delete icons)
-  - *Impact:* Accessibility violation; screen reader users cannot determine button purpose
-  - *Fix:* Add `aria-label` to Button components
-  - *Effort:* 15 minutes
-
-- **[DevSecOps]** 7 npm high-severity vulnerabilities in frontend dependencies
-  - *Packages:* Next.js (4 MODERATE), minimatch (HIGH), flatted (HIGH), @hono/node-server (HIGH)
-  - *Fix:* `npm audit fix && npm audit fix --force`
-  - *Effort:* 30 minutes
-  - *Blocking:* Yes — must resolve before any deployment
-
-- **[DevSecOps]** No CI/CD pipeline (Renault)
-  - *Impact:* No automated security scanning; vulnerable packages not detected
-  - *Fix:* Create .github/workflows for build-test, security-scan, gitleaks
-  - *Effort:* 4-6 hours
-  - *Timeline:* Sprint 0+1
-
-### ⚠️ HIGH PRIORITY (Next Sprint)
-
-- **[Database]** 5 N+1 query patterns identified (Kobayashi)
-  - *Files:* Various ORM queries missing eager-loading
-  - *Impact:* Performance degradation at scale
-  - *Fix:* Use `joinedload()` and `selectinload()` in service layer
-  - *Effort:* 3-4 hours
-
-- **[Database]** 4 undeclared models need migration 008 (Kobayashi)
-  - *Status:* Schema mismatch between code and database
-  - *Fix:* Create migration for polymorphic inheritance subtypes
-  - *Effort:* 2 hours
-
-- **[Infrastructure]** 8 environment variable issues (Fortier)
-  - *Examples:* Default admin credentials hardcoded; no health check retry logic; no env validation
-  - *Fix:* Move to .env; add validation; improve error messages
-  - *Effort:* 2 hours
-
-- **[Tools]** Nmap scanner has no unit tests (Redfoot)
-  - *Impact:* Whitelist/blacklist validation not covered
-  - *Fix:* Add pytest tests for argument sanitization
-  - *Effort:* 3 hours
-  - *Critical Gap:* Strictest security posture; needs test coverage
-
-- **[Tools]** SSL checker missing unit tests (Redfoot)
-  - *Impact:* Protocol detection not verified
-  - *Fix:* Add tests for TLS version detection, expiration logic
-  - *Effort:* 2 hours
-
-- **[Tools]** Config parsers (Fortinet, OPNsense) lack dedicated tests (Redfoot)
-  - *Impact:* Vendor-specific parsing logic not covered
-  - *Fix:* Create pytest suite with sample configs
-  - *Effort:* 4 hours
-
-### 📋 MEDIUM PRIORITY (Next 2 Sprints)
-
-- **[Security]** SSH private keys passed as plaintext in API requests (Kujan)
-  - *Issue:* `/api/v1/scans` accepts SSH keys in request body
-  - *Fix:* Implement SSH key encryption at rest (AES-256)
-  - *Effort:* 3-4 hours
-
-- **[Security]** CORS origins hardcoded to localhost (Kujan)
-  - *Issue:* production code will expose CORS to dev origins
-  - *Fix:* Load CORS_ORIGINS from environment variables
-  - *Effort:* 30 minutes
-  - *Blocker:* For production deployment
-
-- **[Database]** SQLite→PostgreSQL migration incomplete (Kobayashi)
-  - *Status:* 85% compatible; 3 SQL dialect issues remain
-  - *Examples:* AUTOINCREMENT syntax, CAST behavior, JSON operators
-  - *Fix:* Create dialect-agnostic migration helper
-  - *Effort:* 4-6 hours
-  - *Timeline:* Before production scaling
-
-- **[Infrastructure]** Hardcoded ports prevent multi-instance deployment (Fortier)
-  - *Issue:* Backend port 8000, frontend port 3000 hard-coded
-  - *Fix:* Parameterize PORT in .env
-  - *Effort:* 1 hour
-
-- **[Tools]** WinRM SSL validation disabled (development mode) (Redfoot)
-  - *File:* `winrm_collector.py` lines 199-204
-  - *TODO:* `configurer un CA bundle + validation stricte`
-  - *Fix:* Implement proper certificate validation before production
-  - *Effort:* 2 hours
-  - *Status:* Acceptable for current phase; must fix before prod
-
-- **[Tools]** AD Auditor, PingCastle, Collectors missing unit tests (Redfoot)
-  - *Impact:* Remote execution logic not verified
-  - *Effort:* 6-8 hours combined
-  - *Timeline:* Before load testing
-
-### 🔧 LOW PRIORITY / Tech Debt
-
-- **[DevSecOps]** No Docker containerization yet (Renault)
-  - *Status:* Application runs directly on Windows PowerShell
-  - *Fix:* Create production-grade Dockerfile + docker-compose.yml
-  - *Effort:* 4 hours
-
-- **[DevSecOps]** Rate limiter in-memory only (acceptable for dev, need Redis for prod scale) (Renault)
-  - *Effort:* 2 hours (for production scaling)
-
-- **[Infrastructure]** PID files not cleaned on abnormal shutdown (zombie process risk) (Fortier)
-  - *Fix:* Add cleanup handler in start.ps1
-  - *Effort:* 1 hour
-
-- **[Backend]** `ssh_collector.py` monolithic file (1,245 lines) should be split by profile (Redfoot)
-  - *Effort:* 4 hours refactoring
-
-- **[Backend]** `ad_auditor.py` monolithic file (669 lines) should be split by function category (Redfoot)
-  - *Effort:* 3 hours refactoring
-
 ---
 
 ## 🧪 Tests & Qualité
@@ -621,9 +502,7 @@ cd backend
 python test_phase2.py
 ```
 
-**Identifiants admin** : `admin` / mot de passe affiché lors de l'exécution de `init_db.py`
-
-Vous pouvez forcer un mot de passe fixe en définissant `ADMIN_PASSWORD` avant l'initialisation.
+Les identifiants admin sont affichés lors de l'exécution de `init_db.py`.
 
 ### Comment lancer le frontend
 
@@ -775,7 +654,7 @@ Install-Module -Name monkey365 -Scope CurrentUser -Force
 ### Verified Workflow
 
 **Auto-install + Verified Execution:**
-- Monkey365 auto-clones from GitHub (--depth=1 shallow) if missing → stored in `D:\AssistantAudit\tools\monkey365`
+- Monkey365 auto-clones from GitHub (--depth=1 shallow) if missing → stored in `tools/monkey365`
 - Module import verified before each scan; request → PowerShell script auto-generated → module loaded → browser opens (interactive mode)
 - Real-time logs visible in frontend (polling every 2s); PowerShell output captured to `powershell_raw_output.json`
 - Scan completes → status updates to SUCCESS/FAILED
