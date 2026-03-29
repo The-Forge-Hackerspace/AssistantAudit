@@ -502,7 +502,7 @@ def create_full_assessment_scenario(db: Session):
     controls = ControlFactory.create_batch(db, cat.id, count=5)
     
     # Create audit and campaign
-    audit = AuditFactory.create(db, nom_projet="Q1 2026 Audit", entreprise_id=ent.id)
+    audit = AuditFactory.create(db, nom_projet="Q1 2026 Audit", entreprise_id=ent.id, owner_id=auditeur.id)
     campaign = AssessmentCampaignFactory.create(db, audit_id=audit.id)
     
     # Create assessments

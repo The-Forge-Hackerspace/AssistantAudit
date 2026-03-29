@@ -39,7 +39,7 @@ class AuditService:
         return audit
 
     @staticmethod
-    def create_audit(db: Session, data: AuditCreate, owner_id: int | None = None) -> Audit:
+    def create_audit(db: Session, data: AuditCreate, owner_id: int) -> Audit:
         """Cree un nouveau projet d'audit."""
         get_or_404(db, Entreprise, data.entreprise_id)
         audit = Audit(

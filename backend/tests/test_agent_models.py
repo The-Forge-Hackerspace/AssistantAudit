@@ -83,12 +83,13 @@ def entreprise(db: Session) -> Entreprise:
 
 
 @pytest.fixture
-def audit(db: Session, entreprise: Entreprise) -> Audit:
+def audit(db: Session, user: User, entreprise: Entreprise) -> Audit:
     """Audit de test."""
     a = Audit(
         nom_projet="Audit Test",
         entreprise_id=entreprise.id,
         status=AuditStatus.EN_COURS,
+        owner_id=user.id,
     )
     db.add(a)
     db.commit()

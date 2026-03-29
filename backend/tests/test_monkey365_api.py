@@ -710,7 +710,7 @@ def test_delete_scan_not_found_returns_404(client: TestClient, auditeur_headers)
 # ─── Import-to-audit cross-tenant tests ──────────────────────────────────
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_import_to_audit_rejects_cross_tenant_mismatch(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_import_to_audit_rejects_cross_tenant_mismatch(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """POST /import-to-audit rejects scan-audit entreprise mismatch (multi-tenant safety)."""
     from app.models.monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
     from tests.factories import AuditFactory
@@ -734,7 +734,7 @@ def test_import_to_audit_rejects_cross_tenant_mismatch(mock_exec, client: TestCl
     db_session.commit()
 
     # Create an audit belonging to a DIFFERENT entreprise
-    audit = AuditFactory.create(db_session, nom_projet="Audit Autre", entreprise_id=entreprise_audit.id)
+    audit = AuditFactory.create(db_session, nom_projet="Audit Autre", entreprise_id=entreprise_audit.id, owner_id=auditeur_user.id)
 
     response = client.post(
         f"/api/v1/tools/monkey365/scans/{result_id}/import-to-audit",
