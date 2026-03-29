@@ -34,7 +34,7 @@ def list_equipements(
     status_audit: Optional[str] = Query(default=None, pattern=r"^(A_AUDITER|EN_COURS|CONFORME|NON_CONFORME)$"),
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les équipements (filtrable par site, entreprise, type, statut)"""
     items, total = EquipementService.list_equipements(
@@ -45,6 +45,8 @@ def list_equipements(
         status_audit=status_audit,
         offset=pagination.offset,
         limit=pagination.page_size,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return PaginatedResponse(
         items=items,
@@ -59,10 +61,12 @@ def list_equipements(
 def create_equipement(
     body: EquipementCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Crée un nouvel équipement dans un site"""
-    equipement = EquipementService.create_equipement(db, body)
+    equipement = EquipementService.create_equipement(
+        db, body, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return equipement_to_read(equipement)
 
 
@@ -70,10 +74,12 @@ def create_equipement(
 def get_equipement(
     equipement_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Détail d'un équipement"""
-    equipement = EquipementService.get_equipement(db, equipement_id)
+    equipement = EquipementService.get_equipement(
+        db, equipement_id, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return equipement_to_read(equipement)
 
 
@@ -82,10 +88,12 @@ def update_equipement(
     equipement_id: int,
     body: EquipementUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Modifie un équipement"""
-    equipement = EquipementService.update_equipement(db, equipement_id, body)
+    equipement = EquipementService.update_equipement(
+        db, equipement_id, body, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return equipement_to_read(equipement)
 
 
@@ -93,7 +101,7 @@ def update_equipement(
 def delete_equipement(
     equipement_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_admin),
 ):
     """Supprime un équipement et ses assessments associés"""
     ip = EquipementService.delete_equipement(db, equipement_id)

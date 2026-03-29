@@ -19,7 +19,7 @@ def list_sites(
     entreprise_id: int = None,
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les sites (filtrable par entreprise)"""
     items, total = SiteService.list_sites(
@@ -27,6 +27,8 @@ def list_sites(
         entreprise_id=entreprise_id,
         offset=pagination.offset,
         limit=pagination.page_size,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return PaginatedResponse(
         items=items,
@@ -41,10 +43,12 @@ def list_sites(
 def create_site(
     body: SiteCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Crée un nouveau site pour une entreprise"""
-    site = SiteService.create_site(db, body)
+    site = SiteService.create_site(
+        db, body, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return SiteRead(
         id=site.id,
         nom=site.nom,
@@ -59,10 +63,12 @@ def create_site(
 def get_site(
     site_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Détail d'un site"""
-    site = SiteService.get_site(db, site_id)
+    site = SiteService.get_site(
+        db, site_id, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return SiteRead(
         id=site.id,
         nom=site.nom,
@@ -78,10 +84,12 @@ def update_site(
     site_id: int,
     body: SiteUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Modifie un site"""
-    site = SiteService.update_site(db, site_id, body)
+    site = SiteService.update_site(
+        db, site_id, body, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return SiteRead(
         id=site.id,
         nom=site.nom,
@@ -96,7 +104,7 @@ def update_site(
 def delete_site(
     site_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_admin),
 ):
     """Supprime un site et ses équipements"""
     nom = SiteService.delete_site(db, site_id)
