@@ -258,7 +258,13 @@ class Monkey365ScanService:
         entreprise_id: int,
         skip: int = 0,
         limit: int = 20,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> list[Monkey365ScanResult]:
+        from ..core.helpers import user_has_access_to_entreprise
+        if user_id is not None and not is_admin:
+            if not user_has_access_to_entreprise(db, entreprise_id, user_id):
+                return []
         return cast(
             list[Monkey365ScanResult],
             db.query(Monkey365ScanResult)
@@ -270,8 +276,16 @@ class Monkey365ScanService:
         )
 
     @staticmethod
-    def get_scan(db: DBSession, scan_id: int) -> Monkey365ScanResult | None:
-        return cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, scan_id))
+    def get_scan(
+        db: DBSession, scan_id: int,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> Monkey365ScanResult | None:
+        result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, scan_id))
+        if result and user_id is not None and not is_admin:
+            from ..core.helpers import user_has_access_to_entreprise
+            if not user_has_access_to_entreprise(db, result.entreprise_id, user_id):
+                return None
+        return result
 
     # ── Streaming scan (Device Code Flow) ─────────────────────────
 
@@ -393,11 +407,18 @@ class Monkey365ScanService:
             db.close()
 
     @staticmethod
-    def delete_scan(db: DBSession, scan_id: int) -> bool:
+    def delete_scan(
+        db: DBSession, scan_id: int,
+        user_id: int | None = None, is_admin: bool = False,
+    ) -> bool:
         """Delete a Monkey365 scan and clean up associated files."""
         result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, scan_id))
         if not result:
             return False
+        if user_id is not None and not is_admin:
+            from ..core.helpers import user_has_access_to_entreprise
+            if not user_has_access_to_entreprise(db, result.entreprise_id, user_id):
+                return False
 
         # Clean up output directory (contains logs, meta and reports)
         if result.output_path:

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ....core.database import get_db
 from ....core.deps import get_current_auditeur
+from ....core.helpers import user_has_access_to_entreprise
 from ....models.audit import Audit
 from ....models.entreprise import Entreprise
 from ....models.monkey365_scan_result import Monkey365ScanStatus
@@ -32,15 +33,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _rbac(u: User) -> tuple[int, bool]:
+    return u.id, u.role == "admin"
+
+
 @router.post("/monkey365/run", response_model=Monkey365ScanResultSummary, status_code=201)
 def launch_monkey365_scan(
     request: Monkey365ScanCreate,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
+    uid, adm = _rbac(current_user)
     entreprise = db.get(Entreprise, request.entreprise_id)
     if not entreprise:
         raise HTTPException(404, f"Entreprise #{request.entreprise_id} introuvable")
+    if not adm and not user_has_access_to_entreprise(db, request.entreprise_id, uid):
+        raise HTTPException(404, "Ressource introuvable")
 
     try:
         result = Monkey365ScanService.launch_scan(
@@ -73,14 +81,16 @@ def list_monkey365_scans(
     page: int = Query(1, ge=1, description="Numéro de page, commence à 1"),
     page_size: int = Query(50, ge=1, le=500, description="Nombre de résultats par page"),
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Liste paginée des audits Monkey365 pour une entreprise."""
+    uid, adm = _rbac(current_user)
     return Monkey365ScanService.list_scans(
         db=db,
         entreprise_id=entreprise_id,
         skip=(page - 1) * page_size,
         limit=page_size,
+        user_id=uid, is_admin=adm,
     )
 
 
@@ -88,9 +98,10 @@ def list_monkey365_scans(
 def get_monkey365_scan_result(
     result_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
-    result = Monkey365ScanService.get_scan(db, result_id)
+    uid, adm = _rbac(current_user)
+    result = Monkey365ScanService.get_scan(db, result_id, user_id=uid, is_admin=adm)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
     return result
@@ -100,10 +111,11 @@ def get_monkey365_scan_result(
 def get_monkey365_scan_logs(
     result_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Retourne les dernières lignes du log PowerShell du scan (lecture directe du fichier)."""
-    result = Monkey365ScanService.get_scan(db, result_id)
+    uid, adm = _rbac(current_user)
+    result = Monkey365ScanService.get_scan(db, result_id, user_id=uid, is_admin=adm)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
     if not result.output_path:
@@ -121,7 +133,6 @@ def get_monkey365_scan_logs(
             raw = fh.read()
         content = raw.decode("utf-8", errors="replace")
         lines = content.splitlines()
-        # Discard potentially partial first line when reading from the middle
         if tail_start > 0 and len(lines) > 1:
             lines = lines[1:]
         return Monkey365ScanLogs(lines=lines[-500:], total_lines=len(lines))
@@ -134,16 +145,16 @@ def get_monkey365_scan_logs(
 def cancel_monkey365_scan(
     result_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Force l'arrêt d'un scan en cours : tue le process PowerShell et met le status à CANCELLED."""
-    result = Monkey365ScanService.get_scan(db, result_id)
+    uid, adm = _rbac(current_user)
+    result = Monkey365ScanService.get_scan(db, result_id, user_id=uid, is_admin=adm)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
     if result.status not in (Monkey365ScanStatus.RUNNING, Monkey365ScanStatus.AUTHENTICATING):
         raise HTTPException(400, "Ce scan n'est pas en cours d'exécution")
 
-    # Kill the PowerShell process if still running
     Monkey365ScanService.kill_scan_process(result_id)
 
     result.status = Monkey365ScanStatus.CANCELLED
@@ -158,10 +169,11 @@ def cancel_monkey365_scan(
 def get_monkey365_scan_report(
     result_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Retourne le fichier HTML du rapport Monkey365."""
-    result = Monkey365ScanService.get_scan(db, result_id)
+    uid, adm = _rbac(current_user)
+    result = Monkey365ScanService.get_scan(db, result_id, user_id=uid, is_admin=adm)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
     if result.status != Monkey365ScanStatus.SUCCESS:
@@ -224,25 +236,13 @@ async def launch_monkey365_streaming_scan(
 ):
     """
     Lance un scan Monkey365 en mode streaming avec Device Code Flow.
-
-    Le scan est lance en background. Les evenements (device_code, scan_log,
-    scan_complete, scan_error) sont envoyes via WebSocket.
     """
-    # Verifier que l'entreprise existe
+    uid, adm = _rbac(current_user)
     entreprise = db.get(Entreprise, request.entreprise_id)
     if not entreprise:
         raise HTTPException(404, "Ressource introuvable")
 
-    # Verifier ownership : l'utilisateur doit avoir au moins un audit sur cette entreprise
-    audit = (
-        db.query(Audit)
-        .filter(
-            Audit.entreprise_id == request.entreprise_id,
-            Audit.owner_id == current_user.id,
-        )
-        .first()
-    )
-    if audit is None and current_user.role != "admin":
+    if not adm and not user_has_access_to_entreprise(db, request.entreprise_id, uid):
         raise HTTPException(404, "Ressource introuvable")
 
     try:
@@ -256,7 +256,6 @@ async def launch_monkey365_streaming_scan(
     except ValueError as e:
         raise HTTPException(404, str(e))
 
-    # Lancer le scan async en background
     asyncio.create_task(
         Monkey365ScanService.execute_streaming_scan(
             result_id=result.id,
@@ -284,10 +283,10 @@ async def launch_monkey365_streaming_scan(
 def delete_monkey365_scan(
     result_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Supprime un audit Monkey365 et nettoie les fichiers associés."""
-    if not Monkey365ScanService.delete_scan(db, result_id):
+    uid, adm = _rbac(current_user)
+    if not Monkey365ScanService.delete_scan(db, result_id, user_id=uid, is_admin=adm):
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
     return MessageResponse(message=f"Audit Monkey365 #{result_id} supprimé")
-
