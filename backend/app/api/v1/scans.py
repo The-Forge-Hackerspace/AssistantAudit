@@ -75,6 +75,7 @@ def launch_scan(
             nom=payload.nom,
             notes=payload.notes,
             custom_args=payload.custom_args,
+            owner_id=current_user.id,
         )
 
         # Lancer l'exécution en arrière-plan
@@ -105,7 +106,7 @@ def preview_nmap_command(
     scan_type: str = Query(..., description="Type de scan"),
     target: str = Query("", description="Cible"),
     custom_args: Optional[str] = Query(None, description="Arguments custom"),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Retourne un aperçu de la commande nmap qui sera exécutée."""
     command = scan_service.get_nmap_command_preview(target, scan_type, custom_args)
@@ -121,11 +122,16 @@ def list_scans(
     site_id: Optional[int] = Query(None, description="Filtrer par site"),
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les scans réseau, optionnellement filtrés par site."""
     items, total = scan_service.list_scans(
-        db, site_id=site_id, skip=pagination.offset, limit=pagination.page_size
+        db,
+        site_id=site_id,
+        skip=pagination.offset,
+        limit=pagination.page_size,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return PaginatedResponse(
         items=items,
@@ -144,10 +150,12 @@ def list_scans(
 def get_scan(
     scan_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère les détails d'un scan avec tous les hosts et ports."""
-    scan = scan_service.get_scan_with_hosts(db, scan_id)
+    scan = scan_service.get_scan_with_hosts(
+        db, scan_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     if not scan:
         raise HTTPException(status_code=404, detail="Scan introuvable")
     return scan
@@ -161,10 +169,12 @@ def get_scan(
 def delete_scan(
     scan_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Supprime un scan et tous ses résultats."""
-    if not scan_service.delete_scan(db, scan_id):
+    if not scan_service.delete_scan(
+        db, scan_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    ):
         raise HTTPException(status_code=404, detail="Scan introuvable")
     return MessageResponse(message="Scan supprimé")
 
@@ -180,7 +190,7 @@ def decide_host(
     host_id: int,
     payload: ScanHostDecision,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """
     Met à jour la décision sur un host :
@@ -216,7 +226,7 @@ def link_host(
     host_id: int,
     equipement_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Lie un host découvert à un équipement existant dans la base."""
     try:
@@ -234,7 +244,7 @@ def link_host(
 def import_all_hosts(
     scan_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """
     Crée automatiquement un équipement pour chaque host 'pending'

@@ -54,6 +54,7 @@ def create_pending_scan(
     nom: Optional[str] = None,
     notes: Optional[str] = None,
     custom_args: Optional[str] = None,
+    owner_id: int | None = None,
 ) -> ScanReseau:
     """
     Crée un scan en statut 'running' et le persiste immédiatement.
@@ -77,6 +78,7 @@ def create_pending_scan(
         nmap_command=nmap_command,
         statut="running",
         notes=notes,
+        owner_id=owner_id,
     )
     db.add(scan)
     db.commit()
@@ -299,9 +301,17 @@ def link_host_to_equipement(
     return host
 
 
-def get_scan_with_hosts(db: Session, scan_id: int) -> Optional[ScanReseau]:
-    """Récupère un scan avec ses hosts et ports."""
-    return db.get(ScanReseau, scan_id)
+def get_scan_with_hosts(
+    db: Session,
+    scan_id: int,
+    owner_id: int | None = None,
+    is_admin: bool = False,
+) -> Optional[ScanReseau]:
+    """Récupère un scan avec ses hosts et ports. Vérifie ownership si owner_id fourni."""
+    scan = db.get(ScanReseau, scan_id)
+    if scan and owner_id is not None and not is_admin and scan.owner_id != owner_id:
+        return None
+    return scan
 
 
 def list_scans(
@@ -309,9 +319,13 @@ def list_scans(
     site_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 20,
+    owner_id: int | None = None,
+    is_admin: bool = False,
 ) -> tuple[list[ScanReseau], int]:
-    """Liste les scans, optionnellement filtrés par site."""
+    """Liste les scans, optionnellement filtrés par site et owner."""
     query = db.query(ScanReseau)
+    if owner_id is not None and not is_admin:
+        query = query.filter(ScanReseau.owner_id == owner_id)
     if site_id:
         query = query.filter(ScanReseau.site_id == site_id)
     total = query.count()
@@ -319,10 +333,17 @@ def list_scans(
     return items, total
 
 
-def delete_scan(db: Session, scan_id: int) -> bool:
-    """Supprime un scan et tous ses hosts/ports."""
+def delete_scan(
+    db: Session,
+    scan_id: int,
+    owner_id: int | None = None,
+    is_admin: bool = False,
+) -> bool:
+    """Supprime un scan et tous ses hosts/ports. Vérifie ownership."""
     scan = db.get(ScanReseau, scan_id)
     if not scan:
+        return False
+    if owner_id is not None and not is_admin and scan.owner_id != owner_id:
         return False
     db.delete(scan)
     db.commit()
