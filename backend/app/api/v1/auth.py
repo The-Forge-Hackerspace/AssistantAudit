@@ -42,7 +42,7 @@ def _clear_legacy_httponly_cookies(response: Response) -> None:
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(
+def login(
     request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -72,7 +72,7 @@ async def login(
 
 
 @router.post("/login/json", response_model=TokenResponse)
-async def login_json(request: Request, response: Response, body: LoginRequest, db: Session = Depends(get_db)):
+def login_json(request: Request, response: Response, body: LoginRequest, db: Session = Depends(get_db)):
     """Authentification par JSON body (pour les clients API)"""
     # Rate limiting anti brute-force
     login_rate_limiter.check(request)
@@ -123,7 +123,7 @@ def refresh(
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-async def register(
+def register(
     body: UserCreate,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin),
@@ -150,13 +150,13 @@ async def register(
 
 
 @router.get("/me", response_model=UserRead)
-async def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user)):
     """Profil de l'utilisateur courant"""
     return current_user
 
 
 @router.post("/change-password", response_model=MessageResponse)
-async def change_password(
+def change_password(
     body: PasswordChange,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -174,7 +174,7 @@ async def change_password(
 
 
 @router.post("/logout", response_model=MessageResponse)
-async def logout(response: Response):
+def logout(response: Response):
     """Déconnexion : supprime les éventuels cookies httpOnly résiduels."""
     _clear_legacy_httponly_cookies(response)
     return MessageResponse(message="Déconnecté avec succès")
