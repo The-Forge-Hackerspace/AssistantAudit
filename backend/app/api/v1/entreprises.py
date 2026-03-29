@@ -1,12 +1,11 @@
 """
 Routes Entreprises : CRUD.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
-from ...models.entreprise import Entreprise, Contact
 from ...models.user import User
 from ...schemas.entreprise import (
     EntrepriseCreate,
@@ -14,6 +13,7 @@ from ...schemas.entreprise import (
     EntrepriseUpdate,
 )
 from ...schemas.common import PaginatedResponse, MessageResponse
+from ...services.entreprise_service import EntrepriseService
 
 router = APIRouter()
 
@@ -25,13 +25,8 @@ def list_entreprises(
     _: User = Depends(get_current_user),
 ):
     """Liste les entreprises (paginé)"""
-    total = db.query(Entreprise).count()
-    items = (
-        db.query(Entreprise)
-        .order_by(Entreprise.nom)
-        .offset(pagination.offset)
-        .limit(pagination.page_size)
-        .all()
+    items, total = EntrepriseService.list_entreprises(
+        db, offset=pagination.offset, limit=pagination.page_size,
     )
     return PaginatedResponse(
         items=items,
@@ -49,44 +44,7 @@ def create_entreprise(
     _: User = Depends(get_current_auditeur),
 ):
     """Crée une entreprise avec ses contacts"""
-    existing = db.query(Entreprise).filter(Entreprise.nom == body.nom).first()
-    if existing:
-        raise HTTPException(status_code=409, detail=f"L'entreprise '{body.nom}' existe déjà")
-
-    # Convertir les chaînes vides en None pour éviter les conflits UNIQUE
-    siret = body.siret.strip() if body.siret else None
-    siret = siret or None  # "" -> None
-
-    if siret:
-        dup = db.query(Entreprise).filter(Entreprise.siret == siret).first()
-        if dup:
-            raise HTTPException(status_code=409, detail=f"Une entreprise avec le SIRET '{siret}' existe déjà")
-
-    entreprise = Entreprise(
-        nom=body.nom,
-        adresse=body.adresse or None,
-        secteur_activite=body.secteur_activite or None,
-        siret=siret,
-        presentation_desc=body.presentation_desc or None,
-        contraintes_reglementaires=body.contraintes_reglementaires or None,
-    )
-    db.add(entreprise)
-    db.flush()
-
-    for contact_data in body.contacts:
-        contact = Contact(
-            entreprise_id=entreprise.id,
-            nom=contact_data.nom,
-            role=contact_data.role,
-            email=contact_data.email,
-            telephone=contact_data.telephone,
-            is_main_contact=contact_data.is_main_contact,
-        )
-        db.add(contact)
-
-    db.commit()
-    db.refresh(entreprise)
-    return entreprise
+    return EntrepriseService.create_entreprise(db, body)
 
 
 @router.get("/{entreprise_id}", response_model=EntrepriseRead)
@@ -96,10 +54,7 @@ def get_entreprise(
     _: User = Depends(get_current_user),
 ):
     """Détail d'une entreprise"""
-    entreprise = db.get(Entreprise, entreprise_id)
-    if not entreprise:
-        raise HTTPException(status_code=404, detail="Entreprise introuvable")
-    return entreprise
+    return EntrepriseService.get_entreprise(db, entreprise_id)
 
 
 @router.put("/{entreprise_id}", response_model=EntrepriseRead)
@@ -110,17 +65,7 @@ def update_entreprise(
     _: User = Depends(get_current_auditeur),
 ):
     """Met à jour une entreprise"""
-    entreprise = db.get(Entreprise, entreprise_id)
-    if not entreprise:
-        raise HTTPException(status_code=404, detail="Entreprise introuvable")
-
-    update_data = body.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(entreprise, field, value)
-
-    db.commit()
-    db.refresh(entreprise)
-    return entreprise
+    return EntrepriseService.update_entreprise(db, entreprise_id, body)
 
 
 @router.delete("/{entreprise_id}", response_model=MessageResponse)
@@ -130,9 +75,5 @@ def delete_entreprise(
     _: User = Depends(get_current_admin),
 ):
     """Supprime une entreprise"""
-    entreprise = db.get(Entreprise, entreprise_id)
-    if not entreprise:
-        raise HTTPException(status_code=404, detail="Entreprise introuvable")
-    db.delete(entreprise)
-    db.commit()
-    return MessageResponse(message=f"Entreprise '{entreprise.nom}' supprimée")
+    nom = EntrepriseService.delete_entreprise(db, entreprise_id)
+    return MessageResponse(message=f"Entreprise '{nom}' supprimée")

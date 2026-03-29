@@ -6,12 +6,10 @@ from sqlalchemy.orm import Session
 
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
-from ...core.helpers import get_or_404
-from ...models.audit import Audit, AuditStatus
-from ...models.entreprise import Entreprise
 from ...models.user import User
 from ...schemas.audit import AuditCreate, AuditRead, AuditDetail, AuditUpdate
 from ...schemas.common import PaginatedResponse, MessageResponse
+from ...services.audit_service import AuditService
 
 router = APIRouter()
 
@@ -24,11 +22,12 @@ def list_audits(
     _: User = Depends(get_current_user),
 ):
     """Liste les audits (paginé, filtrable par entreprise)"""
-    query = db.query(Audit)
-    if entreprise_id:
-        query = query.filter(Audit.entreprise_id == entreprise_id)
-    total = query.count()
-    items = query.order_by(Audit.date_debut.desc()).offset(pagination.offset).limit(pagination.page_size).all()
+    items, total = AuditService.list_audits(
+        db,
+        entreprise_id=entreprise_id,
+        offset=pagination.offset,
+        limit=pagination.page_size,
+    )
     return PaginatedResponse(
         items=items,
         total=total,
@@ -42,22 +41,10 @@ def list_audits(
 def create_audit(
     body: AuditCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Crée un nouveau projet d'audit"""
-    get_or_404(db, Entreprise, body.entreprise_id)
-    audit = Audit(
-        nom_projet=body.nom_projet,
-        entreprise_id=body.entreprise_id,
-        objectifs=body.objectifs,
-        limites=body.limites,
-        hypotheses=body.hypotheses,
-        risques_initiaux=body.risques_initiaux,
-    )
-    db.add(audit)
-    db.commit()
-    db.refresh(audit)
-    return audit
+    return AuditService.create_audit(db, body, owner_id=current_user.id)
 
 
 @router.get("/{audit_id}", response_model=AuditDetail)
@@ -66,7 +53,7 @@ def get_audit(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    audit = get_or_404(db, Audit, audit_id)
+    audit = AuditService.get_audit(db, audit_id)
     return AuditDetail(
         id=audit.id,
         nom_projet=audit.nom_projet,
@@ -92,17 +79,7 @@ def update_audit(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_auditeur),
 ):
-    audit = get_or_404(db, Audit, audit_id)
-
-    update_data = body.model_dump(exclude_unset=True)
-    if "status" in update_data:
-        update_data["status"] = AuditStatus(update_data["status"])
-    for field, value in update_data.items():
-        setattr(audit, field, value)
-
-    db.commit()
-    db.refresh(audit)
-    return audit
+    return AuditService.update_audit(db, audit_id, body)
 
 
 @router.delete("/{audit_id}", response_model=MessageResponse)
@@ -111,7 +88,5 @@ def delete_audit(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ):
-    audit = get_or_404(db, Audit, audit_id)
-    db.delete(audit)
-    db.commit()
-    return MessageResponse(message=f"Audit '{audit.nom_projet}' supprimé")
+    nom = AuditService.delete_audit(db, audit_id)
+    return MessageResponse(message=f"Audit '{nom}' supprimé")
