@@ -997,6 +997,14 @@ export interface DomainEntry {
   password: string;
 }
 
+export interface DomainEntryResponse {
+  server: string;
+  port: number;
+  domain_name: string;
+  username: string;
+  user_domain: string;
+}
+
 export interface OradadConfig {
   id: number;
   name: string;
@@ -1009,7 +1017,7 @@ export interface OradadConfig {
   output_files: boolean;
   output_mla: boolean;
   sleep_time: number;
-  explicit_domains: DomainEntry[] | null;
+  explicit_domains: DomainEntryResponse[] | null;
   created_at: string;
   updated_at: string | null;
 }

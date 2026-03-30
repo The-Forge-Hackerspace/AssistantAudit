@@ -92,7 +92,7 @@ class OradadConfig(Base):
             self.explicit_domains = json.dumps(domains, ensure_ascii=False)
 
     def get_domains_masked(self) -> list[dict]:
-        """Retourne les domaines avec mots de passe masques (pour API responses)."""
+        """Retourne les domaines sans mot de passe (pour API responses)."""
         domains = self.get_domains_list()
         return [
             {
@@ -101,7 +101,6 @@ class OradadConfig(Base):
                 "domain_name": d.get("domain_name", ""),
                 "username": d.get("username", ""),
                 "user_domain": d.get("user_domain", ""),
-                "password": "••••••" if d.get("password") else "",
             }
             for d in domains
         ]

@@ -234,7 +234,7 @@ export default function OradadPage() {
     setCfgSleepTime(String(config.sleep_time));
     setCfgShowAdvanced(false);
     const domains = config.explicit_domains && config.explicit_domains.length > 0
-      ? config.explicit_domains.map((d, i) => ({ ...d, _key: i }))
+      ? config.explicit_domains.map((d, i) => ({ ...d, password: "", _key: i }))
       : [{ ...EMPTY_DOMAIN, _key: 0 }];
     setCfgDomains(domains);
     setDomainKeyCounter(domains.length);

@@ -36,7 +36,6 @@ class DomainEntryResponse(BaseModel):
     domain_name: str
     username: str
     user_domain: str
-    password: str  # toujours masque dans les reponses
 
 
 class OradadConfigCreate(BaseModel):
