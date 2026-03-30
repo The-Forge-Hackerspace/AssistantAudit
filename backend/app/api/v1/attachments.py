@@ -239,19 +239,27 @@ def upload_attachment(
 def list_attachments(
     result_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les pièces jointes d'un résultat de contrôle."""
     cr = db.query(ControlResult).filter(ControlResult.id == result_id).first()
     if not cr:
         raise HTTPException(status_code=404, detail="Résultat de contrôle introuvable")
 
-    attachments = (
+    query = (
         db.query(Attachment)
         .filter(Attachment.control_result_id == result_id)
-        .order_by(Attachment.uploaded_at.desc())
-        .all()
     )
+    if current_user.role != "admin":
+        query = (
+            query
+            .join(ControlResult, Attachment.control_result_id == ControlResult.id)
+            .join(Assessment, ControlResult.assessment_id == Assessment.id)
+            .join(AssessmentCampaign, Assessment.campaign_id == AssessmentCampaign.id)
+            .join(Audit, AssessmentCampaign.audit_id == Audit.id)
+            .filter(Audit.owner_id == current_user.id)
+        )
+    attachments = query.order_by(Attachment.uploaded_at.desc()).all()
     return [_attachment_to_read(a) for a in attachments]
 
 
