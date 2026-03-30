@@ -159,13 +159,12 @@ class ConnectionManager:
             if (now - ts).total_seconds() < BUFFER_TTL_SECONDS
         ]
 
-        for _, event in valid:
+        for idx, (_, event) in enumerate(valid):
             try:
                 await websocket.send_json(event)
             except (WebSocketDisconnect, RuntimeError):
                 # Re-bufferiser les non-envoyes
-                remaining_idx = valid.index((_, event))
-                self.user_event_buffer[user_id] = valid[remaining_idx:]
+                self.user_event_buffer[user_id] = valid[idx:]
                 return
 
         logger.info(f"Replayed {len(valid)} buffered events for user_id={user_id}")
