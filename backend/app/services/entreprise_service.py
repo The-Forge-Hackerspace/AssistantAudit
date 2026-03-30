@@ -2,6 +2,7 @@
 Service Entreprise : CRUD pour les entreprises et contacts.
 """
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..core.audit_logger import log_access_denied
@@ -21,17 +22,18 @@ class EntrepriseService:
         user_id: int | None = None,
         is_admin: bool = False,
     ) -> tuple[list[Entreprise], int]:
-        """Liste les entreprises avec pagination. Non-admin voit uniquement celles liees a ses audits."""
+        """Liste les entreprises avec pagination. Non-admin voit les siennes + celles liees a ses audits."""
+        query = db.query(Entreprise)
         if user_id is not None and not is_admin:
-            entreprise_ids = (
+            audit_ent_ids = (
                 db.query(Audit.entreprise_id)
                 .filter(Audit.owner_id == user_id)
                 .distinct()
                 .scalar_subquery()
             )
-            query = db.query(Entreprise).filter(Entreprise.id.in_(entreprise_ids))
-        else:
-            query = db.query(Entreprise)
+            query = query.filter(
+                or_(Entreprise.owner_id == user_id, Entreprise.id.in_(audit_ent_ids))
+            )
         total = query.count()
         items = query.order_by(Entreprise.nom).offset(offset).limit(limit).all()
         return items, total
@@ -43,7 +45,7 @@ class EntrepriseService:
         user_id: int | None = None,
         is_admin: bool = False,
     ) -> Entreprise:
-        """Recupere une entreprise par ID. Non-admin doit avoir un audit lie."""
+        """Recupere une entreprise par ID. Non-admin doit etre proprietaire ou avoir un audit lie."""
         entreprise = get_or_404(db, Entreprise, entreprise_id)
         if user_id is not None and not is_admin:
             if not user_has_access_to_entreprise(db, entreprise_id, user_id):
@@ -52,7 +54,7 @@ class EntrepriseService:
         return entreprise
 
     @staticmethod
-    def create_entreprise(db: Session, data: EntrepriseCreate) -> Entreprise:
+    def create_entreprise(db: Session, data: EntrepriseCreate, owner_id: int) -> Entreprise:
         """Cree une entreprise avec ses contacts. Verifie l'unicite du nom et du SIRET."""
         existing = db.query(Entreprise).filter(Entreprise.nom == data.nom).first()
         if existing:
@@ -76,6 +78,7 @@ class EntrepriseService:
             siret=siret,
             presentation_desc=data.presentation_desc or None,
             contraintes_reglementaires=data.contraintes_reglementaires or None,
+            owner_id=owner_id,
         )
         db.add(entreprise)
         db.flush()
@@ -103,7 +106,7 @@ class EntrepriseService:
         user_id: int | None = None,
         is_admin: bool = False,
     ) -> Entreprise:
-        """Met a jour une entreprise existante. Non-admin doit avoir un audit lie."""
+        """Met a jour une entreprise existante. Non-admin doit etre proprietaire ou avoir un audit lie."""
         entreprise = get_or_404(db, Entreprise, entreprise_id)
         if user_id is not None and not is_admin:
             if not user_has_access_to_entreprise(db, entreprise_id, user_id):

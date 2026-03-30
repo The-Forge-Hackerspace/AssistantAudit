@@ -21,7 +21,7 @@ class TestAccessDeniedLogging:
         second_auditeur_user, second_auditeur_headers, caplog,
     ):
         """Un ownership failure produit un WARNING contenant 'access_denied'."""
-        ent = Entreprise(nom="Ent Log Test")
+        ent = Entreprise(nom="Ent Log Test", owner_id=auditeur_user.id)
         db_session.add(ent)
         db_session.flush()
         audit = Audit(nom_projet="Audit Log", entreprise_id=ent.id, owner_id=auditeur_user.id)
@@ -42,7 +42,7 @@ class TestAccessDeniedLogging:
         second_auditeur_user, second_auditeur_headers, caplog,
     ):
         """Le log contient user_id de B, resource_type et resource_id."""
-        ent = Entreprise(nom="Ent ResInfo")
+        ent = Entreprise(nom="Ent ResInfo", owner_id=auditeur_user.id)
         db_session.add(ent)
         db_session.flush()
         audit = Audit(nom_projet="Audit ResInfo", entreprise_id=ent.id, owner_id=auditeur_user.id)
@@ -65,7 +65,7 @@ class TestAccessDeniedLogging:
         second_auditeur_user, second_auditeur_headers, caplog,
     ):
         """Le log ne contient pas de données métier (nom_projet, owner_id de A comme user=)."""
-        ent = Entreprise(nom="Ent NoLeak")
+        ent = Entreprise(nom="Ent NoLeak", owner_id=auditeur_user.id)
         db_session.add(ent)
         db_session.flush()
         audit = Audit(
@@ -103,7 +103,7 @@ class TestAccessDeniedLogging:
         self, client, db_session, auditeur_user, admin_headers, caplog,
     ):
         """Un accès admin ne produit pas de log access_denied."""
-        ent = Entreprise(nom="Ent Admin Bypass")
+        ent = Entreprise(nom="Ent Admin Bypass", owner_id=auditeur_user.id)
         db_session.add(ent)
         db_session.flush()
         audit = Audit(nom_projet="Audit Admin", entreprise_id=ent.id, owner_id=auditeur_user.id)
@@ -123,7 +123,7 @@ class TestAccessDeniedLogging:
         second_auditeur_user, second_auditeur_headers, caplog,
     ):
         """Un échec d'accès entreprise produit un log avec 'Entreprise'."""
-        ent = Entreprise(nom="Ent Priv")
+        ent = Entreprise(nom="Ent Priv", owner_id=auditeur_user.id)
         db_session.add(ent)
         db_session.flush()
         audit = Audit(nom_projet="Audit Ent", entreprise_id=ent.id, owner_id=auditeur_user.id)

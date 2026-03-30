@@ -323,9 +323,9 @@ class TestBuildPsScript:
 
 
 class TestStreamingRoute:
-    def _create_entreprise(self, db_session):
+    def _create_entreprise(self, db_session, owner_id):
         from app.models.entreprise import Entreprise
-        ent = Entreprise(nom="TestCorp", secteur_activite="IT")
+        ent = Entreprise(nom="TestCorp", secteur_activite="IT", owner_id=owner_id)
         db_session.add(ent)
         db_session.commit()
         db_session.refresh(ent)
@@ -347,7 +347,7 @@ class TestStreamingRoute:
         self, client, db_session, auditeur_user, auditeur_headers
     ):
         """La route retourne immediatement avec scan_id et status=authenticating."""
-        ent = self._create_entreprise(db_session)
+        ent = self._create_entreprise(db_session, owner_id=auditeur_user.id)
         self._create_audit_for_user(db_session, ent.id, auditeur_user.id)
 
         with patch(
@@ -379,11 +379,11 @@ class TestStreamingRoute:
         assert data["auth_method"] == "device_code"
 
     def test_streaming_route_no_ownership_returns_404(
-        self, client, db_session, auditeur_user, auditeur_headers
+        self, client, db_session, auditeur_user, auditeur_headers, admin_user,
     ):
-        """404 si l'utilisateur n'a pas d'audit sur l'entreprise."""
-        ent = self._create_entreprise(db_session)
-        # Pas d'audit cree pour cet utilisateur
+        """404 si l'utilisateur n'est ni proprietaire ni lie par audit."""
+        ent = self._create_entreprise(db_session, owner_id=admin_user.id)
+        # Entreprise appartient a admin, pas d'audit pour auditeur
 
         response = client.post(
             "/api/v1/tools/monkey365/stream",
@@ -399,7 +399,7 @@ class TestStreamingRoute:
         self, client, db_session, admin_user, admin_headers
     ):
         """Les admins peuvent lancer un scan sans ownership."""
-        ent = self._create_entreprise(db_session)
+        ent = self._create_entreprise(db_session, owner_id=admin_user.id)
 
         with patch(
             "app.api.v1.tools.monkey365.Monkey365ScanService.create_streaming_scan"

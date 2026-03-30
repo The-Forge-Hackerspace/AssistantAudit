@@ -48,7 +48,7 @@ def create_entreprise(
     current_user: User = Depends(get_current_auditeur),
 ):
     """Crée une entreprise avec ses contacts"""
-    return EntrepriseService.create_entreprise(db, body)
+    return EntrepriseService.create_entreprise(db, body, owner_id=current_user.id)
 
 
 @router.get("/{entreprise_id}", response_model=EntrepriseRead)

@@ -40,8 +40,14 @@ def check_owner(resource, owner_id: int, *, is_admin: bool = False) -> None:
 
 
 def user_has_access_to_entreprise(db: Session, entreprise_id: int, user_id: int) -> bool:
-    """Verifie si un user a au moins un audit lie a cette entreprise."""
+    """Verifie si un user est proprietaire de l'entreprise ou a un audit lie."""
+    from ..models.entreprise import Entreprise
     from ..models.audit import Audit
+    # Check direct ownership first (fast path)
+    ent = db.get(Entreprise, entreprise_id)
+    if ent and ent.owner_id == user_id:
+        return True
+    # Fallback: audit chain (backward compat)
     return db.query(Audit).filter(
         Audit.entreprise_id == entreprise_id,
         Audit.owner_id == user_id,

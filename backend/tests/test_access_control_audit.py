@@ -39,8 +39,8 @@ def auditeur2_headers(auditeur2_user):
 
 
 @pytest.fixture
-def entreprise(db_session):
-    e = Entreprise(nom="Entreprise Test")
+def entreprise(db_session, auditeur_user):
+    e = Entreprise(nom="Entreprise Test", owner_id=auditeur_user.id)
     db_session.add(e)
     db_session.commit()
     db_session.refresh(e)

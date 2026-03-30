@@ -20,7 +20,7 @@ from app.models.assessment import AssessmentCampaign, CampaignStatus
 
 def _create_chain(db, user, *, ent_name="Ent", site_name="Site", equip_ip="10.0.0.1"):
     """Crée la chaîne complète : entreprise → audit → site → equipement."""
-    ent = Entreprise(nom=ent_name)
+    ent = Entreprise(nom=ent_name, owner_id=user.id)
     db.add(ent)
     db.flush()
     audit = Audit(nom_projet=f"Audit {ent_name}", entreprise_id=ent.id, owner_id=user.id)
@@ -45,8 +45,8 @@ def _create_chain(db, user, *, ent_name="Ent", site_name="Site", equip_ip="10.0.
 
 
 @pytest.fixture
-def entreprise(db_session):
-    e = Entreprise(nom="Entreprise RBAC Test")
+def entreprise(db_session, auditeur_user):
+    e = Entreprise(nom="Entreprise RBAC Test", owner_id=auditeur_user.id)
     db_session.add(e)
     db_session.commit()
     db_session.refresh(e)
@@ -166,9 +166,9 @@ class TestAuditIsolation:
 
 
 @pytest.fixture
-def entreprise_a(db_session):
+def entreprise_a(db_session, auditeur_user):
     """Entreprise liee uniquement aux audits de User A."""
-    e = Entreprise(nom="Entreprise A Only")
+    e = Entreprise(nom="Entreprise A Only", owner_id=auditeur_user.id)
     db_session.add(e)
     db_session.commit()
     db_session.refresh(e)
@@ -176,9 +176,9 @@ def entreprise_a(db_session):
 
 
 @pytest.fixture
-def entreprise_shared(db_session):
+def entreprise_shared(db_session, auditeur_user):
     """Entreprise partagee entre User A et User B."""
-    e = Entreprise(nom="Entreprise Shared")
+    e = Entreprise(nom="Entreprise Shared", owner_id=auditeur_user.id)
     db_session.add(e)
     db_session.commit()
     db_session.refresh(e)
@@ -628,7 +628,7 @@ class TestSharedEntreprise:
         second_auditeur_user, second_auditeur_headers,
     ):
         """Sur une entreprise partagée, chaque user ne voit que SON audit."""
-        ent = Entreprise(nom="Ent Shared Audits")
+        ent = Entreprise(nom="Ent Shared Audits", owner_id=auditeur_user.id)
         db_session.add(ent)
         db_session.flush()
 
@@ -665,7 +665,7 @@ class TestSharedEntreprise:
         second_auditeur_user, second_auditeur_headers,
     ):
         """Un site créé sur entreprise partagée est visible par les 2 users."""
-        ent = Entreprise(nom="Ent Shared Sites")
+        ent = Entreprise(nom="Ent Shared Sites", owner_id=auditeur_user.id)
         db_session.add(ent)
         db_session.flush()
 
@@ -711,7 +711,7 @@ class TestRoleControl:
         self, client, db_session, lecteur_user, lecteur_headers,
     ):
         """Un lecteur voit les audits dont il est owner."""
-        ent = Entreprise(nom="Ent Lecteur")
+        ent = Entreprise(nom="Ent Lecteur", owner_id=lecteur_user.id)
         db_session.add(ent)
         db_session.flush()
         audit = Audit(

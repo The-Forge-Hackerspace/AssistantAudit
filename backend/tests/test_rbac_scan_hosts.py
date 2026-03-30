@@ -17,7 +17,7 @@ from app.models.scan import ScanReseau, ScanHost
 
 def _create_site_with_ownership(db, owner, *, ent_name):
     """Crée la chaîne entreprise → audit (ownership) → site pour un owner donné."""
-    ent = Entreprise(nom=ent_name)
+    ent = Entreprise(nom=ent_name, owner_id=owner.id)
     db.add(ent)
     db.flush()
     audit = Audit(nom_projet=f"Audit {ent_name}", entreprise_id=ent.id, owner_id=owner.id)
@@ -32,7 +32,7 @@ def _create_site_with_ownership(db, owner, *, ent_name):
 
 def _create_scan_with_host(db, owner, *, ent_name, ip="10.0.0.1"):
     """Crée la chaîne entreprise → site → scan → host pour un owner donné."""
-    ent = Entreprise(nom=ent_name)
+    ent = Entreprise(nom=ent_name, owner_id=owner.id)
     db.add(ent)
     db.flush()
     site = Site(nom=f"Site {ent_name}", entreprise_id=ent.id)

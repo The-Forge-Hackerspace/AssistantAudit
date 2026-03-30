@@ -73,9 +73,9 @@ def user2(db: Session) -> User:
 
 
 @pytest.fixture
-def entreprise(db: Session) -> Entreprise:
+def entreprise(db: Session, user: User) -> Entreprise:
     """Entreprise de test."""
-    e = Entreprise(nom="TestCorp", secteur_activite="IT")
+    e = Entreprise(nom="TestCorp", secteur_activite="IT", owner_id=user.id)
     db.add(e)
     db.commit()
     db.refresh(e)

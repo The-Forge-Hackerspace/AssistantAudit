@@ -79,7 +79,7 @@ class UserFactory:
 
 class EntrepriseFactory:
     """Factory for creating Entreprise objects"""
-    
+
     @staticmethod
     def create(
         db: Session,
@@ -87,16 +87,26 @@ class EntrepriseFactory:
         secteur_activite: str = "IT",
         adresse: str = "123 Main Street",
         siret: str = None,
+        owner_id: int = None,
         **kwargs
     ) -> Entreprise:
         """Create an entreprise with defaults"""
         if not siret:
             siret = f"123456789{str(uuid.uuid4())[:5]}"
+        if owner_id is None:
+            unique_id = str(uuid.uuid4())[:8]
+            default_user = UserFactory.create(
+                db,
+                username=f"owner_{unique_id}",
+                email=f"owner_{unique_id}@test.local",
+            )
+            owner_id = default_user.id
         ent = Entreprise(
             nom=nom,
             secteur_activite=secteur_activite,
             adresse=adresse,
             siret=siret,
+            owner_id=owner_id,
             **kwargs
         )
         db.add(ent)
@@ -489,7 +499,7 @@ def create_full_assessment_scenario(db: Session):
     auditeur = UserFactory.create(db, username=f"auditeur_{unique_id}", email=f"auditeur_{unique_id}@test.local", role="auditeur")
     
     # Create entreprise and site
-    ent = EntrepriseFactory.create(db, nom=f"Test Corp {unique_id}")
+    ent = EntrepriseFactory.create(db, nom=f"Test Corp {unique_id}", owner_id=auditeur.id)
     site = SiteFactory.create(db, nom="Main Site", entreprise_id=ent.id)
     
     # Create equipements (use keyword args that match model fields)
