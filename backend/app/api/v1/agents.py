@@ -3,7 +3,7 @@ Routes API pour la gestion des agents et le dispatch de taches.
 """
 import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
@@ -171,8 +171,9 @@ def delete_task(
 
 
 @router.post("/tasks/dispatch", response_model=TaskResponse, status_code=201)
-async def dispatch_agent_task(
+def dispatch_agent_task(
     body: TaskDispatchRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_auditeur),
 ):
@@ -190,55 +191,63 @@ async def dispatch_agent_task(
         audit_id=body.audit_id,
     )
 
-    # Notifier l'agent via WebSocket
+    # Notifier l'agent via WebSocket (en arrière-plan)
     from ...core.websocket_manager import ws_manager
-    await ws_manager.send_to_agent(body.agent_uuid, "new_task", {
-        "task_uuid": task.task_uuid,
-        "tool": task.tool,
-        "parameters": task.parameters,
-    })
+    background_tasks.add_task(
+        ws_manager.send_to_agent, body.agent_uuid, "new_task", {
+            "task_uuid": task.task_uuid,
+            "tool": task.tool,
+            "parameters": task.parameters,
+        },
+    )
 
     return task
 
 
 @router.patch("/tasks/{task_uuid}/status", status_code=200)
-async def update_task_status(
+def update_task_status(
     task_uuid: str,
     body: TaskStatusUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
     """Met a jour le status/progress d'une tache. Auth agent."""
     task = AgentService.update_task_status(db, task_uuid, current_agent.id, body)
 
-    # Notifier le user proprietaire via WebSocket
+    # Notifier le user proprietaire via WebSocket (en arrière-plan)
     from ...core.websocket_manager import ws_manager
-    await ws_manager.send_to_user(task.owner_id, "task_status", {
-        "task_uuid": task_uuid,
-        "status": body.status,
-        "progress": task.progress,
-    })
+    background_tasks.add_task(
+        ws_manager.send_to_user, task.owner_id, "task_status", {
+            "task_uuid": task_uuid,
+            "status": body.status,
+            "progress": task.progress,
+        },
+    )
 
     return {"detail": "OK"}
 
 
 @router.post("/tasks/{task_uuid}/result", status_code=200)
-async def submit_task_result(
+def submit_task_result(
     task_uuid: str,
     body: TaskResultSubmit,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_agent: Agent = Depends(get_current_agent),
 ):
     """Soumet les resultats d'une tache. Auth agent."""
     task = AgentService.submit_task_result(db, task_uuid, current_agent.id, body)
 
-    # Notifier le user
+    # Notifier le user (en arrière-plan)
     from ...core.websocket_manager import ws_manager
-    await ws_manager.send_to_user(task.owner_id, "task_result", {
-        "task_uuid": task_uuid,
-        "status": task.status,
-        "result_summary": task.result_summary,
-    })
+    background_tasks.add_task(
+        ws_manager.send_to_user, task.owner_id, "task_result", {
+            "task_uuid": task_uuid,
+            "status": task.status,
+            "result_summary": task.result_summary,
+        },
+    )
 
     return {"detail": "OK"}
 
