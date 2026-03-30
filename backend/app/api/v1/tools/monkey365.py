@@ -160,7 +160,7 @@ def cancel_monkey365_scan(
     result.status = Monkey365ScanStatus.CANCELLED
     result.completed_at = datetime.now(timezone.utc)
     result.error_message = "Scan annulé manuellement"
-    db.commit()
+    db.flush()
     db.refresh(result)
     return result
 

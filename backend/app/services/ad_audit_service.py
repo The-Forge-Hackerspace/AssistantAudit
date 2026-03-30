@@ -104,7 +104,7 @@ def create_pending_ad_audit(
         owner_id=owner_id,
     )
     db.add(audit)
-    db.commit()
+    db.flush()
     db.refresh(audit)
     return audit
 
@@ -237,7 +237,7 @@ def delete_ad_audit_result(
         log_access_denied(owner_id, "ADAuditResult", audit_id, action="delete")
         return False
     db.delete(audit)
-    db.commit()
+    db.flush()
     return True
 
 
@@ -323,8 +323,6 @@ def prefill_assessment_from_ad_audit(
             "status": new_status.value,
             "evidence": finding.get("evidence", ""),
         })
-
-    db.commit()
 
     return {
         "controls_prefilled": prefilled,

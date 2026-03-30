@@ -35,7 +35,7 @@ class AuthService:
 
         # Mettre à jour la dernière connexion
         user.last_login = datetime.now(timezone.utc)
-        db.commit()
+        db.flush()
 
         logger.info(f"Connexion réussie: {user.username}")
         return user
@@ -66,7 +66,7 @@ class AuthService:
             role=role,
         )
         db.add(user)
-        db.commit()
+        db.flush()
         db.refresh(user)
         logger.info(f"Utilisateur créé: {username} (role={role})")
         return user
@@ -77,7 +77,7 @@ class AuthService:
         if not verify_password(current_password, user.password_hash):
             return False
         user.password_hash = hash_password(new_password)
-        db.commit()
+        db.flush()
         logger.info(f"Mot de passe changé pour: {user.username}")
         return True
 

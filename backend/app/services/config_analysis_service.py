@@ -123,7 +123,7 @@ def save_config_analysis(
         if analysis.firewall_rules:
             equipement.rules_count = len(analysis.firewall_rules)
 
-    db.commit()
+    db.flush()
     db.refresh(config)
 
     logger.info(
@@ -182,7 +182,7 @@ def delete_config_analysis(
     if not _check_config_access(db, config, user_id, is_admin):
         return False
     db.delete(config)
-    db.commit()
+    db.flush()
     return True
 
 
@@ -293,8 +293,7 @@ def prefill_assessment_from_config(
 
         prefilled += 1
 
-    db.commit()
-
+    db.flush()
     logger.info(
         f"Pré-remplissage terminé: {prefilled} contrôles "
         f"({compliant} conformes, {non_compliant} non-conformes)"

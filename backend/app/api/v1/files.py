@@ -88,7 +88,7 @@ def upload_file(
         user_id=current_user.id,
         description=description,
     )
-    db.commit()
+    db.flush()
     db.refresh(attachment)
 
     result = AttachmentRead.model_validate(attachment)
@@ -130,4 +130,3 @@ def delete_file(
         attachment_id=attachment_id,
         user_id=current_user.id,
     )
-    db.commit()

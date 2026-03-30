@@ -86,7 +86,7 @@ class Monkey365ScanService:
             entreprise_slug=entreprise_slug,
         )
         db.add(result)
-        db.commit()
+        db.flush()
         db.refresh(result)
         return result
 
@@ -324,7 +324,7 @@ class Monkey365ScanService:
             entreprise_slug=entreprise_slug,
         )
         db.add(result)
-        db.commit()
+        db.flush()
         db.refresh(result)
         return result
 
@@ -432,6 +432,6 @@ class Monkey365ScanService:
 
         # Delete from database
         db.delete(result)
-        db.commit()
+        db.flush()
         logger.info("[MONKEY365] Scan #%s deleted from database", scan_id)
         return True

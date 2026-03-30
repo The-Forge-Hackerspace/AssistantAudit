@@ -155,7 +155,7 @@ class FrameworkService:
                 )
                 db.add(control)
 
-        db.commit()
+        db.flush()
         db.refresh(framework)
         logger.info(
             f"Framework '{framework.ref_id}' importé : "
@@ -360,7 +360,7 @@ class FrameworkService:
         # Désactiver l'ancienne version
         original.is_active = False
 
-        db.commit()
+        db.flush()
         db.refresh(clone)
         logger.info(
             f"Framework '{clone.ref_id}' cloné : v{original.version} -> v{new_version} "
@@ -443,7 +443,7 @@ class FrameworkService:
                 )
                 db.add(control)
 
-        db.commit()
+        db.flush()
         db.refresh(framework)
         logger.info(
             f"Framework '{framework.ref_id}' v{framework.version} créé : "
@@ -455,7 +455,6 @@ class FrameworkService:
             yaml_path = Path(get_settings().FRAMEWORKS_DIR) / f"{framework.ref_id}_v{framework.version}.yaml"
             FrameworkService.export_to_yaml(db, framework.id, yaml_path)
             framework.source_file = str(yaml_path.name)
-            db.commit()
         except Exception as e:
             logger.warning(f"Export YAML automatique échoué : {e}")
 
@@ -512,7 +511,7 @@ class FrameworkService:
                     )
                     db.add(control)
 
-        db.commit()
+        db.flush()
         db.refresh(framework)
         logger.info(f"Framework '{framework.ref_id}' v{framework.version} mis à jour")
 
@@ -535,7 +534,7 @@ class FrameworkService:
         ref = f"{framework.ref_id} v{framework.version}"
         source_file = framework.source_file
         db.delete(framework)
-        db.commit()
+        db.flush()
         logger.info(f"Framework '{ref}' supprimé")
 
         # Supprimer le fichier YAML associé

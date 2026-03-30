@@ -55,7 +55,7 @@ class OradadConfigService:
         if data.explicit_domains:
             config.set_domains_list([d.model_dump() for d in data.explicit_domains])
         db.add(config)
-        db.commit()
+        db.flush()
         db.refresh(config)
         return config
 
@@ -85,7 +85,7 @@ class OradadConfigService:
         for field, value in update_data.items():
             setattr(config, field, value)
 
-        db.commit()
+        db.flush()
         db.refresh(config)
         return config
 
@@ -95,7 +95,7 @@ class OradadConfigService:
     ) -> None:
         config = OradadConfigService.get_config(db, config_id, owner_id, is_admin)
         db.delete(config)
-        db.commit()
+        db.flush()
 
     # ── Taches ORADAD ────────────────────────────────────────────────────
 
@@ -168,7 +168,7 @@ class OradadConfigService:
         summary = dict(task.result_summary) if task.result_summary else {}
         summary["anssi_report"] = report
         task.result_summary = summary
-        db.commit()
+        db.flush()
 
         logger.info(
             "Analyse ANSSI terminee pour la tache %s — score: %s, level: %s",

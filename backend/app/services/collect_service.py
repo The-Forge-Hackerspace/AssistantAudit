@@ -1025,7 +1025,7 @@ def create_pending_collect(
         device_profile=device_profile,
     )
     db.add(collect)
-    db.commit()
+    db.flush()
     db.refresh(collect)
     return collect
 
@@ -1216,7 +1216,7 @@ def delete_collect_result(
     if not _check_equip_access(db, collect.equipement_id, user_id, is_admin):
         return False
     db.delete(collect)
-    db.commit()
+    db.flush()
     return True
 
 
@@ -1302,8 +1302,7 @@ def prefill_assessment_from_collect(
             "findings_count": 0 if passed else 1,
         })
 
-    db.commit()
-
+    db.flush()
     logger.info(
         f"Pré-remplissage collecte #{collect_id}: {prefilled} contrôles "
         f"({compliant_count} conformes, {non_compliant_count} non-conformes)"

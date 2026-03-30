@@ -89,7 +89,7 @@ def update_user(
     if body.password is not None:
         user.password_hash = hash_password(body.password)
 
-    db.commit()
+    db.flush()
     db.refresh(user)
     return user
 
@@ -109,5 +109,4 @@ def delete_user(
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
 
     user.is_active = False
-    db.commit()
     return {"message": f"Utilisateur '{user.username}' désactivé"}

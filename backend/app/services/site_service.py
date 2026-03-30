@@ -87,7 +87,7 @@ class SiteService:
             entreprise_id=data.entreprise_id,
         )
         db.add(site)
-        db.commit()
+        db.flush()
         db.refresh(site)
         return site
 
@@ -104,7 +104,7 @@ class SiteService:
         for field, value in update_data.items():
             setattr(site, field, value)
 
-        db.commit()
+        db.flush()
         db.refresh(site)
         return site
 
@@ -114,5 +114,5 @@ class SiteService:
         site = get_or_404(db, Site, site_id)
         nom = site.nom
         db.delete(site)
-        db.commit()
+        db.flush()
         return nom

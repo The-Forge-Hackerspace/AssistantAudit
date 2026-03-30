@@ -84,7 +84,7 @@ class AgentService:
             status="pending",
         )
         db.add(agent)
-        db.commit()
+        db.flush()
         db.refresh(agent)
 
         logger.info(
@@ -106,7 +106,7 @@ class AgentService:
 
         agent.status = "revoked"
         agent.revoked_at = datetime.now(timezone.utc)
-        db.commit()
+        db.flush()
         logger.info(f"Agent revoked: uuid={agent_uuid}, user={user_id}")
         return agent
 
@@ -121,7 +121,7 @@ class AgentService:
             agent.agent_version = body.agent_version
         if body.os_info:
             agent.os_info = body.os_info
-        db.commit()
+        db.flush()
 
     @staticmethod
     def enroll_agent(db: Session, enrollment_code: str, request: Request) -> dict:
@@ -178,7 +178,7 @@ class AgentService:
         matched_agent.enrollment_used = True
         matched_agent.last_seen = datetime.now(timezone.utc)
         matched_agent.last_ip = request.client.host if request.client else None
-        db.commit()
+        db.flush()
 
         # Lire le certificat CA
         ca_cert_pem = ""
@@ -258,7 +258,7 @@ class AgentService:
         if task.status == "running":
             raise HTTPException(status_code=400, detail="Impossible de supprimer une tache en cours")
         db.delete(task)
-        db.commit()
+        db.flush()
 
     @staticmethod
     def get_agent_task(db: Session, task_uuid: str, agent_id: int) -> AgentTask:
@@ -298,7 +298,7 @@ class AgentService:
                 task.progress = 100
 
         task.status_message = f"Status: {body.status}"
-        db.commit()
+        db.flush()
         return task
 
     @staticmethod
@@ -324,7 +324,7 @@ class AgentService:
             task.error_message = body.error_message
             task.status = "failed"
 
-        db.commit()
+        db.flush()
         return task
 
     @staticmethod
@@ -371,7 +371,7 @@ class AgentService:
             kek_version=1 if envelope.enabled else None,
         )
         db.add(artifact)
-        db.commit()
+        db.flush()
         db.refresh(artifact)
 
         logger.info(

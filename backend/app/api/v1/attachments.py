@@ -219,7 +219,7 @@ def upload_attachment(
         uploaded_by=current_user.username,
     )
     db.add(attachment)
-    db.commit()
+    db.flush()
     db.refresh(attachment)
 
     logger.info(
@@ -363,5 +363,4 @@ def delete_attachment(
 
     # Supprimer de la base
     db.delete(att)
-    db.commit()
     logger.info(f"Attachment record deleted: id={attachment_id} ({att.original_filename})")

@@ -91,7 +91,7 @@ class EntrepriseService:
             )
             db.add(contact)
 
-        db.commit()
+        db.flush()
         db.refresh(entreprise)
         return entreprise
 
@@ -114,7 +114,7 @@ class EntrepriseService:
         for field, value in update_data.items():
             setattr(entreprise, field, value)
 
-        db.commit()
+        db.flush()
         db.refresh(entreprise)
         return entreprise
 
@@ -124,5 +124,5 @@ class EntrepriseService:
         entreprise = get_or_404(db, Entreprise, entreprise_id)
         nom = entreprise.nom
         db.delete(entreprise)
-        db.commit()
+        db.flush()
         return nom

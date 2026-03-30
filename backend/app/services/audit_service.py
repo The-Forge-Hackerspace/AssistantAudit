@@ -54,7 +54,7 @@ class AuditService:
             owner_id=owner_id,
         )
         db.add(audit)
-        db.commit()
+        db.flush()
         db.refresh(audit)
         return audit
 
@@ -74,7 +74,7 @@ class AuditService:
         for field, value in update_data.items():
             setattr(audit, field, value)
 
-        db.commit()
+        db.flush()
         db.refresh(audit)
         return audit
 
@@ -87,5 +87,5 @@ class AuditService:
             raise HTTPException(status_code=404, detail="Audit introuvable")
         nom = audit.nom_projet
         db.delete(audit)
-        db.commit()
+        db.flush()
         return nom

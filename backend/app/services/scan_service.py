@@ -90,7 +90,7 @@ def create_pending_scan(
         owner_id=owner_id,
     )
     db.add(scan)
-    db.commit()
+    db.flush()
     db.refresh(scan)
 
     logger.info(f"Scan #{scan.id} créé en statut 'running' pour {target}")
@@ -291,7 +291,7 @@ def update_host_decision(
                 f"(type={chosen_type}, id={equip.id})"
             )
 
-    db.commit()
+    db.flush()
     db.refresh(host)
     return host
 
@@ -323,7 +323,7 @@ def link_host_to_equipement(
     host.decision = "kept"
     host.chosen_type = equip.type_equipement
 
-    db.commit()
+    db.flush()
     db.refresh(host)
     return host
 
@@ -375,7 +375,7 @@ def delete_scan(
         log_access_denied(owner_id, "ScanReseau", scan_id, action="delete")
         return False
     db.delete(scan)
-    db.commit()
+    db.flush()
     return True
 
 
@@ -440,7 +440,6 @@ def import_all_kept_hosts(
         host.chosen_type = guessed_type
         created.append(equip)
 
-    db.commit()
     logger.info(f"Import scan #{scan_id}: {len(created)} équipements créés")
     return created
 

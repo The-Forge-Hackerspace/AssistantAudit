@@ -75,7 +75,7 @@ def dispatch_task(
         status="pending",
     )
     db.add(task)
-    db.commit()
+    db.flush()
     db.refresh(task)
 
     logger.info(

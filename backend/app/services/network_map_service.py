@@ -76,7 +76,7 @@ class NetworkMapService:
         )
         link = NetworkLink(**data.model_dump())
         db.add(link)
-        db.commit()
+        db.flush()
         db.refresh(link)
         return link
 
@@ -89,7 +89,7 @@ class NetworkMapService:
         _check_site_access(db, link.site_id, user_id, is_admin)
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(link, field, value)
-        db.commit()
+        db.flush()
         db.refresh(link)
         return link
 
@@ -101,7 +101,7 @@ class NetworkMapService:
         link = get_or_404(db, NetworkLink, link_id, detail="Lien introuvable")
         _check_site_access(db, link.site_id, user_id, is_admin)
         db.delete(link)
-        db.commit()
+        db.flush()
 
     # ── Site map & layout ────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ class NetworkMapService:
         else:
             layout.layout_data = layout_data
         try:
-            db.commit()
+            db.flush()
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=409, detail="Conflit lors de la sauvegarde du layout")
@@ -213,7 +213,7 @@ class NetworkMapService:
         connection = SiteConnection(**data.model_dump())
         db.add(connection)
         try:
-            db.commit()
+            db.flush()
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=409, detail="Cette connexion inter-site existe déjà (contrainte d'unicité)")
@@ -232,7 +232,7 @@ class NetworkMapService:
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(connection, field, value)
         try:
-            db.commit()
+            db.flush()
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=409, detail="Conflit de contrainte d'unicité")
@@ -249,7 +249,7 @@ class NetworkMapService:
         )
         _check_ent_access(db, connection.entreprise_id, user_id, is_admin)
         db.delete(connection)
-        db.commit()
+        db.flush()
 
     # ── VLANs ────────────────────────────────────────────────────────────
 
@@ -286,7 +286,7 @@ class NetworkMapService:
         vlan = VlanDefinition(**data.model_dump())
         db.add(vlan)
         try:
-            db.commit()
+            db.flush()
         except IntegrityError:
             db.rollback()
             raise HTTPException(
@@ -306,7 +306,7 @@ class NetworkMapService:
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(vlan, field, value)
         try:
-            db.commit()
+            db.flush()
         except IntegrityError:
             db.rollback()
             raise HTTPException(
@@ -324,4 +324,4 @@ class NetworkMapService:
         vlan = get_or_404(db, VlanDefinition, vlan_def_id, detail="Définition VLAN introuvable")
         _check_site_access(db, vlan.site_id, user_id, is_admin)
         db.delete(vlan)
-        db.commit()
+        db.flush()

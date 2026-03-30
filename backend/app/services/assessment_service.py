@@ -73,7 +73,7 @@ class AssessmentService:
             status=CampaignStatus.DRAFT,
         )
         db.add(campaign)
-        db.commit()
+        db.flush()
         db.refresh(campaign)
         logger.info(f"Campagne créée : '{name}' pour audit #{audit_id}")
         return campaign
@@ -137,7 +137,7 @@ class AssessmentService:
 
         for field, value in update_data.items():
             setattr(campaign, field, value)
-        db.commit()
+        db.flush()
         db.refresh(campaign)
         return campaign
 
@@ -161,7 +161,7 @@ class AssessmentService:
                 eq.status_audit = EquipementAuditStatus.EN_COURS
                 logger.info(f"Équipement #{eq.id} '{eq.hostname}' → EN_COURS (campagne démarrée)")
 
-        db.commit()
+        db.flush()
         db.refresh(campaign)
         return campaign
 
@@ -193,7 +193,7 @@ class AssessmentService:
                 f"(campagne terminée, score={score['compliance_score']}%)"
             )
 
-        db.commit()
+        db.flush()
         db.refresh(campaign)
         return campaign
 
@@ -208,7 +208,7 @@ class AssessmentService:
             raise ValueError(f"Campagne {campaign_id} introuvable")
         AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
         db.delete(campaign)
-        db.commit()
+        db.flush()
         logger.info(f"Campagne supprimée : id={campaign_id} '{campaign.name}'")
 
     # --- Assessments (évaluation d'un équipement) ---
@@ -281,7 +281,7 @@ class AssessmentService:
                 equipement.status_audit = EquipementAuditStatus.EN_COURS
                 logger.info(f"Équipement #{equipement_id} '{equipement.hostname}' → EN_COURS (assessment créé)")
 
-        db.commit()
+        db.flush()
         db.refresh(assessment)
         logger.info(
             f"Assessment créé : équipement #{equipement_id} × "
@@ -310,7 +310,7 @@ class AssessmentService:
             raise ValueError(f"Assessment {assessment_id} introuvable")
         AssessmentService._check_assessment_access(db, assessment, user_id, is_admin)
         db.delete(assessment)
-        db.commit()
+        db.flush()
         logger.info(f"Assessment supprimé : id={assessment_id}")
 
     # --- Résultats de contrôle ---
@@ -345,7 +345,7 @@ class AssessmentService:
         result.assessed_by = assessed_by
         result.assessed_at = datetime.now(timezone.utc)
 
-        db.commit()
+        db.flush()
         db.refresh(result)
         return result
 
@@ -370,7 +370,7 @@ class AssessmentService:
             result.assessed_at = now
             count += 1
 
-        db.commit()
+        db.flush()
         logger.info(f"Mise à jour en masse : {count} résultats")
         return count
 
@@ -632,7 +632,7 @@ class AssessmentService:
         campaign.started_at = now
         virtual_eq.status_audit = EquipementAuditStatus.EN_COURS
 
-        db.commit()
+        db.flush()
         db.refresh(campaign)
         db.refresh(assessment)
 

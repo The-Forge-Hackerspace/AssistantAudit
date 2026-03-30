@@ -174,7 +174,7 @@ class EquipementService:
 
         equipement = cls(**common_fields)
         db.add(equipement)
-        db.commit()
+        db.flush()
         db.refresh(equipement)
         return equipement
 
@@ -202,7 +202,7 @@ class EquipementService:
                 continue
             setattr(equipement, field, value)
 
-        db.commit()
+        db.flush()
         db.refresh(equipement)
         return equipement
 
@@ -212,5 +212,5 @@ class EquipementService:
         equipement = get_or_404(db, Equipement, equipement_id)
         ip = equipement.ip_address
         db.delete(equipement)
-        db.commit()
+        db.flush()
         return ip
