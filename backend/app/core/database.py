@@ -69,11 +69,16 @@ SessionLocal = sessionmaker(
 def get_db():
     """
     Generateur de session DB pour injection de dependance FastAPI.
+    Auto-commit on success, auto-rollback on exception.
     Usage: db: Session = Depends(get_db)
     """
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
