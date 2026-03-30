@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_auditeur, PaginationParams
 from ...models.user import User
-from ...models.site import Site
 from ...schemas.scan import (
     ScanCreate,
     ScanRead,
@@ -45,11 +44,6 @@ def launch_scan(
     Le scan s'exécute en arrière-plan. Utilisez GET /scans pour suivre le statut.
     Plusieurs scans peuvent tourner en parallèle.
     """
-    # Vérifier que le site existe
-    site = db.get(Site, payload.site_id)
-    if not site:
-        raise HTTPException(status_code=404, detail="Site introuvable")
-
     # Valider le type de scan
     valid_types = ("discovery", "port_scan", "full", "custom")
     if payload.scan_type not in valid_types:
@@ -76,6 +70,7 @@ def launch_scan(
             notes=payload.notes,
             custom_args=payload.custom_args,
             owner_id=current_user.id,
+            is_admin=current_user.role == "admin",
         )
 
         # Lancer l'exécution en arrière-plan
@@ -92,7 +87,7 @@ def launch_scan(
         return scan
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.exception("Erreur lors de la création du scan")
         raise HTTPException(status_code=500, detail="Erreur interne lors de la création du scan.")

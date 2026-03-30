@@ -1,8 +1,9 @@
 """
-Tests RBAC — isolation des opérations sur les hosts de scan.
+Tests RBAC — isolation des opérations sur les hosts et lancement de scan.
 
-Vérifie que decide_host, link_host et import_all_hosts respectent
-l'ownership via la chaîne host → scan → ScanReseau.owner_id.
+Vérifie que decide_host, link_host, import_all_hosts et launch_scan
+respectent l'ownership (host → scan → ScanReseau.owner_id pour les hosts,
+Site → Entreprise → Audit.owner_id pour le lancement).
 """
 import pytest
 from app.models.entreprise import Entreprise
@@ -13,6 +14,21 @@ from app.models.scan import ScanReseau, ScanHost
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
+def _create_site_with_ownership(db, owner, *, ent_name):
+    """Crée la chaîne entreprise → audit (ownership) → site pour un owner donné."""
+    ent = Entreprise(nom=ent_name)
+    db.add(ent)
+    db.flush()
+    audit = Audit(nom_projet=f"Audit {ent_name}", entreprise_id=ent.id, owner_id=owner.id)
+    db.add(audit)
+    db.flush()
+    site = Site(nom=f"Site {ent_name}", entreprise_id=ent.id)
+    db.add(site)
+    db.commit()
+    db.refresh(site)
+    return site
+
 
 def _create_scan_with_host(db, owner, *, ent_name, ip="10.0.0.1"):
     """Crée la chaîne entreprise → site → scan → host pour un owner donné."""
@@ -212,3 +228,54 @@ class TestImportAllHostsIsolation:
             headers=admin_headers,
         )
         assert r.status_code == 200
+
+
+# ══════════════════════════════════════════════════════════════════════
+# launch_scan — POST /scans (ownership via Site → Entreprise → Audit)
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestLaunchScanIsolation:
+
+    def test_owner_can_launch_scan_on_own_site(
+        self, client, db_session, auditeur_user, auditeur_headers,
+    ):
+        """Non-régression : un auditeur peut lancer un scan sur son propre site."""
+        site = _create_site_with_ownership(
+            db_session, auditeur_user, ent_name="Ent LaunchOwn",
+        )
+        r = client.post(
+            "/api/v1/scans",
+            json={"site_id": site.id, "target": "192.168.1.0/24", "scan_type": "discovery"},
+            headers=auditeur_headers,
+        )
+        assert r.status_code == 202
+
+    def test_other_user_launch_scan_returns_404(
+        self, client, db_session, auditeur_user,
+        second_auditeur_headers,
+    ):
+        """Auditeur B ne peut pas lancer un scan sur le site d'auditeur A."""
+        site = _create_site_with_ownership(
+            db_session, auditeur_user, ent_name="Ent LaunchCross",
+        )
+        r = client.post(
+            "/api/v1/scans",
+            json={"site_id": site.id, "target": "192.168.1.0/24", "scan_type": "discovery"},
+            headers=second_auditeur_headers,
+        )
+        assert r.status_code == 404
+
+    def test_admin_can_launch_scan_on_any_site(
+        self, client, db_session, auditeur_user, admin_headers,
+    ):
+        """L'admin peut lancer un scan sur n'importe quel site."""
+        site = _create_site_with_ownership(
+            db_session, auditeur_user, ent_name="Ent LaunchAdmin",
+        )
+        r = client.post(
+            "/api/v1/scans",
+            json={"site_id": site.id, "target": "192.168.1.0/24", "scan_type": "discovery"},
+            headers=admin_headers,
+        )
+        assert r.status_code == 202

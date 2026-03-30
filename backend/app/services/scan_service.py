@@ -13,6 +13,7 @@ from ..models.equipement import Equipement, EQUIPEMENT_TYPE_VALUES
 from ..tools.nmap_scanner.scanner import NmapScanner, NmapScanResult
 from ..core.audit_logger import log_access_denied
 from ..core.database import SessionLocal
+from ..core.helpers import user_has_access_to_entreprise
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ def create_pending_scan(
     notes: Optional[str] = None,
     custom_args: Optional[str] = None,
     owner_id: int | None = None,
+    is_admin: bool = False,
 ) -> ScanReseau:
     """
     Crée un scan en statut 'running' et le persiste immédiatement.
@@ -68,6 +70,12 @@ def create_pending_scan(
     site = db.get(Site, site_id)
     if not site:
         raise ValueError(f"Site {site_id} introuvable")
+
+    # Vérifier ownership du site via Site → Entreprise → Audit.owner_id
+    if owner_id is not None and not is_admin:
+        if not user_has_access_to_entreprise(db, site.entreprise_id, owner_id):
+            log_access_denied(owner_id, "Site", site_id, action="launch_scan")
+            raise ValueError(f"Site {site_id} introuvable")
 
     effective_scan_type = scan_type
     nmap_command = _build_display_command(target, scan_type, custom_args)
