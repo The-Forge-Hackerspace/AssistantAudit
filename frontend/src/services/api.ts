@@ -1,3 +1,5 @@
+import axios from "axios";
+import Cookies from "js-cookie";
 import api, { setTokens, clearTokens } from "@/lib/api-client";
 import type {
   TokenResponse,
@@ -95,6 +97,20 @@ export const authApi = {
       current_password,
       new_password,
     });
+    return data;
+  },
+
+  async refresh(): Promise<TokenResponse> {
+    const refreshToken = Cookies.get("aa_refresh_token");
+    if (!refreshToken) {
+      throw new Error("No refresh token");
+    }
+    // Appel direct avec axios (pas l'instance api) pour éviter l'intercepteur
+    const { data } = await axios.post<TokenResponse>(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/auth/refresh`,
+      { refresh_token: refreshToken }
+    );
+    setTokens(data.access_token, data.refresh_token);
     return data;
   },
 
