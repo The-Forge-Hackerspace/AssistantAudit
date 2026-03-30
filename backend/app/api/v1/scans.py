@@ -211,6 +211,8 @@ def decide_host(
             chosen_type=payload.chosen_type,
             hostname_override=payload.hostname,
             create_equipement=payload.create_equipement,
+            owner_id=current_user.id,
+            is_admin=current_user.role == "admin",
         )
         return host
     except ValueError as e:
@@ -230,7 +232,11 @@ def link_host(
 ):
     """Lie un host découvert à un équipement existant dans la base."""
     try:
-        host = scan_service.link_host_to_equipement(db, host_id, equipement_id)
+        host = scan_service.link_host_to_equipement(
+            db, host_id, equipement_id,
+            owner_id=current_user.id,
+            is_admin=current_user.role == "admin",
+        )
         return host
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -251,7 +257,11 @@ def import_all_hosts(
     d'un scan. Le type est deviné en fonction des ports et de l'OS.
     """
     try:
-        created = scan_service.import_all_kept_hosts(db, scan_id)
+        created = scan_service.import_all_kept_hosts(
+            db, scan_id,
+            owner_id=current_user.id,
+            is_admin=current_user.role == "admin",
+        )
         return MessageResponse(
             message=f"{len(created)} équipement(s) créé(s)",
             detail=f"IPs : {', '.join(e.ip_address for e in created)}" if created else None,

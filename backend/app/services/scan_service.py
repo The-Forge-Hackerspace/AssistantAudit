@@ -206,6 +206,8 @@ def update_host_decision(
     chosen_type: Optional[str] = None,
     hostname_override: Optional[str] = None,
     create_equipement: bool = False,
+    owner_id: int | None = None,
+    is_admin: bool = False,
 ) -> ScanHost:
     """
     Met à jour la décision sur un host découvert.
@@ -225,6 +227,13 @@ def update_host_decision(
     host = db.get(ScanHost, host_id)
     if not host:
         raise ValueError(f"Host {host_id} introuvable")
+
+    # Vérifier ownership via le scan parent
+    if owner_id is not None and not is_admin:
+        scan = db.get(ScanReseau, host.scan_id)
+        if not scan or scan.owner_id != owner_id:
+            log_access_denied(owner_id, "ScanHost", host_id, action="update_decision")
+            raise ValueError(f"Host {host_id} introuvable")
 
     host.decision = decision
     if chosen_type:
@@ -283,11 +292,20 @@ def link_host_to_equipement(
     db: Session,
     host_id: int,
     equipement_id: int,
+    owner_id: int | None = None,
+    is_admin: bool = False,
 ) -> ScanHost:
     """Lie un host découvert à un équipement existant."""
     host = db.get(ScanHost, host_id)
     if not host:
         raise ValueError(f"Host {host_id} introuvable")
+
+    # Vérifier ownership via le scan parent
+    if owner_id is not None and not is_admin:
+        scan = db.get(ScanReseau, host.scan_id)
+        if not scan or scan.owner_id != owner_id:
+            log_access_denied(owner_id, "ScanHost", host_id, action="link")
+            raise ValueError(f"Host {host_id} introuvable")
 
     equip = db.get(Equipement, equipement_id)
     if not equip:
@@ -353,13 +371,23 @@ def delete_scan(
     return True
 
 
-def import_all_kept_hosts(db: Session, scan_id: int) -> list[Equipement]:
+def import_all_kept_hosts(
+    db: Session,
+    scan_id: int,
+    owner_id: int | None = None,
+    is_admin: bool = False,
+) -> list[Equipement]:
     """
     Crée des équipements pour tous les hosts 'pending' d'un scan.
     Marque chaque host comme 'kept'.
     """
     scan = db.get(ScanReseau, scan_id)
     if not scan:
+        raise ValueError(f"Scan {scan_id} introuvable")
+
+    # Vérifier ownership
+    if owner_id is not None and not is_admin and scan.owner_id != owner_id:
+        log_access_denied(owner_id, "ScanReseau", scan_id, action="import_hosts")
         raise ValueError(f"Scan {scan_id} introuvable")
 
     created = []
