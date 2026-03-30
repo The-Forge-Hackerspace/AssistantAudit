@@ -20,9 +20,9 @@ class ScanReseau(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nom: Mapped[str | None] = mapped_column(String(200))
     site_id: Mapped[int] = mapped_column(Integer, ForeignKey("sites.id"), nullable=False, index=True)
-    # Isolation inter-techniciens — NULL temporaire
-    owner_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), index=True
+    # Isolation inter-techniciens
+    owner_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
     )
     date_scan: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False, index=True

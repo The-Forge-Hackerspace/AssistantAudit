@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -152,13 +152,15 @@ def create_app() -> FastAPI:
     app.include_router(websocket_router)
 
     # ── Prometheus metrics endpoint ────────────────────────────────────────
+    from .core.deps import get_current_admin
+
     @app.get(
         "/metrics",
         responses={200: {"description": "Prometheus metrics"}},
         tags=["monitoring"],
     )
-    async def metrics():
-        """Expose Prometheus metrics for monitoring"""
+    def metrics(admin=Depends(get_current_admin)):
+        """Expose Prometheus metrics (admin uniquement)"""
         return Response(content=get_metrics(), media_type="text/plain")
 
     # ── Health check endpoints ────────────────────────────────────────────

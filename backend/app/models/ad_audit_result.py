@@ -34,9 +34,9 @@ class ADAuditResultModel(Base):
     equipement_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("equipements.id"), nullable=True, index=True
     )
-    # Isolation inter-techniciens — NULL temporaire
-    owner_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), index=True
+    # Isolation inter-techniciens
+    owner_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
     )
     status: Mapped[ADAuditStatus] = mapped_column(
         Enum(ADAuditStatus), default=ADAuditStatus.RUNNING, nullable=False

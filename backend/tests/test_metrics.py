@@ -200,44 +200,44 @@ class TestPrometheusMiddleware:
 class TestMetricsEndpoint:
     """Tests for /metrics endpoint"""
 
-    def test_metrics_endpoint_returns_200(self, client):
-        """Verify /metrics endpoint returns 200 status"""
-        response = client.get("/metrics")
-        
+    def test_metrics_endpoint_returns_200(self, client, admin_headers):
+        """Verify /metrics endpoint returns 200 status (admin only)"""
+        response = client.get("/metrics", headers=admin_headers)
+
         assert response.status_code == 200
 
-    def test_metrics_endpoint_returns_prometheus_format(self, client):
+    def test_metrics_endpoint_returns_prometheus_format(self, client, admin_headers):
         """Verify /metrics endpoint returns Prometheus format"""
-        response = client.get("/metrics")
-        
+        response = client.get("/metrics", headers=admin_headers)
+
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/plain; charset=utf-8"
-        
+
         content = response.text
         assert len(content) > 0
         assert "# HELP" in content or "#" in content  # Should have comments
 
-    def test_metrics_endpoint_contains_http_metrics(self, client):
+    def test_metrics_endpoint_contains_http_metrics(self, client, admin_headers):
         """Verify /metrics endpoint contains HTTP metrics"""
         # Make a request first
         client.get("/health")
-        
-        response = client.get("/metrics")
+
+        response = client.get("/metrics", headers=admin_headers)
         assert response.status_code == 200
-        
+
         content = response.text
         # Should have some metrics defined
         assert "http_requests_total" in content or "app_info" in content
 
-    def test_metrics_endpoint_is_excluded_from_metrics_loop(self, client):
+    def test_metrics_endpoint_is_excluded_from_metrics_loop(self, client, admin_headers):
         """Verify /metrics endpoint itself doesn't create infinite metrics loop"""
         # Get metrics endpoint multiple times
         for _ in range(3):
-            response = client.get("/metrics")
+            response = client.get("/metrics", headers=admin_headers)
             assert response.status_code == 200
-        
+
         # Should still work without errors
-        response = client.get("/metrics")
+        response = client.get("/metrics", headers=admin_headers)
         assert response.status_code == 200
 
 
@@ -322,7 +322,7 @@ class TestMetricsAccuracy:
 class TestMetricsIntegration:
     """Integration tests for metrics with the application"""
 
-    def test_metrics_work_with_actual_requests(self, client):
+    def test_metrics_work_with_actual_requests(self, client, admin_headers):
         """Verify metrics collection works with real HTTP requests"""
         # Health endpoints are skipped, but we can track requests to other endpoints
         MetricsCollector.record_http_request(
@@ -331,8 +331,8 @@ class TestMetricsIntegration:
             status=200,
             duration=0.001,
         )
-        
-        response = client.get("/metrics")
+
+        response = client.get("/metrics", headers=admin_headers)
         assert response.status_code == 200
         assert len(response.text) > 0
 

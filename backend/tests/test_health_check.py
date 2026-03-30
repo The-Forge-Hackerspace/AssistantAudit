@@ -237,15 +237,15 @@ class TestHealthCheckIntegration:
 class TestHealthCheckMetrics:
     """Tests for health check metrics integration"""
 
-    def test_health_endpoints_excluded_from_metrics(self, client):
+    def test_health_endpoints_excluded_from_metrics(self, client, admin_headers):
         """Verify health endpoints are excluded from Prometheus metrics"""
         # Make requests to health endpoints
         client.get("/health")
         client.get("/ready")
         client.get("/liveness")
 
-        # Get metrics
-        metrics_response = client.get("/metrics")
+        # Get metrics (admin uniquement)
+        metrics_response = client.get("/metrics", headers=admin_headers)
         metrics_text = metrics_response.text
 
         # Verify health endpoints are not tracked in HTTP metrics
