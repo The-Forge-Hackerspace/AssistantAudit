@@ -1,6 +1,7 @@
 """
 Service Agent : CRUD agents, enrollment, heartbeat, operations sur taches/artifacts.
 """
+import hashlib
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,7 +14,6 @@ from ..core.rate_limit import enroll_rate_limiter
 from ..core.security import (
     create_agent_token,
     create_enrollment_token,
-    verify_enrollment_token,
 )
 from ..models.agent import Agent
 from ..models.agent_task import AgentTask
@@ -132,23 +132,25 @@ class AgentService:
         enroll_rate_limiter.check(request)
         enroll_rate_limiter.record_attempt(request)
 
-        pending_agents = db.query(Agent).filter(
+        code_hash = hashlib.sha256(enrollment_code.encode()).hexdigest()
+        matched_agent = db.query(Agent).filter(
             Agent.status == "pending",
             Agent.enrollment_used == False,  # noqa: E712
-            Agent.enrollment_token_hash.isnot(None),
-        ).with_for_update().all()
-
-        matched_agent = None
-        for agent in pending_agents:
-            if verify_enrollment_token(
-                enrollment_code,
-                agent.enrollment_token_hash,
-                agent.enrollment_token_expires,
-            ):
-                matched_agent = agent
-                break
+            Agent.enrollment_token_hash == code_hash,
+        ).with_for_update().first()
 
         if matched_agent is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Code d'enrollment invalide ou expire",
+            )
+
+        # Vérifier expiration
+        now = datetime.now(timezone.utc)
+        exp = matched_agent.enrollment_token_expires
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if now > exp:
             raise HTTPException(
                 status_code=400,
                 detail="Code d'enrollment invalide ou expire",
