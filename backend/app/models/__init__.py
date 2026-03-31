@@ -52,6 +52,10 @@ from .task_artifact import TaskArtifact
 from .anssi_checklist import AnssiCheckpoint
 from .oradad_config import OradadConfig
 from .tag import Tag, TagAssociation
+from .checklist import (
+    ChecklistTemplate, ChecklistSection, ChecklistItem,
+    ChecklistInstance, ChecklistResponse,
+)
 
 __all__ = [
     "User",
@@ -108,4 +112,9 @@ __all__ = [
     "OradadConfig",
     "Tag",
     "TagAssociation",
+    "ChecklistTemplate",
+    "ChecklistSection",
+    "ChecklistItem",
+    "ChecklistInstance",
+    "ChecklistResponse",
 ]
