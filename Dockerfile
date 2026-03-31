@@ -12,11 +12,16 @@ RUN npm run build
 # =============================================
 # Stage 2: Backend + static frontend
 # =============================================
-FROM python:3.13-slim AS production
+FROM python:3.13-slim-bookworm AS production
 
-# Installer les dépendances système
+# Installer les dépendances système + PowerShell 7
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc \
+    libpq-dev gcc curl apt-transport-https \
+    && curl -sSL https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb \
+       -o /tmp/packages-microsoft-prod.deb \
+    && dpkg -i /tmp/packages-microsoft-prod.deb \
+    && rm /tmp/packages-microsoft-prod.deb \
+    && apt-get update && apt-get install -y --no-install-recommends powershell \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -35,8 +40,21 @@ COPY --from=frontend-builder /app/frontend/public ./frontend/public
 COPY --from=frontend-builder /app/frontend/package.json ./frontend/
 COPY --from=frontend-builder /app/frontend/node_modules ./frontend/node_modules
 
+# Modules PowerShell requis par Monkey365
+# On installe les sous-modules ciblés (évite ~2 Go pour Az et Microsoft.Graph complets)
+RUN pwsh -NoProfile -Command "\
+    Set-PSRepository PSGallery -InstallationPolicy Trusted; \
+    Install-Module Az.Accounts                  -Scope AllUsers -Force; \
+    Install-Module Az.Resources                 -Scope AllUsers -Force; \
+    Install-Module ExchangeOnlineManagement     -Scope AllUsers -Force; \
+    Install-Module MicrosoftTeams               -Scope AllUsers -Force; \
+    Install-Module Microsoft.Graph.Authentication -Scope AllUsers -Force; \
+    Install-Module Microsoft.Graph.Users        -Scope AllUsers -Force; \
+    Install-Module PnP.PowerShell               -Scope AllUsers -Force \
+"
+
 # Répertoires
-RUN mkdir -p /app/data /app/certs /app/instance
+RUN mkdir -p /app/data /app/certs /app/instance /app/tools/monkey365
 
 # Utilisateur non-root
 RUN useradd -r -s /bin/false appuser && chown -R appuser:appuser /app

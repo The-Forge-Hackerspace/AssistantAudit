@@ -20,8 +20,9 @@ venv/
 *.swp
 *.swo
 
-# Tools (vendored external tools at repo root — not source code subdirs)
-/tools/
+# Tools (vendored external tools at repo root — ne pas versionner le contenu)
+/tools/*
+!/tools/.gitkeep
 .tools/
 ./tool
 
@@ -77,3 +78,5 @@ AGENTS.md
 .copilot/
 .github/copilot*
 *.copilot*
+# Monkey365 (code tiers, à cloner manuellement dans tools/monkey365/)
+tools/monkey365/

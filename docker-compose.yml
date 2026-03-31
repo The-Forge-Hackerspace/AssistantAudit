@@ -36,9 +36,11 @@ services:
       DATA_DIR: /app/data
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://frontend:3000"]}
+      MONKEY365_PATH: /app/tools/monkey365/Invoke-Monkey365.ps1
     volumes:
       - app-data:/app/data
       - app-certs:/app/certs
+      - ./tools/monkey365:/app/tools/monkey365:ro
     ports:
       - "8000:8000"
 
