@@ -35,7 +35,7 @@ services:
       CA_KEY_PATH: /app/certs/ca.key
       DATA_DIR: /app/data
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://frontend:3000"]}
     volumes:
       - app-data:/app/data
       - app-certs:/app/certs

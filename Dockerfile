@@ -50,5 +50,5 @@ ENV ENV=production \
 
 EXPOSE 8000
 
-# Alembic migration + démarrage
-CMD ["sh", "-c", "cd /app/backend && python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Initialisation DB (create_all ou alembic upgrade selon l'état) + démarrage
+CMD ["sh", "-c", "cd /app/backend && python docker_entrypoint.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
