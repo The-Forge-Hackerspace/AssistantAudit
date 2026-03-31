@@ -21,6 +21,7 @@ from .files import router as files_router
 from .oradad import router as oradad_router
 from .users import router as users_router
 from .tags import router as tags_router
+from .checklists import router as checklists_router
 
 api_router = APIRouter()
 
@@ -44,3 +45,4 @@ api_router.include_router(oradad_router)
 api_router.include_router(files_router, prefix="/files", tags=["Fichiers chiffrés"])
 api_router.include_router(users_router, prefix="/users", tags=["Utilisateurs"])
 api_router.include_router(tags_router, prefix="/tags", tags=["Tags"])
+api_router.include_router(checklists_router, prefix="/checklists", tags=["Checklists"])
