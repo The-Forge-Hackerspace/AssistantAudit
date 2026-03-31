@@ -51,6 +51,7 @@ from .agent_task import AgentTask
 from .task_artifact import TaskArtifact
 from .anssi_checklist import AnssiCheckpoint
 from .oradad_config import OradadConfig
+from .tag import Tag, TagAssociation
 
 __all__ = [
     "User",
@@ -105,4 +106,6 @@ __all__ = [
     "TaskArtifact",
     "AnssiCheckpoint",
     "OradadConfig",
+    "Tag",
+    "TagAssociation",
 ]
