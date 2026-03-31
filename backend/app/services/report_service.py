@@ -2,16 +2,18 @@
 
 import base64
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from weasyprint import HTML
 
 from ..models.audit import Audit
 from ..models.entreprise import Entreprise
 from ..models.report import AuditReport, ReportSection, REPORT_SECTIONS
-from ..schemas.report import AuditReportCreate
+from ..schemas.report import AuditReportCreate, ReportSectionUpdate
 
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates" / "reports"
@@ -90,6 +92,84 @@ class ReportService:
             return None
         with open(path, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
+
+    @staticmethod
+    def list_reports(
+        db: Session, audit_id: int, user_id: int, is_admin: bool
+    ) -> list[AuditReport]:
+        """Liste les rapports d'un audit."""
+        ReportService._check_audit_access(db, audit_id, user_id, is_admin)
+        return db.query(AuditReport).filter(AuditReport.audit_id == audit_id).all()
+
+    @staticmethod
+    def update_section(
+        db: Session, report_id: int, section_key: str,
+        data: ReportSectionUpdate, user_id: int, is_admin: bool
+    ) -> ReportSection:
+        """Met à jour une section (inclure/exclure, titre, contenu custom)."""
+        ReportService.get_report(db, report_id, user_id, is_admin)
+        section = db.query(ReportSection).filter(
+            ReportSection.report_id == report_id,
+            ReportSection.section_key == section_key,
+        ).first()
+        if not section:
+            raise HTTPException(status_code=404, detail="Section non trouvée")
+
+        updates = data.model_dump(exclude_unset=True)
+        for key, val in updates.items():
+            setattr(section, key, val)
+        db.flush()
+        db.refresh(section)
+        return section
+
+    @staticmethod
+    def generate_pdf(db: Session, report_id: int, user_id: int, is_admin: bool) -> str:
+        """Génère le PDF et retourne le chemin du fichier."""
+        report = ReportService.get_report(db, report_id, user_id, is_admin)
+        audit = db.query(Audit).filter(Audit.id == report.audit_id).first()
+
+        report.status = "generating"
+        db.flush()
+
+        try:
+            html_content = ReportService.render_html(db, report)
+
+            from ..core.config import get_settings
+            settings = get_settings()
+            data_dir = getattr(settings, 'DATA_DIR', 'data')
+            reports_dir = Path(data_dir) / "reports"
+            reports_dir.mkdir(parents=True, exist_ok=True)
+
+            filename = f"rapport_{audit.id}_{report.id}.pdf"
+            pdf_path = str(reports_dir / filename)
+
+            html_doc = HTML(string=html_content, base_url=str(TEMPLATES_DIR))
+            html_doc.write_pdf(pdf_path)
+
+            report.pdf_path = pdf_path
+            report.status = "ready"
+            report.generated_at = datetime.now(timezone.utc)
+            db.flush()
+            db.refresh(report)
+            return pdf_path
+
+        except Exception as e:
+            report.status = "error"
+            db.flush()
+            raise HTTPException(status_code=500, detail=f"Erreur génération PDF: {str(e)}")
+
+    @staticmethod
+    def delete_report(
+        db: Session, report_id: int, user_id: int, is_admin: bool
+    ) -> str:
+        """Supprime un rapport et ses fichiers."""
+        report = ReportService.get_report(db, report_id, user_id, is_admin)
+        for path in [report.pdf_path, report.docx_path]:
+            if path and os.path.isfile(path):
+                os.remove(path)
+        db.delete(report)
+        db.flush()
+        return f"Rapport {report_id} supprimé"
 
     @staticmethod
     def render_html(db: Session, report: AuditReport) -> str:

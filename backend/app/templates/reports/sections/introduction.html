@@ -1,7 +1,9 @@
-{% if audit.objectifs %}
-<p>{{ audit.objectifs }}</p>
-{% else %}
-<p class="placeholder-notice">
-    <em>Cette section sera complétée par l'auditeur.</em>
-</p>
+<p>Nous remercions {{ entreprise.nom }} de nous avoir confié la réalisation de cet audit.</p>
+<p>Ce document présente les résultats de l'audit {{ audit.nom_projet }},
+réalisé à partir du {{ audit.date_debut | datefr }}.</p>
+{% if report.consultant_name %}
+<p>Pour toute question, n'hésitez pas à contacter {{ report.consultant_name }}.</p>
+{% endif %}
+{% if report.consultant_contact %}
+<div class="contact-block">{{ report.consultant_contact }}</div>
 {% endif %}

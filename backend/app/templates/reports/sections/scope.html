@@ -1,7 +1,17 @@
-{% if audit.limites %}
-<p>{{ audit.limites }}</p>
+<h2>Couvert</h2>
+{% if audit.objectifs %}
+    {{ audit.objectifs | safe }}
 {% else %}
-<p class="placeholder-notice">
-    <em>Le périmètre de l'audit sera défini dans cette section.</em>
-</p>
+    <p>L'ensemble de l'infrastructure réseau, les serveurs, l'Active Directory,
+    les postes de travail et les accès internet du périmètre défini.</p>
+{% endif %}
+
+{% if audit.limites %}
+    <h2>Exclusions</h2>
+    {{ audit.limites | safe }}
+{% endif %}
+
+{% if audit.hypotheses %}
+    <h2>Hypothèses</h2>
+    {{ audit.hypotheses | safe }}
 {% endif %}

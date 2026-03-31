@@ -1,7 +1,7 @@
 {% if audit.objectifs %}
-<p>{{ audit.objectifs }}</p>
+    {{ audit.objectifs | safe }}
 {% else %}
-<p class="placeholder-notice">
-    <em>Les objectifs de l'audit seront détaillés dans cette section.</em>
-</p>
+    <p>L'audit a pour objectif de dresser un état des lieux complet de l'infrastructure
+    informatique du client, d'identifier les risques de sécurité et les axes d'amélioration,
+    et de proposer des recommandations concrètes et priorisées.</p>
 {% endif %}
