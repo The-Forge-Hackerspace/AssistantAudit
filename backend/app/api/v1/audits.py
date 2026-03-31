@@ -72,6 +72,18 @@ def get_audit(
         planning_path=audit.planning_path,
         total_campaigns=len(audit.campaigns) if audit.campaigns else 0,
         entreprise_nom=audit.entreprise.nom if audit.entreprise else None,
+        date_fin=audit.date_fin,
+        client_contact_name=audit.client_contact_name,
+        client_contact_title=audit.client_contact_title,
+        client_contact_email=audit.client_contact_email,
+        client_contact_phone=audit.client_contact_phone,
+        access_level=audit.access_level,
+        access_missing_details=audit.access_missing_details,
+        intervention_window=audit.intervention_window,
+        intervention_constraints=audit.intervention_constraints,
+        scope_covered=audit.scope_covered,
+        scope_excluded=audit.scope_excluded,
+        audit_type=audit.audit_type,
     )
 
 

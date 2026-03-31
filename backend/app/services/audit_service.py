@@ -52,6 +52,18 @@ class AuditService:
             hypotheses=data.hypotheses,
             risques_initiaux=data.risques_initiaux,
             owner_id=owner_id,
+            date_fin=data.date_fin,
+            client_contact_name=data.client_contact_name,
+            client_contact_title=data.client_contact_title,
+            client_contact_email=data.client_contact_email,
+            client_contact_phone=data.client_contact_phone,
+            access_level=data.access_level,
+            access_missing_details=data.access_missing_details,
+            intervention_window=data.intervention_window,
+            intervention_constraints=data.intervention_constraints,
+            scope_covered=data.scope_covered,
+            scope_excluded=data.scope_excluded,
+            audit_type=data.audit_type,
         )
         db.add(audit)
         db.flush()
