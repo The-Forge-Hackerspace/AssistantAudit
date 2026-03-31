@@ -67,6 +67,12 @@ import type {
   OradadConfig,
   OradadConfigCreate,
   AnssiReport,
+  ChecklistTemplate,
+  ChecklistTemplateDetail,
+  ChecklistInstance,
+  ChecklistInstanceDetail,
+  ChecklistResponse,
+  ChecklistProgress,
 } from "@/types";
 
 // ── Auth ──
@@ -849,6 +855,59 @@ export const toolsApi = {
 
   async importMonkey365ToAudit(resultId: number, auditId: number): Promise<import("@/types/api").Monkey365ImportResult> {
     const { data } = await api.post(`/tools/monkey365/scans/${resultId}/import-to-audit`, { audit_id: auditId });
+    return data;
+  },
+};
+
+// ── Checklists ──
+export const checklistsApi = {
+  async listTemplates(category?: string): Promise<ChecklistTemplate[]> {
+    const params = category ? { category } : {};
+    const { data } = await api.get<ChecklistTemplate[]>("/checklists/templates", { params });
+    return data;
+  },
+
+  async getTemplate(id: number): Promise<ChecklistTemplateDetail> {
+    const { data } = await api.get<ChecklistTemplateDetail>(`/checklists/templates/${id}`);
+    return data;
+  },
+
+  async createInstance(templateId: number, auditId: number, siteId?: number): Promise<ChecklistInstance> {
+    const { data } = await api.post<ChecklistInstance>("/checklists/instances", {
+      template_id: templateId, audit_id: auditId, site_id: siteId ?? null,
+    });
+    return data;
+  },
+
+  async listInstances(auditId: number): Promise<ChecklistInstance[]> {
+    const { data } = await api.get<ChecklistInstance[]>("/checklists/instances", { params: { audit_id: auditId } });
+    return data;
+  },
+
+  async getInstance(id: number): Promise<ChecklistInstanceDetail> {
+    const { data } = await api.get<ChecklistInstanceDetail>(`/checklists/instances/${id}`);
+    return data;
+  },
+
+  async deleteInstance(id: number): Promise<void> {
+    await api.delete(`/checklists/instances/${id}`);
+  },
+
+  async completeInstance(id: number): Promise<ChecklistInstance> {
+    const { data } = await api.post<ChecklistInstance>(`/checklists/instances/${id}/complete`);
+    return data;
+  },
+
+  async respondToItem(instanceId: number, itemId: number, status: string, note?: string): Promise<ChecklistResponse> {
+    const { data } = await api.put<ChecklistResponse>(
+      `/checklists/instances/${instanceId}/items/${itemId}`,
+      { status, note: note ?? null },
+    );
+    return data;
+  },
+
+  async getProgress(instanceId: number): Promise<ChecklistProgress> {
+    const { data } = await api.get<ChecklistProgress>(`/checklists/instances/${instanceId}/progress`);
     return data;
   },
 };
