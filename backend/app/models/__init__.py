@@ -56,6 +56,7 @@ from .checklist import (
     ChecklistTemplate, ChecklistSection, ChecklistItem,
     ChecklistInstance, ChecklistResponse,
 )
+from .report import AuditReport, ReportSection
 
 __all__ = [
     "User",
@@ -117,4 +118,6 @@ __all__ = [
     "ChecklistItem",
     "ChecklistInstance",
     "ChecklistResponse",
+    "AuditReport",
+    "ReportSection",
 ]
