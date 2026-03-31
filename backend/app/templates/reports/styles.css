@@ -1,0 +1,210 @@
+/* ============================================================
+   AssistantAudit — Styles PDF print-ready (WeasyPrint A4)
+   ============================================================ */
+
+/* --- Page A4 --- */
+@page {
+    size: A4;
+    margin: 20mm 25mm;
+    @top-right {
+        content: "Page " counter(page) " / " counter(pages);
+        font-size: 9pt;
+        color: #6B7280;
+    }
+    @bottom-left {
+        content: "Confidentiel";
+        font-size: 8pt;
+        color: #6B7280;
+    }
+    @bottom-right {
+        content: string(project-name);
+        font-size: 8pt;
+        color: #6B7280;
+    }
+}
+
+/* Première page (page de garde) : sans en-tête ni pied */
+@page :first {
+    @top-right { content: none; }
+    @bottom-left { content: none; }
+    @bottom-right { content: none; }
+}
+
+/* Page de garde spécifique */
+@page cover {
+    @top-right { content: none; }
+    @bottom-left { content: none; }
+    @bottom-right { content: none; }
+}
+
+/* --- Reset & Base --- */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #1F2937;
+}
+
+/* --- Sections --- */
+.section {
+    page-break-before: always;
+    margin-bottom: 20mm;
+}
+
+.section:first-of-type {
+    page-break-before: avoid;
+}
+
+.section-title {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #111827;
+    border-bottom: 2px solid #3B82F6;
+    padding-bottom: 4mm;
+    margin-bottom: 8mm;
+}
+
+h2 {
+    font-size: 13pt;
+    font-weight: bold;
+    color: #1D4ED8;
+    margin-top: 6mm;
+    margin-bottom: 3mm;
+}
+
+h3 {
+    font-size: 11pt;
+    font-weight: bold;
+    margin-top: 4mm;
+    margin-bottom: 2mm;
+}
+
+p {
+    margin-bottom: 3mm;
+}
+
+/* --- Tableaux --- */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4mm 0;
+    font-size: 10pt;
+}
+
+th {
+    background-color: #1D4ED8;
+    color: #FFFFFF;
+    padding: 2mm 3mm;
+    text-align: left;
+    font-weight: bold;
+}
+
+td {
+    padding: 2mm 3mm;
+    border: 1px solid #D1D5DB;
+}
+
+tr:nth-child(even) td {
+    background-color: #F3F4F6;
+}
+
+/* --- Page de garde --- */
+.cover-page {
+    page: cover;
+    min-height: 257mm; /* A4 - marges */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.cover-logos {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20mm;
+    min-height: 30mm;
+}
+
+.cover-logo-left,
+.cover-logo-right {
+    max-height: 25mm;
+    max-width: 60mm;
+    object-fit: contain;
+}
+
+.cover-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    padding: 15mm 0;
+}
+
+.cover-title {
+    font-size: 28pt;
+    font-weight: bold;
+    color: #1D4ED8;
+    margin-bottom: 8mm;
+    border: none;
+}
+
+.cover-subtitle {
+    font-size: 18pt;
+    color: #374151;
+    margin-bottom: 12mm;
+}
+
+.cover-meta {
+    font-size: 12pt;
+    text-align: left;
+    max-width: 120mm;
+    margin: 0 auto;
+    border-left: 4px solid #3B82F6;
+    padding-left: 6mm;
+}
+
+.cover-meta p {
+    margin-bottom: 2mm;
+}
+
+.cover-confidential {
+    text-align: center;
+    padding: 4mm;
+    border-top: 1px solid #D1D5DB;
+    font-size: 9pt;
+    color: #6B7280;
+    letter-spacing: 3px;
+}
+
+/* --- Placeholder sections --- */
+.placeholder-notice {
+    color: #9CA3AF;
+    font-style: italic;
+    padding: 6mm;
+    border: 1px dashed #D1D5DB;
+    border-radius: 2mm;
+}
+
+/* --- Listes --- */
+ul, ol {
+    padding-left: 6mm;
+    margin-bottom: 3mm;
+}
+
+li {
+    margin-bottom: 1mm;
+}
+
+/* --- Emphases --- */
+strong { font-weight: bold; }
+em { font-style: italic; }
+
+/* --- Sauts de page --- */
+.page-break { page-break-after: always; }

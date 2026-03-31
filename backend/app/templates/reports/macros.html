@@ -1,0 +1,72 @@
+{# ============================================================
+   Macros Jinja2 réutilisables — rapports AssistantAudit
+   ============================================================ #}
+
+{# Macro : tableau générique
+   Paramètres :
+     headers  — liste de chaînes (en-têtes colonnes)
+     rows     — liste de listes (données)
+#}
+{% macro render_table(headers, rows) %}
+<table>
+    <thead>
+        <tr>
+            {% for h in headers %}
+            <th>{{ h }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            {% for cell in row %}
+            <td>{{ cell }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endmacro %}
+
+
+{# Macro : checklist
+   Paramètres :
+     items — liste de dicts {label, checked, comment?}
+#}
+{% macro render_checklist(items) %}
+<table>
+    <thead>
+        <tr>
+            <th style="width:10mm">État</th>
+            <th>Élément</th>
+            <th>Commentaire</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td style="text-align:center">
+                {% if item.checked %}✓{% else %}✗{% endif %}
+            </td>
+            <td>{{ item.label }}</td>
+            <td>{{ item.comment | default('') }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endmacro %}
+
+
+{# Macro : placeholder graphique
+   Paramètres :
+     title  — titre du graphique
+     note   — note optionnelle
+#}
+{% macro render_chart_placeholder(title, note='') %}
+<div style="border:1px dashed #9CA3AF; padding:8mm; text-align:center; margin:4mm 0;">
+    <p style="color:#6B7280; font-style:italic;">
+        [Graphique : {{ title }}]
+        {% if note %}<br><small>{{ note }}</small>{% endif %}
+    </p>
+</div>
+{% endmacro %}
