@@ -1137,3 +1137,22 @@ export interface AnssiReport {
     not_checked: number;
   };
 }
+
+// ── Tags ──
+export interface Tag {
+  id: number;
+  name: string;
+  color: string;
+  scope: "global" | "audit";
+  audit_id: number | null;
+  created_by: number | null;
+  created_at: string;
+}
+
+export interface TagAssociation {
+  id: number;
+  tag_id: number;
+  taggable_type: string;
+  taggable_id: number;
+  tag: Tag;
+}
