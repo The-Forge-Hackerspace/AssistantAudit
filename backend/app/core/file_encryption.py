@@ -44,9 +44,10 @@ class EnvelopeEncryption:
         original = envelope.decrypt_file(encrypted_file, encrypted_dek, dek_nonce)
     """
 
-    def __init__(self):
-        from app.core.config import get_settings
-        key_hex = get_settings().FILE_ENCRYPTION_KEY
+    def __init__(self, key_hex: str | None = None):
+        if key_hex is None:
+            from app.core.config import get_settings
+            key_hex = get_settings().FILE_ENCRYPTION_KEY
         if not key_hex:
             logger.warning(
                 "FILE_ENCRYPTION_KEY non configuree — chiffrement fichier desactive (dev only)"
