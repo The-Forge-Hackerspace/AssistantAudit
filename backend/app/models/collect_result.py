@@ -13,6 +13,7 @@ from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
+from ..core.encryption import EncryptedText
 
 
 def _utcnow() -> datetime:
@@ -49,7 +50,7 @@ class CollectResult(Base):
     # Connexion
     target_host: Mapped[str] = mapped_column(String(255), nullable=False)
     target_port: Mapped[int] = mapped_column(Integer, nullable=False)
-    username: Mapped[str] = mapped_column(String(255), nullable=False)
+    username: Mapped[str] = mapped_column(EncryptedText, nullable=False)
     device_profile: Mapped[str | None] = mapped_column(String(50), default="linux_server")
 
     # Données collectées (JSON)

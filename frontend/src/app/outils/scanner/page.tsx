@@ -50,6 +50,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -61,10 +62,25 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { scansApi, sitesApi } from "@/services/api";
-import type { Scan, ScanSummary, ScanHost, Site, TypeEquipement } from "@/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import { scansApi, sitesApi, agentsApi, entreprisesApi } from "@/services/api";
+import type { Agent, AgentTask, Entreprise, Scan, ScanSummary, ScanHost, Site, TypeEquipement } from "@/types";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/skeletons";
+import { LaunchScanDialog } from "./components/launch-scan-dialog";
+import { AgentTaskDetail } from "./components/agent-task-detail";
 
 // ── Scan type definitions with nmap args ──
 const SCAN_TYPES = [
@@ -133,30 +149,25 @@ function ScannerContent() {
   // ── State ──
   const [scans, setScans] = useState<ScanSummary[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
+  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedScan, setSelectedScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLaunch, setShowLaunch] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Launch form
-  const [nom, setNom] = useState("");
-  const [siteId, setSiteId] = useState<number>(0);
-  const [target, setTarget] = useState("");
-  const [scanType, setScanType] = useState<string>("discovery");
-  const [customArgs, setCustomArgs] = useState("");
-  const [notes, setNotes] = useState("");
+  // Agent mode
+  const [agentTaskUuid, setAgentTaskUuid] = useState<string | null>(null);
+  const [agentLogs, setAgentLogs] = useState<string[]>([]);
+  const agentLogsRef = useRef<HTMLDivElement>(null);
 
-  // ── Computed nmap command preview ──
-  const commandPreview = useMemo(() => {
-    const t = target || "<cible>";
-    if (scanType === "custom") {
-      const args = customArgs.trim() || "<arguments>";
-      return `nmap ${args} ${t}`;
-    }
-    const scanDef = SCAN_TYPES.find((s) => s.value === scanType);
-    return `nmap ${scanDef?.args || "-sn"} ${t}`;
-  }, [target, scanType, customArgs]);
+  // History view
+  const [viewTab, setViewTab] = useState<"local" | "agent">("local");
+  const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
+  const [filterEntrepriseId, setFilterEntrepriseId] = useState<number>(0);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<AgentTask | null>(null);
 
   // ── Has running scans? ──
   const hasRunningScans = useMemo(
@@ -178,17 +189,89 @@ function ScannerContent() {
 
   const fetchSites = useCallback(async () => {
     try {
-      const res = await sitesApi.list(1, 100);
+      const res = await sitesApi.list(1, 200);
       setSites(res.items);
-    } catch {
-      /* silent */
-    }
+    } catch { /* silent */ }
+  }, []);
+
+  const fetchEntreprises = useCallback(async () => {
+    try {
+      const res = await entreprisesApi.list(1, 100);
+      setEntreprises(res.items);
+    } catch { /* silent */ }
+  }, []);
+
+  const fetchAgents = useCallback(async () => {
+    try { setAgents(await agentsApi.list()); } catch { /* silent */ }
+  }, []);
+
+  const fetchAgentTasks = useCallback(async () => {
+    try { setAgentTasks(await agentsApi.listTasks("nmap")); } catch { /* silent */ }
   }, []);
 
   useEffect(() => {
     fetchScans();
     fetchSites();
-  }, [fetchScans, fetchSites]);
+    fetchEntreprises();
+    fetchAgents();
+    fetchAgentTasks();
+  }, [fetchScans, fetchSites, fetchEntreprises, fetchAgents, fetchAgentTasks]);
+
+  // ── WebSocket: listen for agent task progress ──
+  useEffect(() => {
+    if (!agentTaskUuid) return;
+    const token = document.cookie.match(/aa_access_token=([^;]+)/)?.[1];
+    if (!token) return;
+
+    const wsUrl = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/user?token=${token}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "task_status" && msg.data?.task_uuid === agentTaskUuid) {
+          const status = msg.data.status as string;
+          setAgentLogs((prev) => [...prev, `[STATUS] ${status}`]);
+          if (status === "completed" || status === "failed") {
+            setAgentLogs((prev) => [
+              ...prev,
+              status === "completed"
+                ? "[DONE] Scan terminé avec succès"
+                : `[ERREUR] ${msg.data.error_message || "Échec du scan"}`,
+            ]);
+            fetchScans();
+          }
+        }
+        if (msg.type === "task_progress" && msg.data?.task_uuid === agentTaskUuid) {
+          const lines = msg.data.output_lines as string[] | undefined;
+          if (lines?.length) {
+            setAgentLogs((prev) => [...prev, ...lines]);
+          }
+        }
+        if (msg.type === "task_result" && msg.data?.task_uuid === agentTaskUuid) {
+          setAgentLogs((prev) => [...prev, "[RESULT] Résultats reçus"]);
+          fetchScans();
+        }
+      } catch {
+        /* ignore parse errors */
+      }
+    };
+
+    ws.onerror = () => {
+      setAgentLogs((prev) => [...prev, "[WS] Erreur de connexion WebSocket"]);
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [agentTaskUuid, fetchScans]);
+
+  // Auto-scroll agent logs
+  useEffect(() => {
+    if (agentLogsRef.current) {
+      agentLogsRef.current.scrollTop = agentLogsRef.current.scrollHeight;
+    }
+  }, [agentLogs]);
 
   // ── Polling: refresh every 3s while scans are running ──
   useEffect(() => {
@@ -210,45 +293,12 @@ function ScannerContent() {
     };
   }, [hasRunningScans, fetchScans]);
 
-  // ── Launch scan (async — returns immediately) ──
-  const handleLaunch = async () => {
-    if (!siteId || !target) {
-      toast.error("Veuillez sélectionner un site et saisir une cible");
-      return;
-    }
-    if (scanType === "custom" && !customArgs.trim()) {
-      toast.error("Veuillez saisir les arguments Nmap personnalisés");
-      return;
-    }
-    // Close dialog immediately
-    setShowLaunch(false);
-    try {
-      await scansApi.launch({
-        nom: nom.trim() || undefined,
-        site_id: siteId,
-        target,
-        scan_type: scanType as "discovery" | "port_scan" | "full" | "custom",
-        custom_args: scanType === "custom" ? customArgs.trim() : undefined,
-        notes: notes || undefined,
-      });
-      toast.success("Scan lancé — il s'exécute en arrière-plan");
-      resetForm();
-      fetchScans();
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: string } } };
-      const msg =
-        axiosErr?.response?.data?.detail ||
-        (err instanceof Error ? err.message : "Erreur lors du lancement du scan");
-      toast.error(msg);
-    }
-  };
-
-  const resetForm = () => {
-    setNom("");
-    setTarget("");
-    setCustomArgs("");
-    setNotes("");
-    setScanType("discovery");
+  // Launch callbacks
+  const handleLocalLaunched = () => { fetchScans(); };
+  const handleAgentDispatched = (taskUuid: string) => {
+    setAgentTaskUuid(taskUuid);
+    setAgentLogs(["[DISPATCH] Tache nmap envoyee a l'agent — en attente d'execution..."]);
+    fetchAgentTasks();
   };
 
   // ── View detail ──
@@ -264,7 +314,6 @@ function ScannerContent() {
 
   // ── Delete ──
   const handleDelete = async (id: number) => {
-    if (!confirm("Supprimer ce scan et tous ses résultats ?")) return;
     try {
       await scansApi.delete(id);
       toast.success("Scan supprimé");
@@ -316,16 +365,48 @@ function ScannerContent() {
     }
   };
 
-  const getSiteName = (id: number) =>
-    sites.find((s) => s.id === id)?.nom || `Site #${id}`;
+  const getSiteName = (id: number) => sites.find((s) => s.id === id)?.nom || `Site #${id}`;
+  const getEntrepriseName = (id: number) => entreprises.find((e) => e.id === id)?.nom || `Entreprise #${id}`;
+  const getEntrepriseIdForSite = (siteId: number) => sites.find((s) => s.id === siteId)?.entreprise_id || 0;
+  const getAgentName = (agentId: number) => agents.find((a) => a.id === agentId)?.name || `Agent #${agentId}`;
+
+  const handleViewTask = (task: AgentTask) => {
+    setSelectedTask(task);
+    setShowTaskDetail(true);
+  };
+
+  const handleDeleteTask = async (taskUuid: string) => {
+    try {
+      await agentsApi.deleteTask(taskUuid);
+      toast.success("Tache supprimee");
+      fetchAgentTasks();
+    } catch {
+      toast.error("Erreur lors de la suppression");
+    }
+  };
+
+  // Filtered scans by entreprise
+  const filteredScans = useMemo(() => {
+    if (!filterEntrepriseId) return scans;
+    const siteIds = new Set(sites.filter((s) => s.entreprise_id === filterEntrepriseId).map((s) => s.id));
+    return scans.filter((s) => siteIds.has(s.site_id));
+  }, [scans, filterEntrepriseId, sites]);
+
+  const filteredAgentTasks = useMemo(() => {
+    if (!filterEntrepriseId) return agentTasks;
+    return agentTasks.filter((t) => {
+      const params = t.parameters as Record<string, unknown>;
+      return params?.entreprise_id === filterEntrepriseId;
+    });
+  }, [agentTasks, filterEntrepriseId]);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Radar className="h-6 w-6" />
+            <Radar className="size-6" />
             Scanner Réseau
           </h1>
           <p className="text-muted-foreground">
@@ -333,7 +414,7 @@ function ScannerContent() {
           </p>
         </div>
         <Button onClick={() => setShowLaunch(true)}>
-          <Play className="h-4 w-4 mr-2" />
+          <Play data-icon="inline-start" />
           Lancer un scan
         </Button>
       </div>
@@ -341,25 +422,181 @@ function ScannerContent() {
       {/* Scan list */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Historique des scans
-            {hasRunningScans && (
-              <Badge className="gap-1 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400 text-xs">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                {scans.filter((s) => s.statut === "running").length} en cours
-              </Badge>
-            )}
-          </CardTitle>
-          <CardDescription>
-            {scans.length} scan(s) enregistré(s)
-          </CardDescription>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Historique des scans
+                  {hasRunningScans && (
+                    <Badge className="gap-1 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400 text-xs">
+                      <Loader2 className="size-3 animate-spin" />
+                      {scans.filter((s) => s.statut === "running").length} en cours
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {viewTab === "local"
+                    ? `${filteredScans.length} scan(s) local(aux)`
+                    : `${filteredAgentTasks.length} scan(s) agent`}
+                </CardDescription>
+              </div>
+              <Tabs value={viewTab} onValueChange={(v) => setViewTab(v as "local" | "agent")}>
+                <TabsList>
+                  <TabsTrigger value="local" className="gap-1.5">
+                    <Server className="size-3" />
+                    Local ({filteredScans.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="agent" className="gap-1.5">
+                    <Monitor className="size-3" />
+                    Agent ({filteredAgentTasks.length})
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            {/* Filtre entreprise */}
+            <div className="flex items-center gap-2">
+              <Label className="text-sm whitespace-nowrap">Filtrer par entreprise :</Label>
+              <Select
+                value={filterEntrepriseId ? String(filterEntrepriseId) : "all"}
+                onValueChange={(v) => setFilterEntrepriseId(v === "all" ? 0 : Number(v))}
+              >
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Toutes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">Toutes les entreprises</SelectItem>
+                    {entreprises.map((e) => (
+                      <SelectItem key={e.id} value={String(e.id)}>{e.nom}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {viewTab === "agent" ? (
+            /* ── Agent tasks table ── */
+            filteredAgentTasks.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Monitor className="size-12 mx-auto mb-4 opacity-40" />
+                <p>Aucun scan agent</p>
+                <p className="text-sm">Lancez un scan en mode &quot;Agent distant&quot;</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Entreprise</TableHead>
+                    <TableHead>Site</TableHead>
+                    <TableHead>Cible</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Agent</TableHead>
+                    <TableHead>Progression</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAgentTasks.map((task) => {
+                    const params = task.parameters as Record<string, string>;
+                    return (
+                      <TableRow key={task.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {new Date(
+                            task.created_at.endsWith("Z") || task.created_at.includes("+")
+                              ? task.created_at
+                              : task.created_at + "Z"
+                          ).toLocaleDateString("fr-FR", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <ScanStatusBadge
+                            statut={task.status === "completed" ? "completed" : task.status === "failed" ? "failed" : "running"}
+                            errorMessage={task.error_message}
+                          />
+                        </TableCell>
+                        <TableCell>{task.entreprise_name || "—"}</TableCell>
+                        <TableCell>{task.site_name || "—"}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {params?.target || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {SCAN_TYPE_LABELS[params?.scan_type || "discovery"] || params?.scan_type || "—"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{getAgentName(task.agent_id)}</TableCell>
+                        <TableCell>
+                          {task.status === "running" ? (
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 w-16 bg-blue-100 dark:bg-blue-900/30 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-blue-500 rounded-full transition-all"
+                                  style={{ width: `${task.progress}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground">{task.progress}%</span>
+                            </div>
+                          ) : task.status === "completed" ? (
+                            <span className="text-xs text-green-600">100%</span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewTask(task)}
+                              disabled={task.status === "pending"}
+                            >
+                              <Eye />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={task.status === "running"}
+                                >
+                                  <Trash2 className="text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Supprimer cette tache ?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Cette tache et ses resultats seront definitivement supprimes.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteTask(task.task_uuid)}>
+                                    Supprimer
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )
+          ) : loading ? (
             <TableSkeleton rows={3} cols={7} />
-          ) : scans.length === 0 ? (
+          ) : filteredScans.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <Radar className="h-12 w-12 mx-auto mb-4 opacity-40" />
+              <Radar className="size-12 mx-auto mb-4 opacity-40" />
               <p>Aucun scan réalisé</p>
               <p className="text-sm">
                 Lancez un scan pour découvrir les équipements du réseau
@@ -372,6 +609,7 @@ function ScannerContent() {
                   <TableHead>Nom</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Entreprise</TableHead>
                   <TableHead>Site</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Commande</TableHead>
@@ -382,7 +620,7 @@ function ScannerContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scans.map((scan) => (
+                {filteredScans.map((scan) => (
                   <TableRow key={scan.id} className={scan.statut === "running" ? "bg-primary/5" : ""}>
                     <TableCell className="font-medium max-w-[160px] truncate">
                       {scan.nom || (
@@ -401,6 +639,7 @@ function ScannerContent() {
                         minute: "2-digit",
                       })}
                     </TableCell>
+                    <TableCell>{getEntrepriseName(getEntrepriseIdForSite(scan.site_id))}</TableCell>
                     <TableCell>{getSiteName(scan.site_id)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
@@ -436,16 +675,33 @@ function ScannerContent() {
                           onClick={() => handleViewScan(scan.id)}
                           disabled={scan.statut === "running"}
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(scan.id)}
-                          disabled={scan.statut === "running"}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={scan.statut === "running"}
+                            >
+                              <Trash2 className="text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Supprimer ce scan ?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Ce scan et tous ses résultats seront définitivement supprimés.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(scan.id)}>
+                                Supprimer
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -456,134 +712,70 @@ function ScannerContent() {
         </CardContent>
       </Card>
 
-      {/* Launch dialog */}
-      <Dialog open={showLaunch} onOpenChange={setShowLaunch}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Lancer un scan réseau</DialogTitle>
-            <DialogDescription>
-              Configurez les paramètres du scan Nmap
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Nom du scan */}
-            <div>
-              <Label>Nom du scan (optionnel)</Label>
-              <Input
-                value={nom}
-                onChange={(e) => setNom(e.target.value)}
-                placeholder="Ex : VLAN 10 - MGT, DMZ Serveurs…"
-              />
-            </div>
+      {/* Launch dialog (extracted component) */}
+      <LaunchScanDialog
+        open={showLaunch}
+        onOpenChange={setShowLaunch}
+        onLaunched={handleLocalLaunched}
+        onAgentDispatched={handleAgentDispatched}
+      />
 
-            {/* Site */}
-            <div>
-              <Label>Site *</Label>
-              <Select
-                value={siteId ? String(siteId) : ""}
-                onValueChange={(v) => setSiteId(Number(v))}
+      {/* Agent task logs */}
+      {agentTaskUuid && agentLogs.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Terminal className="size-4" />
+              Logs agent — tâche nmap
+              <Badge variant="outline" className="font-mono text-xs">
+                {agentTaskUuid.slice(0, 8)}
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto"
+                onClick={() => {
+                  setAgentTaskUuid(null);
+                  setAgentLogs([]);
+                }}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un site" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sites.map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.nom}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <X className="size-3" />
+                Fermer
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              ref={agentLogsRef}
+              className="bg-zinc-950 rounded-lg p-4 max-h-[300px] overflow-y-auto font-mono text-xs leading-relaxed"
+            >
+              {agentLogs.map((line, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "whitespace-pre-wrap",
+                    line.startsWith("[ERREUR]") && "text-red-400",
+                    line.startsWith("[DONE]") && "text-green-400",
+                    line.startsWith("[STATUS]") && "text-yellow-400",
+                    line.startsWith("[DISPATCH]") && "text-blue-400",
+                    !line.startsWith("[") && "text-zinc-300"
+                  )}
+                >
+                  {line}
+                </div>
+              ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
 
-            {/* Cible */}
-            <div>
-              <Label>Cible (IP, plage CIDR) *</Label>
-              <Input
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                placeholder="192.168.1.0/24"
-              />
-            </div>
-
-            {/* Type de scan */}
-            <div>
-              <Label>Type de scan</Label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                {SCAN_TYPES.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => setScanType(type.value)}
-                    className={`text-left p-3 rounded-lg border-2 transition-colors ${
-                      scanType === type.value
-                        ? "border-primary bg-primary/5"
-                        : "border-muted hover:border-muted-foreground/30"
-                    }`}
-                  >
-                    <div className="font-medium text-sm">{type.label}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {type.description}
-                    </div>
-                    {type.args && (
-                      <code className="text-[10px] text-muted-foreground font-mono mt-1 block">
-                        {type.args}
-                      </code>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom args (only shown for custom type) */}
-            {scanType === "custom" && (
-              <div>
-                <Label>Arguments Nmap personnalisés *</Label>
-                <Input
-                  value={customArgs}
-                  onChange={(e) => setCustomArgs(e.target.value)}
-                  placeholder="-sV -p 22,80,443 --script vuln"
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Saisissez les arguments nmap sans la cible (elle sera ajoutée automatiquement)
-                </p>
-              </div>
-            )}
-
-            {/* Nmap command preview */}
-            <div className="rounded-lg bg-zinc-950 p-3 mt-2">
-              <div className="flex items-center gap-2 text-zinc-400 text-xs mb-1">
-                <Terminal className="h-3 w-3" />
-                Commande qui sera exécutée
-              </div>
-              <code className="text-green-400 text-sm font-mono break-all">
-                $ {commandPreview}
-              </code>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <Label>Notes (optionnel)</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Notes sur ce scan…"
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLaunch(false)}>
-              Annuler
-            </Button>
-            <Button onClick={handleLaunch}>
-              <Play className="h-4 w-4 mr-2" />
-              Lancer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Agent task detail (extracted component) */}
+      <AgentTaskDetail
+        task={selectedTask}
+        open={showTaskDetail}
+        onOpenChange={setShowTaskDetail}
+        agentName={selectedTask ? getAgentName(selectedTask.agent_id) : ""}
+      />
 
       {/* Detail dialog */}
       <Dialog open={showDetail} onOpenChange={setShowDetail}>
@@ -592,7 +784,7 @@ function ScannerContent() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <Radar className="h-5 w-5" />
+                  <Radar className="size-5" />
                   {selectedScan.nom
                     ? `${selectedScan.nom} — ${getSiteName(selectedScan.site_id)}`
                     : `Résultats du scan — ${getSiteName(selectedScan.site_id)}`}
@@ -609,7 +801,7 @@ function ScannerContent() {
               {selectedScan.nmap_command && (
                 <div className="rounded-lg bg-zinc-950 p-3">
                   <div className="flex items-center gap-2 text-zinc-400 text-xs mb-1">
-                    <Terminal className="h-3 w-3" />
+                    <Terminal className="size-3" />
                     Commande exécutée
                   </div>
                   <code className="text-green-400 text-sm font-mono">
@@ -625,13 +817,13 @@ function ScannerContent() {
                   size="sm"
                   onClick={() => handleImportAll(selectedScan.id)}
                 >
-                  <Download className="h-4 w-4 mr-2" />
+                  <Download data-icon="inline-start" />
                   Importer tous les &quot;pending&quot;
                 </Button>
               </div>
 
               {/* Hosts table */}
-              <div className="space-y-3">
+              <div className="flex flex-col gap-3">
                 {selectedScan.hosts.map((host) => (
                   <HostRow
                     key={host.id}
@@ -663,9 +855,9 @@ function ScanStatusBadge({
 }) {
   if (statut === "running") {
     return (
-      <div className="space-y-1.5 min-w-[100px]">
+      <div className="flex flex-col gap-1.5 min-w-[100px]">
         <Badge className="gap-1.5 bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400">
-          <Loader2 className="h-3 w-3 animate-spin" />
+          <Loader2 className="size-3 animate-spin" />
           En cours
         </Badge>
         <div className="h-1.5 w-full bg-blue-100 dark:bg-blue-900/30 rounded-full overflow-hidden">
@@ -680,7 +872,7 @@ function ScanStatusBadge({
         <Tooltip>
           <TooltipTrigger asChild>
             <Badge variant="destructive" className="gap-1 cursor-help">
-              <AlertCircle className="h-3 w-3" />
+              <AlertCircle className="size-3" />
               Échoué
             </Badge>
           </TooltipTrigger>
@@ -693,7 +885,7 @@ function ScanStatusBadge({
   }
   return (
     <Badge variant="outline" className="gap-1 text-green-600 border-green-200 dark:border-green-800 dark:text-green-400">
-      <Check className="h-3 w-3" />
+      <Check className="size-3" />
       Terminé
     </Badge>
   );
@@ -724,7 +916,7 @@ function HostRow({
         className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/50"
         onClick={() => setExpanded(!expanded)}
       >
-        <TypeIcon className="h-5 w-5 text-muted-foreground" />
+        <TypeIcon className="size-5 text-muted-foreground" />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -754,20 +946,20 @@ function HostRow({
 
         {host.equipement_id && (
           <Badge variant="default" className="gap-1">
-            <Globe className="h-3 w-3" />
+            <Globe className="size-3" />
             Éq. #{host.equipement_id}
           </Badge>
         )}
 
         {expanded ? (
-          <ChevronUp className="h-4 w-4" />
+          <ChevronUp className="size-4" />
         ) : (
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="size-4" />
         )}
       </div>
 
       {expanded && (
-        <CardContent className="border-t pt-4 space-y-4">
+        <CardContent className="border-t pt-4 flex flex-col gap-4">
           {/* Ports */}
           {host.ports.length > 0 && (
             <div>
@@ -826,20 +1018,22 @@ function HostRow({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="serveur">Serveur</SelectItem>
-                    <SelectItem value="reseau">Réseau</SelectItem>
-                    <SelectItem value="switch">Switch</SelectItem>
-                    <SelectItem value="router">Router</SelectItem>
-                    <SelectItem value="access_point">Access Point</SelectItem>
-                    <SelectItem value="firewall">Firewall</SelectItem>
-                    <SelectItem value="printer">Printer</SelectItem>
-                    <SelectItem value="camera">Camera</SelectItem>
-                    <SelectItem value="nas">NAS</SelectItem>
-                    <SelectItem value="hyperviseur">Hyperviseur</SelectItem>
-                    <SelectItem value="telephone">Téléphone</SelectItem>
-                    <SelectItem value="iot">IoT</SelectItem>
-                    <SelectItem value="cloud_gateway">Cloud Gateway</SelectItem>
-                    <SelectItem value="equipement">Autre</SelectItem>
+                    <SelectGroup>
+                      <SelectItem value="serveur">Serveur</SelectItem>
+                      <SelectItem value="reseau">Réseau</SelectItem>
+                      <SelectItem value="switch">Switch</SelectItem>
+                      <SelectItem value="router">Router</SelectItem>
+                      <SelectItem value="access_point">Access Point</SelectItem>
+                      <SelectItem value="firewall">Firewall</SelectItem>
+                      <SelectItem value="printer">Printer</SelectItem>
+                      <SelectItem value="camera">Camera</SelectItem>
+                      <SelectItem value="nas">NAS</SelectItem>
+                      <SelectItem value="hyperviseur">Hyperviseur</SelectItem>
+                      <SelectItem value="telephone">Téléphone</SelectItem>
+                      <SelectItem value="iot">IoT</SelectItem>
+                      <SelectItem value="cloud_gateway">Cloud Gateway</SelectItem>
+                      <SelectItem value="equipement">Autre</SelectItem>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
@@ -850,7 +1044,7 @@ function HostRow({
                   onDecision(host.id, "kept", chosenType);
                 }}
               >
-                <Check className="h-4 w-4 mr-1" />
+                <Check data-icon="inline-start" />
                 Conserver
               </Button>
               <Button
@@ -861,7 +1055,7 @@ function HostRow({
                   onDecision(host.id, "ignored");
                 }}
               >
-                <X className="h-4 w-4 mr-1" />
+                <X data-icon="inline-start" />
                 Ignorer
               </Button>
             </div>

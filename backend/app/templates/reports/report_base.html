@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport d'audit — {{ audit.nom_projet }}</title>
+    <style>{{ css }}</style>
+</head>
+<body>
+
+    {# Page de garde #}
+    {% if sections.cover is defined and sections.cover.included %}
+        {% include "sections/cover.html" %}
+    {% endif %}
+
+    {# Sections 2-25 : chaque section conditionnelle #}
+    {% for section in ordered_sections %}
+        {% if section.included and section.section_key != "cover" %}
+            <div class="section" id="section-{{ section.section_key }}">
+                <h1 class="section-title">{{ loop.index }}. {{ section.title }}</h1>
+                {% if section.custom_content %}
+                    {{ section.custom_content | safe }}
+                {% else %}
+                    {# Contenu auto-généré par la section si elle existe, sinon placeholder #}
+                    {% set section_tpl = "sections/" + section.section_key + ".html" %}
+                    {% include section_tpl ignore missing %}
+                    {# Si pas de template spécifique, on affiche le placeholder #}
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endfor %}
+
+</body>
+</html>

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..models.collect_result import CollectResult, CollectMethod, CollectStatus
 from ..models.equipement import Equipement, EquipementServeur
+from ..models.site import Site
 from ..models.assessment import Assessment, ControlResult, ComplianceStatus
 from ..core.database import SessionLocal
 from ..tools.collectors.ssh_collector import collect_via_ssh
@@ -1024,7 +1025,7 @@ def create_pending_collect(
         device_profile=device_profile,
     )
     db.add(collect)
-    db.commit()
+    db.flush()
     db.refresh(collect)
     return collect
 
@@ -1153,31 +1154,69 @@ def execute_collect_background(
         db.close()
 
 
+def _check_equip_access(db: Session, equipement_id: int, user_id: int | None, is_admin: bool) -> bool:
+    """Verifie l'acces a un equipement via la chaine Equipement → Site → Entreprise."""
+    if user_id is None or is_admin:
+        return True
+    from ..core.helpers import user_has_access_to_entreprise
+    equip = db.get(Equipement, equipement_id)
+    if not equip:
+        return False
+    site = db.get(Site, equip.site_id)
+    if not site:
+        return False
+    return user_has_access_to_entreprise(db, site.entreprise_id, user_id)
+
+
 def list_collect_results(
     db: Session,
     equipement_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 20,
+    user_id: int | None = None,
+    is_admin: bool = False,
 ) -> list[CollectResult]:
-    """Liste les collectes, optionnellement filtrées par équipement, avec pagination."""
+    """Liste les collectes, optionnellement filtrées par équipement et ownership."""
     q = db.query(CollectResult)
     if equipement_id:
         q = q.filter(CollectResult.equipement_id == equipement_id)
+    if user_id is not None and not is_admin:
+        from ..models.audit import Audit
+        accessible_ent_ids = (
+            db.query(Audit.entreprise_id)
+            .filter(Audit.owner_id == user_id)
+            .distinct()
+            .scalar_subquery()
+        )
+        q = q.join(Equipement, CollectResult.equipement_id == Equipement.id).join(
+            Site, Equipement.site_id == Site.id
+        ).filter(Site.entreprise_id.in_(accessible_ent_ids))
     return q.order_by(CollectResult.created_at.desc()).offset(skip).limit(limit).all()
 
 
-def get_collect_result(db: Session, collect_id: int) -> Optional[CollectResult]:
-    """Récupère une collecte par ID."""
-    return db.get(CollectResult, collect_id)
+def get_collect_result(
+    db: Session, collect_id: int,
+    user_id: int | None = None, is_admin: bool = False,
+) -> Optional[CollectResult]:
+    """Récupère une collecte par ID. Vérifie ownership."""
+    collect = db.get(CollectResult, collect_id)
+    if collect and not _check_equip_access(db, collect.equipement_id, user_id, is_admin):
+        return None
+    return collect
 
 
-def delete_collect_result(db: Session, collect_id: int) -> bool:
-    """Supprime une collecte."""
+def delete_collect_result(
+    db: Session, collect_id: int,
+    user_id: int | None = None, is_admin: bool = False,
+) -> bool:
+    """Supprime une collecte. Vérifie ownership."""
     collect = db.get(CollectResult, collect_id)
     if not collect:
         return False
+    if not _check_equip_access(db, collect.equipement_id, user_id, is_admin):
+        return False
     db.delete(collect)
-    db.commit()
+    db.flush()
     return True
 
 
@@ -1263,8 +1302,7 @@ def prefill_assessment_from_collect(
             "findings_count": 0 if passed else 1,
         })
 
-    db.commit()
-
+    db.flush()
     logger.info(
         f"Pré-remplissage collecte #{collect_id}: {prefilled} contrôles "
         f"({compliant_count} conformes, {non_compliant_count} non-conformes)"

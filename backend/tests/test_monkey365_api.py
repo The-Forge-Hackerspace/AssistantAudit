@@ -7,7 +7,22 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from app.models.audit import Audit
 from tests.factories import EntrepriseFactory
+
+
+def _link_user_to_entreprise(db_session, user, entreprise):
+    """Cree un audit pour lier un user a une entreprise (necessaire pour RBAC)."""
+    a = Audit(nom_projet="RBAC Link", entreprise_id=entreprise.id, owner_id=user.id)
+    db_session.add(a)
+    db_session.commit()
+
+
+def _create_linked_entreprise(db_session, user, nom="Test Corp"):
+    """Cree une entreprise + audit de liaison RBAC. Retourne l'entreprise."""
+    ent = EntrepriseFactory.create(db_session, nom=nom)
+    _link_user_to_entreprise(db_session, user, ent)
+    return ent
 
 
 # ─── Helper ──────────────────────────────────────────────────────────────
@@ -89,10 +104,10 @@ def test_launch_scan_missing_entreprise_id(client: TestClient, auditeur_headers)
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_launch_scan_success_auditeur(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_launch_scan_success_auditeur(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """Test launching scan with auditeur role returns 201."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     response = client.post(
         "/api/v1/tools/monkey365/run",
@@ -131,10 +146,10 @@ def test_launch_scan_success_admin(mock_exec, client: TestClient, db_session, ad
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_launch_scan_default_config(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_launch_scan_default_config(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """Test launching scan with empty config uses defaults (spo_sites=[], export_to=[JSON, HTML])."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     response = client.post(
         "/api/v1/tools/monkey365/run",
@@ -170,10 +185,10 @@ def test_launch_scan_invalid_entreprise(mock_exec, client: TestClient, auditeur_
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_list_scans_success(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_list_scans_success(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """Test listing scans for an entreprise returns 200 with array."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     # Launch 2 scans
     for _ in range(2):
@@ -200,10 +215,10 @@ def test_list_scans_success(mock_exec, client: TestClient, db_session, auditeur_
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_get_scan_detail_success(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_get_scan_detail_success(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """Test getting scan detail returns 200 with full details."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     # Launch scan
     launch_response = client.post(
@@ -248,10 +263,10 @@ def test_get_scan_detail_not_found(client: TestClient, auditeur_headers):
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_config_snapshot_contains_only_expected_keys(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_config_snapshot_contains_only_expected_keys(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """Test that config_snapshot contains spo_sites, export_to, output_dir — no secrets."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     launch = client.post(
         "/api/v1/tools/monkey365/run",
@@ -286,10 +301,10 @@ def test_config_snapshot_contains_only_expected_keys(mock_exec, client: TestClie
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_launch_response_has_no_secrets(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_launch_response_has_no_secrets(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """Test that launch (summary) response has no secret fields."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     response = client.post(
         "/api/v1/tools/monkey365/run",
@@ -308,10 +323,10 @@ def test_launch_response_has_no_secrets(mock_exec, client: TestClient, db_sessio
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_launch_scan_response_schema(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_launch_scan_response_schema(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """Test that launch scan response matches Monkey365ScanResultSummary schema."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     response = client.post(
         "/api/v1/tools/monkey365/run",
@@ -337,10 +352,10 @@ def test_launch_scan_response_schema(mock_exec, client: TestClient, db_session, 
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_get_scan_detail_response_schema(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_get_scan_detail_response_schema(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """Test that get scan detail response matches Monkey365ScanResultRead schema."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     # Launch scan
     launch_response = client.post(
@@ -379,10 +394,10 @@ def test_get_scan_detail_response_schema(mock_exec, client: TestClient, db_sessi
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_launch_scan_export_to_auto_includes_json(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_launch_scan_export_to_auto_includes_json(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """Test that export_to automatically includes JSON format."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     # Launch scan with only HTML export
     response = client.post(
@@ -412,10 +427,10 @@ def test_launch_scan_export_to_auto_includes_json(mock_exec, client: TestClient,
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_cancel_running_scan_moves_to_failed(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_cancel_running_scan_moves_to_failed(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """POST /cancel on a running scan transitions status to cancelled."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     launch = client.post(
         "/api/v1/tools/monkey365/run",
@@ -434,10 +449,10 @@ def test_cancel_running_scan_moves_to_failed(mock_exec, client: TestClient, db_s
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_cancel_non_running_scan_returns_400(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_cancel_non_running_scan_returns_400(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """POST /cancel on an already-cancelled scan returns 400."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     launch = client.post(
         "/api/v1/tools/monkey365/run",
@@ -477,10 +492,10 @@ def test_cancel_not_found_returns_404(client: TestClient, auditeur_headers):
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_logs_returns_empty_when_no_log_file(mock_exec, client: TestClient, db_session, auditeur_headers, tmp_path):
+def test_logs_returns_empty_when_no_log_file(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user, tmp_path):
     """GET /logs returns empty lines list when the log file does not exist yet."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     launch = client.post(
         "/api/v1/tools/monkey365/run",
@@ -503,10 +518,10 @@ def test_logs_returns_empty_when_no_log_file(mock_exec, client: TestClient, db_s
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_logs_returns_content_when_log_file_exists(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_logs_returns_content_when_log_file_exists(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """GET /logs returns log lines when monkey365.log exists in output_path."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     launch = client.post(
         "/api/v1/tools/monkey365/run",
@@ -554,10 +569,10 @@ def test_logs_not_found_returns_404(client: TestClient, auditeur_headers):
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_report_returns_400_for_non_success_scan(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_report_returns_400_for_non_success_scan(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """GET /report returns 400 when the scan is not in success state."""
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     launch = client.post(
         "/api/v1/tools/monkey365/run",
@@ -576,12 +591,12 @@ def test_report_returns_400_for_non_success_scan(mock_exec, client: TestClient, 
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_report_returns_404_when_no_html_for_success_scan(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_report_returns_404_when_no_html_for_success_scan(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """GET /report returns 404 when scan succeeded but no HTML file was generated."""
     from app.models.monkey365_scan_result import Monkey365ScanStatus
 
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     launch = client.post(
         "/api/v1/tools/monkey365/run",
@@ -605,13 +620,13 @@ def test_report_returns_404_when_no_html_for_success_scan(mock_exec, client: Tes
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_report_returns_200_file_response_when_html_exists(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_report_returns_200_file_response_when_html_exists(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """GET /report returns 200 FileResponse when a success scan has an HTML report."""
     from pathlib import Path
     from app.models.monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
 
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     launch = client.post(
         "/api/v1/tools/monkey365/run",
@@ -654,12 +669,12 @@ def test_report_returns_200_file_response_when_html_exists(mock_exec, client: Te
 
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_delete_scan_removes_db_row_and_files(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_delete_scan_removes_db_row_and_files(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """DELETE /scans/{id} returns 200, removes DB row, and cleans up output directory."""
     from pathlib import Path
 
     mock_exec.return_value = None
-    entreprise = EntrepriseFactory.create(db_session, nom="Test Corp")
+    entreprise = _create_linked_entreprise(db_session, auditeur_user)
 
     launch = client.post(
         "/api/v1/tools/monkey365/run",
@@ -710,15 +725,15 @@ def test_delete_scan_not_found_returns_404(client: TestClient, auditeur_headers)
 # ─── Import-to-audit cross-tenant tests ──────────────────────────────────
 
 @patch('app.services.monkey365_scan_service.Monkey365ScanService.execute_scan_background')
-def test_import_to_audit_rejects_cross_tenant_mismatch(mock_exec, client: TestClient, db_session, auditeur_headers):
+def test_import_to_audit_rejects_cross_tenant_mismatch(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """POST /import-to-audit rejects scan-audit entreprise mismatch (multi-tenant safety)."""
     from app.models.monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
     from tests.factories import AuditFactory
 
     mock_exec.return_value = None
 
-    entreprise_scan = EntrepriseFactory.create(db_session, nom="Entreprise Scan")
-    entreprise_audit = EntrepriseFactory.create(db_session, nom="Entreprise Audit")
+    entreprise_scan = _create_linked_entreprise(db_session, auditeur_user, nom="Entreprise Scan")
+    entreprise_audit = _create_linked_entreprise(db_session, auditeur_user, nom="Entreprise Audit")
 
     # Create a successful scan belonging to entreprise_scan
     launch = client.post(
@@ -734,7 +749,7 @@ def test_import_to_audit_rejects_cross_tenant_mismatch(mock_exec, client: TestCl
     db_session.commit()
 
     # Create an audit belonging to a DIFFERENT entreprise
-    audit = AuditFactory.create(db_session, nom_projet="Audit Autre", entreprise_id=entreprise_audit.id)
+    audit = AuditFactory.create(db_session, nom_projet="Audit Autre", entreprise_id=entreprise_audit.id, owner_id=auditeur_user.id)
 
     response = client.post(
         f"/api/v1/tools/monkey365/scans/{result_id}/import-to-audit",

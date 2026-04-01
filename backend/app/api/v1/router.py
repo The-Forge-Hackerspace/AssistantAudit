@@ -13,9 +13,17 @@ from .assessments import router as assessments_router
 from .attachments import router as attachments_router
 from .scans import router as scans_router
 from .tools import router as tools_router
-from .pingcastle_terminal import router as pingcastle_ws_router
 from .health import router as health_router
 from .network_map import router as network_map_router
+from .websocket import router as websocket_router
+from .agents import router as agents_router
+from .files import router as files_router
+from .oradad import router as oradad_router
+from .users import router as users_router
+from .tags import router as tags_router
+from .checklists import router as checklists_router
+from .reports import router as reports_router
+from .findings import router as findings_router
 
 api_router = APIRouter()
 
@@ -31,4 +39,14 @@ api_router.include_router(attachments_router, prefix="/attachments", tags=["Piè
 api_router.include_router(scans_router, prefix="/scans", tags=["Scanner réseau"])
 api_router.include_router(network_map_router, prefix="/network-map", tags=["Cartographie réseau"])
 api_router.include_router(tools_router)
-api_router.include_router(pingcastle_ws_router)
+# NOTE: websocket_router est monte directement sur l'app (pas sous /api/v1)
+# car l'agent se connecte a /ws/agent sans prefix API.
+# Voir main.py: app.include_router(websocket_router)
+api_router.include_router(agents_router)
+api_router.include_router(oradad_router)
+api_router.include_router(files_router, prefix="/files", tags=["Fichiers chiffrés"])
+api_router.include_router(users_router, prefix="/users", tags=["Utilisateurs"])
+api_router.include_router(tags_router, prefix="/tags", tags=["Tags"])
+api_router.include_router(checklists_router, prefix="/checklists", tags=["Checklists"])
+api_router.include_router(reports_router, prefix="/reports", tags=["Rapports"])
+api_router.include_router(findings_router, prefix="/findings", tags=["Findings"])

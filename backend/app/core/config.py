@@ -41,7 +41,18 @@ class Settings(BaseSettings):
     ]
 
     # --- Base de données ---
+    # PostgreSQL par défaut en production, SQLite en dev si non configuré
     DATABASE_URL: str = f"sqlite:///{BASE_DIR / 'instance' / 'assistantaudit.db'}"
+
+    # --- Chiffrement au repos (AES-256-GCM) ---
+    # 64 caractères hex = 32 bytes = 256 bits. Générer avec :
+    # python -c 'import os; print(os.urandom(32).hex())'
+    ENCRYPTION_KEY: str = ""       # Clé pour EncryptedText (colonnes sensibles en base)
+    FILE_ENCRYPTION_KEY: str = ""  # KEK pour envelope encryption (fichiers sur disque)
+
+    # --- Certificats mTLS (communication serveur ↔ agent) ---
+    CA_CERT_PATH: str = str(BASE_DIR / "certs" / "ca.pem")
+    CA_KEY_PATH: str = str(BASE_DIR / "certs" / "ca.key")
 
     # --- Sécurité / JWT ---
     SECRET_KEY: str = ""
@@ -71,6 +82,16 @@ class Settings(BaseSettings):
                 "SECRET_KEY trop courte en production (min 32 caractères). "
                 "Générez-en une avec : python -c 'import secrets; print(secrets.token_urlsafe(64))'"
             )
+        if is_safe_env and not self.ENCRYPTION_KEY:
+            raise ValueError(
+                "ENCRYPTION_KEY doit etre defini en production (64 hex chars = 256 bits). "
+                "Generez avec : python -c 'import os; print(os.urandom(32).hex())'"
+            )
+        if is_safe_env and not self.FILE_ENCRYPTION_KEY:
+            raise ValueError(
+                "FILE_ENCRYPTION_KEY doit etre defini en production (64 hex chars = 256 bits). "
+                "Generez avec : python -c 'import os; print(os.urandom(32).hex())'"
+            )
 
     # --- CORS ---
     CORS_ALLOW_METHODS: list[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
@@ -98,10 +119,6 @@ class Settings(BaseSettings):
     MONKEY365_TIMEOUT: int = 600  # secondes
     MONKEY365_AUTO_CLONE: bool = False  # autoriser le clonage git automatique de monkey365
 
-    # --- PingCastle ---
-    PINGCASTLE_PATH: str = ""  # chemin vers PingCastle.exe
-    PINGCASTLE_TIMEOUT: int = 300  # secondes
-    PINGCASTLE_OUTPUT_DIR: str = str(BASE_DIR / "uploads" / "pingcastle")
 
     # --- Données / Stockage ---
     DATA_DIR: str = "./data"  # base directory for scan output storage

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..models.config_analysis import ConfigAnalysis
 from ..models.equipement import Equipement, EquipementFirewall
+from ..models.site import Site
 from ..models.assessment import Assessment, ControlResult, ComplianceStatus
 from ..models.framework import Framework, Control
 from ..schemas.scan import ConfigAnalysisResult, SecurityFinding
@@ -122,7 +123,7 @@ def save_config_analysis(
         if analysis.firewall_rules:
             equipement.rules_count = len(analysis.firewall_rules)
 
-    db.commit()
+    db.flush()
     db.refresh(config)
 
     logger.info(
@@ -145,18 +146,43 @@ def list_config_analyses(
     )
 
 
-def get_config_analysis(db: Session, config_id: int) -> Optional[ConfigAnalysis]:
-    """Récupère une analyse de configuration par ID."""
-    return db.get(ConfigAnalysis, config_id)
+def _check_config_access(db: Session, config: ConfigAnalysis, user_id: int | None, is_admin: bool) -> bool:
+    """Verifie l'acces via Equipement → Site → Entreprise."""
+    if user_id is None or is_admin:
+        return True
+    from ..core.helpers import user_has_access_to_entreprise
+    equip = db.get(Equipement, config.equipement_id)
+    if not equip:
+        return False
+    site = db.get(Site, equip.site_id)
+    if not site:
+        return False
+    return user_has_access_to_entreprise(db, site.entreprise_id, user_id)
 
 
-def delete_config_analysis(db: Session, config_id: int) -> bool:
-    """Supprime une analyse de configuration."""
+def get_config_analysis(
+    db: Session, config_id: int,
+    user_id: int | None = None, is_admin: bool = False,
+) -> Optional[ConfigAnalysis]:
+    """Récupère une analyse de configuration par ID. Vérifie ownership."""
+    config = db.get(ConfigAnalysis, config_id)
+    if config and not _check_config_access(db, config, user_id, is_admin):
+        return None
+    return config
+
+
+def delete_config_analysis(
+    db: Session, config_id: int,
+    user_id: int | None = None, is_admin: bool = False,
+) -> bool:
+    """Supprime une analyse de configuration. Vérifie ownership."""
     config = db.get(ConfigAnalysis, config_id)
     if not config:
         return False
+    if not _check_config_access(db, config, user_id, is_admin):
+        return False
     db.delete(config)
-    db.commit()
+    db.flush()
     return True
 
 
@@ -267,8 +293,7 @@ def prefill_assessment_from_config(
 
         prefilled += 1
 
-    db.commit()
-
+    db.flush()
     logger.info(
         f"Pré-remplissage terminé: {prefilled} contrôles "
         f"({compliant} conformes, {non_compliant} non-conformes)"

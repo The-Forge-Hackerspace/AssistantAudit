@@ -10,6 +10,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from ..core.audit_logger import log_access_denied
 from ..models.ad_audit_result import ADAuditResultModel, ADAuditStatus
 from ..models.equipement import Equipement
 from ..models.assessment import Assessment, ControlResult, ComplianceStatus
@@ -85,6 +86,7 @@ def create_pending_ad_audit(
     target_port: int,
     username: str,
     domain: str,
+    owner_id: int | None = None,
 ) -> ADAuditResultModel:
     """Crée un enregistrement d'audit AD en statut 'running'."""
     if equipement_id:
@@ -99,9 +101,10 @@ def create_pending_ad_audit(
         target_port=target_port,
         username=username,
         domain=domain,
+        owner_id=owner_id,
     )
     db.add(audit)
-    db.commit()
+    db.flush()
     db.refresh(audit)
     return audit
 
@@ -194,26 +197,47 @@ def list_ad_audit_results(
     equipement_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 20,
+    owner_id: int | None = None,
+    is_admin: bool = False,
 ) -> list[ADAuditResultModel]:
-    """Liste les audits AD, optionnellement filtrés par équipement."""
+    """Liste les audits AD, optionnellement filtrés par équipement et owner."""
     q = db.query(ADAuditResultModel)
+    if owner_id is not None and not is_admin:
+        q = q.filter(ADAuditResultModel.owner_id == owner_id)
     if equipement_id:
         q = q.filter(ADAuditResultModel.equipement_id == equipement_id)
     return q.order_by(ADAuditResultModel.created_at.desc()).offset(skip).limit(limit).all()
 
 
-def get_ad_audit_result(db: Session, audit_id: int) -> Optional[ADAuditResultModel]:
-    """Récupère le détail d'un audit AD."""
-    return db.get(ADAuditResultModel, audit_id)
+def get_ad_audit_result(
+    db: Session,
+    audit_id: int,
+    owner_id: int | None = None,
+    is_admin: bool = False,
+) -> Optional[ADAuditResultModel]:
+    """Récupère le détail d'un audit AD. Vérifie ownership si owner_id fourni."""
+    audit = db.get(ADAuditResultModel, audit_id)
+    if audit and owner_id is not None and not is_admin and audit.owner_id != owner_id:
+        log_access_denied(owner_id, "ADAuditResult", audit_id)
+        return None
+    return audit
 
 
-def delete_ad_audit_result(db: Session, audit_id: int) -> bool:
-    """Supprime un audit AD."""
+def delete_ad_audit_result(
+    db: Session,
+    audit_id: int,
+    owner_id: int | None = None,
+    is_admin: bool = False,
+) -> bool:
+    """Supprime un audit AD. Vérifie ownership."""
     audit = db.get(ADAuditResultModel, audit_id)
     if not audit:
         return False
+    if owner_id is not None and not is_admin and audit.owner_id != owner_id:
+        log_access_denied(owner_id, "ADAuditResult", audit_id, action="delete")
+        return False
     db.delete(audit)
-    db.commit()
+    db.flush()
     return True
 
 
@@ -299,8 +323,6 @@ def prefill_assessment_from_ad_audit(
             "status": new_status.value,
             "evidence": finding.get("evidence", ""),
         })
-
-    db.commit()
 
     return {
         "controls_prefilled": prefilled,

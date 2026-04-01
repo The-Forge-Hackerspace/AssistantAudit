@@ -38,6 +38,10 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         """
         Process incoming request, collect metrics, and forward to handler.
         """
+        # Skip WebSocket (BaseHTTPMiddleware ne supporte pas le protocole WS)
+        if request.scope.get("type") == "websocket":
+            return await call_next(request)
+
         # Skip metrics collection for certain paths
         if request.url.path in self.SKIP_PATHS:
             return await call_next(request)

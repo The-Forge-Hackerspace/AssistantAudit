@@ -1,11 +1,12 @@
 import json
 import logging
 import os
+import re
 import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import cast
+from typing import Callable, cast
 
 logger = logging.getLogger(__name__)
 # Derived from this file's location: backend/app/tools/monkey365_runner/executor.py
@@ -21,11 +22,19 @@ def _escape_ps_string(value: str) -> str:
     return value.replace("'", "''")
 
 
+_ANSI_RE = re.compile(r"\x1B\[[0-9;]*[a-zA-Z]")
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
+
 @dataclass
 class Monkey365Config:
     output_dir: str = "./monkey365_output"
     spo_sites: list[str] = field(default_factory=list)
     export_to: list[str] = field(default_factory=lambda: ["JSON", "HTML"])
+    device_code: bool = False
 
 
 class Monkey365Executor:
@@ -39,6 +48,10 @@ class Monkey365Executor:
         self.monkey365_base_dir: Path = self.monkey365_path.parent
         self.output_dir = Path(self.config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        # Exposed so callers (e.g. scan service) can register/kill the process.
+        self.current_process: subprocess.Popen[bytes] | None = None
+        # Optional callback invoked when the PowerShell process starts.
+        self.on_process_start: Callable[[subprocess.Popen[bytes]], None] | None = None
 
     def _resolve_path(self, path: str | None) -> Path:
         if path:
@@ -163,24 +176,33 @@ class Monkey365Executor:
         param_lines = [
             "    Instance        = 'Microsoft365';",
             f"    Collect         = @({collect_items});",
-            "    PromptBehavior  = 'SelectAccount';",
             "    IncludeEntraID  = $true;",
-            "    ForceMSALDesktop = $true;",
             f"    ExportTo        = @({export_to});",
         ]
+
+        if self.config.device_code:
+            param_lines.append("    DeviceCode      = $true;")
+        else:
+            param_lines.append("    PromptBehavior  = 'SelectAccount';")
+            param_lines.append("    ForceMSALDesktop = $true;")
 
         if self.config.spo_sites:
             sites = ", ".join(f"'{_escape_ps_string(s)}'" for s in self.config.spo_sites)
             param_lines.append(f"    SpoSites        = @({sites});")
 
+        # Pass -OutDir so Monkey365 writes reports to a scan-specific directory
+        # instead of the default monkey-reports/ under the install dir.
+        safe_outdir = _escape_ps_string(str(self.output_dir))
+        param_lines.append(f"    OutDir          = '{safe_outdir}';")
+
         param_block = "\n".join(param_lines)
 
-        # Start-Transcript captures ALL PS streams: Write-Host (stream 6),
-        # Write-Verbose (stream 4), Write-Warning (3), Write-Error (2), output (1).
-        # This is far more complete than redirecting subprocess stdout/stderr.
+        # In device code mode, stdout is piped and written to the log file by
+        # run_scan() directly — Start-Transcript would conflict (file lock).
+        # In interactive mode, Start-Transcript captures all PS streams.
         transcript_start = ""
         transcript_stop = ""
-        if log_path:
+        if log_path and not self.config.device_code:
             safe_log = _escape_ps_string(str(log_path))
             transcript_start = f"Start-Transcript -Path '{safe_log}' -Force | Out-Null"
             transcript_stop = "Stop-Transcript | Out-Null"
@@ -209,16 +231,19 @@ Invoke-Monkey365 @param -Verbose
         log_file = output_path / "monkey365.log"
         script = self.build_script(scan_id, log_path=log_file)
 
-        params_snapshot = {
+        params_snapshot: dict[str, object] = {
             "scan_id": scan_id,
             "Instance": "Microsoft365",
             "Collect": self.COLLECT_MODULES,
-            "PromptBehavior": "SelectAccount",
             "IncludeEntraID": True,
-            "ForceMSALDesktop": True,
             "ExportTo": self.config.export_to,
             "SpoSites": self.config.spo_sites or [],
         }
+        if self.config.device_code:
+            params_snapshot["DeviceCode"] = True
+        else:
+            params_snapshot["PromptBehavior"] = "SelectAccount"
+            params_snapshot["ForceMSALDesktop"] = True
         (output_path / "scan_params.json").write_text(
             json.dumps(params_snapshot, indent=2),
             encoding="utf-8",
@@ -247,16 +272,42 @@ Invoke-Monkey365 @param -Verbose
             ]
             logger.info("[MONKEY365] Running PowerShell with args: %s", powershell_command)
 
-            # stdin/stdout/stderr all inherited — MSAL browser popup stays visible.
-            # All PS output is captured via Start-Transcript in the script itself,
-            # which records every stream (Write-Host, Write-Verbose, errors, output).
-            result = subprocess.run(
-                powershell_command,
-                timeout=3600,
-                cwd=self.monkey365_path.parent,
-                env=env,
-            )
-            returncode = result.returncode
+            if self.config.device_code:
+                # Device Code mode: MSAL prints the code to stdout (no popup).
+                # Start-Transcript does NOT capture .NET MSAL output, so we
+                # pipe stdout+stderr and write each line to monkey365.log ourselves.
+                proc = subprocess.Popen(
+                    powershell_command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    cwd=self.monkey365_path.parent,
+                    env=env,
+                )
+                self.current_process = proc
+                if self.on_process_start:
+                    self.on_process_start(proc)
+                with open(log_file, "w", encoding="utf-8") as lf:
+                    assert proc.stdout is not None
+                    for raw_line in proc.stdout:
+                        decoded = _strip_ansi(raw_line.decode("utf-8", errors="replace"))
+                        lf.write(decoded)
+                        lf.flush()
+                proc.wait(timeout=3600)
+                returncode = proc.returncode
+            else:
+                # Interactive mode: stdin/stdout/stderr inherited so MSAL
+                # browser popup stays visible. Logs via Start-Transcript.
+                proc = subprocess.Popen(
+                    powershell_command,
+                    cwd=self.monkey365_path.parent,
+                    env=env,
+                )
+                self.current_process = proc
+                if self.on_process_start:
+                    self.on_process_start(proc)
+                proc.wait(timeout=3600)
+                returncode = proc.returncode
+
             ps_stdout = log_file.read_text(encoding="utf-8", errors="replace") if log_file.exists() else ""
             ps_stderr = ""
 

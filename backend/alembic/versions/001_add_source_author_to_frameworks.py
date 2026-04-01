@@ -15,10 +15,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def _column_exists(table: str, column: str) -> bool:
-    """Check if a column already exists in a SQLite table."""
+    """Vérifie si une colonne existe déjà (compatible SQLite et PostgreSQL)."""
     conn = op.get_bind()
-    result = conn.execute(sa.text(f"PRAGMA table_info('{table}')"))
-    return any(row[1] == column for row in result)
+    inspector = sa.inspect(conn)
+    columns = [col["name"] for col in inspector.get_columns(table)]
+    return column in columns
 
 
 def upgrade() -> None:

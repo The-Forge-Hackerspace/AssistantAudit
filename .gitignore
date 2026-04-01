@@ -20,8 +20,9 @@ venv/
 *.swp
 *.swo
 
-# Tools (vendored external tools at repo root — not source code subdirs)
-/tools/
+# Tools (vendored external tools at repo root — ne pas versionner le contenu)
+/tools/*
+!/tools/.gitkeep
 .tools/
 ./tool
 
@@ -47,12 +48,10 @@ data/
 monkey365_output/
 integrations/monkey365/
 
-# PingCastle
-tools/pingcastle/
-
-# Node (future frontend)
+# Node (frontend)
 node_modules/
 .next/
+frontend/tmp/
 
 # OS
 .DS_Store
@@ -70,12 +69,32 @@ docker-compose.override.yml
 htmlcov/
 .coverage
 
-# AI assistant metadata (Claude Code, GitHub Copilot, etc.)
+# AI assistant metadata (Claude Code, GitHub Copilot, Gemini, etc.)
 .claude/
 CLAUDE.md
 **/CLAUDE.md
+GEMINI.md
+**/GEMINI.md
 AGENTS.md
 **/AGENTS.md
 .copilot/
 .github/copilot*
 *.copilot*
+.hex-skills/
+
+# Dev-only local files
+.archive/
+docs/
+# Monkey365 (code tiers, à cloner manuellement dans tools/monkey365/)
+tools/monkey365/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+/playwright-results/
+package-lock.json
+package.json
+playwright.config.ts

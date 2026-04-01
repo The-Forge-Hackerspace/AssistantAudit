@@ -1,8 +1,13 @@
+import axios from "axios";
+import Cookies from "js-cookie";
 import api, { setTokens, clearTokens } from "@/lib/api-client";
 import type {
   TokenResponse,
   User,
+  UserUpdate,
   PaginatedResponse,
+  Tag,
+  TagAssociation,
   Entreprise,
   EntrepriseCreate,
   Audit,
@@ -41,9 +46,6 @@ import type {
   ADAuditCreate,
   ADAuditResultSummary,
   ADAuditResultRead,
-   PingCastleCreate,
-   PingCastleResultSummary,
-   PingCastleResultRead,
    Monkey365Config,
    Monkey365ScanCreate,
    Monkey365ScanResultSummary,
@@ -58,6 +60,21 @@ import type {
   VlanDefinition,
   VlanDefinitionCreate,
   VlanDefinitionUpdate,
+  Agent,
+  AgentTask,
+  TaskArtifact,
+  AgentCreateRequest,
+  AgentCreateResponse,
+  OradadTask,
+  OradadConfig,
+  OradadConfigCreate,
+  AnssiReport,
+  ChecklistTemplate,
+  ChecklistTemplateDetail,
+  ChecklistInstance,
+  ChecklistInstanceDetail,
+  ChecklistResponse,
+  ChecklistProgress,
 } from "@/types";
 
 // ── Auth ──
@@ -91,8 +108,47 @@ export const authApi = {
     return data;
   },
 
+  async refresh(): Promise<TokenResponse> {
+    const refreshToken = Cookies.get("aa_refresh_token");
+    if (!refreshToken) {
+      throw new Error("No refresh token");
+    }
+    // Appel direct avec axios (pas l'instance api) pour éviter l'intercepteur
+    const { data } = await axios.post<TokenResponse>(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/auth/refresh`,
+      { refresh_token: refreshToken }
+    );
+    setTokens(data.access_token, data.refresh_token);
+    return data;
+  },
+
   logout() {
     clearTokens();
+  },
+};
+
+// ── Users (admin) ──
+export const usersApi = {
+  async list(page = 1, pageSize = 20): Promise<PaginatedResponse<User>> {
+    const { data } = await api.get("/users/", {
+      params: { page, page_size: pageSize },
+    });
+    return data;
+  },
+
+  async create(payload: RegisterRequest): Promise<User> {
+    const { data } = await api.post("/users/", payload);
+    return data;
+  },
+
+  async update(id: number, payload: UserUpdate): Promise<User> {
+    const { data } = await api.put(`/users/${id}`, payload);
+    return data;
+  },
+
+  async delete(id: number): Promise<{ message: string }> {
+    const { data } = await api.delete(`/users/${id}`);
+    return data;
   },
 };
 
@@ -550,6 +606,88 @@ export const vlansApi = {
   },
 };
 
+// ── ORADAD ──
+export const oradadApi = {
+  async listTasks(): Promise<OradadTask[]> {
+    const { data } = await api.get<OradadTask[]>("/oradad/tasks");
+    return data;
+  },
+
+  async analyze(taskUuid: string): Promise<AnssiReport> {
+    const { data } = await api.post<AnssiReport>(`/oradad/analyze/${taskUuid}`);
+    return data;
+  },
+
+  async getReport(taskUuid: string): Promise<AnssiReport> {
+    const { data } = await api.get<AnssiReport>(`/oradad/report/${taskUuid}`);
+    return data;
+  },
+
+  // Config profiles
+  async listConfigs(): Promise<OradadConfig[]> {
+    const { data } = await api.get<OradadConfig[]>("/oradad/configs");
+    return data;
+  },
+
+  async createConfig(payload: OradadConfigCreate): Promise<OradadConfig> {
+    const { data } = await api.post<OradadConfig>("/oradad/configs", payload);
+    return data;
+  },
+
+  async updateConfig(id: number, payload: Partial<OradadConfigCreate>): Promise<OradadConfig> {
+    const { data } = await api.put<OradadConfig>(`/oradad/configs/${id}`, payload);
+    return data;
+  },
+
+  async deleteConfig(id: number): Promise<void> {
+    await api.delete(`/oradad/configs/${id}`);
+  },
+};
+
+// ── Agents ──
+export const agentsApi = {
+  async list(): Promise<Agent[]> {
+    const { data } = await api.get<Agent[]>("/agents/");
+    return data;
+  },
+
+  async create(payload: AgentCreateRequest): Promise<AgentCreateResponse> {
+    const { data } = await api.post<AgentCreateResponse>("/agents/create", payload);
+    return data;
+  },
+
+  async revoke(agentUuid: string): Promise<{ detail: string }> {
+    const { data } = await api.delete<{ detail: string }>(`/agents/${agentUuid}`);
+    return data;
+  },
+
+  async dispatch(payload: {
+    agent_uuid: string;
+    tool: string;
+    parameters?: Record<string, unknown>;
+    audit_id?: number;
+  }): Promise<Record<string, unknown>> {
+    const { data } = await api.post("/agents/tasks/dispatch", payload);
+    return data;
+  },
+
+  async listTasks(tool?: string): Promise<AgentTask[]> {
+    const params = tool ? { tool } : {};
+    const { data } = await api.get<AgentTask[]>("/agents/tasks", { params });
+    return data;
+  },
+
+  async deleteTask(taskUuid: string): Promise<{ detail: string }> {
+    const { data } = await api.delete<{ detail: string }>(`/agents/tasks/${taskUuid}`);
+    return data;
+  },
+
+  async getTaskArtifacts(taskUuid: string): Promise<TaskArtifact[]> {
+    const { data } = await api.get<TaskArtifact[]>(`/agents/tasks/${taskUuid}/artifacts`);
+    return data;
+  },
+};
+
 // ── Tools (Config Parser + SSL Checker) ──
 export const toolsApi = {
   // Config Parser
@@ -670,33 +808,6 @@ export const toolsApi = {
     return data;
   },
 
-  // PingCastle
-  async launchPingCastle(params: PingCastleCreate): Promise<PingCastleResultSummary> {
-    const { data } = await api.post("/tools/pingcastle", params);
-    return data;
-  },
-
-  async listPingCastleResults(equipementId?: number): Promise<PingCastleResultSummary[]> {
-    const params = equipementId ? { equipement_id: equipementId } : {};
-    const { data } = await api.get("/tools/pingcastle-results", { params });
-    return data;
-  },
-
-  async getPingCastleResult(resultId: number): Promise<PingCastleResultRead> {
-    const { data } = await api.get(`/tools/pingcastle-results/${resultId}`);
-    return data;
-  },
-
-  async deletePingCastleResult(resultId: number): Promise<void> {
-    await api.delete(`/tools/pingcastle-results/${resultId}`);
-  },
-
-  async prefillFromPingCastle(resultId: number, assessmentId: number): Promise<PrefillResult> {
-    const { data } = await api.post(
-      `/tools/pingcastle-results/${resultId}/prefill/${assessmentId}`
-    );
-    return data;
-  },
 
   // Monkey365
   async launchMonkey365Scan(data: Monkey365ScanCreate): Promise<Monkey365ScanResultSummary> {
@@ -746,6 +857,95 @@ export const toolsApi = {
 
   async importMonkey365ToAudit(resultId: number, auditId: number): Promise<import("@/types/api").Monkey365ImportResult> {
     const { data } = await api.post(`/tools/monkey365/scans/${resultId}/import-to-audit`, { audit_id: auditId });
+    return data;
+  },
+};
+
+// ── Tags ──
+export const tagsApi = {
+  async list(params?: { audit_id?: number; scope?: string }): Promise<PaginatedResponse<Tag>> {
+    const { data } = await api.get<PaginatedResponse<Tag>>("/tags", { params });
+    return data;
+  },
+  async create(name: string, color?: string, scope?: string, auditId?: number): Promise<Tag> {
+    const { data } = await api.post<Tag>("/tags", {
+      name, color: color ?? "#6B7280", scope: scope ?? "global", audit_id: auditId ?? null,
+    });
+    return data;
+  },
+  async update(id: number, updates: { name?: string; color?: string }): Promise<Tag> {
+    const { data } = await api.put<Tag>(`/tags/${id}`, updates);
+    return data;
+  },
+  async remove(id: number): Promise<void> {
+    await api.delete(`/tags/${id}`);
+  },
+  async associate(tagId: number, taggableType: string, taggableId: number): Promise<TagAssociation> {
+    const { data } = await api.post<TagAssociation>("/tags/associate", {
+      tag_id: tagId, taggable_type: taggableType, taggable_id: taggableId,
+    });
+    return data;
+  },
+  async dissociate(tagId: number, taggableType: string, taggableId: number): Promise<void> {
+    await api.delete("/tags/associate", {
+      params: { tag_id: tagId, taggable_type: taggableType, taggable_id: taggableId },
+    });
+  },
+  async getEntityTags(taggableType: string, taggableId: number): Promise<Tag[]> {
+    const { data } = await api.get<Tag[]>(`/tags/entity/${taggableType}/${taggableId}`);
+    return data;
+  },
+};
+
+// ── Checklists ──
+export const checklistsApi = {
+  async listTemplates(category?: string): Promise<ChecklistTemplate[]> {
+    const params = category ? { category } : {};
+    const { data } = await api.get<ChecklistTemplate[]>("/checklists/templates", { params });
+    return data;
+  },
+
+  async getTemplate(id: number): Promise<ChecklistTemplateDetail> {
+    const { data } = await api.get<ChecklistTemplateDetail>(`/checklists/templates/${id}`);
+    return data;
+  },
+
+  async createInstance(templateId: number, auditId: number, siteId?: number): Promise<ChecklistInstance> {
+    const { data } = await api.post<ChecklistInstance>("/checklists/instances", {
+      template_id: templateId, audit_id: auditId, site_id: siteId ?? null,
+    });
+    return data;
+  },
+
+  async listInstances(auditId: number): Promise<ChecklistInstance[]> {
+    const { data } = await api.get<ChecklistInstance[]>("/checklists/instances", { params: { audit_id: auditId } });
+    return data;
+  },
+
+  async getInstance(id: number): Promise<ChecklistInstanceDetail> {
+    const { data } = await api.get<ChecklistInstanceDetail>(`/checklists/instances/${id}`);
+    return data;
+  },
+
+  async deleteInstance(id: number): Promise<void> {
+    await api.delete(`/checklists/instances/${id}`);
+  },
+
+  async completeInstance(id: number): Promise<ChecklistInstance> {
+    const { data } = await api.post<ChecklistInstance>(`/checklists/instances/${id}/complete`);
+    return data;
+  },
+
+  async respondToItem(instanceId: number, itemId: number, status: string, note?: string): Promise<ChecklistResponse> {
+    const { data } = await api.put<ChecklistResponse>(
+      `/checklists/instances/${instanceId}/items/${itemId}`,
+      { status, note: note ?? null },
+    );
+    return data;
+  },
+
+  async getProgress(instanceId: number): Promise<ChecklistProgress> {
+    const { data } = await api.get<ChecklistProgress>(`/checklists/instances/${instanceId}/progress`);
     return data;
   },
 };

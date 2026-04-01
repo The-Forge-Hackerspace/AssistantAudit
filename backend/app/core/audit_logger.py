@@ -37,6 +37,10 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request and log audit information"""
+        # BaseHTTPMiddleware casse les WebSocket — les laisser passer
+        if request.scope.get("type") == "websocket":
+            return await call_next(request)
+
         # Generate request ID
         request_id = str(uuid.uuid4())
         LogContext.set_request_id(request_id)
@@ -249,3 +253,23 @@ class BusinessAuditLogger:
 
 # Singleton instance
 audit_logger = BusinessAuditLogger()
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Security: RBAC Access Denied Logger
+# ────────────────────────────────────────────────────────────────────────
+
+_security_logger = logging.getLogger("security")
+
+
+def log_access_denied(
+    user_id: int,
+    resource_type: str,
+    resource_id: int | str,
+    action: str = "read",
+) -> None:
+    """Log un échec d'ownership check pour monitoring sécurité."""
+    _security_logger.warning(
+        "access_denied: user=%s resource=%s/%s action=%s",
+        user_id, resource_type, resource_id, action,
+    )

@@ -19,6 +19,7 @@ def _utcnow() -> datetime:
 
 
 class Monkey365ScanStatus(str, PyEnum):
+    AUTHENTICATING = "authenticating"
     RUNNING = "running"
     SUCCESS = "success"
     FAILED = "failed"
@@ -49,6 +50,9 @@ class Monkey365ScanResult(Base):
 
     # Slug de l'entreprise pour référence rapide
     entreprise_slug: Mapped[str | None] = mapped_column(String(200))
+
+    # Methode d'authentification (device_code, certificate, client_secret)
+    auth_method: Mapped[str | None] = mapped_column(String(50))
 
     # Nombre total de findings
     findings_count: Mapped[int | None] = mapped_column(Integer)

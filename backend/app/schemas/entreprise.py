@@ -52,6 +52,7 @@ class EntrepriseUpdate(BaseModel):
 
 class EntrepriseRead(EntrepriseBase):
     id: int
+    owner_id: int
     created_at: datetime
     contacts: list[ContactRead] = []
 

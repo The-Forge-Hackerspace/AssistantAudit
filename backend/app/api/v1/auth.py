@@ -6,13 +6,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from jose import JWTError
+
 from ...core.config import get_settings
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_admin
 from ...core.rate_limit import login_rate_limiter
+from ...core.security import validate_refresh_token
 from ...models.user import User
 from ...schemas.user import (
     LoginRequest,
+    RefreshRequest,
     TokenResponse,
     UserCreate,
     UserRead,
@@ -38,7 +42,7 @@ def _clear_legacy_httponly_cookies(response: Response) -> None:
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(
+def login(
     request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -68,7 +72,7 @@ async def login(
 
 
 @router.post("/login/json", response_model=TokenResponse)
-async def login_json(request: Request, response: Response, body: LoginRequest, db: Session = Depends(get_db)):
+def login_json(request: Request, response: Response, body: LoginRequest, db: Session = Depends(get_db)):
     """Authentification par JSON body (pour les clients API)"""
     # Rate limiting anti brute-force
     login_rate_limiter.check(request)
@@ -87,8 +91,39 @@ async def login_json(request: Request, response: Response, body: LoginRequest, d
     return tokens
 
 
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(
+    request: Request,
+    body: RefreshRequest,
+    db: Session = Depends(get_db),
+):
+    """Renouvelle les tokens a partir d'un refresh token valide."""
+    # Rate limiting (meme limiter que /login)
+    login_rate_limiter.check(request)
+    login_rate_limiter.record_attempt(request)
+
+    try:
+        payload = validate_refresh_token(body.refresh_token)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token invalide ou expire",
+        )
+
+    user_id = payload.get("sub")
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Utilisateur introuvable ou desactive",
+        )
+
+    login_rate_limiter.reset(request)
+    return AuthService.create_tokens(user)
+
+
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-async def register(
+def register(
     body: UserCreate,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin),
@@ -115,13 +150,13 @@ async def register(
 
 
 @router.get("/me", response_model=UserRead)
-async def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user)):
     """Profil de l'utilisateur courant"""
     return current_user
 
 
 @router.post("/change-password", response_model=MessageResponse)
-async def change_password(
+def change_password(
     body: PasswordChange,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -139,7 +174,7 @@ async def change_password(
 
 
 @router.post("/logout", response_model=MessageResponse)
-async def logout(response: Response):
+def logout(response: Response):
     """Déconnexion : supprime les éventuels cookies httpOnly résiduels."""
     _clear_legacy_httponly_cookies(response)
     return MessageResponse(message="Déconnecté avec succès")

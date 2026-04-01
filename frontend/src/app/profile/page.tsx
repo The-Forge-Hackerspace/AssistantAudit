@@ -58,7 +58,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="flex flex-col gap-6 max-w-2xl mx-auto">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Mon profil</h1>
@@ -69,34 +69,34 @@ export default function ProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
+            <User className="size-5" />
             Informations du compte
           </CardTitle>
           <CardDescription>Vos informations de profil</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="flex flex-col gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                <User className="h-3 w-3" /> Nom complet
+                <User className="size-3" /> Nom complet
               </Label>
               <p className="font-medium">{user.full_name}</p>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                <Mail className="h-3 w-3" /> Email
+                <Mail className="size-3" /> Email
               </Label>
               <p className="font-medium">{user.email}</p>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                <Shield className="h-3 w-3" /> Rôle
+                <Shield className="size-3" /> Rôle
               </Label>
               <Badge variant="secondary">{ROLE_LABELS[user.role] || user.role}</Badge>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                <Calendar className="h-3 w-3" /> Membre depuis
+                <Calendar className="size-3" /> Membre depuis
               </Label>
               <p className="font-medium">
                 {new Date(user.created_at).toLocaleDateString("fr-FR", {
@@ -122,14 +122,14 @@ export default function ProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Lock className="h-5 w-5" />
+            <Lock className="size-5" />
             Changer le mot de passe
           </CardTitle>
           <CardDescription>Mettez à jour votre mot de passe de connexion</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="space-y-2">
+          <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="currentPassword">Mot de passe actuel</Label>
               <Input
                 id="currentPassword"
@@ -140,7 +140,7 @@ export default function ProfilePage() {
                 required
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="newPassword">Nouveau mot de passe</Label>
               <Input
                 id="newPassword"
@@ -152,7 +152,7 @@ export default function ProfilePage() {
                 minLength={6}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="confirmPassword">Confirmer le nouveau mot de passe</Label>
               <Input
                 id="confirmPassword"
@@ -165,7 +165,7 @@ export default function ProfilePage() {
               />
             </div>
             <Button type="submit" disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Modifier le mot de passe
             </Button>
           </form>

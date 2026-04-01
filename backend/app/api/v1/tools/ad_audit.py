@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ....core.database import get_db
@@ -8,6 +8,7 @@ from ....core.deps import get_current_auditeur
 from ....models.user import User
 from ....schemas.scan import ADAuditCreate, ADAuditResultSummary, ADAuditResultRead, PrefillResult
 from ....schemas.common import MessageResponse
+from ....core.task_runner import get_task_runner
 from ....services.ad_audit_service import (
     create_pending_ad_audit,
     execute_ad_audit_background,
@@ -24,9 +25,8 @@ router = APIRouter()
 @router.post("/ad-audit", response_model=ADAuditResultSummary)
 def launch_ad_audit(
     params: ADAuditCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """
     Lance un audit Active Directory via LDAP.
@@ -40,11 +40,13 @@ def launch_ad_audit(
             target_port=params.target_port,
             username=params.username,
             domain=params.domain,
+            owner_id=current_user.id,
         )
     except ValueError as e:
         raise HTTPException(404, str(e))
 
-    background_tasks.add_task(
+    task_runner = get_task_runner()
+    task_runner.submit(
         execute_ad_audit_background,
         audit_id=audit.id,
         password=params.password,
@@ -65,7 +67,7 @@ def list_ad_audits(
     page: int = Query(1, ge=1, description="Numéro de page"),
     page_size: int = Query(20, ge=1, le=100, description="Éléments par page"),
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Liste les audits AD, optionnellement filtrés par équipement."""
     return list_ad_audit_results(
@@ -73,6 +75,8 @@ def list_ad_audits(
         equipement_id=equipement_id,
         skip=(page - 1) * page_size,
         limit=page_size,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
 
 
@@ -80,10 +84,12 @@ def list_ad_audits(
 def get_ad_audit(
     audit_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Récupère le détail d'un audit AD."""
-    audit = get_ad_audit_result(db, audit_id)
+    audit = get_ad_audit_result(
+        db, audit_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     if not audit:
         raise HTTPException(404, f"Audit AD #{audit_id} introuvable")
     return audit
@@ -93,10 +99,12 @@ def get_ad_audit(
 def delete_ad_audit(
     audit_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Supprime un audit AD."""
-    if not delete_ad_audit_result(db, audit_id):
+    if not delete_ad_audit_result(
+        db, audit_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    ):
         raise HTTPException(404, f"Audit AD #{audit_id} introuvable")
     return MessageResponse(message=f"Audit AD #{audit_id} supprimé")
 
@@ -106,7 +114,7 @@ def prefill_from_ad_audit(
     audit_id: int,
     assessment_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Pré-remplit un assessment à partir des résultats d'un audit AD."""
     try:

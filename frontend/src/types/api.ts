@@ -40,6 +40,14 @@ export interface RegisterRequest {
   role: "admin" | "auditeur" | "lecteur";
 }
 
+export interface UserUpdate {
+  email?: string;
+  full_name?: string;
+  role?: "admin" | "auditeur" | "lecteur";
+  is_active?: boolean;
+  password?: string;
+}
+
 export interface ChangePasswordRequest {
   current_password: string;
   new_password: string;
@@ -869,81 +877,11 @@ export interface ADAuditResultRead extends ADAuditResultSummary {
   findings: ADAuditFinding[] | null;
 }
 
-// ── PingCastle ──
-export interface PingCastleCreate {
-  target_host: string;
-  domain: string;
-  username: string;
-  password: string;
-  equipement_id?: number;
-}
-
-export type PingCastleStatus = "running" | "success" | "failed";
-
-export interface PingCastleScores {
-  global: number;
-  stale_objects: number;
-  privileged_accounts: number;
-  trust: number;
-  anomaly: number;
-}
-
-export interface PingCastleSummary {
-  tool: string;
-  domain: string;
-  global_score: number;
-  maturity_level: number;
-  maturity_label: string;
-  total_findings: number;
-  compliant: number;
-  non_compliant: number;
-  partial: number;
-  total_risk_rules: number;
-  critical_rules: number;
-  high_rules: number;
-  scores: PingCastleScores;
-}
-
-export interface PingCastleRiskRule {
-  rule_id: string;
-  category: string;
-  model: string;
-  points: number;
-  rationale: string;
-  severity: string;
-}
-
-export interface PingCastleResultSummary {
-  id: number;
-  equipement_id: number | null;
-  status: PingCastleStatus;
-  target_host: string;
-  domain: string;
-  global_score: number | null;
-  maturity_level: number | null;
-  stale_objects_score: number | null;
-  privileged_accounts_score: number | null;
-  trust_score: number | null;
-  anomaly_score: number | null;
-  summary: PingCastleSummary | null;
-  error_message: string | null;
-  created_at: string;
-  completed_at: string | null;
-  duration_seconds: number | null;
-}
-
-export interface PingCastleResultRead extends PingCastleResultSummary {
-  username: string;
-  risk_rules: PingCastleRiskRule[] | null;
-  domain_info: Record<string, unknown> | null;
-  findings: ADAuditFinding[] | null;
-  report_html_path: string | null;
-}
-
 // ── Monkey365 ──
 export interface Monkey365Config {
   spo_sites?: string[];
   export_to?: string[];
+  device_code?: boolean;
 }
 
 export interface Monkey365ScanCreate {
@@ -983,4 +921,238 @@ export interface Monkey365ImportResult {
   assessment_id: number;
   controls_mapped: number;
   controls_total: number;
+}
+
+// ── Agents ──
+export type AgentStatus = "pending" | "active" | "revoked" | "offline";
+
+export interface Agent {
+  id: number;
+  agent_uuid: string;
+  name: string;
+  status: AgentStatus;
+  last_seen: string | null;
+  last_ip: string | null;
+  allowed_tools: string[];
+  os_info: string | null;
+  agent_version: string | null;
+  owner_name: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface AgentCreateRequest {
+  name: string;
+  allowed_tools?: string[];
+  target_user_id?: number | null;
+}
+
+export interface AgentCreateResponse {
+  agent_uuid: string;
+  enrollment_code: string;
+  expires_at: string;
+}
+
+export type AgentTaskStatus = "pending" | "dispatched" | "running" | "completed" | "failed" | "cancelled";
+
+export interface AgentTask {
+  id: number;
+  task_uuid: string;
+  agent_id: number;
+  owner_id: number;
+  audit_id: number | null;
+  tool: string;
+  parameters: Record<string, unknown>;
+  status: AgentTaskStatus;
+  progress: number;
+  status_message: string | null;
+  result_summary: Record<string, unknown> | null;
+  error_message: string | null;
+  created_at: string;
+  dispatched_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  // Enrichis par le serveur (resolus depuis parameters.site_id)
+  site_name?: string;
+  entreprise_name?: string;
+}
+
+export interface TaskArtifact {
+  id: number;
+  file_uuid: string;
+  original_filename: string;
+  mime_type: string;
+  file_size: number;
+  uploaded_at: string;
+  download_url: string;
+}
+
+// ── Checklists ──
+export interface ChecklistTemplate {
+  id: number;
+  name: string;
+  description: string | null;
+  category: string;
+  is_predefined: boolean;
+}
+
+export interface ChecklistTemplateDetail extends ChecklistTemplate {
+  sections: ChecklistSection[];
+}
+
+export interface ChecklistSection {
+  id: number;
+  name: string;
+  description: string | null;
+  order: number;
+  items: ChecklistItem[];
+}
+
+export interface ChecklistItem {
+  id: number;
+  label: string;
+  description: string | null;
+  order: number;
+  ref_code: string | null;
+}
+
+export interface ChecklistInstance {
+  id: number;
+  template_id: number;
+  audit_id: number;
+  site_id: number | null;
+  filled_by: number | null;
+  status: "draft" | "in_progress" | "completed";
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface ChecklistInstanceDetail extends ChecklistInstance {
+  responses: ChecklistResponse[];
+  template_name: string;
+}
+
+export interface ChecklistResponse {
+  id: number;
+  instance_id: number;
+  item_id: number;
+  status: "OK" | "NOK" | "NA" | "UNCHECKED";
+  note: string | null;
+  responded_by: number | null;
+  responded_at: string | null;
+}
+
+export interface ChecklistProgress {
+  total_items: number;
+  answered: number;
+  ok: number;
+  nok: number;
+  na: number;
+  unchecked: number;
+  progress_percent: number;
+}
+
+// ── ORADAD ──
+export interface DomainEntry {
+  server: string;
+  port: number;
+  domain_name: string;
+  username: string;
+  user_domain: string;
+  password: string;
+}
+
+export interface DomainEntryResponse {
+  server: string;
+  port: number;
+  domain_name: string;
+  username: string;
+  user_domain: string;
+}
+
+export interface OradadConfig {
+  id: number;
+  name: string;
+  auto_get_domain: boolean;
+  auto_get_trusts: boolean;
+  level: number;
+  confidential: number;
+  process_sysvol: boolean;
+  sysvol_filter: string | null;
+  output_files: boolean;
+  output_mla: boolean;
+  sleep_time: number;
+  explicit_domains: DomainEntryResponse[] | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface OradadConfigCreate {
+  name: string;
+  auto_get_domain?: boolean;
+  auto_get_trusts?: boolean;
+  level?: number;
+  confidential?: number;
+  process_sysvol?: boolean;
+  sysvol_filter?: string | null;
+  output_files?: boolean;
+  output_mla?: boolean;
+  sleep_time?: number;
+  explicit_domains?: DomainEntry[] | null;
+}
+
+export interface OradadTask {
+  id: number;
+  task_uuid: string;
+  agent_name: string | null;
+  status: AgentTaskStatus;
+  progress: number;
+  created_at: string | null;
+  completed_at: string | null;
+  has_report: boolean;
+}
+
+export interface AnssiCheckResult {
+  vuln_id: string;
+  title: string;
+  category: string;
+  level: number;
+  status: "pass" | "fail" | "warning" | "not_checked";
+  description: string;
+  recommendation: string;
+  evidence: string | null;
+  details: Record<string, unknown> | null;
+}
+
+export interface AnssiReport {
+  findings: AnssiCheckResult[];
+  score: number;
+  level: number;
+  stats: {
+    total_checks: number;
+    passed: number;
+    failed: number;
+    warning: number;
+    not_checked: number;
+  };
+}
+
+// ── Tags ──
+export interface Tag {
+  id: number;
+  name: string;
+  color: string;
+  scope: "global" | "audit";
+  audit_id: number | null;
+  created_by: number | null;
+  created_at: string;
+}
+
+export interface TagAssociation {
+  id: number;
+  tag_id: number;
+  taggable_type: string;
+  taggable_id: number;
+  tag: Tag;
 }

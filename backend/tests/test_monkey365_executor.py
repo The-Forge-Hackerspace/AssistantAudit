@@ -213,15 +213,19 @@ def test_run_scan_captures_output_and_imports_module(tmp_path):
 
     with (
         patch.object(executor, "ensure_monkey365_ready", return_value=executor.monkey365_path),
-        patch("subprocess.run") as mock_run,
+        patch("subprocess.Popen") as mock_popen,
     ):
-        def run_side_effect(*args, **kwargs):
-            # Write the transcript log as PowerShell would
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.wait = MagicMock()
+
+        def popen_side_effect(*args, **kwargs):
+            # Write the transcript log as PowerShell would via Start-Transcript
             output_dir.mkdir(parents=True, exist_ok=True)
             (output_dir / "monkey365.log").write_text(log_content, encoding="utf-8")
-            return MagicMock(returncode=0)
+            return mock_proc
 
-        mock_run.side_effect = run_side_effect
+        mock_popen.side_effect = popen_side_effect
         executor.run_scan("scan-1")
 
     output_file = output_dir / "powershell_raw_output.json"

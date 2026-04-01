@@ -6,13 +6,12 @@ import logging
 import math
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur
+from ...core.deps import get_current_user, get_current_auditeur, PaginationParams
 from ...models.user import User
-from ...models.site import Site
 from ...schemas.scan import (
     ScanCreate,
     ScanRead,
@@ -21,6 +20,7 @@ from ...schemas.scan import (
     ScanHostDecision,
 )
 from ...schemas.common import PaginatedResponse, MessageResponse
+from ...core.task_runner import get_task_runner
 from ...services import scan_service
 
 logger = logging.getLogger(__name__)
@@ -33,9 +33,8 @@ router = APIRouter()
     status_code=status.HTTP_202_ACCEPTED,
     summary="Lancer un scan réseau (asynchrone)",
 )
-async def launch_scan(
+def launch_scan(
     payload: ScanCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),
 ):
@@ -45,11 +44,6 @@ async def launch_scan(
     Le scan s'exécute en arrière-plan. Utilisez GET /scans pour suivre le statut.
     Plusieurs scans peuvent tourner en parallèle.
     """
-    # Vérifier que le site existe
-    site = db.get(Site, payload.site_id)
-    if not site:
-        raise HTTPException(status_code=404, detail="Site introuvable")
-
     # Valider le type de scan
     valid_types = ("discovery", "port_scan", "full", "custom")
     if payload.scan_type not in valid_types:
@@ -75,10 +69,13 @@ async def launch_scan(
             nom=payload.nom,
             notes=payload.notes,
             custom_args=payload.custom_args,
+            owner_id=current_user.id,
+            is_admin=current_user.role == "admin",
         )
 
         # Lancer l'exécution en arrière-plan
-        background_tasks.add_task(
+        task_runner = get_task_runner()
+        task_runner.submit(
             scan_service.execute_scan_background,
             scan_id=scan.id,
             site_id=payload.site_id,
@@ -90,7 +87,7 @@ async def launch_scan(
         return scan
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.exception("Erreur lors de la création du scan")
         raise HTTPException(status_code=500, detail="Erreur interne lors de la création du scan.")
@@ -100,11 +97,11 @@ async def launch_scan(
     "/preview-command",
     summary="Aperçu de la commande Nmap",
 )
-async def preview_nmap_command(
+def preview_nmap_command(
     scan_type: str = Query(..., description="Type de scan"),
     target: str = Query("", description="Cible"),
     custom_args: Optional[str] = Query(None, description="Arguments custom"),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Retourne un aperçu de la commande nmap qui sera exécutée."""
     command = scan_service.get_nmap_command_preview(target, scan_type, custom_args)
@@ -116,23 +113,27 @@ async def preview_nmap_command(
     response_model=PaginatedResponse[ScanSummary],
     summary="Lister les scans",
 )
-async def list_scans(
+def list_scans(
     site_id: Optional[int] = Query(None, description="Filtrer par site"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les scans réseau, optionnellement filtrés par site."""
     items, total = scan_service.list_scans(
-        db, site_id=site_id, skip=(page - 1) * page_size, limit=page_size
+        db,
+        site_id=site_id,
+        skip=pagination.offset,
+        limit=pagination.page_size,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return PaginatedResponse(
         items=items,
         total=total,
-        page=page,
-        page_size=page_size,
-        pages=math.ceil(total / page_size) if total > 0 else 1,
+        page=pagination.page,
+        page_size=pagination.page_size,
+        pages=math.ceil(total / pagination.page_size) if total > 0 else 1,
     )
 
 
@@ -141,13 +142,15 @@ async def list_scans(
     response_model=ScanRead,
     summary="Détails d'un scan",
 )
-async def get_scan(
+def get_scan(
     scan_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère les détails d'un scan avec tous les hosts et ports."""
-    scan = scan_service.get_scan_with_hosts(db, scan_id)
+    scan = scan_service.get_scan_with_hosts(
+        db, scan_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     if not scan:
         raise HTTPException(status_code=404, detail="Scan introuvable")
     return scan
@@ -158,13 +161,15 @@ async def get_scan(
     response_model=MessageResponse,
     summary="Supprimer un scan",
 )
-async def delete_scan(
+def delete_scan(
     scan_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Supprime un scan et tous ses résultats."""
-    if not scan_service.delete_scan(db, scan_id):
+    if not scan_service.delete_scan(
+        db, scan_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+    ):
         raise HTTPException(status_code=404, detail="Scan introuvable")
     return MessageResponse(message="Scan supprimé")
 
@@ -176,11 +181,11 @@ async def delete_scan(
     response_model=ScanHostRead,
     summary="Décider du sort d'un host découvert",
 )
-async def decide_host(
+def decide_host(
     host_id: int,
     payload: ScanHostDecision,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """
     Met à jour la décision sur un host :
@@ -201,6 +206,8 @@ async def decide_host(
             chosen_type=payload.chosen_type,
             hostname_override=payload.hostname,
             create_equipement=payload.create_equipement,
+            owner_id=current_user.id,
+            is_admin=current_user.role == "admin",
         )
         return host
     except ValueError as e:
@@ -212,15 +219,19 @@ async def decide_host(
     response_model=ScanHostRead,
     summary="Lier un host à un équipement existant",
 )
-async def link_host(
+def link_host(
     host_id: int,
     equipement_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Lie un host découvert à un équipement existant dans la base."""
     try:
-        host = scan_service.link_host_to_equipement(db, host_id, equipement_id)
+        host = scan_service.link_host_to_equipement(
+            db, host_id, equipement_id,
+            owner_id=current_user.id,
+            is_admin=current_user.role == "admin",
+        )
         return host
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -231,17 +242,21 @@ async def link_host(
     response_model=MessageResponse,
     summary="Importer tous les hosts en attente",
 )
-async def import_all_hosts(
+def import_all_hosts(
     scan_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """
     Crée automatiquement un équipement pour chaque host 'pending'
     d'un scan. Le type est deviné en fonction des ports et de l'OS.
     """
     try:
-        created = scan_service.import_all_kept_hosts(db, scan_id)
+        created = scan_service.import_all_kept_hosts(
+            db, scan_id,
+            owner_id=current_user.id,
+            is_admin=current_user.role == "admin",
+        )
         return MessageResponse(
             message=f"{len(created)} équipement(s) créé(s)",
             detail=f"IPs : {', '.join(e.ip_address for e in created)}" if created else None,

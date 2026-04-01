@@ -17,6 +17,9 @@ class Entreprise(Base):
     __tablename__ = "entreprises"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
 
     # Informations de base
     nom: Mapped[str] = mapped_column(String(200), unique=True, nullable=False, index=True)

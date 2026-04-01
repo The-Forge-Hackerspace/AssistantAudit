@@ -7,6 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
+from ..core.encryption import EncryptedText
 
 
 def _utcnow() -> datetime:
@@ -19,10 +20,14 @@ class ScanReseau(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nom: Mapped[str | None] = mapped_column(String(200))
     site_id: Mapped[int] = mapped_column(Integer, ForeignKey("sites.id"), nullable=False, index=True)
+    # Isolation inter-techniciens
+    owner_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
     date_scan: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False, index=True
     )
-    raw_xml_output: Mapped[str | None] = mapped_column(Text)
+    raw_xml_output: Mapped[str | None] = mapped_column(EncryptedText)
     nmap_command: Mapped[str | None] = mapped_column(String(1000))
     type_scan: Mapped[str | None] = mapped_column(String(50))
     statut: Mapped[str] = mapped_column(String(20), default="running", nullable=False, index=True)

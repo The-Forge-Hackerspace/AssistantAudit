@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ....core.database import get_db
@@ -8,6 +8,7 @@ from ....core.deps import get_current_auditeur
 from ....models.user import User
 from ....schemas.scan import CollectCreate, CollectResultSummary, CollectResultRead, PrefillResult
 from ....schemas.common import MessageResponse
+from ....core.task_runner import get_task_runner
 from ....services.collect_service import (
     create_pending_collect,
     execute_collect_background,
@@ -21,12 +22,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _rbac(u: User) -> tuple[int, bool]:
+    return u.id, u.role == "admin"
+
+
 @router.post("/collect", response_model=CollectResultSummary)
 def launch_collect(
     params: CollectCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """
     Lance une collecte d'informations système via SSH ou WinRM.
@@ -48,8 +52,8 @@ def launch_collect(
     except ValueError as e:
         raise HTTPException(404, str(e))
 
-    # Lancer la collecte en arrière-plan
-    background_tasks.add_task(
+    task_runner = get_task_runner()
+    task_runner.submit(
         execute_collect_background,
         collect_id=collect.id,
         password=params.password,
@@ -69,14 +73,16 @@ def list_collects(
     page: int = Query(1, ge=1, description="Numéro de page"),
     page_size: int = Query(20, ge=1, le=100, description="Éléments par page"),
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Liste les collectes, optionnellement filtrées par équipement."""
+    uid, adm = _rbac(current_user)
     return list_collect_results(
         db,
         equipement_id=equipement_id,
         skip=(page - 1) * page_size,
         limit=page_size,
+        user_id=uid, is_admin=adm,
     )
 
 
@@ -84,10 +90,11 @@ def list_collects(
 def get_collect(
     collect_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Récupère le détail d'une collecte."""
-    collect = get_collect_result(db, collect_id)
+    uid, adm = _rbac(current_user)
+    collect = get_collect_result(db, collect_id, user_id=uid, is_admin=adm)
     if not collect:
         raise HTTPException(404, f"Collecte #{collect_id} introuvable")
     return collect
@@ -97,10 +104,11 @@ def get_collect(
 def delete_collect(
     collect_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Supprime une collecte."""
-    if not delete_collect_result(db, collect_id):
+    uid, adm = _rbac(current_user)
+    if not delete_collect_result(db, collect_id, user_id=uid, is_admin=adm):
         raise HTTPException(404, f"Collecte #{collect_id} introuvable")
     return MessageResponse(message=f"Collecte #{collect_id} supprimée")
 
@@ -110,7 +118,7 @@ def prefill_from_collect(
     collect_id: int,
     assessment_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Pré-remplit un assessment à partir des résultats d'une collecte."""
     try:

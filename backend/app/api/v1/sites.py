@@ -1,34 +1,35 @@
 """
 Routes Sites : CRUD des emplacements physiques.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
 from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
-from ...models.entreprise import Entreprise
-from ...models.site import Site
 from ...models.user import User
 from ...schemas.site import SiteCreate, SiteRead, SiteUpdate
 from ...schemas.common import PaginatedResponse, MessageResponse
+from ...services.site_service import SiteService
 
 router = APIRouter()
 
 
 @router.get("", response_model=PaginatedResponse[SiteRead])
-async def list_sites(
+def list_sites(
     entreprise_id: int = None,
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les sites (filtrable par entreprise)"""
-    query = db.query(Site)
-    if entreprise_id:
-        query = query.filter(Site.entreprise_id == entreprise_id)
-    total = query.count()
-    items = query.order_by(Site.nom).offset(pagination.offset).limit(pagination.page_size).all()
-
+    items, total = SiteService.list_sites(
+        db,
+        entreprise_id=entreprise_id,
+        offset=pagination.offset,
+        limit=pagination.page_size,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
+    )
     return PaginatedResponse(
         items=items,
         total=total,
@@ -39,33 +40,15 @@ async def list_sites(
 
 
 @router.post("", response_model=SiteRead, status_code=status.HTTP_201_CREATED)
-async def create_site(
+def create_site(
     body: SiteCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Crée un nouveau site pour une entreprise"""
-    # Vérifier que l'entreprise existe
-    entreprise = db.get(Entreprise, body.entreprise_id)
-    if not entreprise:
-        raise HTTPException(status_code=404, detail="Entreprise introuvable")
-
-    # Vérifier unicité nom+entreprise
-    existing = (
-        db.query(Site)
-        .filter(Site.entreprise_id == body.entreprise_id, Site.nom == body.nom)
-        .first()
+    site = SiteService.create_site(
+        db, body, user_id=current_user.id, is_admin=current_user.role == "admin",
     )
-    if existing:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Le site '{body.nom}' existe déjà pour cette entreprise",
-        )
-
-    site = Site(nom=body.nom, description=body.description, adresse=body.adresse, entreprise_id=body.entreprise_id)
-    db.add(site)
-    db.commit()
-    db.refresh(site)
     return SiteRead(
         id=site.id,
         nom=site.nom,
@@ -77,15 +60,15 @@ async def create_site(
 
 
 @router.get("/{site_id}", response_model=SiteRead)
-async def get_site(
+def get_site(
     site_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Détail d'un site"""
-    site = db.get(Site, site_id)
-    if not site:
-        raise HTTPException(status_code=404, detail="Site introuvable")
+    site = SiteService.get_site(
+        db, site_id, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return SiteRead(
         id=site.id,
         nom=site.nom,
@@ -97,23 +80,16 @@ async def get_site(
 
 
 @router.put("/{site_id}", response_model=SiteRead)
-async def update_site(
+def update_site(
     site_id: int,
     body: SiteUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Modifie un site"""
-    site = db.get(Site, site_id)
-    if not site:
-        raise HTTPException(status_code=404, detail="Site introuvable")
-
-    update_data = body.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(site, field, value)
-
-    db.commit()
-    db.refresh(site)
+    site = SiteService.update_site(
+        db, site_id, body, user_id=current_user.id, is_admin=current_user.role == "admin",
+    )
     return SiteRead(
         id=site.id,
         nom=site.nom,
@@ -125,16 +101,11 @@ async def update_site(
 
 
 @router.delete("/{site_id}", response_model=MessageResponse)
-async def delete_site(
+def delete_site(
     site_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_admin),
 ):
     """Supprime un site et ses équipements"""
-    site = db.get(Site, site_id)
-    if not site:
-        raise HTTPException(status_code=404, detail="Site introuvable")
-
-    db.delete(site)
-    db.commit()
-    return MessageResponse(message=f"Site '{site.nom}' supprimé")
+    nom = SiteService.delete_site(db, site_id)
+    return MessageResponse(message=f"Site '{nom}' supprimé")

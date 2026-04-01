@@ -3,7 +3,7 @@ Schémas Pydantic pour les scans réseau (Nmap) et les outils intégrés.
 """
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 from ..models.equipement import EQUIPEMENT_TYPE_VALUES
@@ -24,9 +24,11 @@ class ScanCreate(BaseModel):
         pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._:/\-]{0,254}$",
         examples=["192.168.1.0/24", "10.0.0.1", "server.local"],
     )
-    scan_type: str = Field("discovery", description="discovery | port_scan | full | custom")
-    custom_args: Optional[str] = Field(None, description="Arguments Nmap personnalisés (mode custom)")
-    notes: Optional[str] = None
+    scan_type: Literal["discovery", "port_scan", "full", "custom"] = Field(
+        "discovery", description="Type de scan Nmap"
+    )
+    custom_args: Optional[str] = Field(None, max_length=2000, description="Arguments Nmap personnalises (mode custom)")
+    notes: Optional[str] = Field(None, max_length=2000)
 
 
 class ScanPortRead(BaseModel):
@@ -271,16 +273,18 @@ class PrefillResult(BaseModel):
 class CollectCreate(BaseModel):
     """Paramètres pour lancer une collecte SSH ou WinRM."""
     equipement_id: int
-    method: str = Field(..., description="ssh ou winrm")
-    target_host: str = Field(..., description="IP ou hostname du serveur")
-    target_port: int = Field(22, description="Port SSH (22) ou WinRM (5985/5986)")
-    username: str = Field(..., description="Utilisateur de connexion")
-    password: Optional[str] = Field(None, description="Mot de passe")
-    private_key: Optional[str] = Field(None, description="Clé privée SSH (PEM)")
-    passphrase: Optional[str] = Field(None, description="Passphrase de la clé privée")
+    method: Literal["ssh", "winrm"] = Field(..., description="Methode de collecte")
+    target_host: str = Field(..., max_length=255, description="IP ou hostname du serveur")
+    target_port: int = Field(22, ge=1, le=65535, description="Port SSH (22) ou WinRM (5985/5986)")
+    username: str = Field(..., max_length=255, description="Utilisateur de connexion")
+    password: Optional[str] = Field(None, max_length=1000, description="Mot de passe")
+    private_key: Optional[str] = Field(None, description="Cle privee SSH (PEM)")
+    passphrase: Optional[str] = Field(None, max_length=500, description="Passphrase de la cle privee")
     use_ssl: bool = Field(False, description="WinRM: utiliser HTTPS (port 5986)")
-    transport: str = Field("ntlm", description="WinRM: méthode d'auth (ntlm, kerberos, basic)")
-    device_profile: str = Field("linux_server", description="Profil collecte SSH: linux_server, opnsense, stormshield, fortigate")
+    transport: Literal["ntlm", "kerberos", "basic"] = Field("ntlm", description="WinRM: methode d'auth")
+    device_profile: Literal["linux_server", "opnsense", "stormshield", "fortigate"] = Field(
+        "linux_server", description="Profil collecte SSH"
+    )
 
 
 class CollectResultSummary(BaseModel):
@@ -334,15 +338,15 @@ class CollectResultRead(BaseModel):
 # ─── Audit Active Directory (LDAP) ────────────────────────────
 
 class ADAuditCreate(BaseModel):
-    """Paramètres pour lancer un audit AD."""
-    equipement_id: Optional[int] = Field(None, description="Équipement (DC) associé")
-    target_host: str = Field(..., description="IP ou hostname du contrôleur de domaine")
-    target_port: int = Field(389, description="Port LDAP (389) ou LDAPS (636)")
+    """Parametres pour lancer un audit AD."""
+    equipement_id: Optional[int] = Field(None, description="Equipement (DC) associe")
+    target_host: str = Field(..., max_length=255, description="IP ou hostname du controleur de domaine")
+    target_port: int = Field(389, ge=1, le=65535, description="Port LDAP (389) ou LDAPS (636)")
     use_ssl: bool = Field(False, description="Utiliser LDAPS (SSL)")
-    username: str = Field(..., description="Utilisateur pour la connexion LDAP")
-    password: str = Field(..., description="Mot de passe")
-    domain: str = Field(..., description="Nom du domaine AD (ex: corp.local)")
-    auth_method: str = Field("ntlm", description="Méthode d'auth : ntlm ou simple")
+    username: str = Field(..., max_length=255, description="Utilisateur pour la connexion LDAP")
+    password: str = Field(..., max_length=1000, description="Mot de passe")
+    domain: str = Field(..., max_length=255, description="Nom du domaine AD (ex: corp.local)")
+    auth_method: Literal["ntlm", "simple"] = Field("ntlm", description="Methode d'auth LDAP")
 
 
 class ADAuditFindingRead(BaseModel):
@@ -416,66 +420,6 @@ class ADAuditResultRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ─── PingCastle ────────────────────────────────────────────────
-
-class PingCastleCreate(BaseModel):
-    """Paramètres pour lancer un audit PingCastle."""
-    equipement_id: Optional[int] = Field(None, description="Équipement (DC) associé")
-    target_host: str = Field(..., description="IP ou hostname du contrôleur de domaine")
-    domain: str = Field(..., description="Nom du domaine AD (ex: corp.local)")
-    username: str = Field(..., description="Utilisateur pour l'authentification (DOMAIN\\user)")
-    password: str = Field(..., description="Mot de passe")
-
-
-class PingCastleResultSummary(BaseModel):
-    """Résumé d'un audit PingCastle pour la liste."""
-    id: int
-    equipement_id: Optional[int] = None
-    status: str
-    target_host: str
-    domain: str
-    global_score: Optional[int] = None
-    maturity_level: Optional[int] = None
-    stale_objects_score: Optional[int] = None
-    privileged_accounts_score: Optional[int] = None
-    trust_score: Optional[int] = None
-    anomaly_score: Optional[int] = None
-    summary: Optional[dict] = None
-    error_message: Optional[str] = None
-    created_at: datetime
-    completed_at: Optional[datetime] = None
-    duration_seconds: Optional[int] = None
-
-    model_config = {"from_attributes": True}
-
-
-class PingCastleResultRead(BaseModel):
-    """Détail complet d'un audit PingCastle."""
-    id: int
-    equipement_id: Optional[int] = None
-    status: str
-    target_host: str
-    domain: str
-    username: str
-    global_score: Optional[int] = None
-    stale_objects_score: Optional[int] = None
-    privileged_accounts_score: Optional[int] = None
-    trust_score: Optional[int] = None
-    anomaly_score: Optional[int] = None
-    maturity_level: Optional[int] = None
-    risk_rules: Optional[list] = None
-    domain_info: Optional[dict] = None
-    findings: Optional[list] = None
-    summary: Optional[dict] = None
-    report_html_path: Optional[str] = None
-    error_message: Optional[str] = None
-    created_at: datetime
-    completed_at: Optional[datetime] = None
-    duration_seconds: Optional[int] = None
-
-    model_config = {"from_attributes": True}
-
-
 # ─── Monkey365 Audit ─────────────────────────────────────────
 
 class Monkey365ExportFormat(str, Enum):
@@ -487,6 +431,7 @@ class Monkey365ExportFormat(str, Enum):
 class Monkey365ConfigSchema(BaseModel):
     spo_sites: list[str] = Field(default_factory=list, description="SharePoint sites to scan (e.g., https://domain.sharepoint.com)")
     export_to: list[Monkey365ExportFormat] = Field(default_factory=lambda: [Monkey365ExportFormat.JSON, Monkey365ExportFormat.HTML], description="Formats d'export : JSON, HTML, CSV")
+    device_code: bool = Field(default=False, description="Utiliser Device Code Flow au lieu de l'auth interactive")
 
     @field_validator("export_to", mode="after")
     @classmethod
@@ -552,3 +497,64 @@ class Monkey365ImportResult(BaseModel):
     assessment_id: int
     controls_mapped: int
     controls_total: int
+
+
+# ─── Monkey365 Streaming (Device Code Flow) ─────────────────
+
+class Monkey365AuthMethod(str, Enum):
+    DEVICE_CODE = "device_code"
+    CERTIFICATE = "certificate"
+    CLIENT_SECRET = "client_secret"
+
+
+class Monkey365StreamingScanCreate(BaseModel):
+    """Parametres pour lancer un scan Monkey365 streaming avec Device Code Flow."""
+    entreprise_id: int = Field(..., description="ID de l'entreprise")
+    tenant_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        pattern=r"^[a-zA-Z0-9\-._]+$",
+        description="Azure AD tenant ID (UUID ou nom de domaine)",
+    )
+    auth_method: Monkey365AuthMethod = Field(
+        default=Monkey365AuthMethod.DEVICE_CODE,
+        description="Methode d'authentification",
+    )
+    subscriptions: list[str] = Field(
+        default_factory=list,
+        max_length=50,
+        description="Azure subscriptions a auditer",
+    )
+    ruleset: str = Field(
+        default="cis",
+        max_length=50,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Ruleset (cis, etc.)",
+    )
+    config: Monkey365ConfigSchema = Field(
+        default_factory=Monkey365ConfigSchema,
+        description="Configuration Monkey365 (spo_sites, export_to)",
+    )
+
+    @field_validator("subscriptions")
+    @classmethod
+    def validate_subscriptions(cls, v: list[str]) -> list[str]:
+        """Valide que chaque subscription est un identifiant safe (UUID ou slug)."""
+        import re
+        safe = re.compile(r"^[a-zA-Z0-9\-._]+$")
+        for sub in v:
+            if not sub or len(sub) > 255 or not safe.match(sub):
+                raise ValueError(f"Subscription invalide: {sub!r}")
+        return v
+
+
+class Monkey365StreamingScanResponse(BaseModel):
+    """Reponse immediate au lancement d'un scan streaming."""
+    id: int
+    scan_id: str
+    status: str
+    auth_method: Optional[str] = None
+    message: str = "Scan lance. Ecoutez les evenements WebSocket pour le device code."
+
+    model_config = {"from_attributes": True}

@@ -9,11 +9,11 @@ import {
   Wrench,
   ArrowRight,
   ShieldCheck,
-  Castle,
   Map,
   Cloud,
 } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 const tools = [
   {
@@ -71,13 +71,13 @@ const tools = [
     bgColor: "bg-indigo-500/10",
   },
   {
-    title: "PingCastle",
+    title: "ORADAD (ANSSI)",
     description:
-      "Audit avancé Active Directory avec PingCastle : analyse healthcheck, scores de risque, règles de sécurité et terminal interactif.",
-    icon: Castle,
-    href: "/outils/pingcastle",
-    color: "text-red-500",
-    bgColor: "bg-red-500/10",
+      "Collecte Active Directory avec ORADAD et analyse de sécurité selon le référentiel ANSSI : niveaux de conformité, recommandations et rapport détaillé.",
+    icon: ShieldCheck,
+    href: "/outils/oradad",
+    color: "text-green-500",
+    bgColor: "bg-green-500/10",
   },
   {
     title: "Monkey365",
@@ -92,10 +92,10 @@ const tools = [
 
 export default function OutilsPage() {
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Wrench className="h-6 w-6" />
+          <Wrench className="size-6" />
           Outils d&apos;Infrastructure
         </h1>
         <p className="text-muted-foreground">
@@ -108,12 +108,12 @@ export default function OutilsPage() {
           <Link key={tool.href} href={tool.href}>
             <Card className="h-full hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group">
               <CardHeader>
-                <div className={`inline-flex p-3 rounded-lg ${tool.bgColor} w-fit`}>
-                  <tool.icon className={`h-6 w-6 ${tool.color}`} />
+                <div className={cn("inline-flex p-3 rounded-lg w-fit", tool.bgColor)}>
+                  <tool.icon className={`size-6 ${tool.color}`} />
                 </div>
                 <CardTitle className="flex items-center gap-2">
                   {tool.title}
-                  <ArrowRight className="h-4 w-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                  <ArrowRight className="size-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
                 </CardTitle>
                 <CardDescription>{tool.description}</CardDescription>
               </CardHeader>

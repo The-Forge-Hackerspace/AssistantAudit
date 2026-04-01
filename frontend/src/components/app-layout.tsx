@@ -44,12 +44,26 @@ import {
   FileCode,
   Lock,
   Terminal,
-  Castle,
   Map,
   Cloud,
+  Users2,
+  Bot,
 } from "lucide-react";
 
-const navItems = [
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
+  roles?: string[];
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const navItems: NavGroup[] = [
   {
     label: "Général",
     items: [
@@ -80,8 +94,15 @@ const navItems = [
       { title: "SSL/TLS", href: "/outils/ssl-checker", icon: Lock },
       { title: "Audit AD", href: "/outils/ad-auditor", icon: ShieldCheck },
       { title: "Cartographie réseau", href: "/outils/network-map", icon: Map },
-      { title: "PingCastle", href: "/outils/pingcastle", icon: Castle },
+      { title: "ORADAD (ANSSI)", href: "/outils/oradad", icon: ShieldCheck },
       { title: "Monkey365", href: "/outils/monkey365", icon: Cloud },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
+      { title: "Agents", href: "/agents", icon: Bot, roles: ["admin", "auditeur"] },
+      { title: "Utilisateurs", href: "/utilisateurs", icon: Users2, adminOnly: true },
     ],
   },
 ];
@@ -125,32 +146,42 @@ function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {navItems.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={
-                        item.href === "/"
-                          ? pathname === "/"
-                          : pathname.startsWith(item.href)
-                      }
-                    >
-                      <Link href={item.href}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        {navItems.map((group) => {
+          const visibleItems = group.items.filter(
+            (item) => {
+              if (item.roles) return user?.role && item.roles.includes(user.role);
+              if (item.adminOnly) return user?.role === "admin";
+              return true;
+            }
+          );
+          if (visibleItems.length === 0) return null;
+          return (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {visibleItems.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={
+                          item.href === "/"
+                            ? pathname === "/"
+                            : pathname.startsWith(item.href)
+                        }
+                      >
+                        <Link href={item.href}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
 
       <SidebarFooter>

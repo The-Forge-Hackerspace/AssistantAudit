@@ -1,0 +1,34 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+*.egg-info
+
+# Node
+node_modules
+.next
+out
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# Git
+.git
+.gitignore
+
+# Data / secrets
+*.db
+*.sqlite
+.env
+data/
+certs/
+instance/
+
+# Tests
+.pytest_cache
+.coverage
+htmlcov

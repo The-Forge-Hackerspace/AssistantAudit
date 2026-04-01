@@ -12,13 +12,10 @@ import {
   Search,
   Loader2,
   Server,
-  MapPin,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -37,14 +34,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { equipementsApi, sitesApi } from "@/services/api";
-import type { Equipement, EquipementCreate, Site, TypeEquipement, StatusAudit } from "@/types";
+import type { Equipement, EquipementCreate, Site, TypeEquipement } from "@/types";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/skeletons";
 import {
@@ -53,6 +61,9 @@ import {
   EQUIPEMENT_STATUS_LABELS as STATUS_LABELS,
   EQUIPEMENT_STATUS_VARIANTS as STATUS_VARIANTS,
 } from "@/lib/constants";
+import { EquipementFormFields } from "./components/equipement-form-fields";
+import { EquipementDetailDialog } from "./components/equipement-detail-dialog";
+import { TagFilter } from "@/components/tags/tag-filter";
 
 // ── Default create form ──
 const EMPTY_FORM: EquipementCreate = {
@@ -91,6 +102,7 @@ function EquipementsContent() {
   const [siteFilter, setSiteFilter] = useState<string>(initialSite);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [tagFilter, setTagFilter] = useState<number[]>([]);
 
   // Dialogs
   const [createOpen, setCreateOpen] = useState(false);
@@ -118,7 +130,7 @@ function EquipementsContent() {
         res.items.forEach((s) => (map[s.id] = s.nom));
         setSiteMap(map);
       } catch {
-        /* ignore */
+        toast.error("Erreur lors du chargement des sites");
       }
     };
     loadSites();
@@ -137,7 +149,7 @@ function EquipementsContent() {
       setPages(res.pages);
       setTotal(res.total);
     } catch {
-      /* ignore */
+      toast.error("Erreur lors du chargement des équipements");
     } finally {
       setLoading(false);
     }
@@ -303,11 +315,11 @@ function EquipementsContent() {
 
   const TypeIcon = ({ type }: { type: TypeEquipement }) => {
     const Icon = TYPE_ICONS[type] || Server;
-    return <Icon className="h-4 w-4" />;
+    return <Icon className="size-4" />;
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
@@ -317,7 +329,7 @@ function EquipementsContent() {
           </p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus data-icon="inline-start" />
           Nouvel équipement
         </Button>
       </div>
@@ -327,7 +339,7 @@ function EquipementsContent() {
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input
                 className="pl-9"
                 placeholder="Rechercher par IP, hostname, fabricant..."
@@ -340,12 +352,14 @@ function EquipementsContent() {
                 <SelectValue placeholder="Filtrer par site" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les sites</SelectItem>
-                {sites.map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
-                    {s.nom}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value="all">Tous les sites</SelectItem>
+                  {sites.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.nom}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -353,12 +367,14 @@ function EquipementsContent() {
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les types</SelectItem>
-                {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value="all">Tous les types</SelectItem>
+                  {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -366,16 +382,21 @@ function EquipementsContent() {
                 <SelectValue placeholder="Statut" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="A_AUDITER">À auditer</SelectItem>
-                <SelectItem value="EN_COURS">En cours</SelectItem>
-                <SelectItem value="CONFORME">Conforme</SelectItem>
-                <SelectItem value="NON_CONFORME">Non conforme</SelectItem>
+                <SelectGroup>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="A_AUDITER">À auditer</SelectItem>
+                  <SelectItem value="EN_COURS">En cours</SelectItem>
+                  <SelectItem value="CONFORME">Conforme</SelectItem>
+                  <SelectItem value="NON_CONFORME">Non conforme</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Tag filter ── */}
+      <TagFilter onFilterChange={setTagFilter} selectedTagIds={tagFilter} />
 
       {/* ── Table ── */}
       <Card>
@@ -383,7 +404,7 @@ function EquipementsContent() {
           <TableSkeleton rows={5} cols={5} />
         ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            <Server className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <Server className="size-12 mx-auto mb-4 opacity-50" />
             <p className="text-lg font-medium">Aucun équipement trouvé</p>
             <p className="text-sm mt-1">
               {equipements.length === 0
@@ -392,7 +413,7 @@ function EquipementsContent() {
             </p>
           </div>
         ) : (
-          <div>
+          <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -433,13 +454,13 @@ function EquipementsContent() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button size="icon" variant="ghost" onClick={() => openDetail(eq)}>
-                          <Eye className="h-4 w-4" />
+                          <Eye />
                         </Button>
                         <Button size="icon" variant="ghost" onClick={() => openEdit(eq)}>
-                          <Pencil className="h-4 w-4" />
+                          <Pencil />
                         </Button>
                         <Button size="icon" variant="ghost" onClick={() => openDelete(eq)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <Trash2 className="text-destructive" />
                         </Button>
                       </div>
                     </TableCell>
@@ -449,7 +470,7 @@ function EquipementsContent() {
             </Table>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between px-4 py-3 border-t">
+            <CardFooter className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 Page {page} sur {pages} — {total} résultat{total !== 1 ? "s" : ""}
               </p>
@@ -460,7 +481,7 @@ function EquipementsContent() {
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  <ChevronLeft data-icon="inline-start" />
                   Précédent
                 </Button>
                 <Button
@@ -470,11 +491,11 @@ function EquipementsContent() {
                   onClick={() => setPage((p) => p + 1)}
                 >
                   Suivant
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                  <ChevronRight data-icon="inline-end" />
                 </Button>
               </div>
-            </div>
-          </div>
+            </CardFooter>
+          </>
         )}
       </Card>
 
@@ -488,189 +509,21 @@ function EquipementsContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Site *</Label>
-              <Select
-                value={form.site_id ? String(form.site_id) : ""}
-                onValueChange={(v) => setForm({ ...form, site_id: Number(v) })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un site" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sites.map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
-                      {s.nom}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Type d&apos;équipement *</Label>
-              <Select
-                value={form.type_equipement}
-                onValueChange={(v) =>
-                  setForm({ ...form, type_equipement: v as TypeEquipement })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="create-ip">Adresse IP *</Label>
-                <Input
-                  id="create-ip"
-                  value={form.ip_address}
-                  onChange={(e) => setForm({ ...form, ip_address: e.target.value })}
-                  placeholder="192.168.1.1"
-                  className="font-mono"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="create-hostname">Hostname</Label>
-                <Input
-                  id="create-hostname"
-                  value={form.hostname}
-                  onChange={(e) => setForm({ ...form, hostname: e.target.value })}
-                  placeholder="SRV-DC01"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="create-fabricant">Fabricant</Label>
-                <Input
-                  id="create-fabricant"
-                  value={form.fabricant}
-                  onChange={(e) => setForm({ ...form, fabricant: e.target.value })}
-                  placeholder="Dell, HP, Fortinet..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="create-os">OS détecté</Label>
-                <Input
-                  id="create-os"
-                  value={form.os_detected}
-                  onChange={(e) => setForm({ ...form, os_detected: e.target.value })}
-                  placeholder="Windows Server 2022, FortiOS 7.4..."
-                />
-              </div>
-            </div>
-
-            {/* Type-specific fields */}
-            {form.type_equipement === "reseau" && (
-              <div className="space-y-2 border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground">Champs réseau</p>
-                <div className="space-y-2">
-                  <Label htmlFor="create-firmware">Version firmware</Label>
-                  <Input
-                    id="create-firmware"
-                    value={(form as Record<string, unknown>).firmware_version as string || ""}
-                    onChange={(e) => setForm({ ...form, firmware_version: e.target.value })}
-                    placeholder="ex: IOS 15.2, ArubaOS 8.10..."
-                  />
-                </div>
-              </div>
-            )}
-
-            {form.type_equipement === "serveur" && (
-              <div className="space-y-4 border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground">Champs serveur</p>
-                <div className="space-y-2">
-                  <Label htmlFor="create-os-detail">Détail version OS</Label>
-                  <Input
-                    id="create-os-detail"
-                    value={(form as Record<string, unknown>).os_version_detail as string || ""}
-                    onChange={(e) => setForm({ ...form, os_version_detail: e.target.value })}
-                    placeholder="ex: Windows Server 2022 Datacenter Build 20348"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-modele">Modèle matériel</Label>
-                  <Input
-                    id="create-modele"
-                    value={(form as Record<string, unknown>).modele_materiel as string || ""}
-                    onChange={(e) => setForm({ ...form, modele_materiel: e.target.value })}
-                    placeholder="ex: Dell PowerEdge R740"
-                  />
-                </div>
-              </div>
-            )}
-
-            {form.type_equipement === "firewall" && (
-              <div className="space-y-4 border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground">Champs firewall</p>
-                <div className="space-y-2">
-                  <Label htmlFor="create-license">Statut licence</Label>
-                  <Input
-                    id="create-license"
-                    value={(form as Record<string, unknown>).license_status as string || ""}
-                    onChange={(e) => setForm({ ...form, license_status: e.target.value })}
-                    placeholder="ex: Active, Expired, Trial..."
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="create-vpn">Utilisateurs VPN</Label>
-                    <Input
-                      id="create-vpn"
-                      type="number"
-                      value={(form as Record<string, unknown>).vpn_users_count as number ?? 0}
-                      onChange={(e) =>
-                        setForm({ ...form, vpn_users_count: parseInt(e.target.value) || 0 })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="create-rules">Nombre de règles</Label>
-                    <Input
-                      id="create-rules"
-                      type="number"
-                      value={(form as Record<string, unknown>).rules_count as number ?? 0}
-                      onChange={(e) =>
-                        setForm({ ...form, rules_count: parseInt(e.target.value) || 0 })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="create-notes">Notes d&apos;audit</Label>
-              <Textarea
-                id="create-notes"
-                value={form.notes_audit || ""}
-                onChange={(e) => setForm({ ...form, notes_audit: e.target.value })}
-                placeholder="Observations, remarques..."
-                rows={3}
-              />
-            </div>
-          </div>
-
-          {formError && <p className="text-sm text-destructive">{formError}</p>}
+          <EquipementFormFields
+            mode="create"
+            form={form}
+            setForm={setForm}
+            sites={sites}
+            formError={formError}
+            idPrefix="create"
+          />
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Annuler
             </Button>
             <Button onClick={handleCreate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Créer
             </Button>
           </DialogFooter>
@@ -687,308 +540,67 @@ function EquipementsContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Adresse IP</Label>
-                <Input value={selected?.ip_address || ""} disabled className="font-mono" />
-                <p className="text-xs text-muted-foreground">Non modifiable</p>
-              </div>
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Input value={TYPE_LABELS[selected?.type_equipement || "equipement"]} disabled />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-hostname">Hostname</Label>
-                <Input
-                  id="edit-hostname"
-                  value={form.hostname}
-                  onChange={(e) => setForm({ ...form, hostname: e.target.value })}
-                  placeholder="SRV-DC01"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-fabricant">Fabricant</Label>
-                <Input
-                  id="edit-fabricant"
-                  value={form.fabricant}
-                  onChange={(e) => setForm({ ...form, fabricant: e.target.value })}
-                  placeholder="Dell, HP..."
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-os">OS détecté</Label>
-              <Input
-                id="edit-os"
-                value={form.os_detected}
-                onChange={(e) => setForm({ ...form, os_detected: e.target.value })}
-                placeholder="Windows Server 2022..."
-              />
-            </div>
-
-            {/* Type-specific fields */}
-            {selected?.type_equipement === "reseau" && (
-              <div className="space-y-2 border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground">Champs réseau</p>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-firmware">Version firmware</Label>
-                  <Input
-                    id="edit-firmware"
-                    value={(form as Record<string, unknown>).firmware_version as string || ""}
-                    onChange={(e) => setForm({ ...form, firmware_version: e.target.value })}
-                  />
-                </div>
-              </div>
-            )}
-
-            {selected?.type_equipement === "serveur" && (
-              <div className="space-y-4 border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground">Champs serveur</p>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-os-detail">Détail version OS</Label>
-                  <Input
-                    id="edit-os-detail"
-                    value={(form as Record<string, unknown>).os_version_detail as string || ""}
-                    onChange={(e) => setForm({ ...form, os_version_detail: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-modele">Modèle matériel</Label>
-                  <Input
-                    id="edit-modele"
-                    value={(form as Record<string, unknown>).modele_materiel as string || ""}
-                    onChange={(e) => setForm({ ...form, modele_materiel: e.target.value })}
-                  />
-                </div>
-              </div>
-            )}
-
-            {selected?.type_equipement === "firewall" && (
-              <div className="space-y-4 border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground">Champs firewall</p>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-license">Statut licence</Label>
-                  <Input
-                    id="edit-license"
-                    value={(form as Record<string, unknown>).license_status as string || ""}
-                    onChange={(e) => setForm({ ...form, license_status: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-vpn">Utilisateurs VPN</Label>
-                    <Input
-                      id="edit-vpn"
-                      type="number"
-                      value={(form as Record<string, unknown>).vpn_users_count as number ?? 0}
-                      onChange={(e) =>
-                        setForm({ ...form, vpn_users_count: parseInt(e.target.value) || 0 })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-rules">Nombre de règles</Label>
-                    <Input
-                      id="edit-rules"
-                      type="number"
-                      value={(form as Record<string, unknown>).rules_count as number ?? 0}
-                      onChange={(e) =>
-                        setForm({ ...form, rules_count: parseInt(e.target.value) || 0 })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-notes">Notes d&apos;audit</Label>
-              <Textarea
-                id="edit-notes"
-                value={form.notes_audit || ""}
-                onChange={(e) => setForm({ ...form, notes_audit: e.target.value })}
-                placeholder="Observations, remarques..."
-                rows={3}
-              />
-            </div>
-          </div>
-
-          {formError && <p className="text-sm text-destructive">{formError}</p>}
+          <EquipementFormFields
+            mode="edit"
+            form={form}
+            setForm={setForm}
+            sites={sites}
+            formError={formError}
+            selectedIp={selected?.ip_address}
+            selectedType={selected?.type_equipement}
+            idPrefix="edit"
+          />
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               Annuler
             </Button>
             <Button onClick={handleUpdate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Dialog: Supprimer ── */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer la suppression</DialogTitle>
-            <DialogDescription>
+      {/* ── AlertDialog: Supprimer ── */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
               Êtes-vous sûr de vouloir supprimer l&apos;équipement{" "}
               <strong>{selected?.hostname || selected?.ip_address}</strong> ? Cette action est
               irréversible et supprimera tous les assessments associés.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
           {formError && <p className="text-sm text-destructive">{formError}</p>}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteOpen(false)}>
               Annuler
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+              disabled={saving}
+            >
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Supprimer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Dialog: Détail ── */}
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {selected && <TypeIcon type={selected.type_equipement} />}
-              {selected?.hostname || selected?.ip_address}
-            </DialogTitle>
-          </DialogHeader>
-
-          {selected && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Type</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <TypeIcon type={selected.type_equipement} />
-                    <span className="text-sm font-medium">
-                      {TYPE_LABELS[selected.type_equipement]}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Statut audit</p>
-                  <Badge variant={STATUS_VARIANTS[selected.status_audit]} className="mt-1">
-                    {STATUS_LABELS[selected.status_audit]}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Adresse IP</p>
-                  <p className="text-sm mt-1 font-mono">{selected.ip_address}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Hostname</p>
-                  <p className="text-sm mt-1">{selected.hostname || "Non renseigné"}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Site</p>
-                  <Badge variant="outline" className="mt-1">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    {siteMap[selected.site_id] || `#${selected.site_id}`}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Fabricant</p>
-                  <p className="text-sm mt-1">{selected.fabricant || "Non renseigné"}</p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">OS détecté</p>
-                <p className="text-sm mt-1">{selected.os_detected || "Non renseigné"}</p>
-              </div>
-
-              {/* Type-specific details */}
-              {selected.type_equipement === "reseau" && selected.firmware_version && (
-                <div className="border-t pt-4">
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Détails réseau</p>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Firmware</p>
-                    <p className="text-sm mt-1">{selected.firmware_version}</p>
-                  </div>
-                </div>
-              )}
-
-              {selected.type_equipement === "serveur" && (
-                <div className="border-t pt-4 space-y-3">
-                  <p className="text-sm font-medium text-muted-foreground">Détails serveur</p>
-                  {selected.os_version_detail && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Version OS détaillée</p>
-                      <p className="text-sm mt-1">{selected.os_version_detail}</p>
-                    </div>
-                  )}
-                  {selected.modele_materiel && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Modèle matériel</p>
-                      <p className="text-sm mt-1">{selected.modele_materiel}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {selected.type_equipement === "firewall" && (
-                <div className="border-t pt-4 space-y-3">
-                  <p className="text-sm font-medium text-muted-foreground">Détails firewall</p>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Licence</p>
-                      <p className="text-sm mt-1">{selected.license_status || "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Users VPN</p>
-                      <p className="text-sm mt-1">{selected.vpn_users_count ?? 0}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Règles</p>
-                      <p className="text-sm mt-1">{selected.rules_count ?? 0}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selected.notes_audit && (
-                <div className="border-t pt-4">
-                  <p className="text-sm font-medium text-muted-foreground">Notes d&apos;audit</p>
-                  <p className="text-sm mt-1 whitespace-pre-wrap">{selected.notes_audit}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              onClick={() => {
-                setDetailOpen(false);
-                if (selected) openEdit(selected);
-              }}
-            >
-              <Pencil className="h-4 w-4 mr-2" />
-              Modifier
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EquipementDetailDialog
+        selected={selected}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        siteMap={siteMap}
+        onEdit={openEdit}
+      />
     </div>
   );
 }

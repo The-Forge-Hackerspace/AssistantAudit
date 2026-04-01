@@ -17,9 +17,11 @@ import {
   X,
   UserPlus,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -38,11 +40,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { entreprisesApi } from "@/services/api";
 import type { Entreprise, EntrepriseCreate, Contact } from "@/types";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/skeletons";
+import { cn } from "@/lib/utils";
 
 // ── Contact form row ──
 interface ContactFormData {
@@ -274,12 +287,12 @@ export default function EntreprisesPage() {
 
   // ── Render ──
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Building2 className="h-6 w-6" />
+            <Building2 className="size-6" />
             Entreprises
           </h1>
           <p className="text-muted-foreground">
@@ -287,7 +300,7 @@ export default function EntreprisesPage() {
           </p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus data-icon="inline-start" />
           Nouvelle entreprise
         </Button>
       </div>
@@ -295,7 +308,7 @@ export default function EntreprisesPage() {
       {/* Search + stats */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             placeholder="Rechercher par nom, secteur ou SIRET..."
             value={search}
@@ -315,7 +328,7 @@ export default function EntreprisesPage() {
             <TableSkeleton rows={5} cols={4} />
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <Building2 className="h-12 w-12 mb-4 opacity-30" />
+              <Building2 className="size-12 mb-4 opacity-30" />
               <p className="text-lg font-medium">Aucune entreprise</p>
               <p className="text-sm">
                 {search ? "Aucun résultat pour cette recherche" : "Commencez par ajouter une entreprise"}
@@ -367,29 +380,29 @@ export default function EntreprisesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="size-8"
                           onClick={() => openDetail(entreprise)}
                           title="Voir le détail"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="size-8"
                           onClick={() => openEdit(entreprise)}
                           title="Modifier"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          className="size-8 text-destructive hover:text-destructive"
                           onClick={() => openDelete(entreprise)}
                           title="Supprimer"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 />
                         </Button>
                       </div>
                     </TableCell>
@@ -402,7 +415,7 @@ export default function EntreprisesPage() {
 
         {/* Pagination */}
         {pages > 1 && (
-          <div className="flex items-center justify-between border-t px-4 py-3">
+          <CardFooter className="flex items-center justify-between border-t px-4 py-3">
             <p className="text-sm text-muted-foreground">
               Page {page} sur {pages} — {total} résultat{total > 1 ? "s" : ""}
             </p>
@@ -413,7 +426,7 @@ export default function EntreprisesPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                <ChevronLeft className="h-4 w-4 mr-1" />
+                <ChevronLeft data-icon="inline-start" />
                 Précédent
               </Button>
               <Button
@@ -423,10 +436,10 @@ export default function EntreprisesPage() {
                 onClick={() => setPage((p) => p + 1)}
               >
                 Suivant
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <ChevronRight data-icon="inline-end" />
               </Button>
             </div>
-          </div>
+          </CardFooter>
         )}
       </Card>
 
@@ -440,104 +453,104 @@ export default function EntreprisesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-nom">Nom *</Label>
                 <Input
                   id="create-nom"
                   value={form.nom}
-                  onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, nom: value })); }}
                   placeholder="Nom de l'entreprise"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-siret">SIRET</Label>
                 <Input
                   id="create-siret"
                   value={form.siret}
-                  onChange={(e) => setForm({ ...form, siret: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, siret: value })); }}
                   placeholder="12345678901234"
                   maxLength={14}
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-secteur">Secteur d&apos;activité</Label>
                 <Input
                   id="create-secteur"
                   value={form.secteur_activite}
-                  onChange={(e) => setForm({ ...form, secteur_activite: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, secteur_activite: value })); }}
                   placeholder="ex: Finance, Santé, Industrie..."
                 />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="create-adresse">Adresse</Label>
                 <Input
                   id="create-adresse"
                   value={form.adresse}
-                  onChange={(e) => setForm({ ...form, adresse: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, adresse: value })); }}
                   placeholder="Adresse du siège"
                 />
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-presentation">Présentation</Label>
-              <textarea
+              <Textarea
                 id="create-presentation"
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="min-h-[80px]"
                 value={form.presentation_desc}
-                onChange={(e) => setForm({ ...form, presentation_desc: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, presentation_desc: value })); }}
                 placeholder="Description de l'entreprise..."
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="create-contraintes">Contraintes réglementaires</Label>
-              <textarea
+              <Textarea
                 id="create-contraintes"
-                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="min-h-[60px]"
                 value={form.contraintes_reglementaires}
-                onChange={(e) => setForm({ ...form, contraintes_reglementaires: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, contraintes_reglementaires: value })); }}
                 placeholder="RGPD, PCI-DSS, ISO 27001..."
               />
             </div>
             <Separator />
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold">Contacts</Label>
                 <Button type="button" variant="outline" size="sm" onClick={addContact}>
-                  <UserPlus className="h-4 w-4 mr-1" />
+                  <UserPlus data-icon="inline-start" />
                   Ajouter
                 </Button>
               </div>
               {contacts.map((contact, index) => (
-                <div key={index} className="rounded-md border p-3 space-y-3 relative">
-                  <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => removeContact(index)}>
-                    <X className="h-3 w-3" />
+                <div key={index} className="rounded-md border p-3 flex flex-col gap-3 relative">
+                  <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 size-6" onClick={() => removeContact(index)}>
+                    <X />
                   </Button>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                       <Label className="text-xs">Nom</Label>
                       <Input value={contact.nom} onChange={(e) => updateContact(index, "nom", e.target.value)} placeholder="Nom du contact" className="h-8 text-sm" />
                     </div>
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                       <Label className="text-xs">Rôle</Label>
                       <Input value={contact.role} onChange={(e) => updateContact(index, "role", e.target.value)} placeholder="DSI, RSSI, Admin..." className="h-8 text-sm" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                       <Label className="text-xs">Email</Label>
                       <Input type="email" value={contact.email} onChange={(e) => updateContact(index, "email", e.target.value)} placeholder="email@exemple.com" className="h-8 text-sm" />
                     </div>
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                       <Label className="text-xs">Téléphone</Label>
                       <Input value={contact.telephone} onChange={(e) => updateContact(index, "telephone", e.target.value)} placeholder="+33 1 23 45 67 89" className="h-8 text-sm" />
                     </div>
                   </div>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={contact.is_main_contact} onChange={(e) => updateContact(index, "is_main_contact", e.target.checked)} className="rounded border-gray-300" />
+                    <Checkbox checked={contact.is_main_contact} onCheckedChange={(checked) => updateContact(index, "is_main_contact", !!checked)} />
                     Contact principal
                   </label>
                 </div>
@@ -557,7 +570,7 @@ export default function EntreprisesPage() {
               Annuler
             </Button>
             <Button onClick={handleCreate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Créer
             </Button>
           </DialogFooter>
@@ -574,104 +587,104 @@ export default function EntreprisesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-nom">Nom *</Label>
                 <Input
                   id="edit-nom"
                   value={form.nom}
-                  onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, nom: value })); }}
                   placeholder="Nom de l'entreprise"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-siret">SIRET</Label>
                 <Input
                   id="edit-siret"
                   value={form.siret}
-                  onChange={(e) => setForm({ ...form, siret: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, siret: value })); }}
                   placeholder="12345678901234"
                   maxLength={14}
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-secteur">Secteur d&apos;activité</Label>
                 <Input
                   id="edit-secteur"
                   value={form.secteur_activite}
-                  onChange={(e) => setForm({ ...form, secteur_activite: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, secteur_activite: value })); }}
                   placeholder="ex: Finance, Santé, Industrie..."
                 />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-adresse">Adresse</Label>
                 <Input
                   id="edit-adresse"
                   value={form.adresse}
-                  onChange={(e) => setForm({ ...form, adresse: e.target.value })}
+                  onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, adresse: value })); }}
                   placeholder="Adresse du siège"
                 />
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-presentation">Présentation</Label>
-              <textarea
+              <Textarea
                 id="edit-presentation"
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="min-h-[80px]"
                 value={form.presentation_desc}
-                onChange={(e) => setForm({ ...form, presentation_desc: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, presentation_desc: value })); }}
                 placeholder="Description de l'entreprise..."
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="edit-contraintes">Contraintes réglementaires</Label>
-              <textarea
+              <Textarea
                 id="edit-contraintes"
-                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="min-h-[60px]"
                 value={form.contraintes_reglementaires}
-                onChange={(e) => setForm({ ...form, contraintes_reglementaires: e.target.value })}
+                onChange={(e) => { const value = e.target.value; setForm(prev => ({ ...prev, contraintes_reglementaires: value })); }}
                 placeholder="RGPD, PCI-DSS, ISO 27001..."
               />
             </div>
             <Separator />
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold">Contacts</Label>
                 <Button type="button" variant="outline" size="sm" onClick={addContact}>
-                  <UserPlus className="h-4 w-4 mr-1" />
+                  <UserPlus data-icon="inline-start" />
                   Ajouter
                 </Button>
               </div>
               {contacts.map((contact, index) => (
-                <div key={contact._key || index} className="rounded-md border p-3 space-y-3 relative">
-                  <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => removeContact(index)}>
-                    <X className="h-3 w-3" />
+                <div key={contact._key || index} className="rounded-md border p-3 flex flex-col gap-3 relative">
+                  <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 size-6" onClick={() => removeContact(index)}>
+                    <X />
                   </Button>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                       <Label className="text-xs">Nom</Label>
                       <Input value={contact.nom} onChange={(e) => updateContact(index, "nom", e.target.value)} placeholder="Nom du contact" className="h-8 text-sm" />
                     </div>
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                       <Label className="text-xs">Rôle</Label>
                       <Input value={contact.role} onChange={(e) => updateContact(index, "role", e.target.value)} placeholder="DSI, RSSI, Admin..." className="h-8 text-sm" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                       <Label className="text-xs">Email</Label>
                       <Input type="email" value={contact.email} onChange={(e) => updateContact(index, "email", e.target.value)} placeholder="email@exemple.com" className="h-8 text-sm" />
                     </div>
-                    <div className="space-y-1">
+                    <div className="flex flex-col gap-1">
                       <Label className="text-xs">Téléphone</Label>
                       <Input value={contact.telephone} onChange={(e) => updateContact(index, "telephone", e.target.value)} placeholder="+33 1 23 45 67 89" className="h-8 text-sm" />
                     </div>
                   </div>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={contact.is_main_contact} onChange={(e) => updateContact(index, "is_main_contact", e.target.checked)} className="rounded border-gray-300" />
+                    <Checkbox checked={contact.is_main_contact} onCheckedChange={(checked) => updateContact(index, "is_main_contact", !!checked)} />
                     Contact principal
                   </label>
                 </div>
@@ -691,7 +704,7 @@ export default function EntreprisesPage() {
               Annuler
             </Button>
             <Button onClick={handleUpdate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Enregistrer
             </Button>
           </DialogFooter>
@@ -699,46 +712,44 @@ export default function EntreprisesPage() {
       </Dialog>
 
       {/* ── Dialog: Supprimer ── */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer la suppression</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
               Êtes-vous sûr de vouloir supprimer l&apos;entreprise &laquo;{" "}
               <strong>{selected?.nom}</strong> &raquo; ? Cette action est
               irréversible et supprimera tous les sites, équipements et audits
               associés.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
           {formError && (
             <p className="text-sm text-destructive">{formError}</p>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-              Annuler
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={saving}>
+              {saving && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Supprimer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Dialog: Détail ── */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
+              <Building2 className="size-5" />
               {selected?.nom}
             </DialogTitle>
           </DialogHeader>
 
           {selected && (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <InfoField label="Secteur d'activité" value={selected.secteur_activite} />
                 <InfoField label="SIRET" value={selected.siret} mono />
@@ -779,11 +790,11 @@ export default function EntreprisesPage() {
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                  <Users className="h-4 w-4" />
+                  <Users className="size-4" />
                   Contacts ({selected.contacts?.length || 0})
                 </p>
                 {selected.contacts?.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     {selected.contacts.map((contact) => (
                       <div
                         key={contact.id}
@@ -822,7 +833,7 @@ export default function EntreprisesPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => router.push(`/sites?entreprise=${selected?.id}`)}>
-              <MapPin className="h-4 w-4 mr-2" />
+              <MapPin data-icon="inline-start" />
               Voir les sites
             </Button>
             <Button
@@ -831,7 +842,7 @@ export default function EntreprisesPage() {
                 if (selected) openEdit(selected);
               }}
             >
-              <Pencil className="h-4 w-4 mr-2" />
+              <Pencil data-icon="inline-start" />
               Modifier
             </Button>
           </DialogFooter>
@@ -854,7 +865,7 @@ function InfoField({
   return (
     <div>
       <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className={`text-sm ${mono ? "font-mono" : ""}`}>{value || "—"}</p>
+      <p className={cn("text-sm", mono && "font-mono")}>{value || "—"}</p>
     </div>
   );
 }

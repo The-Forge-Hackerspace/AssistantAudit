@@ -5,12 +5,12 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .core.config import get_settings
-from .core.database import create_all_tables, SessionLocal
+from .core.database import SessionLocal
 from .core.logging_config import configure_structured_logging
 from .core.audit_logger import AuditLoggingMiddleware
 from .core.metrics import init_app_metrics, get_metrics
@@ -40,11 +40,6 @@ async def lifespan(app: FastAPI):
         traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
     )
 
-    # Création des tables en développement
-    if settings.ENV == "development":
-        logger.info("Mode développement : création des tables...")
-        create_all_tables()
-
     # Créer le dossier uploads
     Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
@@ -60,6 +55,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         sync_result = FrameworkService.sync_from_directory(db, settings.FRAMEWORKS_DIR)
+        db.commit()
         total = sync_result['imported'] + sync_result['updated'] + sync_result['unchanged']
         logger.info(
             f"Sync référentiels : {total} frameworks "
@@ -69,6 +65,9 @@ async def lifespan(app: FastAPI):
         if sync_result['errors']:
             for err in sync_result['errors']:
                 logger.error(f"  Erreur sync : {err}")
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -79,6 +78,8 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """Factory pour créer l'application FastAPI"""
+    # Desactiver Swagger/ReDoc en production (surface d'attaque inutile)
+    is_prod = settings.ENV in ("production", "preprod", "staging")
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
@@ -86,16 +87,21 @@ def create_app() -> FastAPI:
             "Outil d'audit d'infrastructure IT — "
             "Référentiels, évaluations de conformité et outils intégrés."
         ),
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url=None if is_prod else "/docs",
+        redoc_url=None if is_prod else "/redoc",
+        openapi_url=None if is_prod else "/openapi.json",
         lifespan=lifespan,
     )
 
     # ── Security Headers Middleware ────────────────────────────────────────
     class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-        """Ajoute les en-têtes de sécurité HTTP à chaque réponse."""
+        """Ajoute les en-tetes de securite HTTP a chaque reponse.
+        Skip les WebSocket (BaseHTTPMiddleware ne supporte pas le protocole WS)."""
 
         async def dispatch(self, request: Request, call_next):
+            # BaseHTTPMiddleware casse les WebSocket — les laisser passer directement
+            if request.scope.get("type") == "websocket":
+                return await call_next(request)
             response: Response = await call_next(request)
             response.headers["X-Content-Type-Options"] = "nosniff"
             response.headers["X-Frame-Options"] = "DENY"
@@ -119,6 +125,9 @@ def create_app() -> FastAPI:
                 response.headers["Strict-Transport-Security"] = (
                     "max-age=31536000; includeSubDomains"
                 )
+            # Masquer les versions serveur (fingerprinting)
+            if "server" in response.headers:
+                del response.headers["server"]
             return response
 
     app.add_middleware(SecurityHeadersMiddleware)
@@ -142,14 +151,20 @@ def create_app() -> FastAPI:
     from .api.v1.router import api_router
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+    # WebSocket monte a la racine (agent se connecte a /ws/agent, pas /api/v1/ws/agent)
+    from .api.v1.websocket import router as websocket_router
+    app.include_router(websocket_router)
+
     # ── Prometheus metrics endpoint ────────────────────────────────────────
+    from .core.deps import get_current_admin
+
     @app.get(
         "/metrics",
         responses={200: {"description": "Prometheus metrics"}},
         tags=["monitoring"],
     )
-    async def metrics():
-        """Expose Prometheus metrics for monitoring"""
+    def metrics(admin=Depends(get_current_admin)):
+        """Expose Prometheus metrics (admin uniquement)"""
         return Response(content=get_metrics(), media_type="text/plain")
 
     # ── Health check endpoints ────────────────────────────────────────────

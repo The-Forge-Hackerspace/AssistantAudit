@@ -11,6 +11,9 @@ import {
   X,
   Plus,
   FileText,
+  Copy,
+  Check,
+  Smartphone,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -22,10 +25,22 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 import { toolsApi, entreprisesApi, auditsApi } from "@/services/api";
 import type { Audit, Entreprise, Monkey365Config, Monkey365ScanCreate, Monkey365ScanResultSummary, Monkey365ScanResultDetail, Monkey365ScanLogs, Monkey365ImportResult } from "@/types/api";
@@ -57,10 +72,13 @@ export default function Monkey365Page() {
   const [scanLogs, setScanLogs] = useState<Monkey365ScanLogs | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Simplified config - only 2 fields
+  // Simplified config
   const [spoSites, setSpoSites] = useState<string[]>([]);
   const [exportFormats, setExportFormats] = useState<string[]>(["JSON", "HTML"]);
   const [siteInput, setSiteInput] = useState("");
+  const [deviceCode, setDeviceCode] = useState(false);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [activeDeviceCode, setActiveDeviceCode] = useState<{ url: string; code: string } | null>(null);
 
   const [scans, setScans] = useState<Monkey365ScanResultSummary[]>([]);
   const [selectedScan, setSelectedScan] = useState<Monkey365ScanResultDetail | null>(null);
@@ -121,7 +139,7 @@ export default function Monkey365Page() {
       case "failed":
         return <Badge variant="destructive">Échec</Badge>;
       case "running":
-        return <Badge className="bg-blue-500"><Loader2 className="h-3 w-3 mr-1 animate-spin" />En cours</Badge>;
+        return <Badge className="bg-blue-500"><Loader2 className="size-3 animate-spin" />En cours</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -133,8 +151,7 @@ export default function Monkey365Page() {
     try {
       const data = await toolsApi.listMonkey365Scans(parseInt(selectedEntrepriseId, 10));
       setScans(data);
-    } catch (err) {
-      console.error("Failed to load scans:", err);
+    } catch {
       toast.error("Erreur lors du chargement des scans");
     } finally {
       setLoading(false);
@@ -157,8 +174,7 @@ export default function Monkey365Page() {
           setScanLogs(logs);
         }
       }
-    } catch (err) {
-      console.error("Failed to load scan detail:", err);
+    } catch {
       toast.error("Erreur lors du chargement des détails");
     }
   };
@@ -182,6 +198,20 @@ export default function Monkey365Page() {
     if (!selectedScan) { setScanLogs(null); }
   }, [selectedScan?.id]);
 
+  // Track the latest device code from logs for the sticky banner
+  useEffect(() => {
+    if (!scanLogs) { setActiveDeviceCode(null); return; }
+    const dcPattern = /open the page (https?:\/\/[^\s]+) and enter the code ([A-Z0-9]{4,12}) to/i;
+    const dcFallback = /(https?:\/\/(?:microsoft\.com|aka\.ms|login\.microsoftonline\.com)\/device\S*)\s.*?(?:code[:\s]+)([A-Z0-9\-]{4,12})/i;
+    let found: { url: string; code: string } | null = null;
+    for (const raw of scanLogs.lines) {
+      const line = raw.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
+      const m = dcPattern.exec(line) || dcFallback.exec(line);
+      if (m) found = { url: m[1], code: m[2] };
+    }
+    setActiveDeviceCode(found);
+  }, [scanLogs]);
+
   // Centralized per-scan poll: fetch detail + logs together every 2s while running
   useEffect(() => {
     if (!selectedScan?.id || selectedScan.status !== "running") return;
@@ -200,8 +230,8 @@ export default function Monkey365Page() {
         if (updated.status !== "running") {
           setElapsedSeconds(updated.duration_seconds || 0);
         }
-      } catch (err) {
-        console.error("Erreur lors du polling du scan:", err);
+      } catch {
+        // polling error silently handled
       }
     };
     poll();
@@ -253,11 +283,16 @@ export default function Monkey365Page() {
       `$param = @{`,
       `    Instance        = 'Microsoft365';`,
       `    Collect         = @('ExchangeOnline', 'MicrosoftTeams', 'Purview', 'SharePointOnline', 'AdminPortal');`,
-      `    PromptBehavior  = 'SelectAccount';`,
       `    IncludeEntraID  = $true;`,
-      `    ForceMSALDesktop = $true;`,
       `    ExportTo        = @('${exportFormats.join("', '")}');`,
     ];
+
+    if (deviceCode) {
+      params.push(`    DeviceCode      = $true;`);
+    } else {
+      params.push(`    PromptBehavior  = 'SelectAccount';`);
+      params.push(`    ForceMSALDesktop = $true;`);
+    }
 
     if (spoSites.length > 0) {
       params.push(`    SpoSites        = @('${spoSites.join("', '")}')`);
@@ -280,6 +315,7 @@ export default function Monkey365Page() {
       const config: Monkey365Config = {
         spo_sites: spoSites.length > 0 ? spoSites : undefined,
         export_to: exportFormats,
+        device_code: deviceCode || undefined,
       };
 
       const payload: Monkey365ScanCreate = {
@@ -292,8 +328,7 @@ export default function Monkey365Page() {
       
       setActiveTab("history");
       await loadScans();
-    } catch (err) {
-      console.error("Failed to launch scan:", err);
+    } catch {
       toast.error("Erreur lors du lancement du scan");
     } finally {
       setLaunching(false);
@@ -322,17 +357,23 @@ export default function Monkey365Page() {
     }
   };
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+
+  const confirmDeleteScan = (scanId: number) => {
+    setPendingDeleteId(scanId);
+    setDeleteDialogOpen(true);
+  };
+
   const handleDeleteScan = async (scanId: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce scan ?")) return;
-    
+    setDeleteDialogOpen(false);
     setDeletingId(scanId);
     try {
       await toolsApi.deleteMonkey365Scan(scanId);
       toast.success("Scan supprimé avec succès");
       setSelectedScan(null);
       await loadScans();
-    } catch (err) {
-      console.error("Failed to delete scan:", err);
+    } catch {
       toast.error("Erreur lors de la suppression du scan");
     } finally {
       setDeletingId(null);
@@ -376,7 +417,7 @@ export default function Monkey365Page() {
           <div className="flex items-center gap-4">
             <Link href="/outils">
               <Button variant="outline" size="icon">
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft />
               </Button>
             </Link>
             <h1 className="text-3xl font-bold">Monkey365 — Audit Microsoft 365</h1>
@@ -384,9 +425,9 @@ export default function Monkey365Page() {
         </div>
 
         <Alert className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-          <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertTriangle className="size-4 text-blue-600 dark:text-blue-400" />
           <AlertDescription className="text-blue-800 dark:text-blue-300">
-            Mode simplifié : INTERACTIVE auth (navigateur), collecte des 5 modules M365 standard, export JSON + HTML.
+            Collecte des 5 modules M365 standard. Auth interactive (navigateur) ou Device Code (code appareil).
           </AlertDescription>
         </Alert>
 
@@ -400,11 +441,13 @@ export default function Monkey365Page() {
                   <SelectValue placeholder="Sélectionner une entreprise" />
                 </SelectTrigger>
                 <SelectContent>
-                  {entreprises.map((ent) => (
-                    <SelectItem key={ent.id} value={ent.id.toString()}>
-                      {ent.nom}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {entreprises.map((ent) => (
+                      <SelectItem key={ent.id} value={ent.id.toString()}>
+                        {ent.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -418,7 +461,7 @@ export default function Monkey365Page() {
             <TabsTrigger value="details">Détails</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="launch" className="space-y-6">
+          <TabsContent value="launch" className="flex flex-col gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Configuration du scan</CardTitle>
@@ -426,9 +469,9 @@ export default function Monkey365Page() {
                   Les paramètres sont fixés pour le cas d'usage standard (99% du temps)
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="flex flex-col gap-6">
                 {/* SharePoint Sites */}
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label>Sites SharePoint (optionnel)</Label>
                   <div className="flex gap-2">
                     <Input
@@ -438,7 +481,7 @@ export default function Monkey365Page() {
                       onKeyPress={(e) => e.key === "Enter" && handleAddSite()}
                     />
                     <Button onClick={handleAddSite} size="sm" variant="outline">
-                      <Plus className="h-4 w-4" />
+                      <Plus />
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-2">
@@ -446,7 +489,7 @@ export default function Monkey365Page() {
                       <Badge key={site} variant="secondary" className="cursor-pointer">
                         {site}
                         <X
-                          className="h-3 w-3 ml-1 hover:text-destructive"
+                          className="size-3 ml-1 hover:text-destructive"
                           onClick={() => handleRemoveSite(site)}
                         />
                       </Badge>
@@ -455,9 +498,9 @@ export default function Monkey365Page() {
                 </div>
 
                 {/* Export Formats */}
-                <div className="space-y-3">
+                <div className="flex flex-col gap-3">
                   <Label>Formats d'export</Label>
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     {["JSON", "HTML", "CSV"].map((format) => (
                       <div key={format} className="flex items-center space-x-2">
                         <Checkbox
@@ -476,20 +519,34 @@ export default function Monkey365Page() {
                   </div>
                 </div>
 
+                {/* Device Code toggle */}
+                <div className="flex items-center justify-between rounded border p-4">
+                  <div className="flex items-center gap-3">
+                    <Smartphone className="size-5 text-muted-foreground" />
+                    <div>
+                      <Label className="text-sm font-medium">Mode Device Code</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Authentification via code appareil — pour les sessions sans navigateur
+                      </p>
+                    </div>
+                  </div>
+                  <Switch checked={deviceCode} onCheckedChange={setDeviceCode} />
+                </div>
+
                 {/* Fixed Parameters Info */}
-                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-800 space-y-2 text-sm">
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded border border-gray-200 dark:border-gray-800 flex flex-col gap-2 text-sm">
                   <p className="font-semibold">Paramètres fixés :</p>
-                  <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300">
+                  <ul className="list-disc list-inside flex flex-col gap-1 text-gray-700 dark:text-gray-300">
                     <li>Instance: Microsoft365</li>
-                    <li>Authentification: INTERACTIVE (navigateur)</li>
+                    <li>Authentification: {deviceCode ? "DEVICE CODE (code appareil)" : "INTERACTIVE (navigateur)"}</li>
                     <li>Modules: ExchangeOnline, MicrosoftTeams, Purview, SharePointOnline, AdminPortal</li>
                     <li>IncludeEntraID: $true</li>
-                    <li>ForceMSALDesktop: $true (MSAL interactive desktop auth)</li>
+                    {!deviceCode && <li>ForceMSALDesktop: $true (MSAL interactive desktop auth)</li>}
                   </ul>
                 </div>
 
                 {/* PowerShell Preview */}
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <Label>Aperçu PowerShell</Label>
                   <pre className="bg-gray-900 text-gray-100 p-4 rounded overflow-auto text-xs max-h-48">
                     {generatePSPreview()}
@@ -505,12 +562,12 @@ export default function Monkey365Page() {
                 >
                   {launching ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="animate-spin" data-icon="inline-start" />
                       Lancement en cours...
                     </>
                   ) : (
                     <>
-                      <Play className="h-4 w-4 mr-2" />
+                      <Play data-icon="inline-start" />
                       Lancer le scan
                     </>
                   )}
@@ -519,7 +576,7 @@ export default function Monkey365Page() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="history" className="space-y-4">
+          <TabsContent value="history" className="flex flex-col gap-4">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -532,7 +589,7 @@ export default function Monkey365Page() {
                     size="sm"
                     variant="outline"
                   >
-                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                    <RefreshCw className={loading ? "animate-spin" : ""} />
                   </Button>
                 </div>
               </CardHeader>
@@ -575,12 +632,12 @@ export default function Monkey365Page() {
                                  variant="ghost"
                                  onClick={(e) => {
                                    e.stopPropagation();
-                                   handleDeleteScan(scan.id);
+                                   confirmDeleteScan(scan.id);
                                  }}
                                  disabled={deletingId === scan.id}
                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                                >
-                                 {deletingId === scan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                                 {deletingId === scan.id ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />}
                                </Button>
                              </div>
                           </TableCell>
@@ -593,7 +650,7 @@ export default function Monkey365Page() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="details" className="space-y-4">
+          <TabsContent value="details" className="flex flex-col gap-4">
             {!selectedScan ? (
               <Card>
                 <CardContent className="py-8">
@@ -616,9 +673,9 @@ export default function Monkey365Page() {
                               disabled={openingReport}
                             >
                               {openingReport ? (
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                <Loader2 className="animate-spin" data-icon="inline-start" />
                               ) : (
-                                <FileText className="h-4 w-4 mr-1" />
+                                <FileText data-icon="inline-start" />
                               )}
                               Rapport HTML
                             </Button>
@@ -627,7 +684,7 @@ export default function Monkey365Page() {
                               size="sm"
                               onClick={handleOpenImportDialog}
                             >
-                              <Plus className="h-4 w-4 mr-1" />
+                              <Plus data-icon="inline-start" />
                               Ajouter à l'audit
                             </Button>
                           </>
@@ -638,24 +695,24 @@ export default function Monkey365Page() {
                             size="sm"
                             onClick={() => handleCancelScan(selectedScan.id)}
                           >
-                            <X className="h-4 w-4 mr-1" />
+                            <X data-icon="inline-start" />
                             Forcer l'arrêt
                           </Button>
                         )}
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => handleDeleteScan(selectedScan.id)}
+                        onClick={() => confirmDeleteScan(selectedScan.id)}
                         disabled={deletingId === selectedScan.id}
                       >
                         {deletingId === selectedScan.id ? (
                           <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            <Loader2 className="animate-spin" data-icon="inline-start" />
                             Suppression...
                           </>
                         ) : (
                           <>
-                            <X className="h-4 w-4 mr-2" />
+                            <X data-icon="inline-start" />
                             Supprimer
                           </>
                         )}
@@ -663,7 +720,7 @@ export default function Monkey365Page() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="flex flex-col gap-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">ID Scan</p>
@@ -700,7 +757,7 @@ export default function Monkey365Page() {
 
                     {selectedScan.error_message && (
                       <Alert variant="destructive">
-                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTriangle className="size-4" />
                         <AlertDescription>{selectedScan.error_message}</AlertDescription>
                       </Alert>
                     )}
@@ -723,7 +780,7 @@ export default function Monkey365Page() {
                       <CardTitle className="text-base">Logs PowerShell</CardTitle>
                       {selectedScan.status === "running" && (
                         <Badge className="bg-blue-500">
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          <Loader2 className="size-3 animate-spin" />
                           En direct
                         </Badge>
                       )}
@@ -742,12 +799,68 @@ export default function Monkey365Page() {
                           : "Aucun log disponible"}
                       </p>
                     ) : (
-                      <div className="bg-gray-950 rounded p-3 max-h-96 overflow-y-auto font-mono text-xs">
-                        {scanLogs.lines.map((line, i) => (
-                          <div key={i} className="text-gray-200 leading-5 whitespace-pre-wrap break-all">
-                            {line || "\u00a0"}
+                      <div className="bg-gray-950 rounded p-3 max-h-96 overflow-y-auto font-mono text-xs relative">
+                        {activeDeviceCode && (
+                          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded bg-indigo-600 px-3 py-2 mb-2 text-white shadow-lg">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Smartphone className="size-5 shrink-0" />
+                              <a href={activeDeviceCode.url} target="_blank" rel="noopener noreferrer" className="text-indigo-200 underline text-xs truncate">
+                                {activeDeviceCode.url}
+                              </a>
+                              <span className="font-mono text-2xl font-bold tracking-wider shrink-0">{activeDeviceCode.code}</span>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                await navigator.clipboard.writeText(activeDeviceCode.code);
+                                setCopiedCode(activeDeviceCode.code);
+                                toast.success("Code copié !");
+                                setTimeout(() => setCopiedCode(null), 2000);
+                              }}
+                              className="shrink-0 flex items-center gap-1 rounded bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 font-medium"
+                            >
+                              {copiedCode === activeDeviceCode.code ? <Check className="size-3" /> : <Copy className="size-3" />}
+                              {copiedCode === activeDeviceCode.code ? "Copié !" : "Copier le code"}
+                            </button>
                           </div>
-                        ))}
+                        )}
+                        {scanLogs.lines.map((line, i) => {
+                          // Strip leftover ANSI escape codes
+                          const clean = line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
+                          // Detect device code: MSAL "open the page ... enter the code ..." pattern
+                          const dcMatch = clean.match(/open the page (https?:\/\/[^\s]+) and enter the code ([A-Z0-9]{4,12}) to/i)
+                            // Also match older "use ... devicelogin ... code XXX" pattern
+                            || clean.match(/(https?:\/\/(?:microsoft\.com|aka\.ms|login\.microsoftonline\.com)\/device\S*)\s.*?(?:code[:\s]+)([A-Z0-9\-]{4,12})/i);
+                          if (dcMatch) {
+                            const dcUrl = dcMatch[1];
+                            const codeValue = dcMatch[2];
+                            return (
+                              <div key={i} className="flex items-center gap-2 rounded bg-indigo-950/60 border border-indigo-500/30 px-2 py-1.5 my-1">
+                                <div className="flex-1 text-indigo-200 leading-5 whitespace-pre-wrap break-all">
+                                  <span>{clean.slice(0, clean.indexOf(codeValue))}</span>
+                                  <span className="text-xl font-bold text-white tracking-wider">{codeValue}</span>
+                                  <span>{clean.slice(clean.indexOf(codeValue) + codeValue.length)}</span>
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    await navigator.clipboard.writeText(codeValue);
+                                    setCopiedCode(codeValue);
+                                    toast.success("Code copié !");
+                                    setTimeout(() => setCopiedCode(null), 2000);
+                                  }}
+                                  className="shrink-0 flex items-center gap-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2 py-1"
+                                >
+                                  {copiedCode === codeValue ? <Check className="size-3" /> : <Copy className="size-3" />}
+                                  {copiedCode === codeValue ? "Copié" : "Copier"}
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={i} className="text-gray-200 leading-5 whitespace-pre-wrap break-all">
+                              {clean || "\u00a0"}
+                            </div>
+                          );
+                        })}
                         <div ref={logsEndRef} />
                       </div>
                     )}
@@ -779,11 +892,13 @@ export default function Monkey365Page() {
                   <SelectValue placeholder="Choisir un audit…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {importAudits.map((audit) => (
-                    <SelectItem key={audit.id} value={audit.id.toString()}>
-                      {audit.nom_projet}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {importAudits.map((audit) => (
+                      <SelectItem key={audit.id} value={audit.id.toString()}>
+                        {audit.nom_projet}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             )}
@@ -796,7 +911,7 @@ export default function Monkey365Page() {
             <Button onClick={handleConfirmImport} disabled={!importAuditId || importing}>
               {importing ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="animate-spin" data-icon="inline-start" />
                   Import en cours…
                 </>
               ) : (
@@ -806,6 +921,24 @@ export default function Monkey365Page() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce scan ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ce scan et ses résultats seront définitivement supprimés. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => pendingDeleteId && handleDeleteScan(pendingDeleteId)}>
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

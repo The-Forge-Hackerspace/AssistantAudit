@@ -25,7 +25,6 @@ export default function LoginPage() {
       // La redirection vers "/" est gérée par AuthGuard
       // une fois que le state `user` est mis à jour.
     } catch (err: unknown) {
-      console.error("Login error:", err);
       if (err && typeof err === "object" && "response" in err) {
         const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } };
         const detail = axiosErr.response?.data?.detail;
@@ -43,9 +42,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-            <ShieldCheck className="h-8 w-8 text-primary" />
+        <CardHeader className="text-center flex flex-col gap-2">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary/10">
+            <ShieldCheck className="size-8 text-primary" />
           </div>
           <CardTitle className="text-2xl font-bold">AssistantAudit</CardTitle>
           <CardDescription>
@@ -53,8 +52,8 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="username">Identifiant</Label>
               <Input
                 id="username"
@@ -66,7 +65,7 @@ export default function LoginPage() {
                 autoComplete="username"
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="password">Mot de passe</Label>
               <Input
                 id="password"
@@ -83,7 +82,7 @@ export default function LoginPage() {
             )}
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading && <Loader2 className="animate-spin" data-icon="inline-start" />}
               Se connecter
             </Button>
           </form>

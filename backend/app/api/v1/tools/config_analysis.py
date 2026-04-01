@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from ....core.database import get_db
 from ....core.deps import get_current_user, get_current_auditeur
+from ....core.helpers import user_has_access_to_entreprise
 from ....models.user import User
 from ....schemas.scan import (
     ConfigAnalysisResult,
@@ -26,12 +27,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _rbac(u: User) -> tuple[int, bool]:
+    return u.id, u.role == "admin"
+
+
 @router.post("/config-analysis", response_model=ConfigUploadResponse)
-async def analyze_config(
+def analyze_config(
     file: UploadFile = File(...),
     equipement_id: int | None = Form(None),
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """
     Upload un fichier de configuration réseau et retourne l'analyse.
@@ -41,24 +46,21 @@ async def analyze_config(
     if not file.filename:
         raise HTTPException(400, "Nom de fichier manquant")
 
-    # ── Limite de taille du fichier ──────────────────────────────────────
     from ....core.config import get_settings
     _settings = get_settings()
     max_bytes = _settings.MAX_CONFIG_UPLOAD_SIZE_MB * 1024 * 1024
-    raw = await file.read(max_bytes + 1)  # lire 1 octet de plus pour détecter
+    raw = file.file.read(max_bytes + 1)
     if len(raw) > max_bytes:
         raise HTTPException(
             413,
             f"Fichier trop volumineux (max {_settings.MAX_CONFIG_UPLOAD_SIZE_MB} Mo).",
         )
 
-    # Try UTF-8, then latin-1
     try:
         content = raw.decode("utf-8")
     except UnicodeDecodeError:
         content = raw.decode("latin-1")
 
-    # Detect vendor
     vendor = ConfigParserBase.detect_vendor(content)
     if not vendor:
         raise HTTPException(
@@ -77,7 +79,6 @@ async def analyze_config(
         logger.exception("Erreur lors du parsing de la configuration")
         raise HTTPException(500, f"Erreur d'analyse : {exc}") from exc
 
-    # Si un équipement est spécifié, persister l'analyse
     config_analysis_id = None
     if equipement_id:
         try:
@@ -105,7 +106,7 @@ async def analyze_config(
 def analyze_config_raw(
     content: str = Form(...),
     vendor_hint: str | None = Form(None),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """
     Analyse une configuration envoyée en texte brut (sans upload de fichier).
@@ -127,7 +128,7 @@ def analyze_config_raw(
 
 @router.get("/config-analysis/vendors")
 def list_vendors(
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Liste les vendors supportés par les parsers de configuration."""
     return {
@@ -154,14 +155,28 @@ def list_analyses(
     page: int = Query(1, ge=1, description="Numéro de page"),
     page_size: int = Query(20, ge=1, le=100, description="Éléments par page"),
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les analyses de configuration sauvegardées, optionnellement filtrées par équipement."""
+    uid, adm = _rbac(current_user)
     from ....models.config_analysis import ConfigAnalysis as CA
 
     query = db.query(CA)
     if equipement_id:
         query = query.filter(CA.equipement_id == equipement_id)
+    if not adm:
+        from ....models.equipement import Equipement
+        from ....models.site import Site
+        from ....models.audit import Audit
+        accessible_ent_ids = (
+            db.query(Audit.entreprise_id)
+            .filter(Audit.owner_id == uid)
+            .distinct()
+            .scalar_subquery()
+        )
+        query = query.join(Equipement, CA.equipement_id == Equipement.id).join(
+            Site, Equipement.site_id == Site.id
+        ).filter(Site.entreprise_id.in_(accessible_ent_ids))
     analyses = (
         query.order_by(CA.created_at.desc())
         .offset((page - 1) * page_size)
@@ -169,7 +184,6 @@ def list_analyses(
         .all()
     )
 
-    # Convertir en summary avec findings_count calculé
     results = []
     for a in analyses:
         results.append(ConfigAnalysisSummary(
@@ -189,10 +203,11 @@ def list_analyses(
 def get_analysis(
     config_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère le détail d'une analyse de configuration."""
-    config = get_config_analysis(db, config_id)
+    uid, adm = _rbac(current_user)
+    config = get_config_analysis(db, config_id, user_id=uid, is_admin=adm)
     if not config:
         raise HTTPException(404, "Analyse de configuration introuvable")
     return config
@@ -202,10 +217,11 @@ def get_analysis(
 def remove_analysis(
     config_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """Supprime une analyse de configuration."""
-    if not delete_config_analysis(db, config_id):
+    uid, adm = _rbac(current_user)
+    if not delete_config_analysis(db, config_id, user_id=uid, is_admin=adm):
         raise HTTPException(404, "Analyse de configuration introuvable")
     return MessageResponse(message="Analyse supprimée")
 
@@ -215,12 +231,11 @@ def prefill_audit(
     config_id: int,
     assessment_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_auditeur),
+    current_user: User = Depends(get_current_auditeur),
 ):
     """
     Pré-remplit les contrôles d'un assessment à partir des findings
     d'une analyse de configuration liée.
-    Mappe automatiquement les findings aux contrôles du framework firewall.
     """
     try:
         result = prefill_assessment_from_config(db, config_id, assessment_id)
@@ -236,7 +251,7 @@ def prefill_audit(
 def list_assessments_for_equipment(
     equipement_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Liste les assessments liés à un équipement (pour sélectionner
