@@ -5,8 +5,6 @@
  *       Bug connu: Docker manque libgobject-2.0 (voir bug BUG-S2-001).
  */
 import { test, expect } from '@playwright/test';
-import * as path from 'path';
-import { loginAsAdmin } from './helpers/auth';
 
 const BASE_URL = 'http://localhost:3000';
 const API_URL = 'http://127.0.0.1:8000';
@@ -46,15 +44,44 @@ test.describe('Rapports — génération et téléchargement PDF', () => {
     const loginResp = await page.request.post(`${API_URL}/api/v1/auth/login`, {
       form: { username: 'admin@assistantaudit.local', password: 'Admin1234!' },
     });
-    expect(loginResp.status()).toBe(200);
+    if (loginResp.status() !== 200) {
+      const errBody = await loginResp.text();
+      throw new Error(`Login failed (${loginResp.status()}): ${errBody}`);
+    }
     const { access_token } = await loginResp.json();
 
-    // Créer un audit de test d'abord (si aucun n'existe)
-    // Ensuite créer un rapport
+    // Créer une entreprise de test (nécessaire pour l'audit)
+    const entrepriseResp = await page.request.post(`${API_URL}/api/v1/entreprises`, {
+      headers: { Authorization: `Bearer ${access_token}` },
+      data: { nom: 'E2E Test Corp', siret: '12345678901234' },
+    });
+    let entrepriseId: number;
+    if (entrepriseResp.status() === 201 || entrepriseResp.status() === 200) {
+      const entreprise = await entrepriseResp.json();
+      entrepriseId = entreprise.id;
+    } else {
+      // Fallback: list existing entreprises
+      const listResp = await page.request.get(`${API_URL}/api/v1/entreprises`, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const entreprises = await listResp.json();
+      if (!Array.isArray(entreprises) || entreprises.length === 0) {
+        console.log('No entreprise available and cannot create one — skipping');
+        test.skip();
+        return;
+      }
+      entrepriseId = entreprises[0].id;
+    }
+
+    // Créer un audit de test
     const auditResp = await page.request.post(`${API_URL}/api/v1/audits`, {
       headers: { Authorization: `Bearer ${access_token}` },
-      data: { nom_projet: 'Test E2E Sprint 2', entreprise_id: 1 },
+      data: { nom_projet: 'Test E2E Sprint 2', entreprise_id: entrepriseId },
     });
+    if (auditResp.status() !== 201 && auditResp.status() !== 200) {
+      const errBody = await auditResp.text();
+      throw new Error(`Audit creation failed (${auditResp.status()}): ${errBody}`);
+    }
     const audit = await auditResp.json();
 
     const reportResp = await page.request.post(`${API_URL}/api/v1/reports`, {
@@ -89,9 +116,7 @@ test.describe('Rapports — génération et téléchargement PDF', () => {
   });
 
   test('Page de génération rapport visible (frontend)', async ({ page }) => {
-    await loginAsAdmin(page);
-
-    // Naviguer vers un audit pour voir si la génération rapport est disponible
+    // storageState handles auth — navigate directly
     await page.goto(`${BASE_URL}/audits`);
     await page.screenshot({ path: 'playwright-results/audits-list.png', fullPage: true });
 

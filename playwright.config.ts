@@ -1,4 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import * as path from 'path';
+
+const storageState = path.join(__dirname, 'playwright/.auth/state.json');
 
 export default defineConfig({
   testDir: './tests',
@@ -8,17 +11,22 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
 
+  globalSetup: './tests/e2e/global-setup.ts',
+
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
+    storageState,
   },
 
-  webServer: {
-    command: 'npm --prefix frontend run dev -- --port 3000',
-    url: 'http://localhost:3000',
-    reuseExistingServer: true,
-    timeout: 120_000,
-  },
+  webServer: process.env.CI
+    ? undefined
+    : {
+        command: 'npm --prefix frontend run dev -- --port 3000',
+        url: 'http://localhost:3000',
+        reuseExistingServer: true,
+        timeout: 120_000,
+      },
 
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

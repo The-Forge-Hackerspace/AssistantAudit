@@ -4,7 +4,6 @@
  * Frontend: http://localhost:3000 | Backend: http://localhost:8000
  */
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin } from './helpers/auth';
 
 const BASE_URL = 'http://localhost:3000';
 
@@ -18,10 +17,7 @@ test.describe('Checklists — mode terrain tablette', () => {
   });
 
   test('Page checklists est accessible après login', async ({ page }) => {
-    // Login
-    await loginAsAdmin(page);
-
-    // Naviguer vers la page checklists d'un audit (ID 1 par défaut)
+    // storageState handles auth — navigate directly
     await page.goto(`${BASE_URL}/audits/1/checklists`);
 
     // Prendre screenshot

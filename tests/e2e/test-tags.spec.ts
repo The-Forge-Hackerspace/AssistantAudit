@@ -3,7 +3,6 @@
  * Prérequis: backend + frontend en cours d'exécution (docker compose up -d)
  */
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin } from './helpers/auth';
 
 const BASE_URL = 'http://localhost:3000';
 
@@ -16,10 +15,7 @@ test.describe('Tags — badges et filtrage multi-tag', () => {
   });
 
   test('Composant TagFilter est présent dans la page équipements (après login)', async ({ page }) => {
-    // Login d'abord
-    await loginAsAdmin(page);
-
-    // Naviguer vers équipements
+    // storageState handles auth — navigate directly
     await page.goto(`${BASE_URL}/equipements`);
     await page.waitForLoadState('networkidle', { timeout: 10000 });
 
