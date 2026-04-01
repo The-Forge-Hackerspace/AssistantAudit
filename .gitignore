@@ -69,15 +69,22 @@ docker-compose.override.yml
 htmlcov/
 .coverage
 
-# AI assistant metadata (Claude Code, GitHub Copilot, etc.)
+# AI assistant metadata (Claude Code, GitHub Copilot, Gemini, etc.)
 .claude/
 CLAUDE.md
 **/CLAUDE.md
+GEMINI.md
+**/GEMINI.md
 AGENTS.md
 **/AGENTS.md
 .copilot/
 .github/copilot*
 *.copilot*
+.hex-skills/
+
+# Dev-only local files
+.archive/
+docs/
 # Monkey365 (code tiers, à cloner manuellement dans tools/monkey365/)
 tools/monkey365/
 
