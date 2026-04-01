@@ -174,6 +174,40 @@ class TestListing:
         findings, total = FindingService.list_findings(db, status="closed")
         assert total == 0
 
+    @pytest.mark.parametrize("limit, offset", [(1, 0), (1, 1)])
+    def test_list_with_pagination(self, db, seed_data, limit, offset):
+        """Vérifie la pagination (offset/limit) et le total."""
+        FindingService.generate_from_assessment(db, seed_data["assessment"].id)
+        all_findings, total = FindingService.list_findings(db)
+        assert total > limit
+
+        paginated, paginated_total = FindingService.list_findings(
+            db, limit=limit, offset=offset,
+        )
+        assert paginated_total == total
+        expected_slice = all_findings[offset:offset + limit]
+        assert [f.id for f in paginated] == [f.id for f in expected_slice]
+
+    def test_list_with_combined_filters(self, db, seed_data):
+        """Filtre combiné : assessment_id + equipment_id + status."""
+        FindingService.generate_from_assessment(db, seed_data["assessment"].id)
+        all_findings, total = FindingService.list_findings(db)
+        assert total > 0
+
+        target = next(
+            f for f in all_findings
+            if f.status == FindingStatus.OPEN and f.equipment_id is not None
+        )
+        filtered, filtered_total = FindingService.list_findings(
+            db,
+            assessment_id=seed_data["assessment"].id,
+            equipment_id=target.equipment_id,
+            status=target.status.value,
+            severity=target.severity,
+        )
+        assert filtered_total >= 1
+        assert all(f.equipment_id == target.equipment_id for f in filtered)
+
     def test_list_with_severity_filter(self, db, seed_data):
         """Filtre par sévérité."""
         FindingService.generate_from_assessment(db, seed_data["assessment"].id)
@@ -240,6 +274,38 @@ class TestStatusTransition:
             db, finding, "open", user_id=uid, comment="Régression détectée"
         )
         assert finding.status == FindingStatus.OPEN
+
+    def test_closed_to_open_creates_history(self, db, seed_data):
+        """On peut rouvrir un finding fermé et cela crée des entrées d'historique."""
+        finding = self._get_first_finding(db, seed_data)
+        uid = seed_data["user"].id
+
+        # OPEN → CLOSED
+        finding = FindingService.update_status(db, finding, "closed", user_id=uid, comment="Fermeture")
+        assert finding.status == FindingStatus.CLOSED
+
+        # CLOSED → OPEN
+        finding = FindingService.update_status(db, finding, "open", user_id=uid, comment="Réouverture")
+        assert finding.status == FindingStatus.OPEN
+        assert len(finding.status_history) >= 2
+        assert finding.status_history[-1].new_status == FindingStatus.OPEN
+
+    def test_update_status_preserves_assigned_to(self, db, seed_data):
+        """update_status sans assigned_to conserve l'assignation existante."""
+        finding = self._get_first_finding(db, seed_data)
+        uid = seed_data["user"].id
+
+        # Assigner
+        finding = FindingService.update_status(
+            db, finding, "assigned", user_id=uid, assigned_to="Jean Dupont",
+        )
+        assert finding.assigned_to == "Jean Dupont"
+
+        # Transition sans passer assigned_to
+        finding = FindingService.update_status(
+            db, finding, "in_progress", user_id=uid,
+        )
+        assert finding.assigned_to == "Jean Dupont"  # préservé
 
 
 # ── Tests de liaison doublon ─────────────────────────────────────────

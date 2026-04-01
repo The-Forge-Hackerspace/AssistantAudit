@@ -77,8 +77,31 @@ class TestTagIsolation:
     """TAG-003 : isolation inter-utilisateurs."""
 
     def test_other_user_cannot_see_audit_tags(
-        self, client: TestClient, auditeur_headers, second_auditeur_headers
+        self, client: TestClient, auditeur_headers, second_auditeur_headers, db_session, auditeur_user
     ):
         """Un auditeur ne voit pas les tags d'audit d'un autre auditeur."""
-        # Le service filtre déjà par owner_id de l'audit — vérifié via les tests service du step 24
-        pass
+        from app.models.audit import Audit
+
+        # Créer un audit appartenant au premier auditeur
+        audit = Audit(nom_projet="tag-isol-test", entreprise_id=1, owner_id=auditeur_user.id)
+        db_session.add(audit)
+        db_session.flush()
+
+        # Créer un tag global (visible par tous)
+        resp = client.post("/api/v1/tags", json={
+            "name": "isol-global", "color": "#000000"
+        }, headers=auditeur_headers)
+        assert resp.status_code == 201
+
+        # Créer un tag d'audit (visible uniquement par le propriétaire)
+        resp = client.post("/api/v1/tags", json={
+            "name": "isol-audit", "color": "#FF0000", "scope": "audit", "audit_id": audit.id
+        }, headers=auditeur_headers)
+        assert resp.status_code == 201
+
+        # Le second auditeur voit le tag global mais pas le tag d'audit
+        resp = client.get("/api/v1/tags", headers=second_auditeur_headers)
+        assert resp.status_code == 200
+        names = [t["name"] for t in resp.json()["items"]]
+        assert "isol-global" in names
+        assert "isol-audit" not in names

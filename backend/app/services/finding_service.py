@@ -1,8 +1,10 @@
 """Service Finding — logique métier pour les non-conformités."""
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..models.assessment import ComplianceStatus, ControlResult
+from ..models.assessment import Assessment, AssessmentCampaign, ComplianceStatus, ControlResult
+from ..models.audit import Audit
 from ..models.finding import (
     Finding, FindingStatus, FindingStatusHistory, VALID_TRANSITIONS,
 )
@@ -83,6 +85,8 @@ class FindingService:
         severity: str | None = None,
         offset: int = 0,
         limit: int = 20,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> tuple[list[Finding], int]:
         """
         Liste les findings avec filtres optionnels.
@@ -91,6 +95,20 @@ class FindingService:
         query = select(Finding)
         count_query = select(func.count(Finding.id))
 
+        # RBAC : restreindre aux audits de l'utilisateur
+        if user_id is not None and not is_admin:
+            owned_finding_ids = (
+                select(Finding.id)
+                .select_from(Finding)
+                .join(Assessment, Finding.assessment_id == Assessment.id)
+                .join(AssessmentCampaign, Assessment.campaign_id == AssessmentCampaign.id)
+                .join(Audit, AssessmentCampaign.audit_id == Audit.id)
+                .where(Audit.owner_id == user_id)
+                .scalar_subquery()
+            )
+            query = query.where(Finding.id.in_(owned_finding_ids))
+            count_query = count_query.where(Finding.id.in_(owned_finding_ids))
+
         if assessment_id is not None:
             query = query.where(Finding.assessment_id == assessment_id)
             count_query = count_query.where(Finding.assessment_id == assessment_id)
@@ -98,8 +116,16 @@ class FindingService:
             query = query.where(Finding.equipment_id == equipment_id)
             count_query = count_query.where(Finding.equipment_id == equipment_id)
         if status is not None:
-            query = query.where(Finding.status == FindingStatus(status))
-            count_query = count_query.where(Finding.status == FindingStatus(status))
+            try:
+                parsed_status = FindingStatus(status)
+            except ValueError:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Statut invalide : '{status}'. "
+                    f"Valeurs acceptées : {', '.join(s.value for s in FindingStatus)}",
+                )
+            query = query.where(Finding.status == parsed_status)
+            count_query = count_query.where(Finding.status == parsed_status)
         if severity is not None:
             query = query.where(Finding.severity == severity)
             count_query = count_query.where(Finding.severity == severity)

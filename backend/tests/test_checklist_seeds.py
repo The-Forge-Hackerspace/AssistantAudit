@@ -67,3 +67,14 @@ class TestChecklistSeedData:
         seed(db_session)
         count2 = db_session.query(ChecklistTemplate).filter_by(category="documentation").count()
         assert count1 == count2
+
+    def test_departure_seed_idempotent(self, db_session):
+        """Le seed départ est idempotent — pas de doublon si lancé 2 fois."""
+        from scripts.seed_checklist_departure import seed
+        from app.models.checklist import ChecklistTemplate
+
+        seed(db_session)
+        count1 = db_session.query(ChecklistTemplate).filter_by(category="departure").count()
+        seed(db_session)
+        count2 = db_session.query(ChecklistTemplate).filter_by(category="departure").count()
+        assert count1 == count2

@@ -37,6 +37,7 @@ def list_findings(
     current_user: User = Depends(get_current_user),
 ):
     """Liste les findings avec filtres et pagination."""
+    uid, is_admin = _rbac(current_user)
     findings, total = FindingService.list_findings(
         db,
         assessment_id=assessment_id,
@@ -45,6 +46,8 @@ def list_findings(
         severity=severity,
         offset=pagination.offset,
         limit=pagination.page_size,
+        user_id=uid,
+        is_admin=is_admin,
     )
     items = [FindingResponse.model_validate(f) for f in findings]
     return PaginatedResponse(

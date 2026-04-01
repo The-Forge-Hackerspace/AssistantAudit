@@ -87,10 +87,21 @@ class ReportService:
 
     @staticmethod
     def _load_logo_base64(path: str | None) -> str | None:
-        """Charge un logo depuis le disque en base64."""
-        if not path or not os.path.isfile(path):
+        """Charge un logo depuis le disque en base64. Restreint au dossier uploads."""
+        if not path:
             return None
-        with open(path, "rb") as f:
+        # Sécurité : interdire les chemins absolus et la traversée de répertoire
+        if os.path.isabs(path) or ".." in path.split(os.sep):
+            return None
+        from ..core.config import get_settings
+        settings = get_settings()
+        upload_dir = Path(settings.UPLOAD_DIR).resolve()
+        safe_path = (upload_dir / path).resolve()
+        if not str(safe_path).startswith(str(upload_dir)):
+            return None
+        if not safe_path.is_file():
+            return None
+        with open(safe_path, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
 
     @staticmethod
