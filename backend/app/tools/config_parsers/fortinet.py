@@ -4,17 +4,17 @@ Config Parser — FortiGate (Fortinet).
 Parse les exports de configuration FortiGate (format texte).
 Extrait : hostname, firmware, interfaces, règles de filtrage, constats de sécurité.
 """
-import re
 import logging
+import re
 from typing import Optional
 
-from .base import ConfigParserBase
 from ...schemas.scan import (
     ConfigAnalysisResult,
-    InterfaceInfo,
     FirewallRuleInfo,
+    InterfaceInfo,
     SecurityFinding,
 )
+from .base import ConfigParserBase
 
 logger = logging.getLogger(__name__)
 

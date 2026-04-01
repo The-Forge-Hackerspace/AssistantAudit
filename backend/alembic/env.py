@@ -2,12 +2,14 @@
 Alembic env.py — Configuration des migrations.
 Lit DATABASE_URL depuis la config applicative (Settings).
 """
-from logging.config import fileConfig
-from sqlalchemy import pool
-from alembic import context
-import sqlalchemy as sa
 import sys
+from logging.config import fileConfig
 from pathlib import Path
+
+import sqlalchemy as sa
+from sqlalchemy import pool
+
+from alembic import context
 
 # Ajouter le backend au path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

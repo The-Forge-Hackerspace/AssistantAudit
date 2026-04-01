@@ -3,7 +3,6 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-
 LINK_TYPE_PATTERN = r"^(ethernet|fiber|wifi|vpn|wan|serial|other)$"
 
 

@@ -4,7 +4,6 @@ Tests RBAC — Entreprise.owner_id direct ownership.
 Vérifie que les entreprises sont visibles dès la création (sans audit),
 que l'isolation fonctionne par owner_id, et que l'admin voit tout.
 """
-import pytest
 
 
 class TestEntrepriseOwnerIsolation:

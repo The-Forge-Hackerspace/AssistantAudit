@@ -9,14 +9,14 @@ from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from .core.audit_logger import AuditLoggingMiddleware
 from .core.config import get_settings
 from .core.database import SessionLocal
+from .core.health_check import HealthCheckService
 from .core.logging_config import configure_structured_logging
-from .core.audit_logger import AuditLoggingMiddleware
-from .core.metrics import init_app_metrics, get_metrics
+from .core.metrics import get_metrics, init_app_metrics
 from .core.metrics_middleware import PrometheusMiddleware
 from .core.sentry_integration import init_sentry
-from .core.health_check import HealthCheckService
 
 settings = get_settings()
 

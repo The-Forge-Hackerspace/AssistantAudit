@@ -8,10 +8,10 @@ au schema directement (pas de create_all_tables). Il se contente de :
   2. Creer l'utilisateur admin par defaut
   3. Synchroniser les referentiels YAML via sync_from_directory
 """
-import sys
 import io
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 # Forcer UTF-8 pour la sortie console (Windows)
@@ -21,11 +21,11 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 BACKEND_DIR = Path(__file__).parent
 sys.path.insert(0, str(BACKEND_DIR))
 
+from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.core.security import hash_password
 from app.models.user import User
 from app.services.framework_service import FrameworkService
-from app.core.config import get_settings
 
 
 def _run_alembic_upgrade() -> bool:
@@ -37,7 +37,7 @@ def _run_alembic_upgrade() -> bool:
         text=True,
     )
     if result.returncode != 0:
-        print(f"  [ERREUR] alembic upgrade head a echoue:")
+        print("  [ERREUR] alembic upgrade head a echoue:")
         for line in result.stderr.strip().splitlines():
             print(f"    {line}")
         return False
@@ -80,7 +80,7 @@ def init_database():
 
             admin = User(
                 username="admin",
-                email="admin@assistantaudit.fr",
+                email=os.getenv("ADMIN_EMAIL", "admin@assistantaudit.fr"),
                 password_hash=hash_password(admin_password),
                 full_name="Administrateur",
                 role="admin",

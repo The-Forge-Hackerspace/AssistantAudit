@@ -15,17 +15,7 @@ test.describe('Tags — badges et filtrage multi-tag', () => {
   });
 
   test('Composant TagFilter est présent dans la page équipements (après login)', async ({ page }) => {
-    // Login d'abord
-    await page.goto(`${BASE_URL}/login`);
-    const emailField = page.locator('input[type="email"], input[name="email"]');
-    const passwordField = page.locator('input[type="password"]');
-    await emailField.waitFor({ timeout: 5000 });
-    await emailField.fill('admin@assistantaudit.local');
-    await passwordField.fill('Admin1234!');
-    await page.locator('button[type="submit"]').click();
-    await page.waitForURL(/(?!login)/, { timeout: 10000 });
-
-    // Naviguer vers équipements
+    // storageState handles auth — navigate directly
     await page.goto(`${BASE_URL}/equipements`);
     await page.waitForLoadState('networkidle', { timeout: 10000 });
 

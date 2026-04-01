@@ -9,7 +9,6 @@ import pytest
 
 from app.core.file_encryption import EnvelopeEncryption, _validate_kek
 
-
 # ────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ────────────────────────────────────────────────────────────────────────

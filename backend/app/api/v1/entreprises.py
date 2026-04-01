@@ -5,14 +5,14 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
+from ...core.deps import PaginationParams, get_current_admin, get_current_auditeur, get_current_user
 from ...models.user import User
+from ...schemas.common import MessageResponse, PaginatedResponse
 from ...schemas.entreprise import (
     EntrepriseCreate,
     EntrepriseRead,
     EntrepriseUpdate,
 )
-from ...schemas.common import PaginatedResponse, MessageResponse
 from ...services.entreprise_service import EntrepriseService
 
 router = APIRouter()

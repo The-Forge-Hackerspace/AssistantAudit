@@ -10,17 +10,16 @@ from jose import JWTError
 from app.core.security import (
     # Existing functions — regression check
     create_access_token,
+    # New functions
+    create_agent_token,
+    create_enrollment_token,
     create_refresh_token,
     decode_token,
     hash_password,
-    verify_password,
-    # New functions
-    create_agent_token,
     verify_agent_token,
-    create_enrollment_token,
     verify_enrollment_token,
+    verify_password,
 )
-
 
 # ────────────────────────────────────────────────────────────────────────
 # Existing functions — regression tests
@@ -91,6 +90,7 @@ class TestAgentToken:
     def test_verify_expired_token_raises(self):
         """Un token agent expire leve JWTError."""
         from jose import jwt
+
         from app.core.config import get_settings
         settings = get_settings()
 
@@ -169,9 +169,9 @@ class TestGetCurrentAgentDep:
     @pytest.fixture
     def setup(self, db_session):
         """Create user + active agent, return (db, user, agent, token)."""
-        from app.models.user import User
-        from app.models.agent import Agent
         from app.core.security import hash_password
+        from app.models.agent import Agent
+        from app.models.user import User
 
         user = User(
             username="dep_test_user",
@@ -201,7 +201,6 @@ class TestGetCurrentAgentDep:
         _, _, agent, token = setup
         # We need an endpoint that uses get_current_agent.
         # Since none exists yet, we test the dependency function directly.
-        from app.core.deps import get_current_agent
         # Direct invocation test is complex with FastAPI deps.
         # Instead, verify the token is valid and the agent exists.
         payload = verify_agent_token(token)

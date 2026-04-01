@@ -11,8 +11,8 @@ from pathlib import Path
 # Ajouter le backend au path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.config import get_settings
 from app.core.cert_manager import CertManager
+from app.core.config import get_settings
 
 
 def main() -> None:

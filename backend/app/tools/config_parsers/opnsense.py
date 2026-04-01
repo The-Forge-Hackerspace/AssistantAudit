@@ -6,16 +6,17 @@ Extrait : hostname, firmware, interfaces, règles de filtrage, constats de sécu
 """
 import logging
 from typing import Optional
-import defusedxml.ElementTree as ET
 from xml.etree.ElementTree import Element
 
-from .base import ConfigParserBase
+import defusedxml.ElementTree as ET
+
 from ...schemas.scan import (
     ConfigAnalysisResult,
-    InterfaceInfo,
     FirewallRuleInfo,
+    InterfaceInfo,
     SecurityFinding,
 )
+from .base import ConfigParserBase
 
 logger = logging.getLogger(__name__)
 

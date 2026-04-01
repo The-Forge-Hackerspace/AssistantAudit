@@ -11,9 +11,8 @@ from sqlalchemy import Column, Integer, String, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.encryption import AES256GCMCipher, EncryptedText
 from app.core.database import Base
-
+from app.core.encryption import AES256GCMCipher, EncryptedText
 
 # ────────────────────────────────────────────────────────────────────────
 # Fixtures

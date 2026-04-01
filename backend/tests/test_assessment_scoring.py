@@ -3,18 +3,13 @@ Unit tests for assessment scoring and compliance calculation.
 Tests the core business logic of compliance score computation.
 """
 
-import pytest
 from sqlalchemy.orm import Session
 
 from app.models import ComplianceStatus
 from tests.factories import (
-    create_full_assessment_scenario,
     AssessmentFactory,
     ControlResultFactory,
-    UserFactory,
-    FrameworkFactory,
-    FrameworkCategoryFactory,
-    ControlFactory,
+    create_full_assessment_scenario,
 )
 
 
@@ -180,7 +175,6 @@ class TestCampaignScoring:
         """Campaign with multiple assessments at different compliance levels"""
         scenario = create_full_assessment_scenario(db_session)
         campaign = scenario["campaign"]
-        audit = scenario["audit"]
         
         # Create a second assessment
         assessment2 = AssessmentFactory.create(
@@ -264,7 +258,7 @@ class TestAssessmentScoreEdgeCases:
         # Assessed only: C, NC, P, NC = 4 results = (1 + 0.5) / 4 = 37.5%
         # Added 95: 48 compliant (i % 2 == 0), 47 non-compliant = 48/95 = 50.526%
         # Total: (1 + 0.5 + 48) / (4 + 95)  = 49.5 / 99 = 50%... but actually got 51%
-        # The initial pattern is: compliant, non_compliant, partially_compliant, not_applicable 
+        # The initial pattern is: compliant, non_compliant, partially_compliant, not_applicable
         # So: 48 new compliant + 1 existing = 49, 47 new non + 1 existing = 48, 1 partial = 0.5
         # (49 + 0.5) / (49 + 48 + 1) = 49.5 / 98 = ~50.5% ≈ 51.0%
         assert assessment.compliance_score == 51.0

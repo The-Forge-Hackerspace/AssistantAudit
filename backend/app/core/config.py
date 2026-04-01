@@ -4,10 +4,10 @@ Charge automatiquement les variables depuis .env
 """
 import os
 import secrets
-from pathlib import Path
 from functools import lru_cache
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Racine du projet (2 niveaux au-dessus de ce fichier)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent

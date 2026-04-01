@@ -3,7 +3,6 @@ Service de dispatch de taches vers les agents.
 Implemente la double verification d'ownership pour l'isolation inter-techniciens.
 """
 import logging
-from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session

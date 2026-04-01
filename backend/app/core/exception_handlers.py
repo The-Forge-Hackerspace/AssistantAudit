@@ -4,10 +4,10 @@ Centralise la gestion des erreurs avec des réponses standardisées.
 """
 import logging
 import traceback
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 

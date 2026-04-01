@@ -1,7 +1,8 @@
 """Tests TDD — Modèles rapport d'audit (RPT-002, brief §7.7)."""
 
 import pytest
-from app.models.report import AuditReport, ReportSection, REPORT_SECTIONS
+
+from app.models.report import REPORT_SECTIONS, AuditReport, ReportSection
 
 
 class TestAuditReport:
@@ -61,6 +62,7 @@ class TestAuditReport:
     def test_duplicate_section_key_rejected(self, db_session, auditeur_user):
         """Un rapport ne peut pas avoir 2 sections avec la même clé."""
         from sqlalchemy.exc import IntegrityError
+
         from app.models.audit import Audit
 
         audit = Audit(nom_projet="dup-section", entreprise_id=1, owner_id=auditeur_user.id)

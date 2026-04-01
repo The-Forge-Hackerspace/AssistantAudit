@@ -8,12 +8,11 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from ..models.assessment import Assessment, ComplianceStatus, ControlResult
 from ..models.config_analysis import ConfigAnalysis
 from ..models.equipement import Equipement, EquipementFirewall
 from ..models.site import Site
-from ..models.assessment import Assessment, ControlResult, ComplianceStatus
-from ..models.framework import Framework, Control
-from ..schemas.scan import ConfigAnalysisResult, SecurityFinding
+from ..schemas.scan import ConfigAnalysisResult
 
 logger = logging.getLogger(__name__)
 

@@ -5,8 +5,6 @@ Covers the fix where PowerShell output was being discarded.
 Now all subprocess output is saved to powershell_raw_output.json.
 """
 import json
-import pytest
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from app.tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor

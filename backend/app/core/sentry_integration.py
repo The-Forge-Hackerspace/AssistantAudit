@@ -8,10 +8,9 @@ from typing import Optional
 
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
-from sentry_sdk.integrations.starlette import StarletteIntegration
-from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
-
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +140,6 @@ def before_send_transaction_hook(transaction: dict, hint: dict) -> Optional[dict
         Modified transaction, or None to skip sending
     """
     # Skip health check transactions
-    op = transaction.get("contexts", {}).get("trace", {}).get("op")
     transaction_name = transaction.get("transaction", "")
     
     if "/health" in transaction_name or "/metrics" in transaction_name:

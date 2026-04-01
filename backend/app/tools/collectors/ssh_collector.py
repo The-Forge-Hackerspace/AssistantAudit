@@ -12,8 +12,8 @@ import logging
 import time
 from dataclasses import dataclass, field
 from typing import Optional
-import defusedxml.ElementTree as ET
 
+import defusedxml.ElementTree as ET
 import paramiko
 
 logger = logging.getLogger(__name__)

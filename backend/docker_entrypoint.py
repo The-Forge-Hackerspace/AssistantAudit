@@ -13,9 +13,10 @@ BACKEND_DIR = Path(__file__).parent
 sys.path.insert(0, str(BACKEND_DIR))
 
 # Import au niveau module pour que Base.metadata connaisse tous les modèles
-from app.core.database import Base, engine  # noqa: E402
-import app.models  # noqa: E402, F401 — Enregistre tous les modèles dans Base.metadata
 from sqlalchemy import inspect as sa_inspect  # noqa: E402
+
+import app.models  # noqa: E402, F401 — Enregistre tous les modèles dans Base.metadata
+from app.core.database import Base, engine  # noqa: E402
 
 
 def _run(cmd: list[str], label: str) -> None:

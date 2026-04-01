@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ....core.deps import get_current_auditeur
 from ....models.user import User
-from ....schemas.scan import SSLCheckRequest, SSLCheckResult, SecurityFinding
+from ....schemas.scan import SecurityFinding, SSLCheckRequest, SSLCheckResult
 from ....tools.ssl_checker.checker import check_ssl
 
 logger = logging.getLogger(__name__)

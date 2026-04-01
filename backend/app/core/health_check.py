@@ -15,13 +15,12 @@ These endpoints are typically used by:
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Any, Dict
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-
 
 logger = logging.getLogger(__name__)
 

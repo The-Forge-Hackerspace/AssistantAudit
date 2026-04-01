@@ -14,10 +14,9 @@ from app.core.database import Base
 from app.core.security import hash_password
 from app.models.agent import Agent
 from app.models.agent_task import AgentTask
-from app.models.user import User
 from app.models.audit import Audit, AuditStatus
 from app.models.entreprise import Entreprise
-
+from app.models.user import User
 
 # ────────────────────────────────────────────────────────────────────────
 # Fixtures

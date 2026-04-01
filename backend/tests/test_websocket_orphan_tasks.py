@@ -2,7 +2,6 @@
 Tests pour le relais task_progress et la detection des taches orphelines
 quand un agent se deconnecte du WebSocket.
 """
-from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest

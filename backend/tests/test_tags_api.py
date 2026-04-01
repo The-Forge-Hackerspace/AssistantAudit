@@ -1,6 +1,5 @@
 """Tests TDD — Routes API tags (TAG-003, brief §5)."""
 
-import pytest
 from fastapi.testclient import TestClient
 
 

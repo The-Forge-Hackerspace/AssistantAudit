@@ -4,7 +4,6 @@ et exécution de commandes PowerShell d'audit système.
 """
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
 
 import winrm
 
@@ -356,7 +355,6 @@ def _parse_winrm_results(result: WinRMCollectResult, raw: dict[str, str]) -> Non
     users["password_policy"] = pwd_policy
 
     # ── Verrouillage ──
-    lockout_raw = raw.get("lockout_policy", "")
     lockout_threshold_str = pwd_policy.get(
         "Lockout threshold", pwd_policy.get("Seuil de verrouillage du compte", "0")
     )

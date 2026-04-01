@@ -4,11 +4,12 @@ Rate limiter in-memory pour protéger contre le brute-force.
 Limite les tentatives par IP sur les endpoints sensibles (login).
 En production avec plusieurs workers, remplacer par Redis-backed (slowapi).
 """
-import time
 import logging
+import time
 from collections import defaultdict
 from threading import Lock
-from fastapi import Request, HTTPException, status
+
+from fastapi import HTTPException, Request, status
 
 logger = logging.getLogger(__name__)
 

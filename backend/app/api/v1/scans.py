@@ -10,17 +10,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur, PaginationParams
+from ...core.deps import PaginationParams, get_current_auditeur, get_current_user
+from ...core.task_runner import get_task_runner
 from ...models.user import User
+from ...schemas.common import MessageResponse, PaginatedResponse
 from ...schemas.scan import (
     ScanCreate,
+    ScanHostDecision,
+    ScanHostRead,
     ScanRead,
     ScanSummary,
-    ScanHostRead,
-    ScanHostDecision,
 )
-from ...schemas.common import PaginatedResponse, MessageResponse
-from ...core.task_runner import get_task_runner
 from ...services import scan_service
 
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ def launch_scan(
 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
+    except Exception:
         logger.exception("Erreur lors de la création du scan")
         raise HTTPException(status_code=500, detail="Erreur interne lors de la création du scan.")
 

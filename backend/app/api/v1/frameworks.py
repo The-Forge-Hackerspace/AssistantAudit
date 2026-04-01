@@ -9,10 +9,10 @@ from sqlalchemy.orm import Session
 
 from ...core.config import get_settings
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_admin, get_current_auditeur, PaginationParams
+from ...core.deps import PaginationParams, get_current_admin, get_current_user
 from ...models.user import User
-from ...schemas.framework import FrameworkRead, FrameworkSummary, FrameworkCloneRequest, FrameworkCreate
-from ...schemas.common import PaginatedResponse, MessageResponse
+from ...schemas.common import MessageResponse, PaginatedResponse
+from ...schemas.framework import FrameworkCloneRequest, FrameworkCreate, FrameworkRead, FrameworkSummary
 from ...services.framework_service import FrameworkService
 
 router = APIRouter()

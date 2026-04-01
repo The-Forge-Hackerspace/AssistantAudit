@@ -10,8 +10,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from ..services.assessment_service import AssessmentService
-from ..tools.monkey365_runner.parser import Monkey365Parser, Monkey365Finding
-from ..tools.monkey365_runner.mapper import Monkey365Mapper, MappingResult
+from ..tools.monkey365_runner.mapper import Monkey365Mapper
+from ..tools.monkey365_runner.parser import Monkey365Parser
 
 logger = logging.getLogger(__name__)
 

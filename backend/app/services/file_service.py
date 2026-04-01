@@ -17,8 +17,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.file_encryption import EnvelopeEncryption
+from app.models.assessment import Assessment, AssessmentCampaign, ControlResult
 from app.models.attachment import Attachment
-from app.models.assessment import AssessmentCampaign, Assessment, ControlResult
 from app.models.audit import Audit
 
 logger = logging.getLogger(__name__)

@@ -5,12 +5,11 @@ Represente une execution d'outil (nmap, oradad, ad_collector) par un agent.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
-
-from ..core.encryption import EncryptedJSON
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
+from ..core.encryption import EncryptedJSON
 
 
 def _utcnow() -> datetime:

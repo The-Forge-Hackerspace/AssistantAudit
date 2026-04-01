@@ -2,15 +2,14 @@
 Tests pour l'upload d'artifacts agent et la reponse d'enrollment enrichie.
 """
 import io
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
 from app.core.security import create_access_token, create_agent_token, hash_password
 from app.models import User
 from app.models.agent import Agent
 from app.models.agent_task import AgentTask
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 

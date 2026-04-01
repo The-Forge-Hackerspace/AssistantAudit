@@ -84,7 +84,7 @@ export function AgentTaskDetail({ task, open, onOpenChange, agentName }: AgentTa
   const [selectedIps, setSelectedIps] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!task || !open) { setArtifacts([]); setSelectedIps(new Set()); return; }
+    if (!task || !open) { setArtifacts([]); setSelectedIps(new Set()); return; } // eslint-disable-line react-hooks/set-state-in-effect -- guard clause pattern
     agentsApi.getTaskArtifacts(task.task_uuid).then(setArtifacts).catch(() => setArtifacts([]));
   }, [task, open]);
 

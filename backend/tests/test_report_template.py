@@ -1,9 +1,9 @@
 """Tests TDD — Service de rendu rapport Jinja2 (RPT-003, brief §7.7)."""
 
 import pytest
-from app.services.report_service import ReportService
+
 from app.schemas.report import AuditReportCreate
-from app.models.report import REPORT_SECTIONS
+from app.services.report_service import ReportService
 
 
 class TestReportService:

@@ -7,9 +7,8 @@ Le fichier physique est stocké dans :
 
 La base de données ne stocke que le chemin relatif.
 """
-from datetime import datetime, timezone
-
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship

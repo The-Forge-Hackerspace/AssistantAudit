@@ -4,9 +4,8 @@ Tests for timezone handling in Monkey365 scan finalization.
 Covers timezone-aware/naive datetime duration calculations to prevent
 TypeError: can't subtract offset-naive and offset-aware datetimes
 """
-import pytest
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 
 def test_timezone_aware_duration_calculation():
