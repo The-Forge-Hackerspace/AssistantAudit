@@ -80,9 +80,10 @@ class Monkey365StreamingExecutor:
 
         try:
             self.process = await asyncio.create_subprocess_exec(
-                "pwsh", "-NoProfile", "-Command", ps_script,
+                "pwsh", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                "-Command", ps_script,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
             )
         except FileNotFoundError:
             error_msg = "pwsh introuvable — PowerShell 7+ est requis"
@@ -126,8 +127,6 @@ class Monkey365StreamingExecutor:
             })
 
         # Attendre la fin du process
-        assert self.process.stderr is not None
-        stderr_data = await self.process.stderr.read()
         try:
             await asyncio.wait_for(self.process.wait(), timeout=3600)
         except asyncio.TimeoutError:
@@ -139,7 +138,8 @@ class Monkey365StreamingExecutor:
             return {"status": "timeout", "scan_id": self.scan_id, "error": "Timeout 1h exceeded"}
 
         if self.process.returncode != 0:
-            error = stderr_data.decode("utf-8", errors="replace")[:500]
+            # stderr est merge dans stdout, les erreurs sont dans output_lines
+            error = "\n".join(output_lines[-10:])[:500] if output_lines else "Erreur inconnue"
             await self.ws_callback("scan_error", {
                 "scan_id": self.scan_id,
                 "error": error,

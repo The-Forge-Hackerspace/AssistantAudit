@@ -61,6 +61,10 @@ def launch_monkey365_scan(
         logger.exception("Unexpected error launching monkey365 scan")
         raise HTTPException(500, f"Erreur interne: {e}")
 
+    # Commit avant de lancer le thread background, sinon la nouvelle session
+    # du thread ne verra pas le scan (transaction pas encore commitée).
+    db.commit()
+
     task_runner = get_task_runner()
     task_runner.submit(
         Monkey365ScanService.execute_scan_background,
@@ -184,13 +188,11 @@ def get_monkey365_scan_report(
     html_file: Path | None = None
     output_root = Path(result.output_path)
     if output_root.exists():
-        for html_dir_name in ("html", "HTML"):
-            html_dir = output_root / html_dir_name
-            if html_dir.exists():
-                candidates = sorted(html_dir.glob("*.html"))
-                if candidates:
-                    html_file = candidates[0]
-                    break
+        # Monkey365 crée un sous-dossier avec son propre UUID,
+        # donc on cherche récursivement dans l'arborescence.
+        candidates = sorted(output_root.rglob("*.html"))
+        if candidates:
+            html_file = candidates[0]
 
     if not html_file:
         raise HTTPException(404, "Fichier HTML introuvable pour ce scan")
@@ -199,7 +201,7 @@ def get_monkey365_scan_report(
         path=str(html_file),
         media_type="text/html",
         filename=html_file.name,
-        headers={"Content-Disposition": f'attachment; filename="{html_file.name}"'},
+        headers={"Content-Disposition": f'inline; filename="{html_file.name}"'},
     )
 
 
