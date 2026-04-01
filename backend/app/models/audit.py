@@ -55,6 +55,26 @@ class Audit(Base):
     hypotheses: Mapped[str | None] = mapped_column(Text)
     risques_initiaux: Mapped[str | None] = mapped_column(Text)
 
+    # Bloc Intervention (brief §4.1)
+    # Dates
+    date_fin: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Interlocuteur technique côté client
+    client_contact_name: Mapped[str | None] = mapped_column(String(200))
+    client_contact_title: Mapped[str | None] = mapped_column(String(200))
+    client_contact_email: Mapped[str | None] = mapped_column(String(200))
+    client_contact_phone: Mapped[str | None] = mapped_column(String(50))
+    # Accès admin
+    access_level: Mapped[str | None] = mapped_column(String(20))  # complete, partial, none
+    access_missing_details: Mapped[str | None] = mapped_column(Text)
+    # Fenêtre d'intervention
+    intervention_window: Mapped[str | None] = mapped_column(String(200))
+    intervention_constraints: Mapped[str | None] = mapped_column(Text)
+    # Périmètre convenu
+    scope_covered: Mapped[str | None] = mapped_column(Text)
+    scope_excluded: Mapped[str | None] = mapped_column(Text)
+    # Type d'audit
+    audit_type: Mapped[str | None] = mapped_column(String(30))  # initial, recurring, targeted
+
     # Relations
     owner: Mapped["User"] = relationship()  # type: ignore[name-defined]
     entreprise: Mapped["Entreprise"] = relationship(back_populates="audits")  # type: ignore[name-defined]

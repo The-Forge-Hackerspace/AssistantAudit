@@ -1,0 +1,54 @@
+{% if audit.audit_type %}
+<p><strong>Type d'audit :</strong>
+    {% if audit.audit_type == "initial" %}Découverte initiale
+    {% elif audit.audit_type == "recurring" %}Audit récurrent
+    {% elif audit.audit_type == "targeted" %}Audit ciblé
+    {% endif %}
+</p>
+{% endif %}
+
+{% if audit.intervention_window %}
+<p><strong>Fenêtre d'intervention :</strong> {{ audit.intervention_window }}</p>
+{% endif %}
+
+<h2>Périmètre couvert</h2>
+{% if audit.scope_covered %}
+    {{ audit.scope_covered | safe }}
+{% elif audit.objectifs %}
+    {{ audit.objectifs | safe }}
+{% else %}
+    <p>L'ensemble de l'infrastructure réseau, les serveurs, l'Active Directory,
+    les postes de travail et les accès internet.</p>
+{% endif %}
+
+{% if audit.scope_excluded or audit.limites %}
+    <h2>Exclusions</h2>
+    {{ (audit.scope_excluded or audit.limites) | safe }}
+{% endif %}
+
+{% if audit.hypotheses %}
+    <h2>Hypothèses</h2>
+    {{ audit.hypotheses | safe }}
+{% endif %}
+
+{% if audit.access_level %}
+<h2>Accès fournis</h2>
+<p><strong>Niveau :</strong>
+    {% if audit.access_level == "complete" %}Complet
+    {% elif audit.access_level == "partial" %}Partiel
+    {% else %}Aucun
+    {% endif %}
+</p>
+{% if audit.access_missing_details %}
+<p><strong>Détails manquants :</strong> {{ audit.access_missing_details }}</p>
+{% endif %}
+{% endif %}
+
+{% if audit.client_contact_name %}
+<h2>Interlocuteur technique</h2>
+<p>{{ audit.client_contact_name }}
+{% if audit.client_contact_title %} — {{ audit.client_contact_title }}{% endif %}
+</p>
+{% if audit.client_contact_email %}<p>{{ audit.client_contact_email }}</p>{% endif %}
+{% if audit.client_contact_phone %}<p>{{ audit.client_contact_phone }}</p>{% endif %}
+{% endif %}

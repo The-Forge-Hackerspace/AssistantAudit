@@ -63,6 +63,7 @@ import {
 } from "@/lib/constants";
 import { EquipementFormFields } from "./components/equipement-form-fields";
 import { EquipementDetailDialog } from "./components/equipement-detail-dialog";
+import { TagFilter } from "@/components/tags/tag-filter";
 
 // ── Default create form ──
 const EMPTY_FORM: EquipementCreate = {
@@ -101,6 +102,7 @@ function EquipementsContent() {
   const [siteFilter, setSiteFilter] = useState<string>(initialSite);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [tagFilter, setTagFilter] = useState<number[]>([]);
 
   // Dialogs
   const [createOpen, setCreateOpen] = useState(false);
@@ -392,6 +394,9 @@ function EquipementsContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Tag filter ── */}
+      <TagFilter onFilterChange={setTagFilter} selectedTagIds={tagFilter} />
 
       {/* ── Table ── */}
       <Card>

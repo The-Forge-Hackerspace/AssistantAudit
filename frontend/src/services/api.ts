@@ -6,6 +6,8 @@ import type {
   User,
   UserUpdate,
   PaginatedResponse,
+  Tag,
+  TagAssociation,
   Entreprise,
   EntrepriseCreate,
   Audit,
@@ -67,6 +69,12 @@ import type {
   OradadConfig,
   OradadConfigCreate,
   AnssiReport,
+  ChecklistTemplate,
+  ChecklistTemplateDetail,
+  ChecklistInstance,
+  ChecklistInstanceDetail,
+  ChecklistResponse,
+  ChecklistProgress,
 } from "@/types";
 
 // ── Auth ──
@@ -849,6 +857,95 @@ export const toolsApi = {
 
   async importMonkey365ToAudit(resultId: number, auditId: number): Promise<import("@/types/api").Monkey365ImportResult> {
     const { data } = await api.post(`/tools/monkey365/scans/${resultId}/import-to-audit`, { audit_id: auditId });
+    return data;
+  },
+};
+
+// ── Tags ──
+export const tagsApi = {
+  async list(params?: { audit_id?: number; scope?: string }): Promise<PaginatedResponse<Tag>> {
+    const { data } = await api.get<PaginatedResponse<Tag>>("/tags", { params });
+    return data;
+  },
+  async create(name: string, color?: string, scope?: string, auditId?: number): Promise<Tag> {
+    const { data } = await api.post<Tag>("/tags", {
+      name, color: color ?? "#6B7280", scope: scope ?? "global", audit_id: auditId ?? null,
+    });
+    return data;
+  },
+  async update(id: number, updates: { name?: string; color?: string }): Promise<Tag> {
+    const { data } = await api.put<Tag>(`/tags/${id}`, updates);
+    return data;
+  },
+  async remove(id: number): Promise<void> {
+    await api.delete(`/tags/${id}`);
+  },
+  async associate(tagId: number, taggableType: string, taggableId: number): Promise<TagAssociation> {
+    const { data } = await api.post<TagAssociation>("/tags/associate", {
+      tag_id: tagId, taggable_type: taggableType, taggable_id: taggableId,
+    });
+    return data;
+  },
+  async dissociate(tagId: number, taggableType: string, taggableId: number): Promise<void> {
+    await api.delete("/tags/associate", {
+      params: { tag_id: tagId, taggable_type: taggableType, taggable_id: taggableId },
+    });
+  },
+  async getEntityTags(taggableType: string, taggableId: number): Promise<Tag[]> {
+    const { data } = await api.get<Tag[]>(`/tags/entity/${taggableType}/${taggableId}`);
+    return data;
+  },
+};
+
+// ── Checklists ──
+export const checklistsApi = {
+  async listTemplates(category?: string): Promise<ChecklistTemplate[]> {
+    const params = category ? { category } : {};
+    const { data } = await api.get<ChecklistTemplate[]>("/checklists/templates", { params });
+    return data;
+  },
+
+  async getTemplate(id: number): Promise<ChecklistTemplateDetail> {
+    const { data } = await api.get<ChecklistTemplateDetail>(`/checklists/templates/${id}`);
+    return data;
+  },
+
+  async createInstance(templateId: number, auditId: number, siteId?: number): Promise<ChecklistInstance> {
+    const { data } = await api.post<ChecklistInstance>("/checklists/instances", {
+      template_id: templateId, audit_id: auditId, site_id: siteId ?? null,
+    });
+    return data;
+  },
+
+  async listInstances(auditId: number): Promise<ChecklistInstance[]> {
+    const { data } = await api.get<ChecklistInstance[]>("/checklists/instances", { params: { audit_id: auditId } });
+    return data;
+  },
+
+  async getInstance(id: number): Promise<ChecklistInstanceDetail> {
+    const { data } = await api.get<ChecklistInstanceDetail>(`/checklists/instances/${id}`);
+    return data;
+  },
+
+  async deleteInstance(id: number): Promise<void> {
+    await api.delete(`/checklists/instances/${id}`);
+  },
+
+  async completeInstance(id: number): Promise<ChecklistInstance> {
+    const { data } = await api.post<ChecklistInstance>(`/checklists/instances/${id}/complete`);
+    return data;
+  },
+
+  async respondToItem(instanceId: number, itemId: number, status: string, note?: string): Promise<ChecklistResponse> {
+    const { data } = await api.put<ChecklistResponse>(
+      `/checklists/instances/${instanceId}/items/${itemId}`,
+      { status, note: note ?? null },
+    );
+    return data;
+  },
+
+  async getProgress(instanceId: number): Promise<ChecklistProgress> {
+    const { data } = await api.get<ChecklistProgress>(`/checklists/instances/${instanceId}/progress`);
     return data;
   },
 };

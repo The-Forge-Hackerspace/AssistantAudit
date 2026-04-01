@@ -1,0 +1,29 @@
+<div class="cover-page">
+    <div class="cover-logos">
+        {% if consultant_logo %}
+            <img src="data:image/png;base64,{{ consultant_logo }}" alt="Logo consultant" class="cover-logo-left">
+        {% else %}
+            <div></div>
+        {% endif %}
+        {% if client_logo %}
+            <img src="data:image/png;base64,{{ client_logo }}" alt="Logo client" class="cover-logo-right">
+        {% endif %}
+    </div>
+    <div class="cover-content">
+        <h1 class="cover-title">Rapport d'audit</h1>
+        <h2 class="cover-subtitle">{{ audit.nom_projet }}</h2>
+        <div class="cover-meta">
+            {% if entreprise %}
+            <p><strong>Client :</strong> {{ entreprise.nom }}</p>
+            {% endif %}
+            <p><strong>Date :</strong> {{ report.generated_at | datefr if report.generated_at else report.created_at | datefr }}</p>
+            <p><strong>Référence :</strong> RPT-{{ report.id }}-{{ audit.id }}</p>
+            {% if consultant_name %}
+                <p><strong>Consultant :</strong> {{ consultant_name }}</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="cover-confidential">
+        <p>DOCUMENT CONFIDENTIEL</p>
+    </div>
+</div>

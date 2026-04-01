@@ -14,6 +14,19 @@ class AuditBase(BaseModel):
     limites: Optional[str] = None
     hypotheses: Optional[str] = None
     risques_initiaux: Optional[str] = None
+    # Bloc Intervention (brief §4.1)
+    date_fin: Optional[datetime] = None
+    client_contact_name: Optional[str] = Field(None, max_length=200)
+    client_contact_title: Optional[str] = Field(None, max_length=200)
+    client_contact_email: Optional[str] = Field(None, max_length=200)
+    client_contact_phone: Optional[str] = Field(None, max_length=50)
+    access_level: Optional[str] = Field(None, pattern=r"^(complete|partial|none)$")
+    access_missing_details: Optional[str] = None
+    intervention_window: Optional[str] = Field(None, max_length=200)
+    intervention_constraints: Optional[str] = None
+    scope_covered: Optional[str] = None
+    scope_excluded: Optional[str] = None
+    audit_type: Optional[str] = Field(None, pattern=r"^(initial|recurring|targeted)$")
 
 
 class AuditCreate(AuditBase):
@@ -30,6 +43,19 @@ class AuditUpdate(BaseModel):
     limites: Optional[str] = None
     hypotheses: Optional[str] = None
     risques_initiaux: Optional[str] = None
+    # Bloc Intervention (brief §4.1)
+    date_fin: Optional[datetime] = None
+    client_contact_name: Optional[str] = Field(None, max_length=200)
+    client_contact_title: Optional[str] = Field(None, max_length=200)
+    client_contact_email: Optional[str] = Field(None, max_length=200)
+    client_contact_phone: Optional[str] = Field(None, max_length=50)
+    access_level: Optional[str] = Field(None, pattern=r"^(complete|partial|none)$")
+    access_missing_details: Optional[str] = None
+    intervention_window: Optional[str] = Field(None, max_length=200)
+    intervention_constraints: Optional[str] = None
+    scope_covered: Optional[str] = None
+    scope_excluded: Optional[str] = None
+    audit_type: Optional[str] = Field(None, pattern=r"^(initial|recurring|targeted)$")
 
 
 class AuditRead(AuditBase):

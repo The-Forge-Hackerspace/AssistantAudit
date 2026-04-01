@@ -51,6 +51,13 @@ from .agent_task import AgentTask
 from .task_artifact import TaskArtifact
 from .anssi_checklist import AnssiCheckpoint
 from .oradad_config import OradadConfig
+from .tag import Tag, TagAssociation
+from .checklist import (
+    ChecklistTemplate, ChecklistSection, ChecklistItem,
+    ChecklistInstance, ChecklistResponse,
+)
+from .report import AuditReport, ReportSection
+from .finding import Finding, FindingStatus, FindingStatusHistory, VALID_TRANSITIONS
 
 __all__ = [
     "User",
@@ -105,4 +112,17 @@ __all__ = [
     "TaskArtifact",
     "AnssiCheckpoint",
     "OradadConfig",
+    "Tag",
+    "TagAssociation",
+    "ChecklistTemplate",
+    "ChecklistSection",
+    "ChecklistItem",
+    "ChecklistInstance",
+    "ChecklistResponse",
+    "AuditReport",
+    "ReportSection",
+    "Finding",
+    "FindingStatus",
+    "FindingStatusHistory",
+    "VALID_TRANSITIONS",
 ]

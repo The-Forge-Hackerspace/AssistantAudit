@@ -987,6 +987,72 @@ export interface TaskArtifact {
   download_url: string;
 }
 
+// ── Checklists ──
+export interface ChecklistTemplate {
+  id: number;
+  name: string;
+  description: string | null;
+  category: string;
+  is_predefined: boolean;
+}
+
+export interface ChecklistTemplateDetail extends ChecklistTemplate {
+  sections: ChecklistSection[];
+}
+
+export interface ChecklistSection {
+  id: number;
+  name: string;
+  description: string | null;
+  order: number;
+  items: ChecklistItem[];
+}
+
+export interface ChecklistItem {
+  id: number;
+  label: string;
+  description: string | null;
+  order: number;
+  ref_code: string | null;
+}
+
+export interface ChecklistInstance {
+  id: number;
+  template_id: number;
+  audit_id: number;
+  site_id: number | null;
+  filled_by: number | null;
+  status: "draft" | "in_progress" | "completed";
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface ChecklistInstanceDetail extends ChecklistInstance {
+  responses: ChecklistResponse[];
+  template_name: string;
+}
+
+export interface ChecklistResponse {
+  id: number;
+  instance_id: number;
+  item_id: number;
+  status: "OK" | "NOK" | "NA" | "UNCHECKED";
+  note: string | null;
+  responded_by: number | null;
+  responded_at: string | null;
+}
+
+export interface ChecklistProgress {
+  total_items: number;
+  answered: number;
+  ok: number;
+  nok: number;
+  na: number;
+  unchecked: number;
+  progress_percent: number;
+}
+
 // ── ORADAD ──
 export interface DomainEntry {
   server: string;
@@ -1070,4 +1136,23 @@ export interface AnssiReport {
     warning: number;
     not_checked: number;
   };
+}
+
+// ── Tags ──
+export interface Tag {
+  id: number;
+  name: string;
+  color: string;
+  scope: "global" | "audit";
+  audit_id: number | null;
+  created_by: number | null;
+  created_at: string;
+}
+
+export interface TagAssociation {
+  id: number;
+  tag_id: number;
+  taggable_type: string;
+  taggable_id: number;
+  tag: Tag;
 }
