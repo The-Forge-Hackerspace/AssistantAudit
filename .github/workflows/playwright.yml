@@ -20,8 +20,8 @@ jobs:
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
 
-    - name: Start backend (Docker Compose)
-      run: docker compose up -d --build db backend
+    - name: Start stack (Docker Compose)
+      run: docker compose up -d --build db backend frontend
       env:
         ENV: testing
         POSTGRES_PASSWORD: changeme
@@ -40,6 +40,28 @@ jobs:
         docker compose ps
         docker compose logs --no-color --tail=200
         exit 1
+
+    - name: Wait for frontend
+      run: |
+        for i in $(seq 1 60); do
+          if curl -fsS http://127.0.0.1:3000/ > /dev/null 2>&1; then
+            echo "Frontend is up"
+            exit 0
+          fi
+          echo "Waiting for frontend... ($i/60)"
+          sleep 2
+        done
+        echo "Frontend failed to start"
+        docker compose ps
+        docker compose logs frontend --no-color --tail=200
+        exit 1
+
+    - name: Seed admin user for E2E tests
+      run: |
+        docker compose exec -T \
+          -e ADMIN_EMAIL=admin@assistantaudit.local \
+          -e ADMIN_PASSWORD=Admin1234! \
+          backend python init_db.py
 
     - name: Run Playwright tests
       run: npx playwright test

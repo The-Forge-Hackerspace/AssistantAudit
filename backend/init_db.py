@@ -80,7 +80,7 @@ def init_database():
 
             admin = User(
                 username="admin",
-                email="admin@assistantaudit.fr",
+                email=os.getenv("ADMIN_EMAIL", "admin@assistantaudit.fr"),
                 password_hash=hash_password(admin_password),
                 full_name="Administrateur",
                 role="admin",
