@@ -95,6 +95,3 @@ tools/monkey365/
 /playwright/.cache/
 /playwright/.auth/
 /playwright-results/
-package-lock.json
-package.json
-playwright.config.ts

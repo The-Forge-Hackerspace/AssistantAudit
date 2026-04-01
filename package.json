@@ -1,0 +1,22 @@
+{
+  "name": "assistantaudit",
+  "version": "1.0.0",
+  "description": "Plateforme d'audit de sécurité IT destinée aux équipes Red Team, auditeurs de conformité et consultants en cybersécurité.",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/The-Forge-Hackerspace/AssistantAudit.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/The-Forge-Hackerspace/AssistantAudit/issues"
+  },
+  "homepage": "https://github.com/The-Forge-Hackerspace/AssistantAudit#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.5.0"
+  }
+}
