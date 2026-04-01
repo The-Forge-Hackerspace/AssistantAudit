@@ -4,12 +4,10 @@ du référentiel AssistantAudit pour pré-remplir les résultats d'audit.
 """
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from ...models.assessment import Assessment, ControlResult, ComplianceStatus
-from ...models.framework import Control
+from ...models.assessment import Assessment, ComplianceStatus, ControlResult
 from .parser import Monkey365Finding
 
 logger = logging.getLogger(__name__)

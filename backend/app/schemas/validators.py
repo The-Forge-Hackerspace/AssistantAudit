@@ -3,8 +3,9 @@ Validateurs métier pour les schémas Pydantic.
 Centralise les validations réutilisables pour IP, hostname, MAC, fichiers, etc.
 """
 import re
-from ipaddress import IPv4Address, IPv6Address, AddressValueError
+from ipaddress import AddressValueError, IPv4Address, IPv6Address
 from typing import Annotated
+
 from pydantic import BeforeValidator
 from pydantic.functional_validators import PlainValidator
 

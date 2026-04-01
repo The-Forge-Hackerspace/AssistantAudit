@@ -6,15 +6,13 @@ Vérifie que chaque auditeur ne voit que ses propres ressources
 scan, campaign) et que l'admin voit tout.
 """
 import pytest
-from app.core.security import create_access_token, hash_password
-from app.models import User
+
+from app.models.assessment import AssessmentCampaign
 from app.models.audit import Audit
 from app.models.entreprise import Entreprise
-from app.models.site import Site
 from app.models.equipement import Equipement
 from app.models.scan import ScanReseau
-from app.models.assessment import AssessmentCampaign, CampaignStatus
-
+from app.models.site import Site
 
 # ── Helpers ──────────────────────────────────────────────────────────
 

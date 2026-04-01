@@ -7,13 +7,12 @@ Couvre :
 - Executor streaming async avec subprocess mocke
 - Route POST /monkey365/stream (retour immediat, ownership)
 """
-import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.models.enums import AuthMethod
 from app.services.monkey365_streaming_executor import Monkey365StreamingExecutor
-
 
 # ── Helpers ──────────────────────────────────────────────────────
 

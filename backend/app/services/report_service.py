@@ -5,16 +5,15 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from fastapi import HTTPException
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.orm import Session
-from fastapi import HTTPException
 from weasyprint import HTML
 
 from ..models.audit import Audit
 from ..models.entreprise import Entreprise
-from ..models.report import AuditReport, ReportSection, REPORT_SECTIONS
+from ..models.report import REPORT_SECTIONS, AuditReport, ReportSection
 from ..schemas.report import AuditReportCreate, ReportSectionUpdate
-
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates" / "reports"
 

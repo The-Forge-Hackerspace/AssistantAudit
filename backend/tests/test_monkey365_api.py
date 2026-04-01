@@ -623,6 +623,7 @@ def test_report_returns_404_when_no_html_for_success_scan(mock_exec, client: Tes
 def test_report_returns_200_file_response_when_html_exists(mock_exec, client: TestClient, db_session, auditeur_headers, auditeur_user):
     """GET /report returns 200 FileResponse when a success scan has an HTML report."""
     from pathlib import Path
+
     from app.models.monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
 
     mock_exec.return_value = None

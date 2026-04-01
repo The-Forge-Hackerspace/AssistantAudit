@@ -7,9 +7,9 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
-from .validators import IPAddress, MACAddress, Hostname, Description
-from ..models.equipement import EQUIPEMENT_TYPE_VALUES
 
+from ..models.equipement import EQUIPEMENT_TYPE_VALUES
+from .validators import Description, Hostname, IPAddress, MACAddress
 
 EQUIPEMENT_TYPE_PATTERN = "^(" + "|".join(EQUIPEMENT_TYPE_VALUES) + ")$"
 

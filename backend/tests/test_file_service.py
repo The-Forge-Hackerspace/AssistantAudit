@@ -26,9 +26,9 @@ from app.core.security import create_access_token
 from app.models.attachment import Attachment
 from app.services.file_service import FileService
 from tests.factories import (
-    AuditFactory,
     AssessmentCampaignFactory,
     AssessmentFactory,
+    AuditFactory,
     ControlFactory,
     ControlResultFactory,
     EntrepriseFactory,
@@ -38,7 +38,6 @@ from tests.factories import (
     SiteFactory,
     UserFactory,
 )
-
 
 # ────────────────────────────────────────────────────────────────────────
 # Fixtures

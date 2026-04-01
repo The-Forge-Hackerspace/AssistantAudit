@@ -4,7 +4,6 @@ et exécution de commandes PowerShell d'audit système.
 """
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
 
 import winrm
 

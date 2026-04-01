@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 from ..core.helpers import get_or_404, user_has_access_to_entreprise
 from ..models.audit import Audit
 from ..models.equipement import (
+    EQUIPEMENT_TYPE_CLASS_MAP,
     Equipement,
     EquipementAuditStatus,
-    EQUIPEMENT_TYPE_CLASS_MAP,
 )
 from ..models.site import Site
 from ..schemas.equipement import EquipementCreate, EquipementRead, EquipementUpdate

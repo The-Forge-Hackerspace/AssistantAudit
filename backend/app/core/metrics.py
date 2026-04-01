@@ -2,15 +2,16 @@
 Prometheus metrics for monitoring application performance and health.
 """
 
+import time
+from typing import Any, Callable
+
 from prometheus_client import (
+    CollectorRegistry,
     Counter,
     Gauge,
     Histogram,
-    CollectorRegistry,
     generate_latest,
 )
-import time
-from typing import Callable, Any
 
 # Create a custom registry for application metrics
 app_registry = CollectorRegistry()

@@ -1,13 +1,17 @@
 """Service checklists — instanciation, réponses, progression."""
 
 from datetime import datetime, timezone
-from sqlalchemy.orm import Session, joinedload
+
 from fastapi import HTTPException
+from sqlalchemy.orm import Session, joinedload
 
 from ..models.audit import Audit
 from ..models.checklist import (
-    ChecklistTemplate, ChecklistSection, ChecklistItem,
-    ChecklistInstance, ChecklistResponse,
+    ChecklistInstance,
+    ChecklistItem,
+    ChecklistResponse,
+    ChecklistSection,
+    ChecklistTemplate,
 )
 from ..schemas.checklist import ChecklistInstanceCreate, ChecklistResponseUpdate
 

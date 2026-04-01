@@ -1,17 +1,21 @@
 """Routes API pour le système de tags (brief §5)."""
 
 import logging
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, PaginationParams
+from ...core.deps import PaginationParams, get_current_user
 from ...models.user import User
-from ...schemas.tag import (
-    TagCreate, TagUpdate, TagRead,
-    TagAssociationCreate, TagAssociationRead,
-)
 from ...schemas.common import MessageResponse, PaginatedResponse
+from ...schemas.tag import (
+    TagAssociationCreate,
+    TagAssociationRead,
+    TagCreate,
+    TagRead,
+    TagUpdate,
+)
 from ...services.tag_service import TagService
 
 router = APIRouter()

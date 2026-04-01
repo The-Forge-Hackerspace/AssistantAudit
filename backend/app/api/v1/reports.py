@@ -1,18 +1,23 @@
 """Routes API rapports d'audit (brief §7.7)."""
 
 import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur
+from ...core.deps import get_current_auditeur, get_current_user
 from ...models.user import User
-from ...schemas.report import (
-    AuditReportCreate, AuditReportRead, AuditReportDetail,
-    ReportSectionRead, ReportSectionUpdate, ReportGenerateRequest,
-)
 from ...schemas.common import MessageResponse
+from ...schemas.report import (
+    AuditReportCreate,
+    AuditReportDetail,
+    AuditReportRead,
+    ReportGenerateRequest,
+    ReportSectionRead,
+    ReportSectionUpdate,
+)
 from ...services.report_service import ReportService
 
 router = APIRouter()

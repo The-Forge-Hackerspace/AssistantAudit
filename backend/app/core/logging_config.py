@@ -3,7 +3,6 @@ Structured JSON logging configuration for AssistantAudit.
 Provides production-ready JSON logging with context support and filtering.
 """
 
-import json
 import logging
 import sys
 from logging import LogRecord
@@ -12,7 +11,6 @@ from typing import Any, Dict
 from pythonjsonlogger import jsonlogger
 
 from .config import get_settings
-
 
 # ────────────────────────────────────────────────────────────────────────
 # Custom JSON Formatter

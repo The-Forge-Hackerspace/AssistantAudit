@@ -2,27 +2,27 @@
 Routes d'authentification : login, register, refresh, profile.
 """
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-
 from jose import JWTError
+from sqlalchemy.orm import Session
 
 from ...core.config import get_settings
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_admin
+from ...core.deps import get_current_admin, get_current_user
 from ...core.rate_limit import login_rate_limiter
 from ...core.security import validate_refresh_token
 from ...models.user import User
+from ...schemas.common import MessageResponse
 from ...schemas.user import (
     LoginRequest,
+    PasswordChange,
     RefreshRequest,
     TokenResponse,
     UserCreate,
     UserRead,
-    PasswordChange,
 )
-from ...schemas.common import MessageResponse
 from ...services.auth_service import AuthService
 
 router = APIRouter()

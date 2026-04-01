@@ -5,21 +5,20 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur, PaginationParams
+from ...core.deps import PaginationParams, get_current_auditeur, get_current_user
 from ...models.user import User
 from ...schemas.assessment import (
+    AssessmentCreate,
+    AssessmentRead,
     CampaignCreate,
     CampaignRead,
     CampaignSummary,
     CampaignUpdate,
-    AssessmentCreate,
-    AssessmentRead,
     ControlResultUpdate,
-    ControlResultRead,
-    M365ScanSimulateRequest,
     M365ScanResponse,
+    M365ScanSimulateRequest,
 )
-from ...schemas.common import PaginatedResponse, MessageResponse, ScoreResponse
+from ...schemas.common import MessageResponse, PaginatedResponse, ScoreResponse
 from ...services.assessment_service import AssessmentService
 from ...services.monkey365_service import Monkey365Service
 

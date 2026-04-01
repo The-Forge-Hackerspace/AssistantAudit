@@ -1,7 +1,6 @@
 """
 Tests CRUD pour les endpoints de gestion des utilisateurs (/api/v1/users/).
 """
-import pytest
 
 
 class TestListUsers:

@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.core.security import (
     create_access_token,
     create_agent_token,
-    create_enrollment_token,
     hash_password,
 )
 from app.models.agent import Agent
@@ -18,7 +17,6 @@ from app.models.agent_task import AgentTask
 from app.models.audit import Audit, AuditStatus
 from app.models.entreprise import Entreprise
 from app.models.user import User
-
 
 # ────────────────────────────────────────────────────────────────────────
 # Fixtures

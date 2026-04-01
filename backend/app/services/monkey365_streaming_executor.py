@@ -10,7 +10,7 @@ import asyncio
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
 from app.core.config import get_settings
 from app.models.enums import AuthMethod

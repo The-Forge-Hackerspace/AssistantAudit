@@ -9,16 +9,16 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
+from ...core.deps import PaginationParams, get_current_admin, get_current_auditeur, get_current_user
 from ...models.equipement import EQUIPEMENT_TYPE_VALUES
 from ...models.user import User
+from ...schemas.common import MessageResponse, PaginatedResponse
 from ...schemas.equipement import (
     EquipementCreate,
     EquipementRead,
     EquipementSummary,
     EquipementUpdate,
 )
-from ...schemas.common import PaginatedResponse, MessageResponse
 from ...services.equipement_service import EquipementService, equipement_to_read
 
 router = APIRouter()

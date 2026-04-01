@@ -1,13 +1,13 @@
 """Seed de la checklist salle serveur / locaux techniques (PROJECT-BRIEF §6.13)."""
 
-import sys
 import os
+import sys
 
 # Ajouter le répertoire backend au PYTHONPATH
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.database import SessionLocal
-from app.models.checklist import ChecklistTemplate, ChecklistSection, ChecklistItem
+from app.models.checklist import ChecklistItem, ChecklistSection, ChecklistTemplate
 
 CHECKLIST_SERVER_ROOM = {
     "name": "Checklist salle serveur / locaux techniques",

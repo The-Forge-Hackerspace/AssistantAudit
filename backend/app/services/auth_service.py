@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..core.security import hash_password, verify_password, create_access_token, create_refresh_token
+from ..core.security import create_access_token, create_refresh_token, hash_password, verify_password
 from ..models.user import User
 
 logger = logging.getLogger(__name__)

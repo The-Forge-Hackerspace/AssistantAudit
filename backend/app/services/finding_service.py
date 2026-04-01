@@ -6,7 +6,10 @@ from sqlalchemy.orm import Session
 from ..models.assessment import Assessment, AssessmentCampaign, ComplianceStatus, ControlResult
 from ..models.audit import Audit
 from ..models.finding import (
-    Finding, FindingStatus, FindingStatusHistory, VALID_TRANSITIONS,
+    VALID_TRANSITIONS,
+    Finding,
+    FindingStatus,
+    FindingStatusHistory,
 )
 
 

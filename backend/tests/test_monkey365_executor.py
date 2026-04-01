@@ -13,7 +13,6 @@ from app.tools.monkey365_runner.executor import (
     Monkey365Executor,
 )
 
-
 # ────────────────────────────────────────────────────────────────────────
 # Monkey365Config Defaults Tests
 # ────────────────────────────────────────────────────────────────────────

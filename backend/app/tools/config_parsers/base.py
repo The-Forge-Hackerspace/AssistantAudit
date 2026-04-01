@@ -2,6 +2,7 @@
 Config Parser — Classe de base pour l'analyse de configurations réseau.
 """
 from abc import ABC, abstractmethod
+
 from ...schemas.scan import ConfigAnalysisResult
 
 

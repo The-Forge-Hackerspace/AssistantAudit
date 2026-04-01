@@ -2,25 +2,23 @@
 Tests critiques manquants : auth, rate limiting, token validation, password hashing.
 Audit dev 3/4.
 """
-import time
 
 import pytest
 from fastapi import HTTPException
 
+from app.core.rate_limit import _RateLimiter
 from app.core.security import (
     create_access_token,
     create_agent_token,
+    create_enrollment_token,
     create_refresh_token,
     decode_token,
     hash_password,
     verify_agent_token,
-    verify_password,
-    create_enrollment_token,
     verify_enrollment_token,
+    verify_password,
 )
-from app.core.rate_limit import _RateLimiter
 from app.services.auth_service import AuthService
-
 
 # ══════════════════════════════════════════════════════════════════════
 # 1. PASSWORD HASHING
@@ -121,7 +119,7 @@ class TestEnrollmentTokens:
         assert verify_enrollment_token("WRONGCOD", code_hash, expiration) is False
 
     def test_enrollment_token_verify_expired(self):
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
         code, code_hash, _ = create_enrollment_token()
         expired = datetime.now(timezone.utc) - timedelta(minutes=1)
         assert verify_enrollment_token(code, code_hash, expired) is False

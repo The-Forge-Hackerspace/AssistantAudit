@@ -3,10 +3,10 @@ Securite : hashing de mots de passe, gestion JWT (user + agent), enrollment.
 """
 import hashlib
 import hmac
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-import logging
 
 import bcrypt
 from jose import JWTError, jwt

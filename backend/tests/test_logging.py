@@ -5,7 +5,6 @@ Tests for structured JSON logging and audit trail infrastructure.
 import json
 import logging
 from io import StringIO
-from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -13,10 +12,10 @@ from fastapi.testclient import TestClient
 
 from app.core.audit_logger import AuditLoggingMiddleware, BusinessAuditLogger
 from app.core.logging_config import (
+    ContextualJsonFormatter,
     LogContext,
     configure_structured_logging,
     get_logger,
-    ContextualJsonFormatter,
 )
 
 

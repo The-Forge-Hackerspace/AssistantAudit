@@ -3,10 +3,6 @@ Tests pour les permissions du fichier ca.key (chmod 600).
 """
 import logging
 import os
-import stat
-from pathlib import Path
-
-import pytest
 
 from app.core.cert_manager import CertManager
 

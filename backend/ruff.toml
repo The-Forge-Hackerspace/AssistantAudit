@@ -1,0 +1,38 @@
+# =============================================================================
+# Ruff — Configuration linter Python pour AssistantAudit
+# Règles de base : erreurs, avertissements, imports
+# =============================================================================
+
+line-length = 120
+
+exclude = [
+    "alembic/versions/",   # Migrations auto-générées
+    "test_phase1.py",      # Fichiers de test legacy
+    "test_phase2.py",
+]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort (tri des imports)
+]
+ignore = [
+    "E402",  # Module import not at top — utilisé dans des scripts avec setup préalable
+    "E501",  # Line too long — toléré temporairement (120 car. limité via line-length)
+    "E701",  # Multiple statements on one line — patterns existants
+    "E741",  # Ambiguous variable name — faux positifs (l, O dans le code existant)
+    "F821",  # Undefined name — faux positifs sur les forward refs SQLAlchemy
+    "F841",  # Unused variable — sera corrigé progressivement
+    "W293",  # Blank line with whitespace — sera corrigé progressivement
+]
+
+
+[lint.per-file-ignores]
+"app/models/*.py" = ["F401"]   # Re-exports dans les modèles (relationships)
+"alembic/env.py" = ["F401"]    # Imports utilisés par Alembic internement
+"scripts/*.py" = ["F401", "E402"]  # Scripts utilitaires
+
+[lint.isort]
+known-first-party = ["app"]

@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur, get_current_admin, PaginationParams
+from ...core.deps import PaginationParams, get_current_admin, get_current_auditeur, get_current_user
 from ...models.user import User
-from ...schemas.audit import AuditCreate, AuditRead, AuditDetail, AuditUpdate
-from ...schemas.common import PaginatedResponse, MessageResponse
+from ...schemas.audit import AuditCreate, AuditDetail, AuditRead, AuditUpdate
+from ...schemas.common import MessageResponse, PaginatedResponse
 from ...services.audit_service import AuditService
 
 router = APIRouter()

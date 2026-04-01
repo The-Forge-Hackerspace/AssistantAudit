@@ -8,14 +8,13 @@ from typing import Generator
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 # Importé depuis app
 from app.core.database import Base
 from app.core.security import create_access_token, hash_password
 from app.models import User
-
 
 # ────────────────────────────────────────────────────────────────────────
 # Database & Session Fixtures
@@ -254,6 +253,6 @@ def cleanup_after_test(db_session: Session):
 def _reset_rate_limiters():
     """Reset les rate limiters entre chaque test pour eviter les 429 parasites."""
     yield
-    from app.core.rate_limit import login_rate_limiter, enroll_rate_limiter
+    from app.core.rate_limit import enroll_rate_limiter, login_rate_limiter
     login_rate_limiter.reset_all()
     enroll_rate_limiter.reset_all()

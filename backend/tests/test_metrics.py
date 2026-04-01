@@ -2,20 +2,13 @@
 Tests for Prometheus metrics collection and exposure.
 """
 
+
 import pytest
-import re
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 from app.core.metrics import (
     MetricsCollector,
     get_metrics,
     init_app_metrics,
-    http_requests_total,
-    http_request_duration_seconds,
-    http_active_requests,
-    assessment_results_total,
-    audit_operations_total,
 )
 from app.core.metrics_middleware import PrometheusMiddleware
 

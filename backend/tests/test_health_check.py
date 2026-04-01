@@ -2,11 +2,9 @@
 Tests for health check endpoints.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from app.core.health_check import HealthCheckService
-
 
 
 class TestHealthEndpoint:

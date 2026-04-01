@@ -4,7 +4,6 @@ Tests pour core/websocket_manager.py et api/v1/websocket.py.
 from datetime import datetime, timedelta, timezone
 
 import pytest
-import pytest_asyncio
 
 from app.core.security import create_access_token, create_agent_token
 from app.core.websocket_manager import (
@@ -12,7 +11,6 @@ from app.core.websocket_manager import (
     BUFFER_TTL_SECONDS,
     ConnectionManager,
 )
-
 
 # ────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -76,6 +74,7 @@ class TestUserWebSocket:
 class TestAgentWebSocket:
     def test_connect_agent_valid_token(self, client, admin_user, db_session):
         from unittest.mock import patch
+
         from app.models.agent import Agent
 
         agent = Agent(

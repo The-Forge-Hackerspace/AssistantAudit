@@ -5,16 +5,16 @@ from sqlalchemy.orm import Session
 
 from ....core.database import get_db
 from ....core.deps import get_current_auditeur
-from ....models.user import User
-from ....schemas.scan import CollectCreate, CollectResultSummary, CollectResultRead, PrefillResult
-from ....schemas.common import MessageResponse
 from ....core.task_runner import get_task_runner
+from ....models.user import User
+from ....schemas.common import MessageResponse
+from ....schemas.scan import CollectCreate, CollectResultRead, CollectResultSummary, PrefillResult
 from ....services.collect_service import (
     create_pending_collect,
-    execute_collect_background,
-    list_collect_results,
-    get_collect_result,
     delete_collect_result,
+    execute_collect_background,
+    get_collect_result,
+    list_collect_results,
     prefill_assessment_from_collect,
 )
 
