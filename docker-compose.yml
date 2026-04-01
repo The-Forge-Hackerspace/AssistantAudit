@@ -40,7 +40,7 @@ services:
     volumes:
       - app-data:/app/data
       - app-certs:/app/certs
-      - ./tools/monkey365:/app/tools/monkey365:ro
+      - ./tools/monkey365:/app/tools/monkey365
       - ./frameworks:/app/frameworks
     ports:
       - "8000:8000"
