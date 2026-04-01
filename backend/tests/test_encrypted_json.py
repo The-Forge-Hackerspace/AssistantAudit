@@ -66,6 +66,7 @@ class TestEncryptedJSON:
     @pytest.fixture
     def unencrypted_db(self, monkeypatch):
         """DB en memoire SANS ENCRYPTION_KEY (mode dev)."""
+        monkeypatch.setenv("ENV", "development")
         monkeypatch.setenv("ENCRYPTION_KEY", "")
         from app.core.config import get_settings
         get_settings.cache_clear()

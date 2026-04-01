@@ -1,0 +1,169 @@
+{
+  "_history": [
+    {
+      "sequence": 1,
+      "phase": "PHASE_0_CONFIG",
+      "created_at": "2026-04-01T12:08:17.175Z",
+      "payload": {
+        "task_provider": "linear",
+        "storage_mode": "linear",
+        "team_id": "0ca97b7a-45ce-47ae-aaaf-adc7687f8eb1",
+        "agents_detected": [
+          "codex",
+          "gemini"
+        ],
+        "story_count": 40
+      }
+    },
+    {
+      "sequence": 2,
+      "phase": "PHASE_1_DISCOVERY",
+      "created_at": "2026-04-01T12:08:17.175Z",
+      "payload": {
+        "stories_loaded": 40,
+        "template_compliance": "all_9_sections_present",
+        "no_child_tasks": true,
+        "epics_verified": 7
+      }
+    },
+    {
+      "sequence": 3,
+      "phase": "PHASE_2_AGENT_LAUNCH",
+      "created_at": "2026-04-01T12:08:17.175Z",
+      "payload": {
+        "health_check_done": true,
+        "agents_available": 2,
+        "agents_required": [
+          "codex",
+          "gemini"
+        ]
+      }
+    },
+    {
+      "sequence": 4,
+      "phase": "PHASE_3_RESEARCH",
+      "created_at": "2026-04-01T12:08:17.175Z",
+      "payload": {
+        "penalty_total": 0,
+        "criteria_passed": 28,
+        "advisory_items": 5,
+        "gate": "GO",
+        "readiness_score": 10
+      }
+    },
+    {
+      "sequence": 5,
+      "phase": "PHASE_4_AUTOFIX",
+      "created_at": "2026-04-01T12:08:17.175Z",
+      "payload": {
+        "penalty_before": 0,
+        "penalty_after": 0,
+        "flagged_items": 0,
+        "advisory_items": 5,
+        "fixes_applied": 0
+      }
+    },
+    {
+      "sequence": 6,
+      "phase": "PHASE_5_MERGE",
+      "created_at": "2026-04-01T12:08:17.175Z",
+      "payload": {
+        "merge_summary": "codex_no_findings_exit1_gemini_no_auth_exit41_primary_audit_0_penalty_GO"
+      }
+    },
+    {
+      "sequence": 7,
+      "phase": "PHASE_6_REFINEMENT",
+      "created_at": "2026-04-01T12:08:17.175Z",
+      "payload": {
+        "iterations": 0,
+        "exit_reason": "SKIPPED",
+        "applied": 0,
+        "skip_reason": "codex_failed_exit1_no_findings_to_refine"
+      }
+    }
+  ],
+  "_next_sequence": 8,
+  "PHASE_0_CONFIG": {
+    "sequence": 1,
+    "phase": "PHASE_0_CONFIG",
+    "created_at": "2026-04-01T12:08:17.175Z",
+    "payload": {
+      "task_provider": "linear",
+      "storage_mode": "linear",
+      "team_id": "0ca97b7a-45ce-47ae-aaaf-adc7687f8eb1",
+      "agents_detected": [
+        "codex",
+        "gemini"
+      ],
+      "story_count": 40
+    }
+  },
+  "PHASE_1_DISCOVERY": {
+    "sequence": 2,
+    "phase": "PHASE_1_DISCOVERY",
+    "created_at": "2026-04-01T12:08:17.175Z",
+    "payload": {
+      "stories_loaded": 40,
+      "template_compliance": "all_9_sections_present",
+      "no_child_tasks": true,
+      "epics_verified": 7
+    }
+  },
+  "PHASE_2_AGENT_LAUNCH": {
+    "sequence": 3,
+    "phase": "PHASE_2_AGENT_LAUNCH",
+    "created_at": "2026-04-01T12:08:17.175Z",
+    "payload": {
+      "health_check_done": true,
+      "agents_available": 2,
+      "agents_required": [
+        "codex",
+        "gemini"
+      ]
+    }
+  },
+  "PHASE_3_RESEARCH": {
+    "sequence": 4,
+    "phase": "PHASE_3_RESEARCH",
+    "created_at": "2026-04-01T12:08:17.175Z",
+    "payload": {
+      "penalty_total": 0,
+      "criteria_passed": 28,
+      "advisory_items": 5,
+      "gate": "GO",
+      "readiness_score": 10
+    }
+  },
+  "PHASE_4_AUTOFIX": {
+    "sequence": 5,
+    "phase": "PHASE_4_AUTOFIX",
+    "created_at": "2026-04-01T12:08:17.175Z",
+    "payload": {
+      "penalty_before": 0,
+      "penalty_after": 0,
+      "flagged_items": 0,
+      "advisory_items": 5,
+      "fixes_applied": 0
+    }
+  },
+  "PHASE_5_MERGE": {
+    "sequence": 6,
+    "phase": "PHASE_5_MERGE",
+    "created_at": "2026-04-01T12:08:17.175Z",
+    "payload": {
+      "merge_summary": "codex_no_findings_exit1_gemini_no_auth_exit41_primary_audit_0_penalty_GO"
+    }
+  },
+  "PHASE_6_REFINEMENT": {
+    "sequence": 7,
+    "phase": "PHASE_6_REFINEMENT",
+    "created_at": "2026-04-01T12:08:17.175Z",
+    "payload": {
+      "iterations": 0,
+      "exit_reason": "SKIPPED",
+      "applied": 0,
+      "skip_reason": "codex_failed_exit1_no_findings_to_refine"
+    }
+  }
+}

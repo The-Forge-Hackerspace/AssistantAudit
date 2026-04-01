@@ -52,7 +52,7 @@ def create_tag(
     current_user: User = Depends(get_current_user),
 ):
     """Crée un tag (global ou lié à un audit)."""
-    tag = TagService.create_tag(db, body, user_id=current_user.id)
+    tag = TagService.create_tag(db, body, user_id=current_user.id, is_admin=current_user.role == "admin")
     return TagRead.model_validate(tag)
 
 

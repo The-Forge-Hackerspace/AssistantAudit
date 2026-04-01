@@ -95,3 +95,9 @@ Endpoints never access the database directly. All DB work goes through services.
 - Never suppress TypeScript errors with `as any` or `@ts-ignore`
 - Never use `async def` on routes or services (backend is sync)
 - Never rename existing DB columns
+
+## Compact Instructions
+
+Preserve during /compact: [Conventions], [Where to look table],
+[Anti-patterns (NEVER rules)], [Architecture pattern], [Workflow rules].
+Drop examples, code blocks, and explanations first.

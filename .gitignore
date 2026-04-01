@@ -80,3 +80,14 @@ AGENTS.md
 *.copilot*
 # Monkey365 (code tiers, à cloner manuellement dans tools/monkey365/)
 tools/monkey365/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+/playwright-results/
+package-lock.json
+package.json
+playwright.config.ts

@@ -1,0 +1,18 @@
+{
+  "story_id": "TOS-35",
+  "story_title": "US031 — Modèle Finding & cycle de vie",
+  "task_provider": "linear",
+  "project_root": "/home/tosaga/DEV/AssistantAudit",
+  "worktree_dir": null,
+  "branch": null,
+  "parallel_group_policy": "sequential",
+  "status_transition_policy": "to_review_only",
+  "tasks": [
+    {"id": "TOS-45", "title": "T001 — Créer modèle Finding + enum FindingStatus", "status": "Todo", "order": 1},
+    {"id": "TOS-46", "title": "T002 — Créer modèle FindingStatusHistory", "status": "Todo", "order": 2},
+    {"id": "TOS-47", "title": "T003 — Créer FindingService", "status": "Todo", "order": 3},
+    {"id": "TOS-48", "title": "T004 — Créer endpoints API /api/v1/findings", "status": "Todo", "order": 4},
+    {"id": "TOS-49", "title": "T005 — Créer schemas Pydantic findings", "status": "Todo", "order": 5},
+    {"id": "TOS-50", "title": "T006 — Créer migration Alembic tables finding", "status": "Todo", "order": 6}
+  ]
+}

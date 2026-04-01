@@ -19,7 +19,9 @@ from sqlalchemy import inspect as sa_inspect  # noqa: E402
 
 
 def _run(cmd: list[str], label: str) -> None:
-    result = subprocess.run(cmd, cwd=str(BACKEND_DIR))
+    # Sécurité : cmd est toujours construit en interne (jamais depuis une entrée utilisateur)
+    assert all(isinstance(arg, str) for arg in cmd), "cmd doit être une liste de chaînes"
+    result = subprocess.run(cmd, cwd=str(BACKEND_DIR))  # noqa: S603
     if result.returncode != 0:
         print(f"[ERREUR] {label} a échoué (code {result.returncode})")
         sys.exit(result.returncode)

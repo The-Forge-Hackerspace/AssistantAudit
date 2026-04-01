@@ -23,6 +23,7 @@ from .users import router as users_router
 from .tags import router as tags_router
 from .checklists import router as checklists_router
 from .reports import router as reports_router
+from .findings import router as findings_router
 
 api_router = APIRouter()
 
@@ -48,3 +49,4 @@ api_router.include_router(users_router, prefix="/users", tags=["Utilisateurs"])
 api_router.include_router(tags_router, prefix="/tags", tags=["Tags"])
 api_router.include_router(checklists_router, prefix="/checklists", tags=["Checklists"])
 api_router.include_router(reports_router, prefix="/reports", tags=["Rapports"])
+api_router.include_router(findings_router, prefix="/findings", tags=["Findings"])

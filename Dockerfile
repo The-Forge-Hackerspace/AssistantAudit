@@ -14,9 +14,11 @@ RUN npm run build
 # =============================================
 FROM python:3.13-slim-bookworm AS production
 
-# Installer les dépendances système + PowerShell 7
+# Installer les dépendances système + WeasyPrint libs + PowerShell 7
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev gcc curl apt-transport-https \
+    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 \
+    libffi-dev shared-mime-info \
     && curl -sSL https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb \
        -o /tmp/packages-microsoft-prod.deb \
     && dpkg -i /tmp/packages-microsoft-prod.deb \

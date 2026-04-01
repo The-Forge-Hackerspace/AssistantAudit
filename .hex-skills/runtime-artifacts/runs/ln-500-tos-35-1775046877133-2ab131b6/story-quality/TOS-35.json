@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "summary_kind": "story-quality",
+  "run_id": "ln-500-tos-35-1775046877133-2ab131b6",
+  "identifier": "TOS-35",
+  "producer_skill": "ln-510",
+  "produced_at": "2026-04-01T12:36:00Z",
+  "payload": {
+    "quality_score": 88,
+    "checks": {
+      "architecture": { "status": "PASS", "details": "Router->Service->Model, sync only, no direct DB in router" },
+      "security": { "status": "PASS", "details": "EncryptedText, Pydantic validation, auth on all endpoints, no SQL injection" },
+      "correctness": { "status": "PASS", "details": "Status transitions validated, dedup in generate, self-duplicate guard" },
+      "tests": { "status": "PASS", "details": "13/13 tests passing, coverage: generation, filtering, lifecycle, duplicates" },
+      "migration": { "status": "PASS", "details": "batch_alter_table SQLite compat, proper FK + indexes" },
+      "lint": { "status": "SKIP", "details": "ruff not installed in venv" },
+      "agent_review": { "status": "SKIP", "details": "Codex/Gemini disabled (no license)" }
+    },
+    "concerns": [
+      { "severity": "low", "description": "SAWarning Equipement polymorphic identity in tests — cosmetic" },
+      { "severity": "low", "description": "No owner_id RBAC filtering on findings list — v1 acceptable" }
+    ],
+    "verdict": "CONCERNS"
+  }
+}

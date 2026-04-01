@@ -55,6 +55,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         sync_result = FrameworkService.sync_from_directory(db, settings.FRAMEWORKS_DIR)
+        db.commit()
         total = sync_result['imported'] + sync_result['updated'] + sync_result['unchanged']
         logger.info(
             f"Sync référentiels : {total} frameworks "
@@ -64,6 +65,9 @@ async def lifespan(app: FastAPI):
         if sync_result['errors']:
             for err in sync_result['errors']:
                 logger.error(f"  Erreur sync : {err}")
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

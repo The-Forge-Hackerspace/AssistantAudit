@@ -85,6 +85,23 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
     from ...models.agent import Agent
     from ...models.agent_task import AgentTask
 
+    # Resoudre agent.id depuis agent_uuid pour les checks d'ownership sur les taches
+    trusted_agent_id: int | None = None
+    try:
+        db = SessionLocal()
+        _agent = db.query(Agent).filter(Agent.agent_uuid == agent_uuid).first()
+        if _agent:
+            trusted_agent_id = _agent.id
+    except Exception:
+        logger.exception("Failed to resolve agent_id for %s", agent_uuid)
+    finally:
+        db.close()
+
+    if trusted_agent_id is None:
+        logger.warning("Agent %s not found in DB, closing WS", agent_uuid)
+        await websocket.close(code=4001, reason="Agent not found")
+        return
+
     try:
         while True:
             data = await _receive_json_safe(websocket)
@@ -122,7 +139,13 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                         db = SessionLocal()
                         task = db.query(AgentTask).filter(
                             AgentTask.task_uuid == ws_data["task_uuid"],
+                            AgentTask.agent_id == trusted_agent_id,
                         ).first()
+                        if not task:
+                            logger.warning(
+                                "Agent %s (id=%s) attempted task_status on task %s — not owned or not found",
+                                agent_uuid, trusted_agent_id, ws_data["task_uuid"],
+                            )
                         if task:
                             new_status = ws_data.get("status")
                             if new_status:
@@ -154,7 +177,13 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                         db = SessionLocal()
                         task = db.query(AgentTask).filter(
                             AgentTask.task_uuid == ws_data["task_uuid"],
+                            AgentTask.agent_id == trusted_agent_id,
                         ).first()
+                        if not task:
+                            logger.warning(
+                                "Agent %s (id=%s) attempted task_result on task %s — not owned or not found",
+                                agent_uuid, trusted_agent_id, ws_data["task_uuid"],
+                            )
                         if task:
                             task.status = "completed"
                             task.progress = 100

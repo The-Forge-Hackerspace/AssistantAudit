@@ -57,6 +57,7 @@ from .checklist import (
     ChecklistInstance, ChecklistResponse,
 )
 from .report import AuditReport, ReportSection
+from .finding import Finding, FindingStatus, FindingStatusHistory, VALID_TRANSITIONS
 
 __all__ = [
     "User",
@@ -120,4 +121,8 @@ __all__ = [
     "ChecklistResponse",
     "AuditReport",
     "ReportSection",
+    "Finding",
+    "FindingStatus",
+    "FindingStatusHistory",
+    "VALID_TRANSITIONS",
 ]

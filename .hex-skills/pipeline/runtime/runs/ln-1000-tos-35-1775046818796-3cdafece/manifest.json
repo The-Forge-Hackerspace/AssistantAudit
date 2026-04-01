@@ -1,0 +1,38 @@
+{
+  "skill": "ln-1000",
+  "identifier": "TOS-35",
+  "story_id": "TOS-35",
+  "story_title": "US031 — Modèle Finding & cycle de vie",
+  "storage_mode": "linear",
+  "project_root": "/home/tosaga/DEV/AssistantAudit",
+  "project_brief": {
+    "name": "AssistantAudit",
+    "tech": "FastAPI + Next.js 16",
+    "type": "web app",
+    "key_rules": [
+      "Router->Service->Model sync only",
+      "No async def on routes",
+      "Never rename DB columns"
+    ]
+  },
+  "story_briefs": {
+    "TOS-35": {
+      "tech": "SQLAlchemy 2, Pydantic v2, Alembic",
+      "keyFiles": "backend/app/models/finding.py, backend/app/services/finding_service.py, backend/app/api/v1/findings.py"
+    }
+  },
+  "business_answers": {},
+  "status_cache": {
+    "Backlog": "e628c70b-ebac-43f0-84eb-64680b96c635",
+    "Todo": "8ed7b5cf-ff72-4ff5-adb7-1febcc2084ee",
+    "In Progress": "1e6fd661-fa30-46ba-b352-f01a212ea21b",
+    "In Review": "daa6a0b7-82a7-441a-8b43-3303ce4764d5",
+    "Done": "7312e891-e2ae-463b-bdcd-d5f51460d41a",
+    "Canceled": "1ad7071e-526e-4c89-b9af-e2e61eed325c",
+    "Duplicate": "747f4896-151b-4d03-8e59-0bce290e340f"
+  },
+  "skill_repo_path": "/home/tosaga/.claude/plugins/marketplaces/levnikolaevich-skills-marketplace/skills-catalog",
+  "worktree_dir": "/home/tosaga/DEV/AssistantAudit",
+  "branch_name": "feature/TOS-35-finding-model-lifecycle",
+  "created_at": "2026-04-01T12:33:38.785Z"
+}

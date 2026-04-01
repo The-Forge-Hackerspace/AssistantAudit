@@ -3,18 +3,10 @@ Tests for health check endpoints.
 """
 
 import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
-from app.main import create_app
 from app.core.health_check import HealthCheckService
 
-
-@pytest.fixture
-def client():
-    """Create test client for health check endpoints"""
-    app = create_app()
-    return TestClient(app)
 
 
 class TestHealthEndpoint:

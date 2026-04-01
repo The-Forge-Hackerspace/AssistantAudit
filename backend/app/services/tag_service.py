@@ -61,8 +61,16 @@ class TagService:
         return tag
 
     @staticmethod
-    def create_tag(db: Session, data: TagCreate, user_id: int) -> Tag:
-        """Crée un tag."""
+    def create_tag(db: Session, data: TagCreate, user_id: int, is_admin: bool = False) -> Tag:
+        """Crée un tag. Vérifie l'accès à l'audit si scope='audit'."""
+        # RBAC : vérifier que l'utilisateur a accès à l'audit référencé
+        if data.scope == "audit" and data.audit_id is not None and not is_admin:
+            audit = db.query(Audit).filter(
+                Audit.id == data.audit_id, Audit.owner_id == user_id
+            ).first()
+            if not audit:
+                raise HTTPException(status_code=404, detail="Audit non trouvé")
+
         # Vérifier unicité
         existing = db.query(Tag).filter(
             Tag.name == data.name,

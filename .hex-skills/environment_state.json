@@ -1,0 +1,51 @@
+{
+  "scanned_at": "2026-04-01T09:10:00Z",
+  "agents": {
+    "codex": {
+      "available": true,
+      "disabled": true,
+      "version": "0.118.0",
+      "config_synced": true,
+      "servers_synced": 6,
+      "detail": "Installed via npm --prefix ~/.local"
+    },
+    "gemini": {
+      "available": true,
+      "disabled": true,
+      "version": "0.35.3",
+      "config_synced": true,
+      "servers_synced": 6,
+      "hooks_synced": 3,
+      "detail": "Installed via npm --prefix ~/.local"
+    }
+  },
+  "claude_md": {
+    "exists": true,
+    "has_compact_instructions": true,
+    "line_count": 103,
+    "has_timestamps": false
+  },
+  "best_practices": {
+    "score": "7/7",
+    "warnings": [],
+    "info": [
+      "CLAUDE.md MCP prefs via output style injection",
+      "AGENTS.md MCP Tool Preferences added",
+      "GEMINI.md MCP Tool Preferences added"
+    ]
+  },
+  "last_assessment": {
+    "assessed_at": "2026-04-01T09:10:00Z",
+    "all_green": true,
+    "workers_run": [
+      "ln-011-agent-installer",
+      "ln-012-mcp-configurator",
+      "ln-013-config-syncer",
+      "ln-014-agent-instructions-manager"
+    ],
+    "workers_skipped": []
+  },
+  "hooks": {
+    "mode": "blocking"
+  }
+}

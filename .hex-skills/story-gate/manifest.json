@@ -1,0 +1,10 @@
+{
+  "story_id": "TOS-35",
+  "task_provider": "linear",
+  "project_root": "/home/tosaga/DEV/AssistantAudit",
+  "worktree_dir": "/home/tosaga/DEV/AssistantAudit",
+  "branch": "feature/TOS-35-finding-model-lifecycle",
+  "fast_track_policy": { "mode": "auto" },
+  "nfr_policy": { "mode": "full" },
+  "test_task_policy": { "mode": "auto" }
+}

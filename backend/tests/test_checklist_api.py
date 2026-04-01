@@ -120,3 +120,54 @@ class TestChecklistInstanceRoutes:
             headers=second_auditeur_headers,
         )
         assert resp.status_code == 404
+
+    def test_delete_instance_makes_it_non_retrievable(
+        self, client: TestClient, auditeur_headers, seeded_template, db_session, auditeur_user
+    ):
+        from app.models.audit import Audit
+        audit = Audit(nom_projet="cl-del-test", entreprise_id=1, owner_id=auditeur_user.id)
+        db_session.add(audit)
+        db_session.flush()
+
+        resp = client.post("/api/v1/checklists/instances", json={
+            "template_id": seeded_template.id, "audit_id": audit.id
+        }, headers=auditeur_headers)
+        instance_id = resp.json()["id"]
+
+        resp = client.delete(
+            f"/api/v1/checklists/instances/{instance_id}", headers=auditeur_headers
+        )
+        assert resp.status_code == 200
+
+        resp_get = client.get(
+            f"/api/v1/checklists/instances/{instance_id}", headers=auditeur_headers
+        )
+        assert resp_get.status_code == 404
+
+    def test_complete_instance_sets_status_and_completed_at(
+        self, client: TestClient, auditeur_headers, seeded_template, db_session, auditeur_user
+    ):
+        from app.models.audit import Audit
+        audit = Audit(nom_projet="cl-compl-test", entreprise_id=1, owner_id=auditeur_user.id)
+        db_session.add(audit)
+        db_session.flush()
+
+        resp = client.post("/api/v1/checklists/instances", json={
+            "template_id": seeded_template.id, "audit_id": audit.id
+        }, headers=auditeur_headers)
+        instance_id = resp.json()["id"]
+
+        resp = client.post(
+            f"/api/v1/checklists/instances/{instance_id}/complete", headers=auditeur_headers
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "completed"
+        assert data["completed_at"] is not None
+
+        resp_get = client.get(
+            f"/api/v1/checklists/instances/{instance_id}", headers=auditeur_headers
+        )
+        assert resp_get.status_code == 200
+        assert resp_get.json()["status"] == "completed"
+        assert resp_get.json()["completed_at"] is not None

@@ -90,7 +90,7 @@ class TestTaskProgressRelay:
     """Verifie que task_progress est relaye vers le bon user."""
 
     def test_task_progress_relayed_to_owner(
-        self, client, auditeur_user, agent_with_tasks
+        self, client, auditeur_user, agent_with_tasks, patch_session_local
     ):
         """Un message task_progress d'un agent est relaye vers le frontend de l'owner."""
         agent, tasks = agent_with_tasks
@@ -122,7 +122,7 @@ class TestTaskProgressRelay:
             assert msg["data"]["progress"] == 42
 
     def test_task_progress_uses_jwt_owner_not_message(
-        self, client, auditeur_user, agent_with_tasks
+        self, client, auditeur_user, agent_with_tasks, patch_session_local
     ):
         """L'owner_id est extrait du JWT agent, pas du message."""
         agent, tasks = agent_with_tasks

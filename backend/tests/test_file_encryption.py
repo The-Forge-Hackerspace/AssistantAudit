@@ -31,6 +31,7 @@ def envelope(monkeypatch):
 @pytest.fixture
 def envelope_no_key(monkeypatch):
     """EnvelopeEncryption sans KEK (mode dev)."""
+    monkeypatch.setenv("ENV", "development")
     monkeypatch.setenv("FILE_ENCRYPTION_KEY", "")
     from app.core.config import get_settings
     get_settings.cache_clear()

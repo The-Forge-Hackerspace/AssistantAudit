@@ -1,0 +1,13 @@
+{
+  "agent": "gemini",
+  "status": "failed",
+  "pid": 901351,
+  "started_at": "2026-04-01T12:05:09Z",
+  "finished_at": "2026-04-01T12:05:11Z",
+  "success": false,
+  "exit_code": 41,
+  "session_id": null,
+  "error": "Exit code 41",
+  "log_file": ".hex-skills/agent-review/gemini/batch-40_story.log",
+  "output_file": ".hex-skills/agent-review/gemini/batch-40_story_result.md"
+}

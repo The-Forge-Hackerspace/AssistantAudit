@@ -75,6 +75,7 @@ class TestUserWebSocket:
 
 class TestAgentWebSocket:
     def test_connect_agent_valid_token(self, client, admin_user, db_session):
+        from unittest.mock import patch
         from app.models.agent import Agent
 
         agent = Agent(
@@ -87,10 +88,11 @@ class TestAgentWebSocket:
         db_session.commit()
 
         token = create_agent_token(agent_uuid="agent-ws-test", owner_id=admin_user.id)
-        with client.websocket_connect(f"/ws/agent?token={token}") as ws:
-            ws.send_json({"type": "heartbeat"})
-            resp = ws.receive_json()
-            assert resp["type"] == "heartbeat_ack"
+        with patch("app.core.database.SessionLocal", lambda: db_session):
+            with client.websocket_connect(f"/ws/agent?token={token}") as ws:
+                ws.send_json({"type": "heartbeat"})
+                resp = ws.receive_json()
+                assert resp["type"] == "heartbeat_ack"
 
     def test_connect_agent_user_token_rejected(self, client, admin_user):
         token = create_access_token(subject=admin_user.id)

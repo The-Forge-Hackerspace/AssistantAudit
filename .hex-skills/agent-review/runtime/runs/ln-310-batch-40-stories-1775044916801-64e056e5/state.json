@@ -1,0 +1,58 @@
+{
+  "run_id": "ln-310-batch-40-stories-1775044916801-64e056e5",
+  "skill": "ln-310",
+  "mode": "story",
+  "identifier": "batch-40-stories",
+  "phase": "PHASE_8_SELF_CHECK",
+  "complete": true,
+  "paused_reason": null,
+  "pending_decision": null,
+  "decisions": [],
+  "health_check_done": true,
+  "agents_required": [
+    "codex",
+    "gemini"
+  ],
+  "agents_available": 2,
+  "agents_skipped_reason": null,
+  "launch_ready": true,
+  "merge_summary": "codex_no_findings_exit1_gemini_no_auth_exit41_primary_audit_0_penalty_GO",
+  "refinement_iterations": 0,
+  "self_check_passed": true,
+  "final_result": "40_stories_approved_0_penalty_GO",
+  "final_verdict": "GO",
+  "agents": {
+    "codex": {
+      "name": "codex",
+      "status": "result_ready",
+      "prompt_file": ".hex-skills/agent-review/codex/batch-40_story_prompt.md",
+      "result_file": ".hex-skills/agent-review/codex/batch-40_story_result.md",
+      "log_file": ".hex-skills/agent-review/codex/batch-40_story.log",
+      "metadata_file": ".hex-skills/agent-review/codex/batch-40_story_metadata.json",
+      "pid": 901120,
+      "session_id": "019d48ee-e414-78b3-997d-a3e17b2100ac",
+      "started_at": "2026-04-01T12:05:08Z",
+      "finished_at": "2026-04-01T12:05:33Z",
+      "exit_code": 1,
+      "error": "Exit code 1"
+    },
+    "gemini": {
+      "name": "gemini",
+      "status": "result_ready",
+      "prompt_file": ".hex-skills/agent-review/gemini/batch-40_story_prompt.md",
+      "result_file": ".hex-skills/agent-review/gemini/batch-40_story_result.md",
+      "log_file": ".hex-skills/agent-review/gemini/batch-40_story.log",
+      "metadata_file": ".hex-skills/agent-review/gemini/batch-40_story_metadata.json",
+      "pid": 901351,
+      "session_id": null,
+      "started_at": "2026-04-01T12:05:09Z",
+      "finished_at": "2026-04-01T12:05:11Z",
+      "exit_code": 41,
+      "error": "Exit code 41"
+    }
+  },
+  "created_at": "2026-04-01T12:01:56.801Z",
+  "updated_at": "2026-04-01T12:08:17.176Z",
+  "refinement_exit_reason": "SKIPPED",
+  "refinement_applied": 0
+}
