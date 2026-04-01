@@ -6,6 +6,7 @@
  */
 import { test, expect } from '@playwright/test';
 import * as path from 'path';
+import { loginAsAdmin } from './helpers/auth';
 
 const BASE_URL = 'http://localhost:3000';
 const API_URL = 'http://127.0.0.1:8000';
@@ -42,7 +43,7 @@ test.describe('Rapports — génération et téléchargement PDF', () => {
     }
 
     // Obtenir un token admin
-    const loginResp = await page.request.post(`${API_URL}/api/v1/auth/token`, {
+    const loginResp = await page.request.post(`${API_URL}/api/v1/auth/login`, {
       form: { username: 'admin@assistantaudit.local', password: 'Admin1234!' },
     });
     expect(loginResp.status()).toBe(200);
@@ -88,13 +89,7 @@ test.describe('Rapports — génération et téléchargement PDF', () => {
   });
 
   test('Page de génération rapport visible (frontend)', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    const emailField = page.locator('input[type="email"], input[name="email"]');
-    await emailField.waitFor({ timeout: 5000 });
-    await emailField.fill('admin@assistantaudit.local');
-    await page.locator('input[type="password"]').fill('Admin1234!');
-    await page.locator('button[type="submit"]').click();
-    await page.waitForURL(/(?!login)/, { timeout: 10000 });
+    await loginAsAdmin(page);
 
     // Naviguer vers un audit pour voir si la génération rapport est disponible
     await page.goto(`${BASE_URL}/audits`);

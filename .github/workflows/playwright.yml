@@ -63,6 +63,26 @@ jobs:
           -e ADMIN_PASSWORD=Admin1234! \
           backend python /app/backend/init_db.py
 
+    - name: Verify admin login works
+      run: |
+        set -e
+        for i in $(seq 1 30); do
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "http://127.0.0.1:8000/api/v1/auth/login" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "username=admin@assistantaudit.local" \
+            --data-urlencode "password=Admin1234!")
+          if [ "$code" = "200" ]; then
+            echo "Admin auth OK"
+            exit 0
+          fi
+          echo "Waiting for admin auth (got $code) ($i/30)"
+          sleep 2
+        done
+        echo "Admin auth never became ready"
+        docker compose logs backend --no-color --tail=200
+        exit 1
+
     - name: Run Playwright tests
       run: npx playwright test
     - uses: actions/upload-artifact@v4

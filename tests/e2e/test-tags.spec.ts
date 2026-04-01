@@ -3,6 +3,7 @@
  * Prérequis: backend + frontend en cours d'exécution (docker compose up -d)
  */
 import { test, expect } from '@playwright/test';
+import { loginAsAdmin } from './helpers/auth';
 
 const BASE_URL = 'http://localhost:3000';
 
@@ -16,14 +17,7 @@ test.describe('Tags — badges et filtrage multi-tag', () => {
 
   test('Composant TagFilter est présent dans la page équipements (après login)', async ({ page }) => {
     // Login d'abord
-    await page.goto(`${BASE_URL}/login`);
-    const emailField = page.locator('input[type="email"], input[name="email"]');
-    const passwordField = page.locator('input[type="password"]');
-    await emailField.waitFor({ timeout: 5000 });
-    await emailField.fill('admin@assistantaudit.local');
-    await passwordField.fill('Admin1234!');
-    await page.locator('button[type="submit"]').click();
-    await page.waitForURL(/(?!login)/, { timeout: 10000 });
+    await loginAsAdmin(page);
 
     // Naviguer vers équipements
     await page.goto(`${BASE_URL}/equipements`);
