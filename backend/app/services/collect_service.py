@@ -563,7 +563,6 @@ def _evaluate_windows_check(check_name: str, collect: CollectResult) -> tuple[bo
 
     if check_name == "antivirus_active":
         active = security.get("antivirus_active", False)
-        raw = security.get("defender_raw", "")
         if active:
             return True, "Antivirus/EDR actif"
         return False, "Aucun antivirus/EDR actif détecté"
@@ -577,7 +576,6 @@ def _evaluate_linux_check(check_name: str, collect: CollectResult) -> tuple[bool
     Returns: (passed: bool, evidence_detail: str)
     """
     security = collect.security or {}
-    users = collect.users or {}
     updates = collect.updates or {}
     os_info = collect.os_info or {}
 

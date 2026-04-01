@@ -438,7 +438,6 @@ class ADAuditor:
 
     def _collect_laps(self, result: ADAuditResult) -> None:
         """Vérifie si LAPS est déployé (attribut ms-Mcs-AdmPwd dans le schéma)."""
-        schema_dn = f"CN=ms-Mcs-AdmPwd,CN=Schema,CN=Configuration,{self._base_dn}"
         entries = self._search(
             f"CN=Schema,CN=Configuration,{self._base_dn}",
             "(lDAPDisplayName=ms-Mcs-AdmPwd)",

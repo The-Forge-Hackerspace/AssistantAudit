@@ -23,14 +23,12 @@ ignore = [
     "E501",  # Line too long — toléré temporairement (120 car. limité via line-length)
     "E701",  # Multiple statements on one line — patterns existants
     "E741",  # Ambiguous variable name — faux positifs (l, O dans le code existant)
-    "F821",  # Undefined name — faux positifs sur les forward refs SQLAlchemy
-    "F841",  # Unused variable — sera corrigé progressivement
     "W293",  # Blank line with whitespace — sera corrigé progressivement
 ]
 
 
 [lint.per-file-ignores]
-"app/models/*.py" = ["F401"]   # Re-exports dans les modèles (relationships)
+"app/models/*.py" = ["F401", "F821"]  # Re-exports + SQLAlchemy forward-ref strings
 "alembic/env.py" = ["F401"]    # Imports utilisés par Alembic internement
 "scripts/*.py" = ["F401", "E402"]  # Scripts utilitaires
 

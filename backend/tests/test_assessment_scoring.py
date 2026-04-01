@@ -175,7 +175,6 @@ class TestCampaignScoring:
         """Campaign with multiple assessments at different compliance levels"""
         scenario = create_full_assessment_scenario(db_session)
         campaign = scenario["campaign"]
-        audit = scenario["audit"]
         
         # Create a second assessment
         assessment2 = AssessmentFactory.create(

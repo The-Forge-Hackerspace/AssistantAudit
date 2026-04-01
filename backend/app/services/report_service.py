@@ -45,7 +45,7 @@ class ReportService:
         db: Session, data: AuditReportCreate, user_id: int, is_admin: bool
     ) -> AuditReport:
         """Crée un rapport avec ses 25 sections."""
-        audit = ReportService._check_audit_access(db, data.audit_id, user_id, is_admin)
+        ReportService._check_audit_access(db, data.audit_id, user_id, is_admin)
 
         report = AuditReport(
             audit_id=data.audit_id,

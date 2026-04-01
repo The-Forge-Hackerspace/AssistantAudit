@@ -208,7 +208,7 @@ class TestParseTar:
 
     def test_parse_empty_tar(self):
         buf = io.BytesIO()
-        with tarfile.open(fileobj=buf, mode="w") as tar:
+        with tarfile.open(fileobj=buf, mode="w"):
             pass
         result = OradadAnalysisService.parse_oradad_tar(buf.getvalue())
         assert result == {}

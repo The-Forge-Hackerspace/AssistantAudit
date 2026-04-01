@@ -62,8 +62,7 @@ def _get_certificate(host: str, port: int, timeout: int) -> CertificateInfo:
     try:
         with socket.create_connection((host, port), timeout=timeout) as sock:
             with context.wrap_socket(sock, server_hostname=host) as ssock:
-                cert_bin = ssock.getpeercert(binary_form=True)
-                cert_dict = ssl.DER_cert_to_PEM_cert(cert_bin)
+                ssock.getpeercert(binary_form=True)
 
                 # Re-connect with verification to get parsed cert
                 ctx2 = ssl.create_default_context()

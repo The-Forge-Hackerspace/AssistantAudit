@@ -140,7 +140,6 @@ def before_send_transaction_hook(transaction: dict, hint: dict) -> Optional[dict
         Modified transaction, or None to skip sending
     """
     # Skip health check transactions
-    op = transaction.get("contexts", {}).get("trace", {}).get("op")
     transaction_name = transaction.get("transaction", "")
     
     if "/health" in transaction_name or "/metrics" in transaction_name:

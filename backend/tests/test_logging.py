@@ -42,7 +42,6 @@ class TestStructuredLogging:
         """Test JSON formatter creates valid JSON"""
         formatter = ContextualJsonFormatter()
         
-        logger = logging.getLogger("test")
         handler = logging.StreamHandler(StringIO())
         handler.setFormatter(formatter)
         
@@ -294,7 +293,7 @@ class TestAuditLoggingMiddleware:
         
         # Unhandled exceptions return 500
         with pytest.raises(ValueError):
-            response = client.get("/error")
+            client.get("/error")
         # The middleware should have logged the error before it propogates
 
     def test_middleware_logs_post_request(self, test_app, caplog):
@@ -340,8 +339,8 @@ class TestLoggingIntegration:
         LogContext.clear()
         LogContext.set_request_id("multi-logger-test")
         
-        logger1 = get_logger("logger1")
-        logger2 = get_logger("logger2")
+        get_logger("logger1")
+        get_logger("logger2")
         
         # Both loggers should see the same context
         context = LogContext.get()
