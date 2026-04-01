@@ -9,11 +9,11 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from ..models.collect_result import CollectResult, CollectMethod, CollectStatus
+from ..core.database import SessionLocal
+from ..models.assessment import Assessment, ComplianceStatus, ControlResult
+from ..models.collect_result import CollectMethod, CollectResult, CollectStatus
 from ..models.equipement import Equipement, EquipementServeur
 from ..models.site import Site
-from ..models.assessment import Assessment, ControlResult, ComplianceStatus
-from ..core.database import SessionLocal
 from ..tools.collectors.ssh_collector import collect_via_ssh
 from ..tools.collectors.winrm_collector import collect_via_winrm
 
@@ -563,10 +563,9 @@ def _evaluate_windows_check(check_name: str, collect: CollectResult) -> tuple[bo
 
     if check_name == "antivirus_active":
         active = security.get("antivirus_active", False)
-        raw = security.get("defender_raw", "")
         if active:
-            return True, f"Antivirus/EDR actif"
-        return False, f"Aucun antivirus/EDR actif détecté"
+            return True, "Antivirus/EDR actif"
+        return False, "Aucun antivirus/EDR actif détecté"
 
     return False, f"Vérification '{check_name}' non implémentée"
 
@@ -577,7 +576,6 @@ def _evaluate_linux_check(check_name: str, collect: CollectResult) -> tuple[bool
     Returns: (passed: bool, evidence_detail: str)
     """
     security = collect.security or {}
-    users = collect.users or {}
     updates = collect.updates or {}
     os_info = collect.os_info or {}
 
@@ -621,13 +619,13 @@ def _evaluate_linux_check(check_name: str, collect: CollectResult) -> tuple[bool
     if check_name == "ssh_password_disabled":
         ssh_pass = security.get("ssh_password_authentication", "NOT_SET").strip().lower()
         if "no" in ssh_pass:
-            return True, f"PasswordAuthentication = no"
+            return True, "PasswordAuthentication = no"
         return False, f"PasswordAuthentication = {ssh_pass}"
 
     if check_name == "pam_configured":
         pam = security.get("pam_pwquality", "NOT_CONFIGURED")
         if pam and pam != "NOT_CONFIGURED" and "minlen" in pam.lower():
-            return True, f"PAM pwquality configuré"
+            return True, "PAM pwquality configuré"
         return False, "PAM pwquality non configuré"
 
     if check_name == "firewall_active":

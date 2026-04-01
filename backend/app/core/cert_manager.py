@@ -10,7 +10,6 @@ Usage :
     mgr = CertManager(ca_cert_path, ca_key_path)
     cert_pem, key_pem = mgr.sign_agent_cert(agent_uuid)
 """
-import hashlib
 import logging
 import os
 from datetime import datetime, timedelta, timezone

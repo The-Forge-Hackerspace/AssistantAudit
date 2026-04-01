@@ -11,20 +11,19 @@ import re
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 
 from ...core.config import get_settings
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur
-from ...models.user import User
-from ...models.assessment import ControlResult, Assessment, AssessmentCampaign
+from ...core.deps import get_current_auditeur, get_current_user
+from ...models.assessment import Assessment, AssessmentCampaign, ControlResult
+from ...models.attachment import Attachment
 from ...models.audit import Audit
 from ...models.equipement import Equipement
 from ...models.site import Site
-from ...models.entreprise import Entreprise
-from ...models.attachment import Attachment
+from ...models.user import User
 from ...schemas.attachment import AttachmentRead
 
 logger = logging.getLogger(__name__)

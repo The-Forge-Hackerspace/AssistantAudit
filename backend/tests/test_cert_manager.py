@@ -12,7 +12,6 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from app.core.cert_manager import CertManager
 
-
 # ────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ────────────────────────────────────────────────────────────────────────

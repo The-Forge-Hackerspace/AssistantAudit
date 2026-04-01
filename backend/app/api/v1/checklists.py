@@ -1,6 +1,7 @@
 """Routes API checklists terrain (brief §4.2, §7.2)."""
 
 import logging
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -8,9 +9,13 @@ from ...core.database import get_db
 from ...core.deps import get_current_user
 from ...models.user import User
 from ...schemas.checklist import (
-    ChecklistTemplateRead, ChecklistTemplateList,
-    ChecklistInstanceCreate, ChecklistInstanceRead, ChecklistInstanceDetail,
-    ChecklistResponseUpdate, ChecklistResponseRead,
+    ChecklistInstanceCreate,
+    ChecklistInstanceDetail,
+    ChecklistInstanceRead,
+    ChecklistResponseRead,
+    ChecklistResponseUpdate,
+    ChecklistTemplateList,
+    ChecklistTemplateRead,
 )
 from ...schemas.common import MessageResponse
 from ...services.checklist_service import ChecklistService

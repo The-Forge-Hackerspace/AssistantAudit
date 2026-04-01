@@ -59,7 +59,6 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
 
         # Request start
         start_time = time.time()
-        request_body = None
 
         # Try to capture request body for POST/PUT/PATCH
         if request.method in ["POST", "PUT", "PATCH"]:
@@ -67,9 +66,9 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
                 body = await request.body()
                 if body:
                     try:
-                        request_body = body.decode("utf-8")[:500]  # Limit size
+                        body.decode("utf-8")[:500]  # Validate decodable
                     except UnicodeDecodeError:
-                        request_body = "<binary>"
+                        pass
                 # Ensure request body is accessible later
                 async def receive():
                     return {"type": "http.request", "body": body}

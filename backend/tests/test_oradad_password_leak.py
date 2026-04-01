@@ -4,7 +4,6 @@ Tests sécurité — DomainEntryResponse ne doit jamais exposer le password.
 Vérifie que GET /oradad/configs retourne les domaines sans champ password,
 et que POST/PUT stockent correctement le password en DB.
 """
-import pytest
 
 
 class TestDomainPasswordNotExposed:

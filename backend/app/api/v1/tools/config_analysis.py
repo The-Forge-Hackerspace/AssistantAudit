@@ -1,27 +1,26 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from ....core.database import get_db
-from ....core.deps import get_current_user, get_current_auditeur
-from ....core.helpers import user_has_access_to_entreprise
+from ....core.deps import get_current_auditeur, get_current_user
 from ....models.user import User
+from ....schemas.common import MessageResponse
 from ....schemas.scan import (
-    ConfigAnalysisResult,
-    ConfigUploadResponse,
     ConfigAnalysisRead,
+    ConfigAnalysisResult,
     ConfigAnalysisSummary,
+    ConfigUploadResponse,
     PrefillResult,
 )
-from ....schemas.common import MessageResponse
-from ....tools.config_parsers import get_parser, ConfigParserBase
 from ....services.config_analysis_service import (
-    save_config_analysis,
-    get_config_analysis,
     delete_config_analysis,
+    get_config_analysis,
     prefill_assessment_from_config,
+    save_config_analysis,
 )
+from ....tools.config_parsers import ConfigParserBase, get_parser
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -165,9 +164,9 @@ def list_analyses(
     if equipement_id:
         query = query.filter(CA.equipement_id == equipement_id)
     if not adm:
+        from ....models.audit import Audit
         from ....models.equipement import Equipement
         from ....models.site import Site
-        from ....models.audit import Audit
         accessible_ent_ids = (
             db.query(Audit.entreprise_id)
             .filter(Audit.owner_id == uid)

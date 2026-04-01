@@ -8,15 +8,12 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from app.core.storage import (
-    slugify,
-    get_scan_output_path,
     ensure_scan_directory,
+    get_scan_output_path,
+    slugify,
     write_meta_json,
 )
-
 
 # ────────────────────────────────────────────────────────────────────────
 # slugify() Tests

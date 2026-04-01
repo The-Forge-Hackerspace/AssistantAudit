@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def seeded_template(db_session):
     """Crée un template avec items pour les tests API."""
-    from app.models.checklist import ChecklistTemplate, ChecklistSection, ChecklistItem
+    from app.models.checklist import ChecklistItem, ChecklistSection, ChecklistTemplate
     tpl = ChecklistTemplate(name="API Test CL", category="lan", is_predefined=True)
     db_session.add(tpl)
     db_session.flush()
@@ -57,7 +57,7 @@ class TestChecklistInstanceRoutes:
 
     def test_respond_to_item(self, client: TestClient, auditeur_headers, seeded_template, db_session, auditeur_user):
         from app.models.audit import Audit
-        from app.models.checklist import ChecklistSection, ChecklistItem
+        from app.models.checklist import ChecklistItem, ChecklistSection
         audit = Audit(nom_projet="cl-resp-test", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()

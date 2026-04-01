@@ -1,9 +1,10 @@
 """Tests TDD — Système de tags transversal (brief §5)."""
 
 import pytest
+
 from app.models.tag import Tag, TagAssociation
+from app.schemas.tag import TagCreate
 from app.services.tag_service import TagService
-from app.schemas.tag import TagCreate, TagUpdate
 
 
 class TestTagModel:

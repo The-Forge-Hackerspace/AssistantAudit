@@ -5,11 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_admin, PaginationParams
+from ...core.deps import PaginationParams, get_current_admin
 from ...core.security import hash_password
 from ...models.user import User
-from ...schemas.user import UserCreate, UserRead, UserUpdate
 from ...schemas.common import PaginatedResponse
+from ...schemas.user import UserCreate, UserRead, UserUpdate
 from ...services.auth_service import AuthService
 
 router = APIRouter()

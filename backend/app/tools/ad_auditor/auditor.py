@@ -8,11 +8,10 @@ et évalue la conformité par rapport au référentiel AD.
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import ldap3
-from ldap3 import Server, Connection, ALL, NTLM, SIMPLE, SUBTREE, ALL_ATTRIBUTES
+from ldap3 import ALL, ALL_ATTRIBUTES, NTLM, SIMPLE, SUBTREE, Connection, Server
 from ldap3.core.exceptions import LDAPException
 
 logger = logging.getLogger(__name__)
@@ -439,7 +438,6 @@ class ADAuditor:
 
     def _collect_laps(self, result: ADAuditResult) -> None:
         """Vérifie si LAPS est déployé (attribut ms-Mcs-AdmPwd dans le schéma)."""
-        schema_dn = f"CN=ms-Mcs-AdmPwd,CN=Schema,CN=Configuration,{self._base_dn}"
         entries = self._search(
             f"CN=Schema,CN=Configuration,{self._base_dn}",
             "(lDAPDisplayName=ms-Mcs-AdmPwd)",

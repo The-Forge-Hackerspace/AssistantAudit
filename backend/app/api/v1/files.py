@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from ...core.config import get_settings
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur
+from ...core.deps import get_current_auditeur, get_current_user
 from ...models.user import User
 from ...schemas.attachment import AttachmentRead
 from ...services.file_service import FileService

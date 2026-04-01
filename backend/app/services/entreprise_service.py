@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..core.audit_logger import log_access_denied
 from ..core.helpers import get_or_404, user_has_access_to_entreprise
 from ..models.audit import Audit
-from ..models.entreprise import Entreprise, Contact
+from ..models.entreprise import Contact, Entreprise
 from ..schemas.entreprise import EntrepriseCreate, EntrepriseUpdate
 
 

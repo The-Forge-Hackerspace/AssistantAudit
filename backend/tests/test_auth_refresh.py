@@ -1,8 +1,9 @@
 """
 Tests pour POST /auth/refresh et validate_refresh_token.
 """
-import pytest
 from datetime import timedelta
+
+import pytest
 from jose import JWTError
 
 from app.core.security import (
@@ -10,7 +11,6 @@ from app.core.security import (
     create_refresh_token,
     validate_refresh_token,
 )
-
 
 # ────────────────────────────────────────────────────────────────────────
 # validate_refresh_token — Tests unitaires
@@ -35,9 +35,11 @@ class TestValidateRefreshToken:
 
     def test_expired_token_rejected(self, auditeur_user):
         """Un refresh token expire est refuse."""
-        from jose import jwt
-        from app.core.config import get_settings
         from datetime import datetime, timezone
+
+        from jose import jwt
+
+        from app.core.config import get_settings
 
         settings = get_settings()
         payload = {

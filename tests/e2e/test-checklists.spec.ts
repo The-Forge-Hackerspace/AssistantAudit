@@ -17,24 +17,7 @@ test.describe('Checklists — mode terrain tablette', () => {
   });
 
   test('Page checklists est accessible après login', async ({ page }) => {
-    // Login
-    await page.goto(`${BASE_URL}/login`);
-
-    // Attendre que le formulaire soit là
-    const emailField = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]');
-    const passwordField = page.locator('input[type="password"]');
-
-    await emailField.waitFor({ timeout: 5000 });
-    await emailField.fill('admin@assistantaudit.local');
-    await passwordField.fill('Admin1234!');
-
-    // Submit
-    await page.locator('button[type="submit"]').click();
-
-    // Attendre navigation
-    await page.waitForURL(/(?!login)/, { timeout: 10000 });
-
-    // Naviguer vers la page checklists d'un audit (ID 1 par défaut)
+    // storageState handles auth — navigate directly
     await page.goto(`${BASE_URL}/audits/1/checklists`);
 
     // Prendre screenshot

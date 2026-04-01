@@ -2,62 +2,65 @@
 Package models : tous les modèles SQLAlchemy.
 Importés ici pour qu'Alembic et create_all les détectent automatiquement.
 """
-from .user import User
-from .entreprise import Entreprise, Contact
-from .audit import Audit, AuditStatus
-from .site import Site
-from .equipement import (
-    Equipement,
-    EquipementReseau,
-    EquipementServeur,
-    EquipementFirewall,
-    EquipementSwitch,
-    EquipementRouter,
-    EquipementAccessPoint,
-    EquipementPrinter,
-    EquipementCamera,
-    EquipementNAS,
-    EquipementHyperviseur,
-    EquipementTelephone,
-    EquipementIoT,
-    EquipementCloudGateway,
-    EquipementAuditStatus,
-    EQUIPEMENT_TYPE_VALUES,
-    EQUIPEMENT_TYPE_CLASS_MAP,
-)
-from .scan import ScanReseau, ScanHost, ScanPort
-from .network_map import NetworkLink, NetworkMapLayout, SiteConnection
-from .framework import (
-    Framework,
-    FrameworkCategory,
-    Control,
-    ControlSeverity,
-    CheckType,
-)
-from .assessment import (
-    AssessmentCampaign,
-    Assessment,
-    ControlResult,
-    ComplianceStatus,
-    CampaignStatus,
-)
-from .attachment import Attachment
-from .config_analysis import ConfigAnalysis
-from .collect_result import CollectResult, CollectMethod, CollectStatus
 from .ad_audit_result import ADAuditResultModel, ADAuditStatus
-from .monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
 from .agent import Agent
 from .agent_task import AgentTask
-from .task_artifact import TaskArtifact
 from .anssi_checklist import AnssiCheckpoint
-from .oradad_config import OradadConfig
-from .tag import Tag, TagAssociation
-from .checklist import (
-    ChecklistTemplate, ChecklistSection, ChecklistItem,
-    ChecklistInstance, ChecklistResponse,
+from .assessment import (
+    Assessment,
+    AssessmentCampaign,
+    CampaignStatus,
+    ComplianceStatus,
+    ControlResult,
 )
+from .attachment import Attachment
+from .audit import Audit, AuditStatus
+from .checklist import (
+    ChecklistInstance,
+    ChecklistItem,
+    ChecklistResponse,
+    ChecklistSection,
+    ChecklistTemplate,
+)
+from .collect_result import CollectMethod, CollectResult, CollectStatus
+from .config_analysis import ConfigAnalysis
+from .entreprise import Contact, Entreprise
+from .equipement import (
+    EQUIPEMENT_TYPE_CLASS_MAP,
+    EQUIPEMENT_TYPE_VALUES,
+    Equipement,
+    EquipementAccessPoint,
+    EquipementAuditStatus,
+    EquipementCamera,
+    EquipementCloudGateway,
+    EquipementFirewall,
+    EquipementHyperviseur,
+    EquipementIoT,
+    EquipementNAS,
+    EquipementPrinter,
+    EquipementReseau,
+    EquipementRouter,
+    EquipementServeur,
+    EquipementSwitch,
+    EquipementTelephone,
+)
+from .finding import VALID_TRANSITIONS, Finding, FindingStatus, FindingStatusHistory
+from .framework import (
+    CheckType,
+    Control,
+    ControlSeverity,
+    Framework,
+    FrameworkCategory,
+)
+from .monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
+from .network_map import NetworkLink, NetworkMapLayout, SiteConnection
+from .oradad_config import OradadConfig
 from .report import AuditReport, ReportSection
-from .finding import Finding, FindingStatus, FindingStatusHistory, VALID_TRANSITIONS
+from .scan import ScanHost, ScanPort, ScanReseau
+from .site import Site
+from .tag import Tag, TagAssociation
+from .task_artifact import TaskArtifact
+from .user import User
 
 __all__ = [
     "User",

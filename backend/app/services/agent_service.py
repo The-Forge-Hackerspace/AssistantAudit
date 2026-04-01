@@ -206,8 +206,8 @@ class AgentService:
         db: Session, user_id: int, is_admin: bool = False, tool: str | None = None,
     ) -> list[dict]:
         """Liste les taches agent avec resolution site/entreprise."""
-        from ..models.site import Site
         from ..models.entreprise import Entreprise
+        from ..models.site import Site
         from ..schemas.agent import TaskResponse
 
         query = db.query(AgentTask)

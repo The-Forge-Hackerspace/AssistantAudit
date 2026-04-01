@@ -2,18 +2,17 @@
 Service Scan Réseau — Orchestration des scans Nmap et persistance des résultats.
 """
 import logging
-from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from ..models.scan import ScanReseau, ScanHost, ScanPort
-from ..models.site import Site
-from ..models.equipement import Equipement, EQUIPEMENT_TYPE_VALUES
-from ..tools.nmap_scanner.scanner import NmapScanner, NmapScanResult
 from ..core.audit_logger import log_access_denied
 from ..core.database import SessionLocal
 from ..core.helpers import user_has_access_to_entreprise
+from ..models.equipement import EQUIPEMENT_TYPE_VALUES, Equipement
+from ..models.scan import ScanHost, ScanPort, ScanReseau
+from ..models.site import Site
+from ..tools.nmap_scanner.scanner import NmapScanner, NmapScanResult
 
 logger = logging.getLogger(__name__)
 

@@ -6,13 +6,11 @@ Attachment → ControlResult → Assessment → Campaign → Audit → owner_id.
 """
 import uuid
 
-import pytest
-from app.core.security import create_access_token
 from app.models.attachment import Attachment
 from tests.factories import (
-    AuditFactory,
     AssessmentCampaignFactory,
     AssessmentFactory,
+    AuditFactory,
     ControlFactory,
     ControlResultFactory,
     EntrepriseFactory,
@@ -21,7 +19,6 @@ from tests.factories import (
     FrameworkFactory,
     SiteFactory,
 )
-
 
 # ── Helpers ──────────────────────────────────────────────────────────
 

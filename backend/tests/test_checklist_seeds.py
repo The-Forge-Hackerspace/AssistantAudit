@@ -1,6 +1,5 @@
 """Tests TDD — Seeds checklists salle serveur, documentation, départ (step 33)."""
 
-import pytest
 
 
 class TestChecklistSeedData:
@@ -35,9 +34,9 @@ class TestChecklistSeedData:
 
     def test_all_items_have_ref_and_label(self):
         """Chaque item a un ref_code et un label."""
-        from scripts.seed_checklist_server_room import CHECKLIST_SERVER_ROOM
-        from scripts.seed_checklist_documentation import CHECKLIST_DOCUMENTATION
         from scripts.seed_checklist_departure import CHECKLIST_DEPARTURE
+        from scripts.seed_checklist_documentation import CHECKLIST_DOCUMENTATION
+        from scripts.seed_checklist_server_room import CHECKLIST_SERVER_ROOM
 
         for checklist in [CHECKLIST_SERVER_ROOM, CHECKLIST_DOCUMENTATION, CHECKLIST_DEPARTURE]:
             for section in checklist["sections"]:
@@ -48,8 +47,8 @@ class TestChecklistSeedData:
 
     def test_server_room_seed_idempotent(self, db_session):
         """Le seed est idempotent — pas de doublon si lancé 2 fois."""
-        from scripts.seed_checklist_server_room import seed
         from app.models.checklist import ChecklistTemplate
+        from scripts.seed_checklist_server_room import seed
 
         seed(db_session)
         count1 = db_session.query(ChecklistTemplate).filter_by(category="server_room").count()
@@ -59,8 +58,8 @@ class TestChecklistSeedData:
 
     def test_documentation_seed_idempotent(self, db_session):
         """Le seed documentation est idempotent — pas de doublon si lancé 2 fois."""
-        from scripts.seed_checklist_documentation import seed
         from app.models.checklist import ChecklistTemplate
+        from scripts.seed_checklist_documentation import seed
 
         seed(db_session)
         count1 = db_session.query(ChecklistTemplate).filter_by(category="documentation").count()
@@ -70,8 +69,8 @@ class TestChecklistSeedData:
 
     def test_departure_seed_idempotent(self, db_session):
         """Le seed départ est idempotent — pas de doublon si lancé 2 fois."""
-        from scripts.seed_checklist_departure import seed
         from app.models.checklist import ChecklistTemplate
+        from scripts.seed_checklist_departure import seed
 
         seed(db_session)
         count1 = db_session.query(ChecklistTemplate).filter_by(category="departure").count()

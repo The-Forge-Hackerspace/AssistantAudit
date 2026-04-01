@@ -1,11 +1,10 @@
 """Service tags — CRUD, association, filtrage."""
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
-from fastapi import HTTPException, status
 
-from ..models.tag import Tag, TagAssociation
 from ..models.audit import Audit
+from ..models.tag import Tag, TagAssociation
 from ..schemas.tag import TagCreate, TagUpdate
 
 

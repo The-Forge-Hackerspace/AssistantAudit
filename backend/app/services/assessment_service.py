@@ -12,15 +12,15 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..core.helpers import get_or_404
 from ..models.assessment import (
-    AssessmentCampaign,
     Assessment,
-    ControlResult,
+    AssessmentCampaign,
     CampaignStatus,
     ComplianceStatus,
+    ControlResult,
 )
 from ..models.audit import Audit
-from ..models.framework import Framework, Control
 from ..models.equipement import Equipement, EquipementAuditStatus
+from ..models.framework import Control, Framework
 from ..models.monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
 from ..models.site import Site
 

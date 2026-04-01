@@ -6,8 +6,8 @@ from enum import Enum
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
-from ..models.equipement import EQUIPEMENT_TYPE_VALUES
 
+from ..models.equipement import EQUIPEMENT_TYPE_VALUES
 
 EQUIPEMENT_TYPE_PATTERN = "^(" + "|".join(EQUIPEMENT_TYPE_VALUES) + ")$"
 

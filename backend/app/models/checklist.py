@@ -1,9 +1,17 @@
 """Modèles checklist terrain (brief §4.2, §7.2)."""
 
 from datetime import datetime, timezone
+
 from sqlalchemy import (
-    CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text,
-    UniqueConstraint, text,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

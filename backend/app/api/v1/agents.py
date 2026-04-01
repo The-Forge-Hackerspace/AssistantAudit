@@ -3,14 +3,13 @@ Routes API pour la gestion des agents et le dispatch de taches.
 """
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
 from ...core.deps import get_current_agent, get_current_auditeur
 from ...core.security import create_agent_token
 from ...models.agent import Agent
-from ...models.user import User
 from ...schemas.agent import (
     AgentCreateRequest,
     AgentCreateResponse,

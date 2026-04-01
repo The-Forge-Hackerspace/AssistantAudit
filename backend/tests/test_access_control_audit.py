@@ -5,12 +5,12 @@ Verifie l'isolation inter-roles (admin/auditeur/lecteur) et inter-tenants
 sur tous les endpoints critiques.
 """
 import pytest
-from app.core.security import create_access_token, hash_password, create_agent_token
+
+from app.core.security import create_access_token, create_agent_token, hash_password
 from app.models import User
+from app.models.agent import Agent
 from app.models.audit import Audit
 from app.models.entreprise import Entreprise
-from app.models.agent import Agent
-
 
 # ── Fixtures supplementaires ─────────────────────────────────────────
 

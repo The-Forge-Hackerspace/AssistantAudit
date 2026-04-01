@@ -10,24 +10,23 @@ from sqlalchemy.orm import Session
 from ....core.database import get_db
 from ....core.deps import get_current_auditeur
 from ....core.helpers import user_has_access_to_entreprise
-from ....models.audit import Audit
+from ....core.task_runner import get_task_runner
 from ....models.entreprise import Entreprise
 from ....models.monkey365_scan_result import Monkey365ScanStatus
 from ....models.user import User
+from ....schemas.common import MessageResponse
 from ....schemas.scan import (
-    Monkey365ScanCreate,
-    Monkey365ScanResultRead,
-    Monkey365ScanResultSummary,
-    Monkey365ScanLogs,
     Monkey365ImportRequest,
     Monkey365ImportResult,
+    Monkey365ScanCreate,
+    Monkey365ScanLogs,
+    Monkey365ScanResultRead,
+    Monkey365ScanResultSummary,
     Monkey365StreamingScanCreate,
     Monkey365StreamingScanResponse,
 )
-from ....schemas.common import MessageResponse
-from ....core.task_runner import get_task_runner
-from ....services.monkey365_scan_service import Monkey365ScanService
 from ....services.assessment_service import AssessmentService
+from ....services.monkey365_scan_service import Monkey365ScanService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

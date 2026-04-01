@@ -1,19 +1,23 @@
 """Tests unitaires — FindingService."""
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from app.core.database import Base
 from app.models.assessment import (
-    Assessment, AssessmentCampaign, CampaignStatus, ComplianceStatus, ControlResult,
+    Assessment,
+    AssessmentCampaign,
+    CampaignStatus,
+    ComplianceStatus,
+    ControlResult,
 )
-from app.models.equipement import Equipement
-from app.models.finding import Finding, FindingStatus, VALID_TRANSITIONS
-from app.models.framework import CheckType, Control, ControlSeverity, Framework, FrameworkCategory
-from app.models.user import User
 from app.models.audit import Audit
 from app.models.entreprise import Entreprise
+from app.models.equipement import Equipement
+from app.models.finding import Finding, FindingStatus
+from app.models.framework import CheckType, Control, ControlSeverity, Framework, FrameworkCategory
 from app.models.site import Site
+from app.models.user import User
 from app.services.finding_service import FindingService
 
 

@@ -8,15 +8,15 @@ Tests path construction, backward compatibility, edge cases, and data integrity.
 import json
 from pathlib import Path
 from unittest.mock import patch
+
 import pytest
 
 from app.core.storage import (
-    slugify,
-    get_scan_output_path,
     ensure_scan_directory,
+    get_scan_output_path,
+    slugify,
     write_meta_json,
 )
-
 
 # ────────────────────────────────────────────────────────────────────────
 # TEST 1: Path Construction - No Duplicate Tenant IDs
@@ -375,7 +375,7 @@ class TestDataIntegrity:
                     loaded = json.load(f)
                 
                 assert loaded["scan_id"] == scan_id, f"Metadata scan_id mismatch for {company}"
-                assert loaded["entreprise_name"] == company, f"Metadata company mismatch"
+                assert loaded["entreprise_name"] == company, "Metadata company mismatch"
     
     def test_duplicate_audit_idempotency(self, tmp_path):
         """Test that running the same audit twice doesn't corrupt data."""

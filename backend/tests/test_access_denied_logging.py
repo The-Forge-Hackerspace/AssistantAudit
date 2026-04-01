@@ -5,11 +5,9 @@ Vérifie que les access_denied produisent des WARNING structurés
 sans leaker de données sensibles.
 """
 import logging
-import pytest
 
 from app.models.audit import Audit
 from app.models.entreprise import Entreprise
-
 
 SECURITY_LOGGER = "security"
 

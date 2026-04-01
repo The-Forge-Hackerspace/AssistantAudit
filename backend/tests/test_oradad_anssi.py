@@ -4,23 +4,22 @@ Tests pour le modele AnssiCheckpoint, le script de seed et le service OradadAnal
 import csv
 import io
 import tarfile
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.orm import Session
 
 from app.models.anssi_checklist import AnssiCheckpoint
 from app.services.oradad_analysis_service import (
-    OradadAnalysisService,
     UAC_ACCOUNTDISABLE,
     UAC_DONT_EXPIRE_PASSWD,
     UAC_DONT_REQUIRE_PREAUTH,
-    UAC_TRUSTED_FOR_DELEGATION,
-    UAC_SERVER_TRUST_ACCOUNT,
     UAC_ENCRYPTED_TEXT_PASSWORD_ALLOWED,
+    UAC_SERVER_TRUST_ACCOUNT,
+    UAC_TRUSTED_FOR_DELEGATION,
+    OradadAnalysisService,
 )
-from scripts.seed_anssi_checkpoints import seed, ANSSI_CHECKPOINTS
-
+from scripts.seed_anssi_checkpoints import ANSSI_CHECKPOINTS, seed
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -209,7 +208,7 @@ class TestParseTar:
 
     def test_parse_empty_tar(self):
         buf = io.BytesIO()
-        with tarfile.open(fileobj=buf, mode="w") as tar:
+        with tarfile.open(fileobj=buf, mode="w"):
             pass
         result = OradadAnalysisService.parse_oradad_tar(buf.getvalue())
         assert result == {}

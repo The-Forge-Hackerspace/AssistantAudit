@@ -1,9 +1,16 @@
 """Modèles rapport d'audit (brief §7.7)."""
 
 from datetime import datetime, timezone
+
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Integer, String, Text,
-    CheckConstraint, UniqueConstraint,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

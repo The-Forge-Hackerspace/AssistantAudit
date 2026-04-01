@@ -5,7 +5,6 @@ Tests for structured JSON logging and audit trail infrastructure.
 import json
 import logging
 from io import StringIO
-from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -13,10 +12,10 @@ from fastapi.testclient import TestClient
 
 from app.core.audit_logger import AuditLoggingMiddleware, BusinessAuditLogger
 from app.core.logging_config import (
+    ContextualJsonFormatter,
     LogContext,
     configure_structured_logging,
     get_logger,
-    ContextualJsonFormatter,
 )
 
 
@@ -43,7 +42,6 @@ class TestStructuredLogging:
         """Test JSON formatter creates valid JSON"""
         formatter = ContextualJsonFormatter()
         
-        logger = logging.getLogger("test")
         handler = logging.StreamHandler(StringIO())
         handler.setFormatter(formatter)
         
@@ -295,7 +293,7 @@ class TestAuditLoggingMiddleware:
         
         # Unhandled exceptions return 500
         with pytest.raises(ValueError):
-            response = client.get("/error")
+            client.get("/error")
         # The middleware should have logged the error before it propogates
 
     def test_middleware_logs_post_request(self, test_app, caplog):
@@ -341,8 +339,8 @@ class TestLoggingIntegration:
         LogContext.clear()
         LogContext.set_request_id("multi-logger-test")
         
-        logger1 = get_logger("logger1")
-        logger2 = get_logger("logger2")
+        get_logger("logger1")
+        get_logger("logger2")
         
         # Both loggers should see the same context
         context = LogContext.get()

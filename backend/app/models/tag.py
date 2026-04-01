@@ -1,9 +1,17 @@
 """Modèle Tag et TagAssociation — système de tags transversal (brief §5)."""
 
 from datetime import datetime, timezone
+
 from sqlalchemy import (
-    Column, DateTime, ForeignKey, Integer, String, UniqueConstraint,
-    Index, CheckConstraint, text,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

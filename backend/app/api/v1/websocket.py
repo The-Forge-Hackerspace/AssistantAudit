@@ -81,6 +81,7 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
 
     # Pour les updates en base (heartbeat last_seen + task status)
     from datetime import datetime, timezone
+
     from ...core.database import SessionLocal
     from ...models.agent import Agent
     from ...models.agent_task import AgentTask
@@ -213,6 +214,7 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
 async def _handle_agent_disconnect(agent_uuid: str, owner_id: int | None) -> None:
     """Nettoie a la deconnexion : marque les taches running comme failed."""
     from datetime import datetime, timezone
+
     from ...core.database import SessionLocal
     from ...models.agent import Agent
     from ...models.agent_task import AgentTask

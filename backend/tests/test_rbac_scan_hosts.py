@@ -5,13 +5,11 @@ Vérifie que decide_host, link_host, import_all_hosts et launch_scan
 respectent l'ownership (host → scan → ScanReseau.owner_id pour les hosts,
 Site → Entreprise → Audit.owner_id pour le lancement).
 """
-import pytest
-from app.models.entreprise import Entreprise
 from app.models.audit import Audit
-from app.models.site import Site
+from app.models.entreprise import Entreprise
 from app.models.equipement import Equipement
-from app.models.scan import ScanReseau, ScanHost
-
+from app.models.scan import ScanHost, ScanReseau
+from app.models.site import Site
 
 # ── Helpers ──────────────────────────────────────────────────────────
 

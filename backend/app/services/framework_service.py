@@ -13,8 +13,8 @@ from typing import Optional
 import yaml
 from sqlalchemy.orm import Session
 
-from ..models.framework import Framework, FrameworkCategory, Control, ControlSeverity, CheckType
 from ..core.config import get_settings
+from ..models.framework import CheckType, Control, ControlSeverity, Framework, FrameworkCategory
 
 logger = logging.getLogger(__name__)
 

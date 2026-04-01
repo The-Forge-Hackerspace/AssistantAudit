@@ -1,10 +1,11 @@
 # tests/test_checklist_service.py
 
 import pytest
-from app.services.checklist_service import ChecklistService
-from app.schemas.checklist import ChecklistInstanceCreate, ChecklistResponseUpdate
-from app.models.checklist import ChecklistTemplate, ChecklistSection, ChecklistItem
+
 from app.models.audit import Audit
+from app.models.checklist import ChecklistItem, ChecklistSection, ChecklistTemplate
+from app.schemas.checklist import ChecklistInstanceCreate, ChecklistResponseUpdate
+from app.services.checklist_service import ChecklistService
 
 
 @pytest.fixture

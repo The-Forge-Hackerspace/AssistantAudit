@@ -39,9 +39,11 @@ class TestScanOwnerIdNotNull:
 
     def test_create_scan_without_owner_fails(self, client: TestClient, admin_headers, db_session):
         """Créer un scan sans owner_id doit échouer en base."""
-        from app.models.scan import ScanReseau
-        from sqlalchemy.exc import IntegrityError
         from datetime import datetime, timezone
+
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models.scan import ScanReseau
 
         scan = ScanReseau(
             site_id=1,
@@ -66,8 +68,9 @@ class TestADAuditOwnerIdNotNull:
 
     def test_create_ad_audit_without_owner_fails(self, db_session):
         """Créer un résultat AD sans owner_id doit échouer."""
-        from app.models.ad_audit_result import ADAuditResultModel
         from sqlalchemy.exc import IntegrityError
+
+        from app.models.ad_audit_result import ADAuditResultModel
 
         result = ADAuditResultModel(
             equipement_id=1,

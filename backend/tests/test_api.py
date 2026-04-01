@@ -2,7 +2,6 @@
 Tests de base pour l'API AssistantAudit.
 Utilise les fixtures de conftest.py (DB in-memory, isolation par test).
 """
-import pytest
 
 
 # --- Health ---

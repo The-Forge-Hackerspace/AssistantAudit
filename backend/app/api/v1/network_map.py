@@ -2,10 +2,9 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_user, get_current_auditeur
+from ...core.deps import get_current_auditeur, get_current_user
 from ...models.user import User
 from ...schemas.common import MessageResponse
-from ...schemas.vlan import VlanDefinitionCreate, VlanDefinitionRead, VlanDefinitionUpdate
 from ...schemas.network_map import (
     MultiSiteEdge,
     MultiSiteNode,
@@ -21,6 +20,7 @@ from ...schemas.network_map import (
     SiteConnectionRead,
     SiteConnectionUpdate,
 )
+from ...schemas.vlan import VlanDefinitionCreate, VlanDefinitionRead, VlanDefinitionUpdate
 from ...services.network_map_service import NetworkMapService
 
 router = APIRouter()

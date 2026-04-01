@@ -2,18 +2,17 @@
 Tests for Sentry SDK integration.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from app.core.sentry_integration import (
-    init_sentry,
+    add_breadcrumb,
     capture_exception,
     capture_message,
-    set_user_context,
+    init_sentry,
+    operation_context,
     set_request_context,
     set_transaction_name,
-    add_breadcrumb,
-    operation_context,
+    set_user_context,
     test_sentry_connection,
 )
 
@@ -317,9 +316,9 @@ class TestIntegration:
     def test_sentry_modules_import_successfully(self):
         """Verify all Sentry modules import without errors"""
         from app.core.sentry_integration import (
-            init_sentry,
             capture_exception,
             capture_message,
+            init_sentry,
             operation_context,
         )
         

@@ -1,9 +1,13 @@
 """Tests TDD — Modèles checklist terrain (step 26, brief §4.2, §7.2)."""
 
 import pytest
+
 from app.models.checklist import (
-    ChecklistTemplate, ChecklistSection, ChecklistItem,
-    ChecklistInstance, ChecklistResponse,
+    ChecklistInstance,
+    ChecklistItem,
+    ChecklistResponse,
+    ChecklistSection,
+    ChecklistTemplate,
 )
 
 
@@ -80,6 +84,7 @@ class TestChecklistInstance:
     def test_unique_instance_per_audit_site(self, db_session, auditeur_user):
         """Un même template ne peut être instancié 2 fois pour le même audit+site."""
         from sqlalchemy.exc import IntegrityError
+
         from app.models.audit import Audit
 
         tpl = ChecklistTemplate(name="Unique Test", category="custom")
@@ -136,14 +141,16 @@ class TestChecklistResponse:
         """Un statut invalide est rejeté par la contrainte check."""
         # Note : SQLite ne vérifie pas les CHECK constraints par défaut
         # Ce test vérifie la validation au niveau schema (Pydantic)
-        from app.schemas.checklist import ChecklistResponseUpdate
         from pydantic import ValidationError
+
+        from app.schemas.checklist import ChecklistResponseUpdate
         with pytest.raises(ValidationError):
             ChecklistResponseUpdate(status="INVALID")
 
     def test_unique_response_per_item_per_instance(self, db_session, auditeur_user):
         """Un item ne peut avoir qu'une seule réponse par instance."""
         from sqlalchemy.exc import IntegrityError
+
         from app.models.audit import Audit
 
         tpl = ChecklistTemplate(name="Unique Resp", category="custom")

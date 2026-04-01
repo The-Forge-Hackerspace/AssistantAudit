@@ -4,8 +4,9 @@ Tests for Monkey365 module loading and verification.
 Covers ensure_monkey365_ready() which verifies the Monkey365 PowerShell module
 is available and can be imported before running scans.
 """
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from app.tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor
 

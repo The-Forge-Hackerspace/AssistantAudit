@@ -4,31 +4,23 @@ Provides utilities for building complex test scenarios quickly.
 """
 
 import uuid
-from typing import Optional
+
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
 from app.models import (
-    User,
-    Entreprise,
+    Assessment,
+    AssessmentCampaign,
+    Audit,
     Contact,
-    Site,
+    Control,
+    ControlResult,
+    Entreprise,
     Equipement,
-    EquipementReseau,
-    EquipementServeur,
-    EquipementFirewall,
     Framework,
     FrameworkCategory,
-    Control,
-    ControlSeverity,
-    CheckType,
-    AssessmentCampaign,
-    Assessment,
-    ControlResult,
-    ComplianceStatus,
-    CampaignStatus,
-    Audit,
-    AuditStatus,
+    Site,
+    User,
 )
 
 
@@ -346,7 +338,7 @@ class ControlFactory:
         **kwargs
     ) -> Control:
         """Create a control with defaults"""
-        from app.models.framework import ControlSeverity, CheckType
+        from app.models.framework import CheckType, ControlSeverity
         
         control = Control(
             category_id=category_id,
@@ -369,7 +361,6 @@ class ControlFactory:
         count: int = 5
     ) -> list[Control]:
         """Create multiple controls"""
-        from app.models.framework import ControlSeverity
         
         controls = []
         severities = ["low", "medium", "high", "critical"]
@@ -471,7 +462,6 @@ class ControlResultFactory:
         control_ids: list[int],
     ) -> list[ControlResult]:
         """Create multiple control results"""
-        from app.models.assessment import ComplianceStatus
         
         statuses = ["compliant", "non_compliant", "partially_compliant", "not_applicable"]
         results = []

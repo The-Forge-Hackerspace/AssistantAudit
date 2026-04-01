@@ -4,8 +4,9 @@ Supporte PostgreSQL (psycopg2) et SQLite (dev/tests).
 Fournit le moteur, la session factory et le modele de base.
 """
 from pathlib import Path
+
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import get_settings
 
