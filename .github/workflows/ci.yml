@@ -111,7 +111,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Exécuter les tests backend avec couverture
-        run: pytest -q --tb=short --cov=app --cov-report=xml
+        run: pytest tests/ -q --tb=short --cov=app --cov-report=xml
 
       - name: Uploader le rapport de couverture
         if: always()
