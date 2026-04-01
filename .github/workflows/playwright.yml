@@ -23,9 +23,7 @@ jobs:
     - name: Start backend (Docker Compose)
       run: docker compose up -d --build db backend
       env:
-        SECRET_KEY: ci-test-secret-key
-        ENCRYPTION_KEY: ${{ secrets.CI_ENCRYPTION_KEY }}
-        FILE_ENCRYPTION_KEY: ${{ secrets.CI_FILE_ENCRYPTION_KEY }}
+        ENV: testing
         POSTGRES_PASSWORD: changeme
 
     - name: Wait for backend health
