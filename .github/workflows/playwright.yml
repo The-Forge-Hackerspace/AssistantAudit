@@ -61,7 +61,7 @@ jobs:
         docker compose exec -T \
           -e ADMIN_EMAIL=admin@assistantaudit.local \
           -e ADMIN_PASSWORD=Admin1234! \
-          backend python init_db.py
+          backend python /app/backend/init_db.py
 
     - name: Run Playwright tests
       run: npx playwright test
