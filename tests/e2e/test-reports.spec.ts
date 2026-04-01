@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 import * as path from 'path';
 
 const BASE_URL = 'http://localhost:3000';
-const API_URL = 'http://localhost:8000';
+const API_URL = 'http://127.0.0.1:8000';
 
 test.describe('Rapports — génération et téléchargement PDF', () => {
   test('API health check backend', async ({ page }) => {
