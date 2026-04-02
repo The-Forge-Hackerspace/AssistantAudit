@@ -2,12 +2,32 @@
 Configuration de l'application via Pydantic Settings.
 Charge automatiquement les variables depuis .env
 """
+import logging
 import os
 import secrets
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+
+def _validate_hex_key(value: str, name: str, expected_len: int = 64) -> None:
+    """Valide qu'une clé est un hex valide de la longueur attendue."""
+    if len(value) != expected_len:
+        raise ValueError(
+            f"{name} doit faire exactement {expected_len} caractères hexadécimaux "
+            f"(actuellement {len(value)}). "
+            f"Générez avec : python -c 'import os; print(os.urandom(32).hex())'"
+        )
+    try:
+        bytes.fromhex(value)
+    except ValueError:
+        raise ValueError(
+            f"{name} contient des caractères non-hexadécimaux. "
+            f"Générez avec : python -c 'import os; print(os.urandom(32).hex())'"
+        )
 
 # Racine du projet (2 niveaux au-dessus de ce fichier)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -74,7 +94,25 @@ class Settings(BaseSettings):
                         "Générez une clé avec: python -c 'import secrets; print(secrets.token_urlsafe(64))'\n"
                         "Puis ajoutez SECRET_KEY=<clé> dans votre fichier .env"
                     )
-        
+                logger.warning(
+                    "SECRET_KEY non définie — clé auto-générée pour le développement. "
+                    "Définissez SECRET_KEY dans .env pour la persistance entre redémarrages."
+                )
+
+        # Avertissement si SECRET_KEY trop courte en non-production
+        if len(self.SECRET_KEY) < 32 and self.ENV not in ("production", "preprod", "staging"):
+            logger.warning(
+                "SECRET_KEY fait moins de 32 caractères (%d). "
+                "Utilisez une clé plus longue pour plus de sécurité.",
+                len(self.SECRET_KEY),
+            )
+
+        # Validation des clés hex dès qu'elles sont renseignées (tout environnement)
+        if self.ENCRYPTION_KEY:
+            _validate_hex_key(self.ENCRYPTION_KEY, "ENCRYPTION_KEY")
+        if self.FILE_ENCRYPTION_KEY:
+            _validate_hex_key(self.FILE_ENCRYPTION_KEY, "FILE_ENCRYPTION_KEY")
+
         # Validation en production
         is_safe_env = self.ENV in ("production", "preprod", "staging")
         if is_safe_env and len(self.SECRET_KEY) < 32:
@@ -84,13 +122,13 @@ class Settings(BaseSettings):
             )
         if is_safe_env and not self.ENCRYPTION_KEY:
             raise ValueError(
-                "ENCRYPTION_KEY doit etre defini en production (64 hex chars = 256 bits). "
-                "Generez avec : python -c 'import os; print(os.urandom(32).hex())'"
+                "ENCRYPTION_KEY doit être défini en production (64 hex chars = 256 bits). "
+                "Générez avec : python -c 'import os; print(os.urandom(32).hex())'"
             )
         if is_safe_env and not self.FILE_ENCRYPTION_KEY:
             raise ValueError(
-                "FILE_ENCRYPTION_KEY doit etre defini en production (64 hex chars = 256 bits). "
-                "Generez avec : python -c 'import os; print(os.urandom(32).hex())'"
+                "FILE_ENCRYPTION_KEY doit être défini en production (64 hex chars = 256 bits). "
+                "Générez avec : python -c 'import os; print(os.urandom(32).hex())'"
             )
 
     # --- CORS ---
