@@ -88,6 +88,9 @@ docs/
 # Monkey365 (code tiers, à cloner manuellement dans tools/monkey365/)
 tools/monkey365/
 
+# Manual test results
+tests/manual/results/
+
 # Playwright
 /test-results/
 /playwright-report/

@@ -168,13 +168,55 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+
+  # ---------------------------------------------------------------------------
+  # Scan — Analyse de vulnérabilités avec Trivy
+  # Scanne l'image Docker construite ; bloque le pipeline sur CRITICAL.
+  # ---------------------------------------------------------------------------
+  scan:
+    name: Security Scan
+    needs: [build, detect-changes]
+    if: needs.detect-changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurer Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construire l'image pour le scan
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: scan-target:latest
+          cache-from: type=gha
+
+      - name: Scan de vulnérabilités Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: scan-target:latest
+          scan-type: image
+          severity: CRITICAL
+          exit-code: '1'
+          format: table
+          output: trivy-results.txt
+
+      - name: Uploader le rapport Trivy
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-results.txt
   # ---------------------------------------------------------------------------
   # Deploy — Déploiement (uniquement sur main avec changements code)
   # Réutilise l'image construite par le job build (pas de rebuild).
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy
-    needs: [build, detect-changes]
+    needs: [build, scan, detect-changes]
     if: >-
       needs.detect-changes.outputs.code == 'true'
       && github.ref == 'refs/heads/main'
