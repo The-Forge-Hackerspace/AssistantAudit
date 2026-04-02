@@ -201,7 +201,7 @@ def get_monkey365_scan_report(
         path=str(html_file),
         media_type="text/html",
         filename=html_file.name,
-        headers={"Content-Disposition": f'inline; filename="{html_file.name}"'},
+        headers={"Content-Disposition": f'attachment; filename="{html_file.name}"'},
     )
 
 

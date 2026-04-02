@@ -15,20 +15,51 @@ out
 .vscode
 .idea
 *.swp
+*.swo
+*~
 
 # Git
 .git
 .gitignore
+.gitattributes
 
 # Data / secrets
 *.db
 *.sqlite
 .env
+.env.*
 data/
 certs/
 instance/
 
 # Tests
+tests/
+backend/tests/
 .pytest_cache
 .coverage
 htmlcov
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# CI/CD
+.github/
+
+# Logs
+*.log
+
+# Docker (éviter inclusion récursive)
+docker-compose*.yml
+Dockerfile*
+
+# Dev tools
+playwright.config.ts
+package.json
+package-lock.json
+start.ps1
+install_m365_modules.ps1
+ruff.toml
+.hex-skills/
+tools/
