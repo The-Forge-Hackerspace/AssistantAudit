@@ -70,7 +70,10 @@ def _ensure_admin() -> None:
             return
         print("[OK] Utilisateur admin créé (login: admin)")
         if password_was_generated:
-            print(f"[INFO] Mot de passe initial: {admin_password}")
+            creds_file = Path("/app/data/.admin_credentials")
+            creds_file.write_text(f"admin:{admin_password}\n")
+            creds_file.chmod(0o600)
+            print(f"[INFO] Mot de passe initial écrit dans {creds_file}")
         else:
             print("[INFO] Mot de passe défini via ADMIN_PASSWORD")
     finally:
