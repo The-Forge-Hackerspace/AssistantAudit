@@ -45,13 +45,9 @@ def _ensure_admin() -> None:
 
         admin_password = os.getenv("ADMIN_PASSWORD")
         if not admin_password:
-            import secrets
-            import string
-            alphabet = string.ascii_letters + string.digits + "!@#$%"
-            admin_password = "".join(secrets.choice(alphabet) for _ in range(16))
-            password_was_generated = True
-        else:
-            password_was_generated = False
+            print("[WARN] ADMIN_PASSWORD non défini — admin non créé")
+            print("[WARN] Définissez ADMIN_PASSWORD dans .env ou docker-compose.yml")
+            return
 
         admin = User(
             username="admin",
@@ -69,13 +65,6 @@ def _ensure_admin() -> None:
             print("[SKIP] L'utilisateur 'admin' a été créé par un autre processus")
             return
         print("[OK] Utilisateur admin créé (login: admin)")
-        if password_was_generated:
-            creds_file = Path("/app/data/.admin_credentials")
-            creds_file.write_text(f"admin:{admin_password}\n")
-            creds_file.chmod(0o600)
-            print(f"[INFO] Mot de passe initial écrit dans {creds_file}")
-        else:
-            print("[INFO] Mot de passe défini via ADMIN_PASSWORD")
     finally:
         db.close()
 

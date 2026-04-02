@@ -43,6 +43,7 @@ services:
       CA_KEY_PATH: /app/certs/ca.key
       DATA_DIR: /app/data
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://frontend:3000"]}
       MONKEY365_PATH: /app/tools/monkey365/Invoke-Monkey365.ps1
     volumes:
