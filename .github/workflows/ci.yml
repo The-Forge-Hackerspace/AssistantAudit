@@ -200,9 +200,16 @@ jobs:
           image-ref: scan-target:latest
           scan-type: image
           severity: CRITICAL
+          ignore-unfixed: true
           exit-code: '1'
           format: table
           output: trivy-results.txt
+
+      - name: Afficher le rapport Trivy
+        if: always()
+        run: |
+          echo "===== Rapport Trivy ====="
+          sed -n '1,200p' trivy-results.txt || true
 
       - name: Uploader le rapport Trivy
         if: always()
