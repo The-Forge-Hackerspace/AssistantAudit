@@ -28,15 +28,16 @@ RUN apt-get update \
     && rm /tmp/packages-microsoft-prod.deb \
     && apt-get update \
     && apt-get install -y --no-install-recommends powershell \
-    && apt-get purge -y --auto-remove gcc apt-transport-https \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 WORKDIR /app
 
-# Dépendances Python
+# Dépendances Python (gcc requis pour compiler les extensions C)
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt \
-    && find /usr/local/lib/python3.13 -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+    && apt-get update && apt-get purge -y --auto-remove gcc apt-transport-https \
+    && rm -rf /var/lib/apt/lists/* \
+    && find /usr/local/lib/python3.*/site-packages -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true
 
 # Code backend
 COPY backend/ ./backend/
@@ -61,7 +62,7 @@ RUN pwsh -NoProfile -Command "\
     Install-Module PnP.PowerShell               -Scope AllUsers -Force -NoClobber \
     " \
     && rm -rf /root/.cache /tmp/* /var/tmp/* \
-    && find /usr/local/share/powershell -name '*.nupkg' -delete 2>/dev/null || true
+    && find /usr/local/share/powershell -name '*.nupkg' -delete 2>/dev/null; true
 
 # Répertoires
 RUN mkdir -p /app/data /app/certs /app/instance /app/tools/monkey365

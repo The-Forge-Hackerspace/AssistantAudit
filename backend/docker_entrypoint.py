@@ -16,6 +16,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 # Import au niveau module pour que Base.metadata connaisse tous les modèles
 from sqlalchemy import inspect as sa_inspect  # noqa: E402
+from sqlalchemy.exc import IntegrityError  # noqa: E402
 
 import app.models  # noqa: E402, F401 — Enregistre tous les modèles dans Base.metadata
 from app.core.database import Base, SessionLocal, engine  # noqa: E402
@@ -48,6 +49,9 @@ def _ensure_admin() -> None:
             import string
             alphabet = string.ascii_letters + string.digits + "!@#$%"
             admin_password = "".join(secrets.choice(alphabet) for _ in range(16))
+            password_was_generated = True
+        else:
+            password_was_generated = False
 
         admin = User(
             username="admin",
@@ -57,9 +61,18 @@ def _ensure_admin() -> None:
             role="admin",
         )
         db.add(admin)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # Un autre processus a créé l'admin entre le SELECT et le INSERT
+            db.rollback()
+            print("[SKIP] L'utilisateur 'admin' a été créé par un autre processus")
+            return
         print("[OK] Utilisateur admin créé (login: admin)")
-        print(f"[INFO] Mot de passe initial: {admin_password}")
+        if password_was_generated:
+            print(f"[INFO] Mot de passe initial: {admin_password}")
+        else:
+            print("[INFO] Mot de passe défini via ADMIN_PASSWORD")
     finally:
         db.close()
 
