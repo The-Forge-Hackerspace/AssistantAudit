@@ -29,21 +29,19 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy import create_engine, select, update
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import create_engine, select, update  # noqa: E402
+from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
-from app.core.config import get_settings, _validate_hex_key
-from app.core.encryption import AES256GCMCipher, EncryptedText, EncryptedJSON
-from app.core.file_encryption import EnvelopeEncryption
-from app.models.attachment import Attachment
-
-# Modèles contenant des colonnes chiffrées avec ENCRYPTION_KEY
-from app.models.scan import ScanReseau
-from app.models.oradad_config import OradadConfig
-from app.models.collect_result import CollectResult
-from app.models.finding import Finding
-from app.models.agent_task import AgentTask
-from app.models.ad_audit_result import ADAuditResultModel
+from app.core.config import _validate_hex_key, get_settings  # noqa: E402
+from app.core.encryption import AES256GCMCipher, EncryptedJSON, EncryptedText  # noqa: E402
+from app.core.file_encryption import EnvelopeEncryption  # noqa: E402
+from app.models.ad_audit_result import ADAuditResultModel  # noqa: E402
+from app.models.agent_task import AgentTask  # noqa: E402
+from app.models.attachment import Attachment  # noqa: E402
+from app.models.collect_result import CollectResult  # noqa: E402
+from app.models.finding import Finding  # noqa: E402
+from app.models.oradad_config import OradadConfig  # noqa: E402
+from app.models.scan import ScanReseau  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Logging structuré
