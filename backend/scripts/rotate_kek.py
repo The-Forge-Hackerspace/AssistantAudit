@@ -29,7 +29,8 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy import create_engine, select, update  # noqa: E402
+from sqlalchemy import Text as SAText  # noqa: E402
+from sqlalchemy import create_engine, literal, select, type_coerce, update  # noqa: E402
 from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
 from app.core.config import _validate_hex_key, get_settings  # noqa: E402
@@ -95,17 +96,19 @@ def rotate_encryption_key(
         table_name = model_cls.__tablename__
         logger.info("Rotation colonnes chiffrées : %s.%s", table_name, col_name)
 
-        col_attr = getattr(model_cls, col_name)
-        rows = session.query(model_cls).filter(col_attr.isnot(None)).all()
+        # Charger uniquement les IDs pour éviter le déchiffrement automatique
+        # du TypeDecorator (qui utiliserait la nouvelle clé sur des données
+        # encore chiffrées avec l'ancienne clé).
+        ids = session.execute(
+            select(table.c.id).where(table.c[col_name].isnot(None))
+        ).scalars().all()
 
         row_success = 0
 
-        for row in rows:
-            row_id = getattr(row, "id", "?")
-            # Lire la valeur brute via SQLAlchemy query builder
-            # (évite le déchiffrement automatique du TypeDecorator)
+        for row_id in ids:
+            # Lire la valeur brute en bypassant le TypeDecorator via type_coerce
             raw_value = session.execute(
-                select(table.c[col_name]).where(table.c.id == row_id)
+                select(type_coerce(table.c[col_name], SAText())).where(table.c.id == row_id)
             ).scalar()
             if raw_value is None:
                 continue
@@ -115,10 +118,11 @@ def rotate_encryption_key(
                 new_ciphertext = new_cipher.encrypt(plaintext)
 
                 if apply:
+                    # Écrire la valeur brute en bypassant le TypeDecorator via literal
                     session.execute(
                         update(table)
                         .where(table.c.id == row_id)
-                        .values({col_name: new_ciphertext})
+                        .values({col_name: literal(new_ciphertext)})
                     )
 
                 row_success += 1
@@ -230,36 +234,46 @@ def run_rotation(
     settings = get_settings()
 
     # --- Validation des clés fournies ---
-    if rotation_type in ("kek", "all"):
-        if not old_kek_hex:
-            logger.error("ERREUR: ancienne FILE_ENCRYPTION_KEY requise pour la rotation KEK")
-            sys.exit(1)
-        _validate_hex_key(old_kek_hex, "ancienne FILE_ENCRYPTION_KEY")
-        new_kek_hex = settings.FILE_ENCRYPTION_KEY
-        if not new_kek_hex:
-            logger.error("ERREUR: FILE_ENCRYPTION_KEY doit être définie dans l'environnement (nouvelle clé)")
-            sys.exit(1)
-        _validate_hex_key(new_kek_hex, "FILE_ENCRYPTION_KEY (nouvelle)")
-        if old_kek_hex == new_kek_hex:
-            logger.error("ERREUR: ancienne et nouvelle FILE_ENCRYPTION_KEY identiques")
-            sys.exit(1)
+    try:
+        if rotation_type in ("kek", "all"):
+            if not old_kek_hex:
+                logger.error("ERREUR: ancienne FILE_ENCRYPTION_KEY requise pour la rotation KEK")
+                sys.exit(1)
+            _validate_hex_key(old_kek_hex, "ancienne FILE_ENCRYPTION_KEY")
+            new_kek_hex = settings.FILE_ENCRYPTION_KEY
+            if not new_kek_hex:
+                logger.error("ERREUR: FILE_ENCRYPTION_KEY doit être définie dans l'environnement (nouvelle clé)")
+                sys.exit(1)
+            _validate_hex_key(new_kek_hex, "FILE_ENCRYPTION_KEY (nouvelle)")
+            if old_kek_hex == new_kek_hex:
+                logger.error("ERREUR: ancienne et nouvelle FILE_ENCRYPTION_KEY identiques")
+                sys.exit(1)
 
-    if rotation_type in ("encryption", "all"):
-        if not old_enc_hex:
-            logger.error("ERREUR: ancienne ENCRYPTION_KEY requise pour la rotation des colonnes chiffrées")
-            sys.exit(1)
-        _validate_hex_key(old_enc_hex, "ancienne ENCRYPTION_KEY")
-        new_enc_hex = settings.ENCRYPTION_KEY
-        if not new_enc_hex:
-            logger.error("ERREUR: ENCRYPTION_KEY doit être définie dans l'environnement (nouvelle clé)")
-            sys.exit(1)
-        _validate_hex_key(new_enc_hex, "ENCRYPTION_KEY (nouvelle)")
-        if old_enc_hex == new_enc_hex:
-            logger.error("ERREUR: ancienne et nouvelle ENCRYPTION_KEY identiques")
-            sys.exit(1)
+        if rotation_type in ("encryption", "all"):
+            if not old_enc_hex:
+                logger.error("ERREUR: ancienne ENCRYPTION_KEY requise pour la rotation des colonnes chiffrées")
+                sys.exit(1)
+            _validate_hex_key(old_enc_hex, "ancienne ENCRYPTION_KEY")
+            new_enc_hex = settings.ENCRYPTION_KEY
+            if not new_enc_hex:
+                logger.error("ERREUR: ENCRYPTION_KEY doit être définie dans l'environnement (nouvelle clé)")
+                sys.exit(1)
+            _validate_hex_key(new_enc_hex, "ENCRYPTION_KEY (nouvelle)")
+            if old_enc_hex == new_enc_hex:
+                logger.error("ERREUR: ancienne et nouvelle ENCRYPTION_KEY identiques")
+                sys.exit(1)
+    except ValueError as exc:
+        logger.error("ERREUR de validation de clé: %s", exc)
+        sys.exit(1)
 
     # --- Connexion DB ---
-    engine = create_engine(settings.DATABASE_URL)
+    if settings.DATABASE_URL.startswith("sqlite"):
+        engine = create_engine(settings.DATABASE_URL)
+    else:
+        engine = create_engine(
+            settings.DATABASE_URL,
+            connect_args={"connect_timeout": 5},
+        )
     SessionFactory = sessionmaker(bind=engine)
     session = SessionFactory()
 
