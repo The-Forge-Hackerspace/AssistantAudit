@@ -2,9 +2,11 @@
 Point d'entrée Docker — initialise la base de données avant de démarrer uvicorn.
 
 Stratégie :
-- Base fraîche (aucune table) : create_all() + alembic stamp head
+- Base fraîche (aucune table) : create_all() + alembic stamp head + admin
 - Base existante              : alembic upgrade head (migrations incrémentales)
+- Admin absent                : création avec mot de passe affiché dans les logs
 """
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +18,9 @@ sys.path.insert(0, str(BACKEND_DIR))
 from sqlalchemy import inspect as sa_inspect  # noqa: E402
 
 import app.models  # noqa: E402, F401 — Enregistre tous les modèles dans Base.metadata
-from app.core.database import Base, engine  # noqa: E402
+from app.core.database import Base, SessionLocal, engine  # noqa: E402
+from app.core.security import hash_password  # noqa: E402
+from app.models.user import User  # noqa: E402
 
 
 def _run(cmd: list[str], label: str) -> None:
@@ -27,6 +31,37 @@ def _run(cmd: list[str], label: str) -> None:
         print(f"[ERREUR] {label} a échoué (code {result.returncode})")
         sys.exit(result.returncode)
     print(f"[OK] {label}")
+
+
+def _ensure_admin() -> None:
+    """Crée l'utilisateur admin s'il n'existe pas encore."""
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(User.username == "admin").first()
+        if existing:
+            print("[SKIP] L'utilisateur 'admin' existe déjà")
+            return
+
+        admin_password = os.getenv("ADMIN_PASSWORD")
+        if not admin_password:
+            import secrets
+            import string
+            alphabet = string.ascii_letters + string.digits + "!@#$%"
+            admin_password = "".join(secrets.choice(alphabet) for _ in range(16))
+
+        admin = User(
+            username="admin",
+            email=os.getenv("ADMIN_EMAIL", "admin@assistantaudit.fr"),
+            password_hash=hash_password(admin_password),
+            full_name="Administrateur",
+            role="admin",
+        )
+        db.add(admin)
+        db.commit()
+        print("[OK] Utilisateur admin créé (login: admin)")
+        print(f"[INFO] Mot de passe initial: {admin_password}")
+    finally:
+        db.close()
 
 
 def main() -> None:
@@ -47,6 +82,9 @@ def main() -> None:
         # Base gérée par Alembic : appliquer les migrations en attente
         print("[INFO] Application des migrations Alembic…")
         _run([sys.executable, "-m", "alembic", "upgrade", "head"], "alembic upgrade head")
+
+    # Créer l'admin si absent (premier démarrage ou base réinitialisée)
+    _ensure_admin()
 
 
 if __name__ == "__main__":
