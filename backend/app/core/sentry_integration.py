@@ -4,7 +4,19 @@ Captures and reports exceptions to Sentry for centralized error management.
 """
 
 import logging
+import sys
 from typing import Optional
+
+# Bloquer l'import d'eventlet si le module est incompatible avec cette version de Python.
+# sentry_sdk tente d'importer eventlet pour détecter le monkey-patching (utils.py:_is_contextvars_broken).
+# eventlet <= 0.33 est cassé sur Python 3.12+ (ssl.wrap_socket supprimé).
+if "eventlet" not in sys.modules:
+    try:
+        import eventlet  # noqa: F401
+    except (AttributeError, ImportError):
+        # Marquer comme non-importable pour que sentry_sdk l'ignore
+        sys.modules["eventlet"] = None  # type: ignore[assignment]
+        sys.modules["eventlet.patcher"] = None  # type: ignore[assignment]
 
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration

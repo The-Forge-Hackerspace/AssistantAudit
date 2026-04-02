@@ -21,7 +21,6 @@ Prérequis :
 - ENCRYPTION_KEY doit contenir la NOUVELLE clé de chiffrement dans l'environnement
 """
 import logging
-import re
 import sys
 from pathlib import Path
 
@@ -30,10 +29,10 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy import create_engine, inspect as sa_inspect, text
+from sqlalchemy import create_engine, select, update
 from sqlalchemy.orm import sessionmaker, Session
 
-from app.core.config import get_settings
+from app.core.config import get_settings, _validate_hex_key
 from app.core.encryption import AES256GCMCipher, EncryptedText, EncryptedJSON
 from app.core.file_encryption import EnvelopeEncryption
 from app.models.attachment import Attachment
@@ -71,22 +70,6 @@ ENCRYPTED_COLUMNS: list[tuple[type, str, type]] = [
     (ADAuditResultModel, "findings", EncryptedText),
 ]
 
-# ---------------------------------------------------------------------------
-# Expression régulière pour valider un hex de 64 caractères
-# ---------------------------------------------------------------------------
-_HEX64_RE = re.compile(r"^[0-9a-fA-F]{64}$")
-
-
-def _validate_hex_key(value: str, label: str) -> None:
-    """Valide qu'une clé est un hex de 64 caractères. Lève ValueError sinon."""
-    if not _HEX64_RE.match(value):
-        raise ValueError(
-            f"ERREUR: {label} doit être une chaîne hexadécimale de 64 caractères "
-            f"(reçu {len(value)} caractères). "
-            f"Générez avec : python -c 'import os; print(os.urandom(32).hex())'"
-        )
-
-
 # ===================================================================
 # Phase 1 : Rotation ENCRYPTION_KEY (colonnes EncryptedText/EncryptedJSON)
 # ===================================================================
@@ -96,92 +79,64 @@ def rotate_encryption_key(
     new_key_hex: str,
     session: Session,
     apply: bool = False,
-) -> tuple[int, int]:
+) -> int:
     """
     Re-chiffre toutes les colonnes EncryptedText/EncryptedJSON
     avec la nouvelle ENCRYPTION_KEY.
 
-    Retourne (success_count, error_count).
-    Toute exception est propagée pour permettre le rollback transactionnel.
+    Retourne le nombre d'enregistrements traités.
+    Lève RuntimeError au premier échec pour permettre le rollback transactionnel.
     """
     old_cipher = AES256GCMCipher(old_key_hex)
     new_cipher = AES256GCMCipher(new_key_hex)
 
     total_success = 0
-    total_errors = 0
 
     for model_cls, col_name, col_type in ENCRYPTED_COLUMNS:
+        table = model_cls.__table__
         table_name = model_cls.__tablename__
         logger.info("Rotation colonnes chiffrées : %s.%s", table_name, col_name)
 
-        # Récupérer les lignes dont la colonne n'est pas null (requête brute
-        # pour éviter le déchiffrement automatique du TypeDecorator)
         col_attr = getattr(model_cls, col_name)
         rows = session.query(model_cls).filter(col_attr.isnot(None)).all()
 
         row_success = 0
-        row_errors = 0
 
         for row in rows:
             row_id = getattr(row, "id", "?")
-            # Lire la valeur brute directement via inspection SQL
-            # Les TypeDecorators déchiffrent automatiquement à la lecture,
-            # on doit lire la valeur brute pour la re-chiffrer.
-            raw_value = _read_raw_column(session, model_cls, col_name, row_id)
+            # Lire la valeur brute via SQLAlchemy query builder
+            # (évite le déchiffrement automatique du TypeDecorator)
+            raw_value = session.execute(
+                select(table.c[col_name]).where(table.c.id == row_id)
+            ).scalar()
             if raw_value is None:
                 continue
 
             try:
-                # Déchiffrer avec l'ancienne clé
                 plaintext = old_cipher.decrypt(raw_value)
-                # Re-chiffrer avec la nouvelle clé
                 new_ciphertext = new_cipher.encrypt(plaintext)
 
                 if apply:
-                    _write_raw_column(session, model_cls, col_name, row_id, new_ciphertext)
+                    session.execute(
+                        update(table)
+                        .where(table.c.id == row_id)
+                        .values({col_name: new_ciphertext})
+                    )
 
                 row_success += 1
                 logger.debug(
                     "  OK %s.%s id=%s", table_name, col_name, row_id
                 )
             except Exception as exc:
-                row_errors += 1
-                logger.error(
-                    "  ERREUR %s.%s id=%s : %s", table_name, col_name, row_id, exc
-                )
                 raise RuntimeError(
-                    f"ERREUR: clé ancienne incorrecte ou donnée corrompue pour "
+                    f"Clé ancienne incorrecte ou donnée corrompue pour "
                     f"{table_name}.{col_name} id={row_id} — {exc}"
                 ) from exc
 
-        logger.info(
-            "  %s.%s : %d OK, %d erreurs", table_name, col_name, row_success, row_errors
-        )
+        logger.info("  %s.%s : %d OK", table_name, col_name, row_success)
         total_success += row_success
-        total_errors += row_errors
 
-    return total_success, total_errors
-
-
-def _read_raw_column(session: Session, model_cls: type, col_name: str, row_id: int) -> str | None:
-    """Lit la valeur brute (chiffrée) d'une colonne sans passer par le TypeDecorator."""
-    table_name = model_cls.__tablename__
-    result = session.execute(
-        text(f"SELECT {col_name} FROM {table_name} WHERE id = :rid"),
-        {"rid": row_id},
-    ).scalar()
-    return result
-
-
-def _write_raw_column(
-    session: Session, model_cls: type, col_name: str, row_id: int, value: str
-) -> None:
-    """Écrit une valeur brute dans une colonne sans passer par le TypeDecorator."""
-    table_name = model_cls.__tablename__
-    session.execute(
-        text(f"UPDATE {table_name} SET {col_name} = :val WHERE id = :rid"),
-        {"val": value, "rid": row_id},
-    )
+    return total_success
 
 
 # ===================================================================
@@ -193,12 +148,12 @@ def rotate_kek(
     new_key_hex: str,
     session: Session,
     apply: bool = False,
-) -> tuple[int, int]:
+) -> int:
     """
     Re-chiffre toutes les DEK des Attachments avec la nouvelle KEK.
 
-    Retourne (success_count, error_count).
-    Toute exception est propagée pour permettre le rollback transactionnel.
+    Retourne le nombre de fichiers traités.
+    Lève RuntimeError au premier échec pour permettre le rollback transactionnel.
     """
     attachments = session.query(Attachment).filter(
         Attachment.encrypted_dek.isnot(None)
@@ -207,7 +162,6 @@ def rotate_kek(
     logger.info("Trouvé %d fichiers avec DEK chiffré", len(attachments))
 
     success = 0
-    errors = 0
 
     for att in attachments:
         try:
@@ -222,16 +176,12 @@ def rotate_kek(
             success += 1
             logger.debug("  OK fichier id=%s (%s)", att.id, att.original_filename)
         except Exception as exc:
-            errors += 1
-            logger.error(
-                "  ERREUR fichier id=%s (%s) : %s", att.id, att.original_filename, exc
-            )
             raise RuntimeError(
-                f"ERREUR: clé ancienne incorrecte ou donnée corrompue pour "
+                f"Clé ancienne incorrecte ou donnée corrompue pour "
                 f"Attachment id={att.id} ({att.original_filename}) — {exc}"
             ) from exc
 
-    return success, errors
+    return success
 
 
 # ===================================================================
@@ -327,14 +277,14 @@ def run_rotation(
         # --- Rotation KEK (FILE_ENCRYPTION_KEY) ---
         if rotation_type in ("kek", "all"):
             logger.info("--- Rotation FILE_ENCRYPTION_KEY (KEK) ---")
-            kek_ok, kek_err = rotate_kek(old_kek_hex, new_kek_hex, session, apply=apply)
-            logger.info("KEK : %d OK, %d erreurs", kek_ok, kek_err)
+            kek_ok = rotate_kek(old_kek_hex, new_kek_hex, session, apply=apply)
+            logger.info("KEK : %d OK", kek_ok)
 
         # --- Rotation ENCRYPTION_KEY (colonnes) ---
         if rotation_type in ("encryption", "all"):
             logger.info("--- Rotation ENCRYPTION_KEY (colonnes chiffrées) ---")
-            enc_ok, enc_err = rotate_encryption_key(old_enc_hex, new_enc_hex, session, apply=apply)
-            logger.info("ENCRYPTION_KEY : %d OK, %d erreurs", enc_ok, enc_err)
+            enc_ok = rotate_encryption_key(old_enc_hex, new_enc_hex, session, apply=apply)
+            logger.info("ENCRYPTION_KEY : %d OK", enc_ok)
 
         # --- Commit transactionnel ---
         if apply:
