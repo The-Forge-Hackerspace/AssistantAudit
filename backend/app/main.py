@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -16,6 +16,7 @@ from .core.health_check import HealthCheckService
 from .core.logging_config import configure_structured_logging
 from .core.metrics import get_metrics, init_app_metrics
 from .core.metrics_middleware import PrometheusMiddleware
+from .core.rate_limit import api_rate_limiter, public_rate_limiter
 from .core.sentry_integration import init_sentry
 
 settings = get_settings()
@@ -166,6 +167,46 @@ def create_app() -> FastAPI:
     def metrics(admin=Depends(get_current_admin)):
         """Expose Prometheus metrics (admin uniquement)"""
         return Response(content=get_metrics(), media_type="text/plain")
+
+    # ── Rate Limiting Middleware ────────────────────────────────────────────
+    # Routes publiques (health, ready, liveness, metrics) : 100 req/min
+    # Routes API authentifiées : 30 req/min
+    PUBLIC_PATHS = {"/health", "/ready", "/liveness", "/metrics"}
+
+    class RateLimitMiddleware(BaseHTTPMiddleware):
+        """Rate limiting par catégorie : public (100/min) vs API (30/min).
+        Les endpoints auth (login/enroll) ont leur propre limiter inline."""
+
+        async def dispatch(self, request: Request, call_next):
+            # WebSocket : pas de rate limiting
+            if request.scope.get("type") == "websocket":
+                return await call_next(request)
+
+            path = request.url.path
+
+            try:
+                # Routes publiques
+                if path in PUBLIC_PATHS:
+                    public_rate_limiter.check(request)
+                    public_rate_limiter.record_attempt(request)
+                # Routes API (sauf auth — géré inline dans les routes)
+                elif path.startswith(settings.API_V1_PREFIX):
+                    auth_prefix = f"{settings.API_V1_PREFIX}/auth/"
+                    agents_enroll = f"{settings.API_V1_PREFIX}/agents/enroll"
+                    if not path.startswith(auth_prefix) and path != agents_enroll:
+                        api_rate_limiter.check(request)
+                        api_rate_limiter.record_attempt(request)
+            except HTTPException as exc:
+                from starlette.responses import JSONResponse
+                return JSONResponse(
+                    status_code=exc.status_code,
+                    content={"detail": exc.detail},
+                    headers=exc.headers,
+                )
+
+            return await call_next(request)
+
+    app.add_middleware(RateLimitMiddleware)
 
     # ── Health check endpoints ────────────────────────────────────────────
     @app.get(

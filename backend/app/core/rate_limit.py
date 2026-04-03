@@ -1,7 +1,10 @@
-"""
-Rate limiter in-memory pour protéger contre le brute-force.
+"""Rate limiter in-memory pour protéger contre le brute-force et l'abus d'API.
 
-Limite les tentatives par IP sur les endpoints sensibles (login).
+Limite les requêtes par IP avec des seuils configurables par catégorie :
+- auth : 5 req/min (login, enroll) — protection brute-force
+- api  : 30 req/min (endpoints authentifiés) — usage normal
+- public : 100 req/min (health, metrics, readiness) — monitoring
+
 En production avec plusieurs workers, remplacer par Redis-backed (slowapi).
 """
 import logging
@@ -13,17 +16,28 @@ from fastapi import HTTPException, Request, status
 
 logger = logging.getLogger(__name__)
 
-# ── Configuration ────────────────────────────────────────────────────────────
-MAX_ATTEMPTS = 5          # tentatives max par fenêtre
-WINDOW_SECONDS = 60       # durée de la fenêtre (1 minute)
-BLOCK_SECONDS = 300       # durée du blocage après dépassement (5 minutes)
-CLEANUP_INTERVAL = 120    # nettoyage mémoire toutes les 2 minutes
+# ── Configuration par catégorie ──────────────────────────────────────────────
+RATE_LIMITS = {
+    "auth": {"max_attempts": 5, "window_seconds": 60, "block_seconds": 300},
+    "api": {"max_attempts": 30, "window_seconds": 60, "block_seconds": 60},
+    "public": {"max_attempts": 100, "window_seconds": 60, "block_seconds": 30},
+}
+
+CLEANUP_INTERVAL = 120  # nettoyage mémoire toutes les 2 minutes
 
 
 class _RateLimiter:
     """Compteur de tentatives par IP avec fenêtre glissante."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        max_attempts: int = 5,
+        window_seconds: int = 60,
+        block_seconds: int = 300,
+    ):
+        self.max_attempts = max_attempts
+        self.window_seconds = window_seconds
+        self.block_seconds = block_seconds
         # {ip: [timestamp1, timestamp2, ...]}
         self._attempts: dict[str, list[float]] = defaultdict(list)
         # {ip: block_until_timestamp}
@@ -39,7 +53,7 @@ class _RateLimiter:
 
         with self._lock:
             self._last_cleanup = now
-            cutoff = now - WINDOW_SECONDS
+            cutoff = now - self.window_seconds
 
             # Nettoyer les tentatives expirées
             expired_ips = []
@@ -60,8 +74,8 @@ class _RateLimiter:
     def _get_client_ip(self, request: Request) -> str:
         """
         Extrait l'IP du client.
-        X-Forwarded-For n'est utilise qu'en production (derriere un reverse proxy
-        de confiance). En dev, on utilise toujours l'IP directe pour eviter
+        X-Forwarded-For n'est utilisé qu'en production (derrière un reverse proxy
+        de confiance). En dev, on utilise toujours l'IP directe pour éviter
         le spoofing du header.
         """
         from .config import get_settings
@@ -74,7 +88,7 @@ class _RateLimiter:
 
     def check(self, request: Request) -> None:
         """
-        Vérifie si l'IP est autorisée à tenter un login.
+        Vérifie si l'IP est autorisée à effectuer la requête.
         Lève HTTP 429 si le rate limit est dépassé.
         """
         self._cleanup()
@@ -91,34 +105,34 @@ class _RateLimiter:
                     )
                     raise HTTPException(
                         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                        detail=f"Trop de tentatives. Réessayez dans {remaining} secondes.",
+                        detail=f"Trop de requêtes. Réessayez dans {remaining} secondes.",
                         headers={"Retry-After": str(remaining)},
                     )
                 else:
                     del self._blocked[ip]
 
             # Nettoyer les tentatives hors fenêtre pour cette IP
-            cutoff = now - WINDOW_SECONDS
+            cutoff = now - self.window_seconds
             self._attempts[ip] = [
                 t for t in self._attempts[ip] if t > cutoff
             ]
 
             # Vérifier le nombre de tentatives
-            if len(self._attempts[ip]) >= MAX_ATTEMPTS:
-                self._blocked[ip] = now + BLOCK_SECONDS
+            if len(self._attempts[ip]) >= self.max_attempts:
+                self._blocked[ip] = now + self.block_seconds
                 self._attempts[ip].clear()
                 logger.warning(
-                    f"[RATE_LIMIT] IP {ip} bloquée pour {BLOCK_SECONDS}s "
-                    f"après {MAX_ATTEMPTS} tentatives"
+                    f"[RATE_LIMIT] IP {ip} bloquée pour {self.block_seconds}s "
+                    f"après {self.max_attempts} requêtes"
                 )
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=f"Trop de tentatives. Réessayez dans {BLOCK_SECONDS} secondes.",
-                    headers={"Retry-After": str(BLOCK_SECONDS)},
+                    detail=f"Trop de requêtes. Réessayez dans {self.block_seconds} secondes.",
+                    headers={"Retry-After": str(self.block_seconds)},
                 )
 
     def record_attempt(self, request: Request) -> None:
-        """Enregistre une tentative de login (appelé à chaque essai)."""
+        """Enregistre une tentative (appelé à chaque requête)."""
         ip = self._get_client_ip(request)
         now = time.time()
         with self._lock:
@@ -132,12 +146,14 @@ class _RateLimiter:
             self._blocked.pop(ip, None)
 
     def reset_all(self) -> None:
-        """Remet tous les compteurs a zero (utilise dans les tests)."""
+        """Remet tous les compteurs à zéro (utilisé dans les tests)."""
         with self._lock:
             self._attempts.clear()
             self._blocked.clear()
 
 
-# Singletons globaux
-login_rate_limiter = _RateLimiter()
-enroll_rate_limiter = _RateLimiter()  # protege /agents/enroll contre le brute-force
+# ── Singletons par catégorie ─────────────────────────────────────────────────
+login_rate_limiter = _RateLimiter(**RATE_LIMITS["auth"])
+enroll_rate_limiter = _RateLimiter(**RATE_LIMITS["auth"])
+api_rate_limiter = _RateLimiter(**RATE_LIMITS["api"])
+public_rate_limiter = _RateLimiter(**RATE_LIMITS["public"])
