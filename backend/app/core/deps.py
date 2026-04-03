@@ -4,6 +4,8 @@ Dépendances FastAPI réutilisables :
   - Utilisateur courant (authentifié via JWT)
   - Pagination
 """
+import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Query, status
@@ -110,6 +112,19 @@ async def get_current_agent(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Agent introuvable ou revoque",
         )
+
+    # Avertissement si le certificat expire dans moins de 30 jours
+    if agent.cert_expires_at:
+        expires = agent.cert_expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        days_left = (expires - datetime.now(timezone.utc)).days
+        if days_left < 30:
+            logging.getLogger(__name__).warning(
+                "Agent %s certificate expires in %d days",
+                agent.agent_uuid, days_left,
+            )
+
     return agent
 
 

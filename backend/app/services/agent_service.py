@@ -107,6 +107,24 @@ class AgentService:
         agent.status = "revoked"
         agent.revoked_at = datetime.now(timezone.utc)
         db.flush()
+
+        # Regenerer la CRL avec tous les agents revoques
+        ca_cert_path = Path(settings.CA_CERT_PATH)
+        ca_key_path = Path(settings.CA_KEY_PATH)
+        if ca_cert_path.exists() and ca_key_path.exists():
+            from ..core.cert_manager import CertManager
+            revoked_agents = db.query(Agent).filter(
+                Agent.status == "revoked",
+                Agent.cert_serial.isnot(None),
+            ).all()
+            revoked_serials = [
+                (int(a.cert_serial, 16), a.revoked_at or datetime.now(timezone.utc))
+                for a in revoked_agents
+            ]
+            if revoked_serials:
+                mgr = CertManager(ca_cert_path, ca_key_path)
+                mgr.generate_crl(revoked_serials, Path(settings.CRL_PATH))
+
         logger.info(f"Agent revoked: uuid={agent_uuid}, user={user_id}")
         return agent
 
@@ -168,6 +186,7 @@ class AgentService:
 
             matched_agent.cert_fingerprint = CertManager.get_cert_fingerprint(cert_pem)
             matched_agent.cert_serial = CertManager.get_cert_serial(cert_pem)
+            matched_agent.cert_expires_at = CertManager.get_cert_expiry(cert_pem)
 
         # Generer le JWT agent
         agent_token = create_agent_token(

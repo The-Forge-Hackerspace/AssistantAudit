@@ -40,6 +40,9 @@ class Agent(Base):
     cert_serial: Mapped[str | None] = mapped_column(
         String(64)
     )  # serial number du certificat pour revocation
+    cert_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )  # date d'expiration du certificat client
 
     # Enrollment
     enrollment_token_hash: Mapped[str | None] = mapped_column(

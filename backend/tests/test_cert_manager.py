@@ -5,6 +5,7 @@ Utilise tmp_path pour tous les fichiers — ne touche pas aux vrais certs/.
 """
 from pathlib import Path
 
+from datetime import datetime, timedelta, timezone
 import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -221,3 +222,118 @@ class TestUtilities:
         cert_pem, _ = ca.sign_agent_cert("uuid-match")
         cert = x509.load_pem_x509_certificate(cert_pem)
         assert CertManager.get_cert_serial(cert_pem) == format(cert.serial_number, "x")
+
+
+# ────────────────────────────────────────────────────────────────────────
+# CRL (Certificate Revocation List)
+# ────────────────────────────────────────────────────────────────────────
+
+
+class TestCRL:
+    def test_generate_crl_creates_file(self, ca, tmp_path):
+        crl_path = tmp_path / "crl.pem"
+        cert_pem, _ = ca.sign_agent_cert("uuid-revoke-1")
+        serial = int(CertManager.get_cert_serial(cert_pem), 16)
+        now = datetime.now(timezone.utc)
+
+        ca.generate_crl([(serial, now)], crl_path)
+        assert crl_path.exists()
+
+    def test_generate_crl_content_valid(self, ca, tmp_path):
+        crl_path = tmp_path / "crl.pem"
+        cert_pem, _ = ca.sign_agent_cert("uuid-crl-valid")
+        serial = int(CertManager.get_cert_serial(cert_pem), 16)
+        now = datetime.now(timezone.utc)
+
+        crl_pem = ca.generate_crl([(serial, now)], crl_path)
+        crl = x509.load_pem_x509_crl(crl_pem)
+        assert len(list(crl)) == 1
+        revoked = crl.get_revoked_certificate_by_serial_number(serial)
+        assert revoked is not None
+
+    def test_generate_empty_crl(self, ca, tmp_path):
+        crl_path = tmp_path / "crl.pem"
+        crl_pem = ca.generate_crl([], crl_path)
+        crl = x509.load_pem_x509_crl(crl_pem)
+        assert len(list(crl)) == 0
+
+    def test_crl_signed_by_ca(self, ca, tmp_path):
+        crl_path = tmp_path / "crl.pem"
+        crl_pem = ca.generate_crl([], crl_path)
+        crl = x509.load_pem_x509_crl(crl_pem)
+        ca_cert = x509.load_pem_x509_certificate(ca.ca_cert_path.read_bytes())
+        assert crl.issuer == ca_cert.subject
+
+    def test_crl_next_update_30_days(self, ca, tmp_path):
+        crl_path = tmp_path / "crl.pem"
+        crl_pem = ca.generate_crl([], crl_path)
+        crl = x509.load_pem_x509_crl(crl_pem)
+        delta = crl.next_update_utc - crl.last_update_utc
+        assert 29 <= delta.days <= 31
+
+    def test_load_crl_nonexistent(self, tmp_path):
+        assert CertManager.load_crl(tmp_path / "nope.pem") is None
+
+    def test_load_crl_existing(self, ca, tmp_path):
+        crl_path = tmp_path / "crl.pem"
+        ca.generate_crl([], crl_path)
+        crl = CertManager.load_crl(crl_path)
+        assert crl is not None
+
+    def test_is_cert_revoked_true(self, ca, tmp_path):
+        crl_path = tmp_path / "crl.pem"
+        cert_pem, _ = ca.sign_agent_cert("uuid-rev-check")
+        serial_hex = CertManager.get_cert_serial(cert_pem)
+        serial_int = int(serial_hex, 16)
+        now = datetime.now(timezone.utc)
+
+        ca.generate_crl([(serial_int, now)], crl_path)
+        assert CertManager.is_cert_revoked(serial_hex, crl_path) is True
+
+    def test_is_cert_revoked_false(self, ca, tmp_path):
+        crl_path = tmp_path / "crl.pem"
+        cert_pem, _ = ca.sign_agent_cert("uuid-not-rev")
+        serial_hex = CertManager.get_cert_serial(cert_pem)
+
+        # CRL vide — aucun cert revoque
+        ca.generate_crl([], crl_path)
+        assert CertManager.is_cert_revoked(serial_hex, crl_path) is False
+
+    def test_is_cert_revoked_no_crl(self, tmp_path):
+        assert CertManager.is_cert_revoked("abc123", tmp_path / "missing.pem") is False
+
+    def test_multiple_revoked_certs(self, ca, tmp_path):
+        crl_path = tmp_path / "crl.pem"
+        now = datetime.now(timezone.utc)
+        serials = []
+        for i in range(3):
+            cert_pem, _ = ca.sign_agent_cert(f"uuid-multi-{i}")
+            serial_hex = CertManager.get_cert_serial(cert_pem)
+            serials.append((int(serial_hex, 16), now))
+
+        ca.generate_crl(serials, crl_path)
+        crl = CertManager.load_crl(crl_path)
+        assert len(list(crl)) == 3
+
+
+# ────────────────────────────────────────────────────────────────────────
+# get_cert_expiry
+# ────────────────────────────────────────────────────────────────────────
+
+
+class TestCertExpiry:
+    def test_expiry_returns_datetime(self, ca):
+        cert_pem, _ = ca.sign_agent_cert("uuid-expiry")
+        expiry = CertManager.get_cert_expiry(cert_pem)
+        assert isinstance(expiry, datetime)
+
+    def test_expiry_is_about_1_year(self, ca):
+        cert_pem, _ = ca.sign_agent_cert("uuid-expiry-yr")
+        expiry = CertManager.get_cert_expiry(cert_pem)
+        delta = expiry - datetime.now(timezone.utc)
+        assert 363 <= delta.days <= 366
+
+    def test_expiry_matches_cert(self, ca):
+        cert_pem, _ = ca.sign_agent_cert("uuid-expiry-match")
+        cert = x509.load_pem_x509_certificate(cert_pem)
+        assert CertManager.get_cert_expiry(cert_pem) == cert.not_valid_after_utc
