@@ -4,7 +4,7 @@ Pre-charge en base au deploiement via un script de seed.
 Source : https://www.cert.ssi.gouv.fr/uploads/guide-ad.html
 """
 from sqlalchemy import Boolean, Integer, String, Text
-from sqlalchemy.dialects.sqlite import JSON
+from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.database import Base

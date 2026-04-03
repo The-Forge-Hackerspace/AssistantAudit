@@ -253,6 +253,13 @@ def cleanup_after_test(db_session: Session):
 def _reset_rate_limiters():
     """Reset les rate limiters entre chaque test pour eviter les 429 parasites."""
     yield
-    from app.core.rate_limit import enroll_rate_limiter, login_rate_limiter
+    from app.core.rate_limit import (
+        api_rate_limiter,
+        enroll_rate_limiter,
+        login_rate_limiter,
+        public_rate_limiter,
+    )
     login_rate_limiter.reset_all()
     enroll_rate_limiter.reset_all()
+    api_rate_limiter.reset_all()
+    public_rate_limiter.reset_all()

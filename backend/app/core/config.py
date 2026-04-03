@@ -73,6 +73,7 @@ class Settings(BaseSettings):
     # --- Certificats mTLS (communication serveur ↔ agent) ---
     CA_CERT_PATH: str = str(BASE_DIR / "certs" / "ca.pem")
     CA_KEY_PATH: str = str(BASE_DIR / "certs" / "ca.key")
+    CRL_PATH: str = str(BASE_DIR / "certs" / "crl.pem")
 
     # --- Sécurité / JWT ---
     SECRET_KEY: str = ""
@@ -130,6 +131,20 @@ class Settings(BaseSettings):
                 "FILE_ENCRYPTION_KEY doit être défini en production (64 hex chars = 256 bits). "
                 "Générez avec : python -c 'import os; print(os.urandom(32).hex())'"
             )
+
+        # Validation CORS en production : pas de wildcard
+        if is_safe_env:
+            if "*" in self.CORS_ORIGINS:
+                raise ValueError(
+                    "CORS_ORIGINS ne doit pas contenir '*' en production. "
+                    "Listez explicitement les origines autorisées."
+                )
+            for origin in self.CORS_ORIGINS:
+                if not origin.startswith(("http://", "https://")):
+                    raise ValueError(
+                        f"CORS_ORIGINS invalide : '{origin}' — "
+                        "chaque origine doit commencer par http:// ou https://"
+                    )
 
     # --- CORS ---
     CORS_ALLOW_METHODS: list[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
