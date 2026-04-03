@@ -208,7 +208,6 @@ def main():
         logger.info("=== MODE DRY-RUN ===")
         for table_name in tables_to_migrate:
             if table_name in metadata.tables:
-                table = metadata.tables[table_name]
                 with Session(source_engine) as s:
                     count = s.execute(
                         text(f"SELECT COUNT(*) FROM {table_name}")  # noqa: S608
