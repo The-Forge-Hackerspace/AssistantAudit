@@ -30,6 +30,9 @@ def _get_engine():
     connect_args = {}
     if is_sqlite:
         connect_args["check_same_thread"] = False
+    else:
+        # Timeout de connexion pour éviter un blocage si le serveur DB est injoignable
+        connect_args["connect_timeout"] = 5
 
     # Pool config : uniquement pour PostgreSQL (SQLite utilise NullPool implicitement)
     pool_kwargs = {}
