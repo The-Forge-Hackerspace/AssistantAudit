@@ -150,9 +150,8 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                         )
                         if not task:
                             logger.warning(
-                                "Agent %s (id=%s) attempted task_status on task %s — not owned or not found",
+                                "Agent %s attempted task_status on task %s — not owned or not found",
                                 agent_uuid,
-                                trusted_agent_id,
                                 ws_data["task_uuid"],
                             )
                         if task:
@@ -192,9 +191,8 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                         )
                         if not task:
                             logger.warning(
-                                "Agent %s (id=%s) attempted task_result on task %s — not owned or not found",
+                                "Agent %s attempted task_result on task %s — not owned or not found",
                                 agent_uuid,
-                                trusted_agent_id,
                                 ws_data["task_uuid"],
                             )
                         if task:
