@@ -6,6 +6,7 @@ dans la sortie stdout en temps reel, et streame les logs via un callback
 WebSocket. Complementaire a l'executeur synchrone existant (tools/monkey365_runner/executor.py)
 qui reste utilise pour le mode local Windows avec MSAL desktop.
 """
+
 import asyncio
 import logging
 import re
@@ -68,29 +69,37 @@ class Monkey365StreamingExecutor:
         monkey365_path = settings.MONKEY365_PATH
         if not monkey365_path:
             error_msg = "MONKEY365_PATH non configure"
-            await self.ws_callback("scan_error", {
-                "scan_id": self.scan_id,
-                "error": error_msg,
-            })
+            await self.ws_callback(
+                "scan_error",
+                {
+                    "scan_id": self.scan_id,
+                    "error": error_msg,
+                },
+            )
             raise RuntimeError(error_msg)
 
-        ps_script = self._build_ps_script(
-            tenant_id, subscriptions or [], ruleset, auth_method, monkey365_path
-        )
+        ps_script = self._build_ps_script(tenant_id, subscriptions or [], ruleset, auth_method, monkey365_path)
 
         try:
             self.process = await asyncio.create_subprocess_exec(
-                "pwsh", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                "-Command", ps_script,
+                "pwsh",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                ps_script,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
         except FileNotFoundError:
             error_msg = "pwsh introuvable — PowerShell 7+ est requis"
-            await self.ws_callback("scan_error", {
-                "scan_id": self.scan_id,
-                "error": error_msg,
-            })
+            await self.ws_callback(
+                "scan_error",
+                {
+                    "scan_id": self.scan_id,
+                    "error": error_msg,
+                },
+            )
             raise RuntimeError(error_msg)
 
         output_lines: list[str] = []
@@ -110,42 +119,54 @@ class Monkey365StreamingExecutor:
                 if match:
                     url = match.group(1)
                     code = match.group(2)
-                    await self.ws_callback("device_code", {
-                        "scan_id": self.scan_id,
-                        "url": url,
-                        "code": code,
-                        "message": f"Authentifiez-vous sur {url} avec le code : {code}",
-                    })
+                    await self.ws_callback(
+                        "device_code",
+                        {
+                            "scan_id": self.scan_id,
+                            "url": url,
+                            "code": code,
+                            "message": f"Authentifiez-vous sur {url} avec le code : {code}",
+                        },
+                    )
                     device_code_sent = True
                     continue
 
             # Streamer les logs
-            await self.ws_callback("scan_log", {
-                "scan_id": self.scan_id,
-                "line": line,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
+            await self.ws_callback(
+                "scan_log",
+                {
+                    "scan_id": self.scan_id,
+                    "line": line,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
 
         # Attendre la fin du process
         try:
             await asyncio.wait_for(self.process.wait(), timeout=3600)
         except asyncio.TimeoutError:
             self.process.terminate()
-            await self.ws_callback("scan_error", {
-                "scan_id": self.scan_id,
-                "error": "Timeout (1h) depasse — scan arrete",
-            })
+            await self.ws_callback(
+                "scan_error",
+                {
+                    "scan_id": self.scan_id,
+                    "error": "Timeout (1h) depasse — scan arrete",
+                },
+            )
             return {"status": "timeout", "scan_id": self.scan_id, "error": "Timeout 1h exceeded"}
 
         if self.process.returncode != 0:
             stderr_bytes = await self.process.stderr.read()
             stderr_text = (stderr_bytes or b"").decode("utf-8", errors="replace").strip()
             error = stderr_text or ("\n".join(output_lines[-10:])[:500] if output_lines else "Erreur inconnue")
-            await self.ws_callback("scan_error", {
-                "scan_id": self.scan_id,
-                "error": error,
-                "returncode": self.process.returncode,
-            })
+            await self.ws_callback(
+                "scan_error",
+                {
+                    "scan_id": self.scan_id,
+                    "error": error,
+                    "returncode": self.process.returncode,
+                },
+            )
             return {
                 "status": "error",
                 "scan_id": self.scan_id,
@@ -153,13 +174,16 @@ class Monkey365StreamingExecutor:
                 "returncode": self.process.returncode,
             }
 
-        await self.ws_callback("scan_complete", {
-            "scan_id": self.scan_id,
-            "summary": {
-                "status": "completed",
-                "lines_count": len(output_lines),
+        await self.ws_callback(
+            "scan_complete",
+            {
+                "scan_id": self.scan_id,
+                "summary": {
+                    "status": "completed",
+                    "lines_count": len(output_lines),
+                },
             },
-        })
+        )
 
         return {
             "status": "success",
@@ -177,9 +201,10 @@ class Monkey365StreamingExecutor:
     ) -> str:
         """Construit le script PowerShell Monkey365 pour le serveur."""
         from pathlib import Path
+
         monkey365_dir = str(Path(monkey365_path).parent).replace("'", "''")
 
-        subs_str = ", ".join(f"'{s.replace(chr(39), chr(39)*2)}'" for s in subscriptions) if subscriptions else ""
+        subs_str = ", ".join(f"'{s.replace(chr(39), chr(39) * 2)}'" for s in subscriptions) if subscriptions else ""
 
         auth_param = ""
         if auth_method == AuthMethod.DEVICE_CODE:

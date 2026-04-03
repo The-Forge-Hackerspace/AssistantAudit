@@ -2,6 +2,7 @@
 Routes Scan Réseau — Lancement de scans Nmap, gestion des résultats,
 décisions sur les hosts découverts, import vers équipements.
 """
+
 import logging
 import math
 from typing import Optional
@@ -149,7 +150,10 @@ def get_scan(
 ):
     """Récupère les détails d'un scan avec tous les hosts et ports."""
     scan = scan_service.get_scan_with_hosts(
-        db, scan_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        scan_id,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     if not scan:
         raise HTTPException(status_code=404, detail="Scan introuvable")
@@ -168,13 +172,17 @@ def delete_scan(
 ):
     """Supprime un scan et tous ses résultats."""
     if not scan_service.delete_scan(
-        db, scan_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        scan_id,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     ):
         raise HTTPException(status_code=404, detail="Scan introuvable")
     return MessageResponse(message="Scan supprimé")
 
 
 # ── Host management ──
+
 
 @router.put(
     "/hosts/{host_id}/decision",
@@ -228,7 +236,9 @@ def link_host(
     """Lie un host découvert à un équipement existant dans la base."""
     try:
         host = scan_service.link_host_to_equipement(
-            db, host_id, equipement_id,
+            db,
+            host_id,
+            equipement_id,
             owner_id=current_user.id,
             is_admin=current_user.role == "admin",
         )
@@ -253,7 +263,8 @@ def import_all_hosts(
     """
     try:
         created = scan_service.import_all_kept_hosts(
-            db, scan_id,
+            db,
+            scan_id,
             owner_id=current_user.id,
             is_admin=current_user.role == "admin",
         )

@@ -2,6 +2,7 @@
 Validateurs métier pour les schémas Pydantic.
 Centralise les validations réutilisables pour IP, hostname, MAC, fichiers, etc.
 """
+
 import re
 from ipaddress import AddressValueError, IPv4Address, IPv6Address
 from typing import Annotated
@@ -31,10 +32,7 @@ def validate_hostname(hostname: str) -> str:
     hostname = hostname.strip()
     # RFC 1123 : lettres, chiffres, tirets, points (pas @ ou /)
     if not re.match(r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})*\.?$", hostname):
-        raise ValueError(
-            f"Nom d'hôte invalide: {hostname}. "
-            "Utiliser alphanumeriques, tirets et points."
-        )
+        raise ValueError(f"Nom d'hôte invalide: {hostname}. Utiliser alphanumeriques, tirets et points.")
     return hostname
 
 

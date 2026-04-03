@@ -1,6 +1,7 @@
 """
 Service Assessment : campagnes d'évaluation, scoring, résultats.
 """
+
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -28,10 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 class AssessmentService:
-
     @staticmethod
     def _check_audit_access(
-        db: Session, audit_id: int, user_id: int | None, is_admin: bool,
+        db: Session,
+        audit_id: int,
+        user_id: int | None,
+        is_admin: bool,
     ) -> None:
         """Verifie l'acces a un audit. 404 si non autorise."""
         if is_admin or user_id is None:
@@ -42,14 +45,20 @@ class AssessmentService:
 
     @staticmethod
     def _check_campaign_access(
-        db: Session, campaign: AssessmentCampaign, user_id: int | None, is_admin: bool,
+        db: Session,
+        campaign: AssessmentCampaign,
+        user_id: int | None,
+        is_admin: bool,
     ) -> None:
         """Verifie l'acces via Campaign → Audit."""
         AssessmentService._check_audit_access(db, campaign.audit_id, user_id, is_admin)
 
     @staticmethod
     def _check_assessment_access(
-        db: Session, assessment: Assessment, user_id: int | None, is_admin: bool,
+        db: Session,
+        assessment: Assessment,
+        user_id: int | None,
+        is_admin: bool,
     ) -> None:
         """Verifie l'acces via Assessment → Campaign → Audit."""
         campaign = db.get(AssessmentCampaign, assessment.campaign_id)
@@ -61,8 +70,12 @@ class AssessmentService:
 
     @staticmethod
     def create_campaign(
-        db: Session, name: str, audit_id: int, description: str = None,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        name: str,
+        audit_id: int,
+        description: str = None,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> AssessmentCampaign:
         """Crée une nouvelle campagne d'évaluation"""
         AssessmentService._check_audit_access(db, audit_id, user_id, is_admin)
@@ -80,8 +93,10 @@ class AssessmentService:
 
     @staticmethod
     def get_campaign(
-        db: Session, campaign_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        campaign_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Optional[AssessmentCampaign]:
         campaign = db.get(AssessmentCampaign, campaign_id)
         if campaign:
@@ -90,8 +105,12 @@ class AssessmentService:
 
     @staticmethod
     def list_campaigns(
-        db: Session, audit_id: int = None, offset: int = 0, limit: int = 20,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        audit_id: int = None,
+        offset: int = 0,
+        limit: int = 20,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> tuple[list[AssessmentCampaign], int]:
         """
         List assessment campaigns with pagination.
@@ -107,17 +126,18 @@ class AssessmentService:
         if audit_id:
             query = query.filter(AssessmentCampaign.audit_id == audit_id)
         elif user_id is not None and not is_admin:
-            query = query.join(Audit, AssessmentCampaign.audit_id == Audit.id).filter(
-                Audit.owner_id == user_id
-            )
+            query = query.join(Audit, AssessmentCampaign.audit_id == Audit.id).filter(Audit.owner_id == user_id)
         total = query.count()
         campaigns = query.order_by(AssessmentCampaign.created_at.desc()).offset(offset).limit(limit).all()
         return campaigns, total
 
     @staticmethod
     def update_campaign(
-        db: Session, campaign_id: int, data,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        campaign_id: int,
+        data,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> AssessmentCampaign:
         """Met à jour une campagne (nom, description, statut)"""
         campaign = db.get(AssessmentCampaign, campaign_id)
@@ -143,8 +163,10 @@ class AssessmentService:
 
     @staticmethod
     def start_campaign(
-        db: Session, campaign_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        campaign_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> AssessmentCampaign:
         """Démarre une campagne et passe les équipements associés en EN_COURS."""
         campaign = db.get(AssessmentCampaign, campaign_id)
@@ -167,8 +189,10 @@ class AssessmentService:
 
     @staticmethod
     def complete_campaign(
-        db: Session, campaign_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        campaign_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> AssessmentCampaign:
         """Termine une campagne et met à jour le statut des équipements."""
         campaign = db.get(AssessmentCampaign, campaign_id)
@@ -199,8 +223,10 @@ class AssessmentService:
 
     @staticmethod
     def delete_campaign(
-        db: Session, campaign_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        campaign_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> None:
         """Supprime une campagne et tous ses assessments/résultats associés."""
         campaign = db.get(AssessmentCampaign, campaign_id)
@@ -242,11 +268,15 @@ class AssessmentService:
             raise ValueError(f"Framework {framework_id} introuvable")
 
         # Vérifier qu'il n'existe pas déjà un assessment pour cette combinaison
-        existing = db.query(Assessment).filter_by(
-            campaign_id=campaign_id,
-            equipement_id=equipement_id,
-            framework_id=framework_id,
-        ).first()
+        existing = (
+            db.query(Assessment)
+            .filter_by(
+                campaign_id=campaign_id,
+                equipement_id=equipement_id,
+                framework_id=framework_id,
+            )
+            .first()
+        )
         if existing:
             raise ValueError(
                 f"Un assessment existe déjà pour cette combinaison "
@@ -291,8 +321,10 @@ class AssessmentService:
 
     @staticmethod
     def get_assessment(
-        db: Session, assessment_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        assessment_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Optional[Assessment]:
         assessment = db.get(Assessment, assessment_id)
         if assessment:
@@ -301,8 +333,10 @@ class AssessmentService:
 
     @staticmethod
     def delete_assessment(
-        db: Session, assessment_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        assessment_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> None:
         """Supprime un assessment et tous ses résultats de contrôle / pièces jointes."""
         assessment = db.get(Assessment, assessment_id)
@@ -393,9 +427,7 @@ class AssessmentService:
         assessed = total - counts["not_assessed"] - counts["not_applicable"]
         score = None
         if assessed > 0:
-            score = round(
-                (counts["compliant"] + 0.5 * counts["partially_compliant"]) / assessed * 100, 1
-            )
+            score = round((counts["compliant"] + 0.5 * counts["partially_compliant"]) / assessed * 100, 1)
 
         return {
             "compliance_score": score,
@@ -411,16 +443,23 @@ class AssessmentService:
 
     @staticmethod
     def get_assessment_score(
-        db: Session, assessment_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        assessment_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> dict | None:
         """
         Calculate compliance score for an assessment.
         Optimized to eagerly load control results.
         """
-        assessment = db.query(Assessment).options(
-            selectinload(Assessment.results).selectinload(ControlResult.control),
-        ).filter(Assessment.id == assessment_id).first()
+        assessment = (
+            db.query(Assessment)
+            .options(
+                selectinload(Assessment.results).selectinload(ControlResult.control),
+            )
+            .filter(Assessment.id == assessment_id)
+            .first()
+        )
 
         if not assessment:
             return None
@@ -429,16 +468,23 @@ class AssessmentService:
 
     @staticmethod
     def get_campaign_score(
-        db: Session, campaign_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        campaign_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> dict | None:
         """
         Calculate compliance score for a campaign (aggregated across all assessments).
         Optimized to eagerly load assessment results.
         """
-        campaign = db.query(AssessmentCampaign).options(
-            selectinload(AssessmentCampaign.assessments).selectinload(Assessment.results),
-        ).filter(AssessmentCampaign.id == campaign_id).first()
+        campaign = (
+            db.query(AssessmentCampaign)
+            .options(
+                selectinload(AssessmentCampaign.assessments).selectinload(Assessment.results),
+            )
+            .filter(AssessmentCampaign.id == campaign_id)
+            .first()
+        )
 
         if not campaign:
             return None
@@ -481,16 +527,10 @@ class AssessmentService:
         if not audit:
             raise ValueError(f"Audit #{audit_id} introuvable")
         if audit.entreprise_id != scan.entreprise_id:
-            raise ValueError(
-                "Le scan Monkey365 appartient à une entreprise différente de l'audit cible"
-            )
+            raise ValueError("Le scan Monkey365 appartient à une entreprise différente de l'audit cible")
 
         # Trouver le framework CIS-M365-V5
-        framework = (
-            db.query(Framework)
-            .filter(Framework.ref_id == "CIS-M365-V5")
-            .first()
-        )
+        framework = db.query(Framework).filter(Framework.ref_id == "CIS-M365-V5").first()
         if not framework:
             raise ValueError("Framework CIS-M365-V5 introuvable — vérifiez que le YAML a bien été importé")
 
@@ -590,16 +630,11 @@ class AssessmentService:
                 for f in findings:
                     if f.rule_id:
                         findings_by_rule[f.rule_id.lower()] = f.status_text
-                logger.info(
-                    f"Monkey365Parser : {len(findings)} findings, "
-                    f"{len(findings_by_rule)} règles distinctes"
-                )
+                logger.info(f"Monkey365Parser : {len(findings)} findings, {len(findings_by_rule)} règles distinctes")
             except Exception:
                 logger.exception("Erreur lors du parsing des findings Monkey365")
         else:
-            logger.warning(
-                f"Aucun répertoire de sortie accessible pour le scan #{scan_result_id}"
-            )
+            logger.warning(f"Aucun répertoire de sortie accessible pour le scan #{scan_result_id}")
 
         # Mapping status_text → ComplianceStatus
         STATUS_MAP = {

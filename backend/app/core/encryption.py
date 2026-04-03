@@ -8,6 +8,7 @@ Fournit :
 Format stocke en base : hex(nonce_12B || ciphertext || tag_16B)
 La cle ENCRYPTION_KEY est une variable d'environnement distincte de SECRET_KEY.
 """
+
 import json
 import logging
 import os
@@ -62,6 +63,7 @@ class EncryptedJSON(TypeDecorator):
     En Python on manipule des dict/list natifs, en base c'est chiffre.
     Si ENCRYPTION_KEY est vide, les donnees sont stockees en JSON clair (mode dev).
     """
+
     impl = Text
     cache_ok = True
 
@@ -92,12 +94,11 @@ class EncryptedJSON(TypeDecorator):
     def _get_cipher() -> AES256GCMCipher | None:
         """Retourne le cipher si ENCRYPTION_KEY est configuree, sinon None."""
         from app.core.config import get_settings
+
         key = get_settings().ENCRYPTION_KEY
         if not key:
             if not EncryptedJSON._warned_no_key:
-                logger.warning(
-                    "ENCRYPTION_KEY non configuree — colonnes EncryptedJSON stockees en clair (dev only)"
-                )
+                logger.warning("ENCRYPTION_KEY non configuree — colonnes EncryptedJSON stockees en clair (dev only)")
                 EncryptedJSON._warned_no_key = True
             return None
         return AES256GCMCipher(key)
@@ -113,6 +114,7 @@ class EncryptedText(TypeDecorator):
     En Python on manipule du texte clair, en base c'est chiffre.
     Si ENCRYPTION_KEY est vide, les donnees sont stockees en clair (mode dev).
     """
+
     impl = Text
     cache_ok = True
 
@@ -142,12 +144,11 @@ class EncryptedText(TypeDecorator):
     def _get_cipher() -> AES256GCMCipher | None:
         """Retourne le cipher si ENCRYPTION_KEY est configuree, sinon None."""
         from app.core.config import get_settings
+
         key = get_settings().ENCRYPTION_KEY
         if not key:
             if not EncryptedText._warned_no_key:
-                logger.warning(
-                    "ENCRYPTION_KEY non configuree — colonnes sensibles stockees en clair (dev only)"
-                )
+                logger.warning("ENCRYPTION_KEY non configuree — colonnes sensibles stockees en clair (dev only)")
                 EncryptedText._warned_no_key = True
             return None
         return AES256GCMCipher(key)

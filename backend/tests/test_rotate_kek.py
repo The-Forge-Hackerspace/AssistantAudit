@@ -1,6 +1,7 @@
 """
 Tests TD-002 : rotation KEK complète.
 """
+
 import os
 
 import pytest
@@ -22,9 +23,7 @@ class TestRotateKek:
         encrypted_file, encrypted_dek, dek_nonce = enc.encrypt_file(plaintext)
 
         # Rotation
-        new_encrypted_dek, new_nonce = EnvelopeEncryption.rotate_kek(
-            encrypted_dek, dek_nonce, old_kek, new_kek
-        )
+        new_encrypted_dek, new_nonce = EnvelopeEncryption.rotate_kek(encrypted_dek, dek_nonce, old_kek, new_kek)
 
         # Le DEK chiffré a changé
         assert new_encrypted_dek != encrypted_dek
@@ -55,9 +54,7 @@ class TestRotateKek:
         encrypted_file, encrypted_dek, dek_nonce = enc_old.encrypt_file(plaintext)
 
         # Rotation
-        new_encrypted_dek, new_nonce = EnvelopeEncryption.rotate_kek(
-            encrypted_dek, dek_nonce, old_kek, new_kek
-        )
+        new_encrypted_dek, new_nonce = EnvelopeEncryption.rotate_kek(encrypted_dek, dek_nonce, old_kek, new_kek)
 
         # L'ancienne KEK ne déchiffre plus le nouveau DEK
         with pytest.raises((InvalidTag, Exception)):

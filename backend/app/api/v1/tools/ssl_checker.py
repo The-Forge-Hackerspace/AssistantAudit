@@ -47,18 +47,22 @@ def ssl_check_batch(
         except Exception as exc:
             logger.warning("SSL check failed for %s:%d : %s", req.host, req.port, exc)
             # Return a result with error
-            results.append(SSLCheckResult(
-                host=req.host,
-                port=req.port,
-                certificate=None,
-                protocols=[],
-                findings=[SecurityFinding(
-                    severity="high",
-                    category="Connexion",
-                    title=f"Impossible de se connecter à {req.host}:{req.port}",
-                    description=str(exc),
-                    remediation="Vérifier l'accessibilité de l'hôte et le port.",
-                )],
-            ))
+            results.append(
+                SSLCheckResult(
+                    host=req.host,
+                    port=req.port,
+                    certificate=None,
+                    protocols=[],
+                    findings=[
+                        SecurityFinding(
+                            severity="high",
+                            category="Connexion",
+                            title=f"Impossible de se connecter à {req.host}:{req.port}",
+                            description=str(exc),
+                            remediation="Vérifier l'accessibilité de l'hôte et le port.",
+                        )
+                    ],
+                )
+            )
 
     return results

@@ -2,6 +2,7 @@
 Service AD Audit — Orchestration des audits Active Directory,
 persistance des résultats et pré-remplissage des contrôles d'audit.
 """
+
 import logging
 import time
 from dataclasses import asdict
@@ -172,10 +173,7 @@ def execute_ad_audit_background(
         audit.duration_seconds = elapsed
         db.commit()
 
-        logger.info(
-            f"[AD_AUDIT] Audit #{audit_id} terminé en {elapsed}s "
-            f"(status={audit.status.value})"
-        )
+        logger.info(f"[AD_AUDIT] Audit #{audit_id} terminé en {elapsed}s (status={audit.status.value})")
 
     except Exception as e:
         logger.exception(f"[AD_AUDIT] Erreur fatale audit #{audit_id}")
@@ -261,11 +259,7 @@ def prefill_assessment_from_ad_audit(
         raise ValueError(f"Assessment #{assessment_id} introuvable")
 
     # Charger les control results de l'assessment
-    control_results = (
-        db.query(ControlResult)
-        .filter(ControlResult.assessment_id == assessment_id)
-        .all()
-    )
+    control_results = db.query(ControlResult).filter(ControlResult.assessment_id == assessment_id).all()
 
     # Index par ref_id
     cr_by_ref: dict[str, ControlResult] = {}
@@ -317,12 +311,14 @@ def prefill_assessment_from_ad_audit(
         cr.recommendation = finding.get("remediation", "")
         prefilled += 1
 
-        details.append({
-            "control_ref": ref,
-            "title": finding.get("title", ""),
-            "status": new_status.value,
-            "evidence": finding.get("evidence", ""),
-        })
+        details.append(
+            {
+                "control_ref": ref,
+                "title": finding.get("title", ""),
+                "status": new_status.value,
+                "evidence": finding.get("evidence", ""),
+            }
+        )
 
     return {
         "controls_prefilled": prefilled,

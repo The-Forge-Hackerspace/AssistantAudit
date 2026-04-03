@@ -38,7 +38,6 @@ class Monkey365Config:
 
 
 class Monkey365Executor:
-
     COLLECT_MODULES = ["ExchangeOnline", "MicrosoftTeams", "Purview", "SharePointOnline", "AdminPortal"]
 
     def __init__(self, config: Monkey365Config, monkey365_path: str | None = None, allow_auto_clone: bool = False):
@@ -106,8 +105,7 @@ class Monkey365Executor:
             )
             if clone_result.returncode != 0:
                 raise RuntimeError(
-                    "Failed to clone Monkey365 repository:\n"
-                    + (clone_result.stderr or clone_result.stdout)
+                    "Failed to clone Monkey365 repository:\n" + (clone_result.stderr or clone_result.stdout)
                 )
 
         module_path = monkey365_dir / "monkey365.psm1"
@@ -324,11 +322,7 @@ Invoke-Monkey365 @param -Verbose
             )
 
             if returncode != 0:
-                error = Monkey365ExecutionError(
-                    "PowerShell failed (code "
-                    + str(returncode)
-                    + ")"
-                )
+                error = Monkey365ExecutionError("PowerShell failed (code " + str(returncode) + ")")
                 return {"status": "error", "scan_id": scan_id, "error": str(error)}
 
             results = self.parse_results(ps_stdout, scan_id)
@@ -336,8 +330,12 @@ Invoke-Monkey365 @param -Verbose
 
         except subprocess.TimeoutExpired as exc:
             raw_output = {
-                "stdout": (exc.stdout or b"").decode("utf-8", errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or ""),
-                "stderr": (exc.stderr or b"").decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or ""),
+                "stdout": (exc.stdout or b"").decode("utf-8", errors="replace")
+                if isinstance(exc.stdout, bytes)
+                else (exc.stdout or ""),
+                "stderr": (exc.stderr or b"").decode("utf-8", errors="replace")
+                if isinstance(exc.stderr, bytes)
+                else (exc.stderr or ""),
                 "returncode": None,
                 "duration_seconds": time.time() - start_time,
             }

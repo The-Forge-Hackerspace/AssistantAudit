@@ -1,6 +1,7 @@
 """
 Modèle User — Authentification et rôles.
 """
+
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, Integer, String

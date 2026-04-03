@@ -1,6 +1,7 @@
 """
 Tests pour la validation de complexite des mots de passe.
 """
+
 import pytest
 from pydantic import ValidationError
 

@@ -4,11 +4,11 @@ Modèle Monkey365ScanResult — Résultat d'un audit Monkey365 sur Microsoft 365
 Stocke les métadonnées de scan, la configuration snapshot, et les résultats d'audit
 pour analyse et suivi des audits Microsoft 365.
 """
+
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.sqlite import JSON
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -28,12 +28,11 @@ class Monkey365ScanStatus(str, PyEnum):
 
 class Monkey365ScanResult(Base):
     """Résultat d'un audit Monkey365, lié à une entreprise."""
+
     __tablename__ = "monkey365_scan_results"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    entreprise_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("entreprises.id"), nullable=False, index=True
-    )
+    entreprise_id: Mapped[int] = mapped_column(Integer, ForeignKey("entreprises.id"), nullable=False, index=True)
     status: Mapped[Monkey365ScanStatus] = mapped_column(
         Enum(Monkey365ScanStatus), default=Monkey365ScanStatus.RUNNING, nullable=False
     )
@@ -58,9 +57,7 @@ class Monkey365ScanResult(Base):
     findings_count: Mapped[int | None] = mapped_column(Integer)
 
     # Métadonnées temporelles
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
 

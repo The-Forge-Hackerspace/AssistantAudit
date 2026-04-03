@@ -6,6 +6,7 @@ Stratégie :
 - Base existante              : alembic upgrade head (migrations incrémentales)
 - Admin absent                : création avec mot de passe affiché dans les logs
 """
+
 import os
 import subprocess
 import sys

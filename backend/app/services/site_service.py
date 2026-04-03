@@ -1,6 +1,7 @@
 """
 Service Site : CRUD des emplacements physiques.
 """
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -12,10 +13,12 @@ from ..schemas.site import SiteCreate, SiteUpdate
 
 
 class SiteService:
-
     @staticmethod
     def _check_entreprise_access(
-        db: Session, entreprise_id: int, user_id: int | None, is_admin: bool,
+        db: Session,
+        entreprise_id: int,
+        user_id: int | None,
+        is_admin: bool,
     ) -> None:
         """Verifie l'acces a l'entreprise pour un non-admin."""
         if user_id is not None and not is_admin:
@@ -34,10 +37,7 @@ class SiteService:
         """Liste les sites avec pagination. Non-admin voit uniquement ceux lies a ses entreprises."""
         if user_id is not None and not is_admin:
             accessible_ent_ids = (
-                db.query(Audit.entreprise_id)
-                .filter(Audit.owner_id == user_id)
-                .distinct()
-                .scalar_subquery()
+                db.query(Audit.entreprise_id).filter(Audit.owner_id == user_id).distinct().scalar_subquery()
             )
             query = db.query(Site).filter(Site.entreprise_id.in_(accessible_ent_ids))
             if entreprise_id is not None:
@@ -52,8 +52,10 @@ class SiteService:
 
     @staticmethod
     def get_site(
-        db: Session, site_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        site_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Site:
         """Recupere un site par ID. Non-admin doit avoir acces a l'entreprise."""
         site = get_or_404(db, Site, site_id)
@@ -62,18 +64,16 @@ class SiteService:
 
     @staticmethod
     def create_site(
-        db: Session, data: SiteCreate,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        data: SiteCreate,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Site:
         """Cree un site. Verifie l'acces a l'entreprise, l'existence et l'unicite nom+entreprise."""
         get_or_404(db, Entreprise, data.entreprise_id)
         SiteService._check_entreprise_access(db, data.entreprise_id, user_id, is_admin)
 
-        existing = (
-            db.query(Site)
-            .filter(Site.entreprise_id == data.entreprise_id, Site.nom == data.nom)
-            .first()
-        )
+        existing = db.query(Site).filter(Site.entreprise_id == data.entreprise_id, Site.nom == data.nom).first()
         if existing:
             raise HTTPException(
                 status_code=409,
@@ -93,8 +93,11 @@ class SiteService:
 
     @staticmethod
     def update_site(
-        db: Session, site_id: int, data: SiteUpdate,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        site_id: int,
+        data: SiteUpdate,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Site:
         """Met a jour un site existant. Verifie l'acces."""
         site = get_or_404(db, Site, site_id)

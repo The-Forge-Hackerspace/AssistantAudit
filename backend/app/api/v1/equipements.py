@@ -3,6 +3,7 @@ Routes Equipements : CRUD des assets d'infrastructure.
 
 Gère les 3 sous-types STI (réseau, serveur, firewall) via un champ type_equipement.
 """
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, status
@@ -65,7 +66,10 @@ def create_equipement(
 ):
     """Crée un nouvel équipement dans un site"""
     equipement = EquipementService.create_equipement(
-        db, body, user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        body,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return equipement_to_read(equipement)
 
@@ -78,7 +82,10 @@ def get_equipement(
 ):
     """Détail d'un équipement"""
     equipement = EquipementService.get_equipement(
-        db, equipement_id, user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        equipement_id,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return equipement_to_read(equipement)
 
@@ -92,7 +99,11 @@ def update_equipement(
 ):
     """Modifie un équipement"""
     equipement = EquipementService.update_equipement(
-        db, equipement_id, body, user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        equipement_id,
+        body,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return equipement_to_read(equipement)
 

@@ -30,9 +30,7 @@ def create_report(
     current_user: User = Depends(get_current_auditeur),
 ):
     """Crée un rapport pour un audit (avec 25 sections)."""
-    return ReportService.create_report(
-        db, body, user_id=current_user.id, is_admin=current_user.role == "admin"
-    )
+    return ReportService.create_report(db, body, user_id=current_user.id, is_admin=current_user.role == "admin")
 
 
 @router.get("", response_model=list[AuditReportRead])
@@ -42,9 +40,7 @@ def list_reports(
     current_user: User = Depends(get_current_user),
 ):
     """Liste les rapports d'un audit."""
-    return ReportService.list_reports(
-        db, audit_id, user_id=current_user.id, is_admin=current_user.role == "admin"
-    )
+    return ReportService.list_reports(db, audit_id, user_id=current_user.id, is_admin=current_user.role == "admin")
 
 
 @router.get("/{report_id}", response_model=AuditReportDetail)
@@ -54,9 +50,7 @@ def get_report(
     current_user: User = Depends(get_current_user),
 ):
     """Récupère un rapport avec ses sections."""
-    report = ReportService.get_report(
-        db, report_id, user_id=current_user.id, is_admin=current_user.role == "admin"
-    )
+    report = ReportService.get_report(db, report_id, user_id=current_user.id, is_admin=current_user.role == "admin")
     return AuditReportDetail.model_validate(report)
 
 
@@ -70,8 +64,7 @@ def update_section(
 ):
     """Met à jour une section (inclure/exclure, titre, contenu custom)."""
     return ReportService.update_section(
-        db, report_id, section_key, body,
-        user_id=current_user.id, is_admin=current_user.role == "admin"
+        db, report_id, section_key, body, user_id=current_user.id, is_admin=current_user.role == "admin"
     )
 
 
@@ -83,12 +76,8 @@ def generate_report(
     current_user: User = Depends(get_current_auditeur),
 ):
     """Génère le PDF du rapport."""
-    ReportService.generate_pdf(
-        db, report_id, user_id=current_user.id, is_admin=current_user.role == "admin"
-    )
-    return ReportService.get_report(
-        db, report_id, user_id=current_user.id, is_admin=current_user.role == "admin"
-    )
+    ReportService.generate_pdf(db, report_id, user_id=current_user.id, is_admin=current_user.role == "admin")
+    return ReportService.get_report(db, report_id, user_id=current_user.id, is_admin=current_user.role == "admin")
 
 
 @router.get("/{report_id}/download")
@@ -98,9 +87,7 @@ def download_report(
     current_user: User = Depends(get_current_user),
 ):
     """Télécharge le PDF du rapport."""
-    report = ReportService.get_report(
-        db, report_id, user_id=current_user.id, is_admin=current_user.role == "admin"
-    )
+    report = ReportService.get_report(db, report_id, user_id=current_user.id, is_admin=current_user.role == "admin")
     if not report.pdf_path or not os.path.isfile(report.pdf_path):
         raise HTTPException(status_code=404, detail="PDF non généré")
     return FileResponse(
@@ -117,7 +104,5 @@ def delete_report(
     current_user: User = Depends(get_current_auditeur),
 ):
     """Supprime un rapport."""
-    msg = ReportService.delete_report(
-        db, report_id, user_id=current_user.id, is_admin=current_user.role == "admin"
-    )
+    msg = ReportService.delete_report(db, report_id, user_id=current_user.id, is_admin=current_user.role == "admin")
     return MessageResponse(message=msg)

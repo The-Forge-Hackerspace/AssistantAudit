@@ -69,9 +69,11 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
                         body.decode("utf-8")[:500]  # Validate decodable
                     except UnicodeDecodeError:
                         pass
+
                 # Ensure request body is accessible later
                 async def receive():
                     return {"type": "http.request", "body": body}
+
                 request._receive = receive
             except Exception as e:
                 self.logger.debug(f"Could not capture request body: {e}")
@@ -108,7 +110,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         # Log response
         duration_ms = (time.time() - start_time) * 1000
         log_level = "info" if response.status_code < 400 else "warning"
-        
+
         log_method = getattr(self.logger, log_level)
         log_method(
             "HTTP response sent",
@@ -270,5 +272,8 @@ def log_access_denied(
     """Log un échec d'ownership check pour monitoring sécurité."""
     _security_logger.warning(
         "access_denied: user=%s resource=%s/%s action=%s",
-        user_id, resource_type, resource_id, action,
+        user_id,
+        resource_type,
+        resource_id,
+        action,
     )

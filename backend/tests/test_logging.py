@@ -25,10 +25,10 @@ class TestStructuredLogging:
     def test_configure_structured_logging(self, caplog):
         """Test that structured logging can be configured"""
         configure_structured_logging("INFO")
-        
+
         logger = get_logger("test")
         logger.info("Test message")
-        
+
         # Logger should be configured
         assert len(logger.handlers) >= 0 or len(logging.getLogger().handlers) > 0
 
@@ -41,10 +41,10 @@ class TestStructuredLogging:
     def test_json_formatter_basic(self):
         """Test JSON formatter creates valid JSON"""
         formatter = ContextualJsonFormatter()
-        
+
         handler = logging.StreamHandler(StringIO())
         handler.setFormatter(formatter)
-        
+
         record = logging.LogRecord(
             name="test",
             level=logging.INFO,
@@ -54,11 +54,11 @@ class TestStructuredLogging:
             args=(),
             exc_info=None,
         )
-        
+
         # Format should create valid JSON
         formatted = handler.format(record)
         assert formatted  # Should not be empty
-        
+
         # Should be able to parse as JSON (try to extract JSON object)
         try:
             json.loads(formatted)
@@ -69,7 +69,7 @@ class TestStructuredLogging:
     def test_contextual_json_formatter_with_fields(self):
         """Test JSON formatter adds contextual fields"""
         formatter = ContextualJsonFormatter()
-        
+
         record = logging.LogRecord(
             name="audit_test",
             level=logging.INFO,
@@ -79,16 +79,16 @@ class TestStructuredLogging:
             args=(),
             exc_info=None,
         )
-        
+
         # Add custom fields
         record.request_id = "123"
         record.user_id = "456"
         record.operation = "CREATE"
-        
+
         # Process the record
         log_record = {}
         formatter.add_fields(log_record, record, {})
-        
+
         # Check that custom fields are present
         assert log_record.get("request_id") == "123"
         assert log_record.get("user_id") == "456"
@@ -105,7 +105,7 @@ class TestLogContext:
         """Test setting and retrieving request ID"""
         LogContext.clear()
         LogContext.set_request_id("req-123")
-        
+
         context = LogContext.get()
         assert context["request_id"] == "req-123"
 
@@ -113,7 +113,7 @@ class TestLogContext:
         """Test setting user ID"""
         LogContext.clear()
         LogContext.set_user_id(42)
-        
+
         context = LogContext.get()
         assert context["user_id"] == 42
 
@@ -121,7 +121,7 @@ class TestLogContext:
         """Test setting operation type"""
         LogContext.clear()
         LogContext.set_operation("UPDATE")
-        
+
         context = LogContext.get()
         assert context["operation"] == "UPDATE"
 
@@ -129,10 +129,10 @@ class TestLogContext:
         """Test that context is properly isolated"""
         LogContext.clear()
         LogContext.set_request_id("req-1")
-        
+
         context1 = LogContext.get()
         assert context1["request_id"] == "req-1"
-        
+
         LogContext.clear()
         assert "request_id" not in LogContext.get()
 
@@ -142,7 +142,7 @@ class TestLogContext:
         LogContext.set_request_id("req-abc")
         LogContext.set_user_id(99)
         LogContext.set_operation("DELETE")
-        
+
         context = LogContext.get()
         assert context["request_id"] == "req-abc"
         assert context["user_id"] == 99
@@ -166,7 +166,7 @@ class TestBusinessAuditLogger:
                 user_id=42,
                 details={"username": "john", "role": "admin"},
             )
-        
+
         # Check that log was recorded
         assert "Created user" in caplog.text
         assert "test_audit" in caplog.text
@@ -180,7 +180,7 @@ class TestBusinessAuditLogger:
                 user_id=42,
                 changes={"name": "new name", "description": "updated"},
             )
-        
+
         assert "Updated site" in caplog.text
 
     def test_log_delete(self, audit_logger, caplog):
@@ -191,7 +191,7 @@ class TestBusinessAuditLogger:
                 entity_id=10,
                 user_id=42,
             )
-        
+
         assert "Deleted equipment" in caplog.text
 
     def test_log_status_change(self, audit_logger, caplog):
@@ -204,7 +204,7 @@ class TestBusinessAuditLogger:
                 new_status="IN_PROGRESS",
                 user_id=42,
             )
-        
+
         assert "Status changed" in caplog.text
 
     def test_log_export(self, audit_logger, caplog):
@@ -216,7 +216,7 @@ class TestBusinessAuditLogger:
                 user_id=42,
                 count=150,
             )
-        
+
         assert "Exported assessment" in caplog.text
 
     def test_log_action(self, audit_logger, caplog):
@@ -227,7 +227,7 @@ class TestBusinessAuditLogger:
                 user_id=42,
                 details={"framework_id": 5, "audit_id": 10},
             )
-        
+
         assert "Action: assign_framework" in caplog.text
 
 
@@ -239,37 +239,37 @@ class TestAuditLoggingMiddleware:
         """Create a test FastAPI app with audit middleware"""
         app = FastAPI()
         app.add_middleware(AuditLoggingMiddleware)
-        
+
         @app.get("/test")
         def test_endpoint():
             return {"status": "ok"}
-        
+
         @app.get("/error")
         def error_endpoint():
             raise ValueError("Test error")
-        
+
         @app.post("/data")
         def post_endpoint(data: dict):
             return {"received": data}
-        
+
         return app
 
     def test_middleware_logs_request(self, test_app, caplog):
         """Test that middleware logs HTTP requests"""
         client = TestClient(test_app)
-        
+
         with caplog.at_level(logging.INFO):
             response = client.get("/test")
-        
+
         assert response.status_code == 200
         assert "HTTP request received" in caplog.text or "HTTP response sent" in caplog.text
 
     def test_middleware_adds_request_id_header(self, test_app):
         """Test that middleware adds request ID to response"""
         client = TestClient(test_app)
-        
+
         response = client.get("/test")
-        
+
         assert response.status_code == 200
         assert "x-request-id" in response.headers
         # Request ID should be UUID format
@@ -279,10 +279,10 @@ class TestAuditLoggingMiddleware:
     def test_middleware_logs_response_status(self, test_app, caplog):
         """Test that middleware logs response status codes"""
         client = TestClient(test_app)
-        
+
         with caplog.at_level(logging.INFO):
             response = client.get("/test")
-        
+
         assert response.status_code == 200
         # Response should be logged with status
         assert "HTTP" in caplog.text
@@ -290,7 +290,7 @@ class TestAuditLoggingMiddleware:
     def test_middleware_logs_error_response(self, test_app):
         """Test that middleware logs error responses"""
         client = TestClient(test_app)
-        
+
         # Unhandled exceptions return 500
         with pytest.raises(ValueError):
             client.get("/error")
@@ -299,16 +299,16 @@ class TestAuditLoggingMiddleware:
     def test_middleware_logs_post_request(self, test_app, caplog):
         """Test that middleware logs POST requests"""
         client = TestClient(test_app)
-        
+
         with caplog.at_level(logging.INFO):
             response = client.post("/data", json={"key": "value"})
-        
+
         assert response.status_code == 200
 
     def test_middleware_skips_health_checks(self, test_app):
         """Test that middleware skips health check endpoints"""
         client = TestClient(test_app)
-        
+
         # These should work without audit logging interference
         # (404 is expected since /health doesn't exist, but no error should occur)
         response = client.get("/health")
@@ -322,14 +322,14 @@ class TestLoggingIntegration:
     def test_structured_logging_end_to_end(self, caplog):
         """Test full structured logging flow"""
         configure_structured_logging("DEBUG")
-        
+
         logger = get_logger("integration_test")
         LogContext.set_request_id("int-test-123")
         LogContext.set_user_id(1)
-        
+
         # Log a message - it will be formatted as JSON to stdout
         logger.info("Integration test message")
-        
+
         # The logging system should have handlers configured
         root_logger = logging.getLogger()
         assert len(root_logger.handlers) > 0
@@ -338,10 +338,10 @@ class TestLoggingIntegration:
         """Test that context is shared across loggers"""
         LogContext.clear()
         LogContext.set_request_id("multi-logger-test")
-        
+
         get_logger("logger1")
         get_logger("logger2")
-        
+
         # Both loggers should see the same context
         context = LogContext.get()
         assert context["request_id"] == "multi-logger-test"

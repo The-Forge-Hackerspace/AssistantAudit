@@ -1,6 +1,7 @@
 """
 Schémas Framework (Référentiel) & Control.
 """
+
 from datetime import datetime
 from typing import Optional
 
@@ -60,7 +61,9 @@ class FrameworkBase(BaseModel):
     version: str = Field(default="1.0", max_length=20)
     engine: Optional[str] = None
     engine_config: Optional[dict] = None
-    source: Optional[str] = Field(None, max_length=500, description="Recommandations sur lesquelles le framework est basé")
+    source: Optional[str] = Field(
+        None, max_length=500, description="Recommandations sur lesquelles le framework est basé"
+    )
     author: Optional[str] = Field(None, max_length=200, description="Créateur du framework")
 
 
@@ -83,6 +86,7 @@ class FrameworkRead(FrameworkBase):
 
 class FrameworkSummary(BaseModel):
     """Version allégée sans les catégories/contrôles"""
+
     id: int
     ref_id: str
     name: str
@@ -99,5 +103,6 @@ class FrameworkSummary(BaseModel):
 
 class FrameworkCloneRequest(BaseModel):
     """Demande de clonage d'un framework en nouvelle version"""
+
     new_version: str = Field(..., max_length=20, description="Numéro de la nouvelle version")
     new_name: Optional[str] = Field(None, max_length=200, description="Nouveau nom (optionnel)")

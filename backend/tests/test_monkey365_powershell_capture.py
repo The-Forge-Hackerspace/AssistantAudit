@@ -4,6 +4,7 @@ Tests for PowerShell stdout/stderr capture to output directory.
 Covers the fix where PowerShell output was being discarded.
 Now all subprocess output is saved to powershell_raw_output.json.
 """
+
 import json
 from unittest.mock import MagicMock, patch
 
@@ -38,10 +39,8 @@ def test_powershell_output_captured_to_file(tmp_path):
 
     log_content = "Monkey365 scan completed successfully\nResults written to disk\n"
 
-    with patch('subprocess.Popen') as mock_popen:
-        mock_popen.return_value = _mock_popen(
-            returncode=0, write_log_content=log_content, output_dir=output_dir
-        )
+    with patch("subprocess.Popen") as mock_popen:
+        mock_popen.return_value = _mock_popen(returncode=0, write_log_content=log_content, output_dir=output_dir)
 
         executor.run_scan("scan_1")
 
@@ -72,10 +71,8 @@ def test_powershell_output_captured_on_failure(tmp_path):
 
     log_content = "Starting scan...\nFATAL ERROR: Authentication failed\n"
 
-    with patch('subprocess.Popen') as mock_popen:
-        mock_popen.return_value = _mock_popen(
-            returncode=1, write_log_content=log_content, output_dir=output_dir
-        )
+    with patch("subprocess.Popen") as mock_popen:
+        mock_popen.return_value = _mock_popen(returncode=1, write_log_content=log_content, output_dir=output_dir)
 
         executor.run_scan("scan_failed")
 
@@ -100,7 +97,7 @@ def test_powershell_output_empty_stdout_stderr(tmp_path):
 
     executor = Monkey365Executor(config, str(monkey365_path.parent))
 
-    with patch('subprocess.Popen') as mock_popen:
+    with patch("subprocess.Popen") as mock_popen:
         mock_popen.return_value = _mock_popen(returncode=0)
 
         executor.run_scan("scan_empty")
@@ -126,12 +123,10 @@ def test_powershell_output_json_format_valid(tmp_path):
     executor = Monkey365Executor(config, str(monkey365_path.parent))
 
     # Start-Transcript captures all PS streams in a single log file
-    log_content = 'Output with "quotes" and\nnewlines\nError with \'apostrophes\' and\ttabs\n'
+    log_content = "Output with \"quotes\" and\nnewlines\nError with 'apostrophes' and\ttabs\n"
 
-    with patch('subprocess.Popen') as mock_popen:
-        mock_popen.return_value = _mock_popen(
-            returncode=0, write_log_content=log_content, output_dir=output_dir
-        )
+    with patch("subprocess.Popen") as mock_popen:
+        mock_popen.return_value = _mock_popen(returncode=0, write_log_content=log_content, output_dir=output_dir)
 
         executor.run_scan("scan_json")
 
@@ -139,7 +134,7 @@ def test_powershell_output_json_format_valid(tmp_path):
         output_data = json.loads(output_file.read_text())
 
         assert '"quotes"' in output_data["stdout"]
-        assert '\n' in output_data["stdout"]
+        assert "\n" in output_data["stdout"]
         assert "'apostrophes'" in output_data["stdout"]
 
 

@@ -19,7 +19,6 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "templates" / "reports"
 
 
 class ReportService:
-
     @staticmethod
     def _get_jinja_env() -> Environment:
         """Configure l'environnement Jinja2 pour les rapports."""
@@ -41,9 +40,7 @@ class ReportService:
         return audit
 
     @staticmethod
-    def create_report(
-        db: Session, data: AuditReportCreate, user_id: int, is_admin: bool
-    ) -> AuditReport:
+    def create_report(db: Session, data: AuditReportCreate, user_id: int, is_admin: bool) -> AuditReport:
         """Crée un rapport avec ses 25 sections."""
         ReportService._check_audit_access(db, data.audit_id, user_id, is_admin)
 
@@ -74,9 +71,7 @@ class ReportService:
         return report
 
     @staticmethod
-    def get_report(
-        db: Session, report_id: int, user_id: int, is_admin: bool
-    ) -> AuditReport:
+    def get_report(db: Session, report_id: int, user_id: int, is_admin: bool) -> AuditReport:
         """Récupère un rapport avec ses sections."""
         report = db.query(AuditReport).filter(AuditReport.id == report_id).first()
         if not report:
@@ -93,6 +88,7 @@ class ReportService:
         if os.path.isabs(path) or ".." in path.split(os.sep):
             return None
         from ..core.config import get_settings
+
         settings = get_settings()
         upload_dir = Path(settings.UPLOAD_DIR).resolve()
         safe_path = (upload_dir / path).resolve()
@@ -104,24 +100,25 @@ class ReportService:
             return base64.b64encode(f.read()).decode("utf-8")
 
     @staticmethod
-    def list_reports(
-        db: Session, audit_id: int, user_id: int, is_admin: bool
-    ) -> list[AuditReport]:
+    def list_reports(db: Session, audit_id: int, user_id: int, is_admin: bool) -> list[AuditReport]:
         """Liste les rapports d'un audit."""
         ReportService._check_audit_access(db, audit_id, user_id, is_admin)
         return db.query(AuditReport).filter(AuditReport.audit_id == audit_id).all()
 
     @staticmethod
     def update_section(
-        db: Session, report_id: int, section_key: str,
-        data: ReportSectionUpdate, user_id: int, is_admin: bool
+        db: Session, report_id: int, section_key: str, data: ReportSectionUpdate, user_id: int, is_admin: bool
     ) -> ReportSection:
         """Met à jour une section (inclure/exclure, titre, contenu custom)."""
         ReportService.get_report(db, report_id, user_id, is_admin)
-        section = db.query(ReportSection).filter(
-            ReportSection.report_id == report_id,
-            ReportSection.section_key == section_key,
-        ).first()
+        section = (
+            db.query(ReportSection)
+            .filter(
+                ReportSection.report_id == report_id,
+                ReportSection.section_key == section_key,
+            )
+            .first()
+        )
         if not section:
             raise HTTPException(status_code=404, detail="Section non trouvée")
 
@@ -145,8 +142,9 @@ class ReportService:
             html_content = ReportService.render_html(db, report)
 
             from ..core.config import get_settings
+
             settings = get_settings()
-            data_dir = getattr(settings, 'DATA_DIR', 'data')
+            data_dir = getattr(settings, "DATA_DIR", "data")
             reports_dir = Path(data_dir) / "reports"
             reports_dir.mkdir(parents=True, exist_ok=True)
 
@@ -169,9 +167,7 @@ class ReportService:
             raise HTTPException(status_code=500, detail=f"Erreur génération PDF: {str(e)}")
 
     @staticmethod
-    def delete_report(
-        db: Session, report_id: int, user_id: int, is_admin: bool
-    ) -> str:
+    def delete_report(db: Session, report_id: int, user_id: int, is_admin: bool) -> str:
         """Supprime un rapport et ses fichiers."""
         report = ReportService.get_report(db, report_id, user_id, is_admin)
         for path in [report.pdf_path, report.docx_path]:

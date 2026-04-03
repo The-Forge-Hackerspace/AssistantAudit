@@ -8,6 +8,7 @@ Profils supportés :
 - stormshield  : Pare-feu Stormshield (SNS)
 - fortigate    : Pare-feu FortiGate (FortiOS)
 """
+
 import logging
 import time
 from dataclasses import dataclass, field
@@ -29,6 +30,7 @@ SUPPORTED_PROFILES = ("linux_server", "opnsense", "stormshield", "fortigate")
 @dataclass
 class SSHCollectResult:
     """Résultat brut de la collecte SSH."""
+
     success: bool = False
     error: str | None = None
     hostname: str = ""
@@ -51,64 +53,46 @@ LINUX_COMMANDS: dict[str, str] = {
     "kernel": "uname -r",
     "uptime": "uptime -p 2>/dev/null || uptime",
     "arch": "uname -m",
-
     # --- Mises à jour ---
     # Debian/Ubuntu
-    "apt_updates": (
-        "apt list --upgradable 2>/dev/null | grep -c upgradable || echo 0"
-    ),
-    "apt_security": (
-        "apt list --upgradable 2>/dev/null | grep -i security | wc -l || echo 0"
-    ),
+    "apt_updates": ("apt list --upgradable 2>/dev/null | grep -c upgradable || echo 0"),
+    "apt_security": ("apt list --upgradable 2>/dev/null | grep -i security | wc -l || echo 0"),
     # RHEL/CentOS
     "yum_updates": "yum check-update --quiet 2>/dev/null | grep -c '\\.' || echo 0",
     "unattended_upgrades": (
         "dpkg -l unattended-upgrades 2>/dev/null | grep -c '^ii' || "
         "systemctl is-enabled dnf-automatic.timer 2>/dev/null || echo 0"
     ),
-
     # --- Réseau ---
     "ip_addresses": "ip -4 addr show 2>/dev/null || ifconfig 2>/dev/null",
     "routes": "ip route show 2>/dev/null || route -n 2>/dev/null",
     "dns": "cat /etc/resolv.conf 2>/dev/null",
     "listening_ports": "ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null",
-
     # --- Firewall ---
     "ufw_status": "ufw status verbose 2>/dev/null || echo NOT_INSTALLED",
     "iptables_rules": "iptables -L -n --line-numbers 2>/dev/null | head -80 || echo NO_ACCESS",
     "nftables_rules": "nft list ruleset 2>/dev/null | head -80 || echo NOT_INSTALLED",
-
     # --- SSH ---
     "sshd_config": "cat /etc/ssh/sshd_config 2>/dev/null | grep -v '^#' | grep -v '^$'",
-    "ssh_root_login": (
-        "grep -i '^PermitRootLogin' /etc/ssh/sshd_config 2>/dev/null || echo 'NOT_SET'"
-    ),
-    "ssh_password_auth": (
-        "grep -i '^PasswordAuthentication' /etc/ssh/sshd_config 2>/dev/null || echo 'NOT_SET'"
-    ),
-
+    "ssh_root_login": ("grep -i '^PermitRootLogin' /etc/ssh/sshd_config 2>/dev/null || echo 'NOT_SET'"),
+    "ssh_password_auth": ("grep -i '^PasswordAuthentication' /etc/ssh/sshd_config 2>/dev/null || echo 'NOT_SET'"),
     # --- Utilisateurs ---
     "users_with_shell": (
-        "cat /etc/passwd | grep -v '/nologin' | grep -v '/false' | "
-        "awk -F: '{print $1\":\"$3\":\"$7}'"
+        "cat /etc/passwd | grep -v '/nologin' | grep -v '/false' | awk -F: '{print $1\":\"$3\":\"$7}'"
     ),
     "sudoers": "cat /etc/sudoers 2>/dev/null | grep -v '^#' | grep -v '^$' | head -30 || echo NO_ACCESS",
     "last_logins": "last -n 10 2>/dev/null",
-
     # --- Services ---
     "services_running": "systemctl list-units --type=service --state=running --no-pager 2>/dev/null | head -60",
     "services_enabled": "systemctl list-unit-files --type=service --state=enabled --no-pager 2>/dev/null | head -60",
-
     # --- Journalisation ---
     "rsyslog_active": "systemctl is-active rsyslog 2>/dev/null || echo inactive",
     "journald_config": "cat /etc/systemd/journald.conf 2>/dev/null | grep -v '^#' | grep -v '^$'",
     "auditd_active": "systemctl is-active auditd 2>/dev/null || echo inactive",
     "auditd_rules": "auditctl -l 2>/dev/null | head -30 || echo NO_ACCESS",
-
     # --- Stockage ---
     "disk_usage": "df -h 2>/dev/null",
     "mount_points": "mount 2>/dev/null | grep -v tmpfs | grep -v cgroup",
-
     # --- Sécurité ---
     "passwd_perms": "ls -la /etc/passwd /etc/shadow 2>/dev/null",
     "selinux": "getenforce 2>/dev/null || echo NOT_INSTALLED",
@@ -119,7 +103,6 @@ LINUX_COMMANDS: dict[str, str] = {
         "systemctl is-active mdatp 2>/dev/null && echo defender || "
         "echo NONE"
     ),
-
     # --- PAM ---
     "pam_pwquality": (
         "cat /etc/security/pwquality.conf 2>/dev/null | grep -v '^#' | grep -v '^$' || echo NOT_CONFIGURED"
@@ -136,50 +119,40 @@ OPNSENSE_COMMANDS: dict[str, str] = {
     "kernel": "uname -r",
     "uptime": "uptime",
     "arch": "uname -m",
-
     # --- Mises à jour ---
     "updates_pending": "opnsense-update -c 2>/dev/null; echo EXIT=$?",
     "pkg_audit": "pkg audit -F 2>/dev/null | tail -5 || echo NOT_AVAILABLE",
     "installed_version": "opnsense-version 2>/dev/null",
-
     # --- Réseau ---
     "interfaces": "ifconfig -a 2>/dev/null | head -100",
     "routes": "netstat -rn 2>/dev/null | head -40",
     "dns": "cat /etc/resolv.conf 2>/dev/null",
     "listening_ports": "sockstat -4 -l 2>/dev/null | head -60",
-
     # --- Firewall (pf) ---
     "pf_status": "/sbin/pfctl -s info 2>/dev/null || pfctl -s info 2>/dev/null || echo PF_DISABLED",
     "pf_rules_count": "/sbin/pfctl -s rules 2>/dev/null | wc -l | tr -d ' ' || echo 0",
     "pf_rules": "/sbin/pfctl -s rules 2>/dev/null | head -80",
     "pf_nat": "/sbin/pfctl -s nat 2>/dev/null | head -40",
     "pf_states_count": "/sbin/pfctl -s info 2>/dev/null | grep -i 'current entries' || echo N/A",
-
     # --- Configuration ---
     "config_xml_size": "ls -la /conf/config.xml 2>/dev/null",
     "config_backup_count": "ls /conf/backup/ 2>/dev/null | wc -l | tr -d ' ' || echo 0",
     "aliases": "/sbin/pfctl -t -s Tables 2>/dev/null | head -30 || echo NONE",
-
     # --- Services ---
     "services": "configctl service list 2>/dev/null || service -e 2>/dev/null",
-
     # --- VPN ---
     "openvpn_status": "configctl openvpn status 2>/dev/null || sockstat -4 | grep openvpn || echo NOT_RUNNING",
     "ipsec_status": "ipsec statusall 2>/dev/null | head -30 || echo NOT_CONFIGURED",
     "wireguard_status": "wg show 2>/dev/null || echo NOT_INSTALLED",
-
     # --- Sécurité ---
     "ssh_config": "cat /etc/ssh/sshd_config 2>/dev/null | grep -v '^#' | grep -v '^$'",
     "ssh_root_login": "grep -i '^PermitRootLogin' /etc/ssh/sshd_config 2>/dev/null || echo 'NOT_SET'",
     "users": "cat /etc/passwd 2>/dev/null | grep -v nologin | grep -v '/usr/sbin/nologin'",
-
     # --- Logs ---
     "clog_filter": "clog /var/log/filter.log 2>/dev/null | tail -20 || echo NO_ACCESS",
     "syslog_remote": "grep -i '@' /usr/local/etc/syslog.conf 2>/dev/null || echo NONE",
-
     # --- IDS/IPS (Suricata) ---
     "suricata_status": "configctl ids status 2>/dev/null || pgrep suricata > /dev/null && echo RUNNING || echo NOT_RUNNING",
-
     # --- HA / CARP ---
     "carp_status": "ifconfig | grep -A1 carp 2>/dev/null || echo NO_CARP",
 }
@@ -194,44 +167,35 @@ STORMSHIELD_COMMANDS: dict[str, str] = {
     "serial": "CONFIG SYSTEM PROPERTY index=SerialNumber",
     "uptime": "SYSTEM UPTIME",
     "license": "CONFIG LICENSE LIST",
-
     # --- Réseau ---
     "interfaces": "CONFIG NETWORK INTERFACE LIST",
     "routes": "CONFIG NETWORK ROUTE LIST",
     "dns": "CONFIG NETWORK DNS LIST",
-
     # --- Firewall ---
     "filter_rules_count": "CONFIG FILTER COUNT",
     "filter_rules": "CONFIG FILTER SHOW",
     "nat_rules": "CONFIG NAT SHOW",
     "active_connections": "CONFIG FILTER CONNTRACK list state=established",
-
     # --- Objets ---
     "objects_host": "CONFIG OBJECT HOST LIST",
     "objects_network": "CONFIG OBJECT NETWORK LIST",
     "objects_group": "CONFIG OBJECT GROUP LIST",
-
     # --- VPN ---
     "vpn_ipsec_peers": "CONFIG IPSEC PEER LIST",
     "vpn_ipsec_sa": "PKI IPSEC SA LIST",
     "vpn_ssl_status": "CONFIG OPENVPN LIST",
-
     # --- Sécurité ---
     "admin_accounts": "CONFIG AUTH LOCAL USER LIST",
     "ssh_status": "CONFIG SSH SHOW",
     "antivirus": "CONFIG ANTIVIRUS SHOW",
     "ips_status": "CONFIG ASQ SHOW",
-
     # --- Logs ---
     "syslog_servers": "CONFIG SYSLOG LIST",
     "alarm_list": "CONFIG ALARM LIST filter=on",
-
     # --- HA ---
     "ha_status": "HA STATUS",
-
     # --- Services ---
     "services_status": "SYSTEM SERVICE LIST",
-
     # --- MàJ ---
     "firmware_version": "VERSION",
     "update_status": "SYSTEM UPDATE STATUS",
@@ -247,14 +211,12 @@ FORTIGATE_COMMANDS: dict[str, str] = {
     "uptime": "get system performance status | grep Uptime",
     "firmware": "get system status | grep Version",
     "license": "get system fortiguard-service status",
-
     # --- Réseau ---
     "interfaces": "get system interface | grep -A5 '== \\['",
     "interfaces_physical": "diagnose hardware deviceinfo nic",
     "routes": "get router info routing-table all",
     "dns": "get system dns",
     "arp_table": "get system arp | head -40",
-
     # --- Firewall ---
     "policy_count": "get firewall policy | grep -c 'edit'",
     "policies": "show firewall policy | head -200",
@@ -262,12 +224,10 @@ FORTIGATE_COMMANDS: dict[str, str] = {
     "vip": "get firewall vip | head -40",
     "address_objects": "get firewall address | head -60",
     "address_groups": "get firewall addrgrp | head -40",
-
     # --- VPN ---
     "vpn_ipsec_tunnels": "get vpn ipsec tunnel summary",
     "vpn_ssl_status": "get vpn ssl monitor",
     "vpn_ssl_settings": "get vpn ssl settings | head -30",
-
     # --- Sécurité ---
     "admin_users": "get system admin | grep 'edit\\|accprofile'",
     "admin_settings": "get system global | grep admin",
@@ -276,22 +236,17 @@ FORTIGATE_COMMANDS: dict[str, str] = {
     "antivirus_profile": "get antivirus profile | head -30",
     "ips_settings": "get ips global",
     "webfilter": "get webfilter profile | head -20",
-
     # --- Logs ---
     "log_settings": "get log setting",
     "log_syslogd": "get log syslogd setting",
     "log_fortianalyzer": "get log fortianalyzer setting",
     "log_disk": "get log disk setting",
-
     # --- HA ---
     "ha_status": "get system ha status",
-
     # --- NTP ---
     "ntp": "get system ntp | head -20",
-
     # --- SNMP ---
     "snmp": "get system snmp sysinfo",
-
     # --- Sessions ---
     "session_count": "diagnose sys session stat",
 }
@@ -358,6 +313,7 @@ def collect_via_ssh(
 
         if private_key:
             import io
+
             pkey = paramiko.RSAKey.from_private_key(
                 io.StringIO(private_key),
                 password=passphrase,
@@ -394,16 +350,11 @@ def collect_via_ssh(
                 )
             else:
                 # SFTP échoué → fallback exec_command classique
-                logger.warning(
-                    f"OPNsense SFTP échoué ({config_data.get('error')}), "
-                    "fallback sur exec_command..."
-                )
+                logger.warning(f"OPNsense SFTP échoué ({config_data.get('error')}), fallback sur exec_command...")
                 raw_outputs: dict[str, str] = {}
                 for cmd_name, cmd in commands.items():
                     try:
-                        _, stdout, stderr = client.exec_command(
-                            cmd, timeout=SSH_COMMAND_TIMEOUT
-                        )
+                        _, stdout, stderr = client.exec_command(cmd, timeout=SSH_COMMAND_TIMEOUT)
                         output = stdout.read().decode("utf-8", errors="replace").strip()
                         raw_outputs[cmd_name] = output
                     except Exception as e:
@@ -417,9 +368,7 @@ def collect_via_ssh(
             raw_outputs: dict[str, str] = {}
             for cmd_name, cmd in commands.items():
                 try:
-                    _, stdout, stderr = client.exec_command(
-                        cmd, timeout=SSH_COMMAND_TIMEOUT
-                    )
+                    _, stdout, stderr = client.exec_command(cmd, timeout=SSH_COMMAND_TIMEOUT)
                     output = stdout.read().decode("utf-8", errors="replace").strip()
                     raw_outputs[cmd_name] = output
                 except Exception as e:
@@ -450,6 +399,7 @@ def collect_via_ssh(
         logger.error(f"Timeout SSH vers {host}:{port}")
     except Exception as e:
         import traceback
+
         result.error = f"Erreur de connexion: {e}"
         logger.error(f"Erreur collecte SSH {host}:{port}: {e}")
         logger.error(traceback.format_exc())
@@ -547,11 +497,13 @@ def _parse_ssh_results(result: SSHCollectResult, raw: dict[str, str]) -> None:
     for line in users_raw.splitlines():
         parts = line.split(":")
         if len(parts) >= 3:
-            users_list.append({
-                "username": parts[0],
-                "uid": parts[1],
-                "shell": parts[2],
-            })
+            users_list.append(
+                {
+                    "username": parts[0],
+                    "uid": parts[1],
+                    "shell": parts[2],
+                }
+            )
     result.users = {
         "users_with_shell": users_list,
         "sudoers_raw": raw.get("sudoers", ""),
@@ -672,15 +624,23 @@ def _collect_opnsense_via_sftp(client: paramiko.SSHClient) -> dict:
                     descr = (rule_el.findtext("descr") or "").strip()
                     protocol = (rule_el.findtext("protocol") or "any").strip()
 
-                    src = "any" if rule_el.find("source/any") is not None else (
-                        (rule_el.findtext("source/network") or "").strip()
-                        or (rule_el.findtext("source/address") or "").strip()
-                        or "?"
+                    src = (
+                        "any"
+                        if rule_el.find("source/any") is not None
+                        else (
+                            (rule_el.findtext("source/network") or "").strip()
+                            or (rule_el.findtext("source/address") or "").strip()
+                            or "?"
+                        )
                     )
-                    dst = "any" if rule_el.find("destination/any") is not None else (
-                        (rule_el.findtext("destination/network") or "").strip()
-                        or (rule_el.findtext("destination/address") or "").strip()
-                        or "?"
+                    dst = (
+                        "any"
+                        if rule_el.find("destination/any") is not None
+                        else (
+                            (rule_el.findtext("destination/network") or "").strip()
+                            or (rule_el.findtext("destination/address") or "").strip()
+                            or "?"
+                        )
                     )
                     dst_port = (rule_el.findtext("destination/port") or "").strip()
                     status = "disabled" if disabled else "enabled"
@@ -688,8 +648,7 @@ def _collect_opnsense_via_sftp(client: paramiko.SSHClient) -> dict:
 
                     service = f"{protocol}/{dst_port}" if dst_port else protocol
                     rules_text_lines.append(
-                        f"#{idx} [{status}] {rule_type} {interface}: "
-                        f"{src} → {dst} {service} {log_flag} {descr}"
+                        f"#{idx} [{status}] {rule_type} {interface}: {src} → {dst} {service} {log_flag} {descr}"
                     )
 
             data["firewall_rules_count"] = enabled_rules
@@ -731,9 +690,7 @@ def _collect_opnsense_via_sftp(client: paramiko.SSHClient) -> dict:
             openvpn_srv = root.findall(".//openvpn/openvpn-server")
             openvpn_cli = root.findall(".//openvpn/openvpn-client")
             if openvpn_srv or openvpn_cli:
-                data["openvpn_status"] = (
-                    f"{len(openvpn_srv)} serveur(s), {len(openvpn_cli)} client(s) OpenVPN"
-                )
+                data["openvpn_status"] = f"{len(openvpn_srv)} serveur(s), {len(openvpn_cli)} client(s) OpenVPN"
             else:
                 data["openvpn_status"] = ""
 
@@ -780,32 +737,21 @@ def _collect_opnsense_via_sftp(client: paramiko.SSHClient) -> dict:
                 shell = (u.findtext("shell") or "").strip()
                 uid = (u.findtext("uid") or "").strip()
                 if name:
-                    user_lines.append(
-                        f"{name}:{uid}:{shell or '/usr/local/sbin/opnsense-shell'}"
-                    )
+                    user_lines.append(f"{name}:{uid}:{shell or '/usr/local/sbin/opnsense-shell'}")
             data["users"] = "\n".join(user_lines)
 
             # ── WebGUI ──
-            data["webgui_protocol"] = (
-                root.findtext(".//system/webgui/protocol") or "https"
-            ).strip()
+            data["webgui_protocol"] = (root.findtext(".//system/webgui/protocol") or "https").strip()
 
             # ── DNS ──
-            dns_servers = [
-                el.text.strip()
-                for el in root.findall(".//system/dnsserver")
-                if el.text
-            ]
+            dns_servers = [el.text.strip() for el in root.findall(".//system/dnsserver") if el.text]
             data["dns_servers"] = ", ".join(dns_servers) if dns_servers else ""
 
             # ── Interfaces ──
             iface_lines: list[str] = []
             iface_node = root.find(".//interfaces")
             if iface_node is not None:
-                logger.debug(
-                    f"OPNsense interfaces node found, children: "
-                    f"{[c.tag for c in iface_node]}"
-                )
+                logger.debug(f"OPNsense interfaces node found, children: {[c.tag for c in iface_node]}")
                 for child in iface_node:
                     tag = child.tag
                     # Ignorer les éléments non-interface
@@ -845,21 +791,15 @@ def _collect_opnsense_via_sftp(client: paramiko.SSHClient) -> dict:
 
             # ── Firmware (dans config.xml si présent) ──
             data["firmware_version"] = (
-                root.findtext(".//system/firmware/version")
-                or root.findtext(".//version")
-                or ""
+                root.findtext(".//system/firmware/version") or root.findtext(".//version") or ""
             ).strip()
 
             # ── Unbound DNS / DNSSEC (inspiré opnDossier) ──
             unbound_enabled = (
-                root.findtext(".//OPNsense/unboundplus/general/enabled")
-                or root.findtext(".//unbound/enable")
-                or "0"
+                root.findtext(".//OPNsense/unboundplus/general/enabled") or root.findtext(".//unbound/enable") or "0"
             ).strip()
             dnssec_enabled = (
-                root.findtext(".//OPNsense/unboundplus/general/dnssec")
-                or root.findtext(".//unbound/dnssec")
-                or "0"
+                root.findtext(".//OPNsense/unboundplus/general/dnssec") or root.findtext(".//unbound/dnssec") or "0"
             ).strip()
             data["unbound_enabled"] = unbound_enabled == "1"
             data["dnssec_enabled"] = dnssec_enabled == "1"
@@ -874,9 +814,7 @@ def _collect_opnsense_via_sftp(client: paramiko.SSHClient) -> dict:
                 data["wan_blockbogons"] = False
 
             # ── IDS mode IPS (inspiré opnDossier) ──
-            ids_ips_mode = (
-                root.findtext(".//OPNsense/IDS/general/ips") or "0"
-            ).strip()
+            ids_ips_mode = (root.findtext(".//OPNsense/IDS/general/ips") or "0").strip()
             data["ids_ips_mode"] = ids_ips_mode == "1"
 
             # ── Analyse avancée des règles firewall (inspiré opnDossier) ──
@@ -908,18 +846,13 @@ def _collect_opnsense_via_sftp(client: paramiko.SSHClient) -> dict:
                         rules_with_log += 1
                     # Détecter any→any pass (overly permissive) — opnDossier security check
                     if rule_type == "pass" and src_any and dst_any:
-                        any_any_rules.append(
-                            f"#{idx} {iface}: pass any→any {descr or '(sans description)'}"
-                        )
+                        any_any_rules.append(f"#{idx} {iface}: pass any→any {descr or '(sans description)'}")
 
             data["any_any_rules"] = any_any_rules
             data["any_any_rules_count"] = len(any_any_rules)
             data["rules_without_descr"] = rules_without_descr
             data["rules_with_log"] = rules_with_log
-            data["rules_log_ratio"] = (
-                f"{rules_with_log}/{enabled_rules}"
-                if enabled_rules > 0 else "0/0"
-            )
+            data["rules_log_ratio"] = f"{rules_with_log}/{enabled_rules}" if enabled_rules > 0 else "0/0"
 
             # ── Interfaces inutilisées (inspiré opnDossier) ──
             configured_interfaces: list[str] = []
@@ -931,10 +864,7 @@ def _collect_opnsense_via_sftp(client: paramiko.SSHClient) -> dict:
                     enable_el = child.find("enable")
                     if enable_el is not None:
                         configured_interfaces.append(tag)
-            unused_interfaces = [
-                iface for iface in configured_interfaces
-                if iface not in interfaces_in_rules
-            ]
+            unused_interfaces = [iface for iface in configured_interfaces if iface not in interfaces_in_rules]
             data["unused_interfaces"] = unused_interfaces
             data["unused_interfaces_count"] = len(unused_interfaces)
 
@@ -948,13 +878,11 @@ def _collect_opnsense_via_sftp(client: paramiko.SSHClient) -> dict:
             data["ntp_servers_count"] = len(ntp_servers)
 
             # ── SNMP (inspiré opnDossier) ──
-            snmp_community = (
-                root.findtext(".//system/snmpd/rocommunity") or ""
-            ).strip()
+            snmp_community = (root.findtext(".//system/snmpd/rocommunity") or "").strip()
             data["snmp_community"] = snmp_community
-            data["snmp_default_community"] = snmp_community.lower() in (
-                "public", "private", ""
-            ) if snmp_community else False
+            data["snmp_default_community"] = (
+                snmp_community.lower() in ("public", "private", "") if snmp_community else False
+            )
 
             logger.info(
                 f"OPNsense config.xml parsed: hostname={data.get('hostname')}, "
@@ -1065,8 +993,7 @@ def _try_opnsense_dynamic_commands(client: paramiko.SSHClient) -> dict:
                 value = output[start:end].strip()
                 # Filtrer les lignes qui sont juste l'echo de la commande
                 clean_lines = [
-                    line for line in value.splitlines()
-                    if not line.strip().startswith("echo ") and "__MRK_" not in line
+                    line for line in value.splitlines() if not line.strip().startswith("echo ") and "__MRK_" not in line
                 ]
                 dynamic[cmd_name] = "\n".join(clean_lines).strip()
                 logger.debug(f"OPNsense [{cmd_name}]: {dynamic[cmd_name][:80]}")
@@ -1117,10 +1044,7 @@ def _build_opnsense_from_config(
     pf_status_raw = dynamic.get("pf_status", "")
     pf_enabled = config.get("firewall_enabled", True)
     if pf_status_raw:
-        pf_enabled = (
-            "enabled" in pf_status_raw.lower()
-            or "current entries" in pf_status_raw.lower()
-        )
+        pf_enabled = "enabled" in pf_status_raw.lower() or "current entries" in pf_status_raw.lower()
 
     result.security = {
         "firewall_engine": "pf",
@@ -1243,7 +1167,7 @@ def _parse_opnsense_results(result: SSHCollectResult, raw: dict[str, str]) -> No
     pf_rules = raw.get("pf_rules", "")
     pf_rules_count_raw = raw.get("pf_rules_count", "0").strip()
     # Nettoyer : extraire uniquement les chiffres (wc -l sur FreeBSD retourne "      15")
-    pf_rules_count = ''.join(c for c in pf_rules_count_raw if c.isdigit()) or "0"
+    pf_rules_count = "".join(c for c in pf_rules_count_raw if c.isdigit()) or "0"
 
     result.security = {
         "firewall_engine": "pf",

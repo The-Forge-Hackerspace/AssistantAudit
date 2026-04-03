@@ -1,13 +1,13 @@
 """Tests TDD — Seeds checklists salle serveur, documentation, départ (step 33)."""
 
 
-
 class TestChecklistSeedData:
     """CK-005, CK-006, CK-007 : contenu des seeds checklists."""
 
     def test_server_room_seed_structure(self):
         """La checklist salle serveur a 7 sections et ~38 items."""
         from scripts.seed_checklist_server_room import CHECKLIST_SERVER_ROOM
+
         sections = CHECKLIST_SERVER_ROOM["sections"]
         assert len(sections) == 7
         total_items = sum(len(s["items"]) for s in sections)
@@ -17,6 +17,7 @@ class TestChecklistSeedData:
     def test_documentation_seed_structure(self):
         """La checklist documentation a 5 sections et ~22 items."""
         from scripts.seed_checklist_documentation import CHECKLIST_DOCUMENTATION
+
         sections = CHECKLIST_DOCUMENTATION["sections"]
         assert len(sections) == 5
         total_items = sum(len(s["items"]) for s in sections)
@@ -26,6 +27,7 @@ class TestChecklistSeedData:
     def test_departure_seed_structure(self):
         """La checklist départ a 5 sections et ~18 items."""
         from scripts.seed_checklist_departure import CHECKLIST_DEPARTURE
+
         sections = CHECKLIST_DEPARTURE["sections"]
         assert len(sections) == 5
         total_items = sum(len(s["items"]) for s in sections)

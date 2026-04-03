@@ -92,12 +92,30 @@ jobs:
   # Exécuté uniquement si du code source a changé.
   # ---------------------------------------------------------------------------
   test:
-    name: Test
+    name: Test (${{ matrix.db }})
     needs: [lint, detect-changes]
     if: needs.detect-changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: assistantaudit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -118,11 +136,15 @@ jobs:
       - name: Installer les dépendances backend
         run: pip install -r requirements.txt
 
+      - name: Configurer DATABASE_URL pour PostgreSQL
+        if: matrix.db == 'postgres'
+        run: echo "DATABASE_URL=postgresql://test:test@localhost:5432/assistantaudit_test" >> "$GITHUB_ENV"
+
       - name: Exécuter les tests backend avec couverture
         run: pytest tests/ -q --tb=short --cov=app --cov-report=xml
 
       - name: Uploader le rapport de couverture
-        if: always()
+        if: always() && matrix.db == 'sqlite'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report

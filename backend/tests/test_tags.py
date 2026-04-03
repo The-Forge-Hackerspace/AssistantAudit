@@ -22,6 +22,7 @@ class TestTagModel:
     def test_create_audit_tag(self, db_session, auditeur_user):
         """Un tag d'audit est lié à un audit spécifique."""
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="test", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()
@@ -34,6 +35,7 @@ class TestTagModel:
     def test_duplicate_global_tag_rejected(self, db_session):
         """Deux tags globaux avec le même nom sont rejetés."""
         from sqlalchemy.exc import IntegrityError
+
         db_session.add(Tag(name="duplicate", color="#000000", scope="global"))
         db_session.flush()
         db_session.add(Tag(name="duplicate", color="#FFFFFF", scope="global"))
@@ -65,6 +67,7 @@ class TestTagAssociation:
     def test_duplicate_association_rejected(self, db_session):
         """Le même tag ne peut pas être associé 2 fois à la même entité."""
         from sqlalchemy.exc import IntegrityError
+
         tag = Tag(name="dup-assoc", color="#000000", scope="global")
         db_session.add(tag)
         db_session.flush()
@@ -105,13 +108,9 @@ class TestTagService:
         assert tag.created_by == auditeur_user.id
 
     def test_create_duplicate_tag_raises_409(self, db_session, auditeur_user):
-        TagService.create_tag(
-            db_session, TagCreate(name="dup-svc"), user_id=auditeur_user.id
-        )
+        TagService.create_tag(db_session, TagCreate(name="dup-svc"), user_id=auditeur_user.id)
         with pytest.raises(Exception) as exc_info:
-            TagService.create_tag(
-                db_session, TagCreate(name="dup-svc"), user_id=auditeur_user.id
-            )
+            TagService.create_tag(db_session, TagCreate(name="dup-svc"), user_id=auditeur_user.id)
         assert exc_info.value.status_code == 409
 
     def test_list_tags_non_admin_sees_global_only(self, db_session, auditeur_user, second_auditeur_user):
@@ -123,29 +122,18 @@ class TestTagService:
 
     def test_associate_and_get_tags(self, db_session, auditeur_user):
         """Associer un tag puis le récupérer pour une entité."""
-        tag = TagService.create_tag(
-            db_session, TagCreate(name="assoc-test"), user_id=auditeur_user.id
-        )
-        TagService.associate_tag(
-            db_session, tag.id, "equipement", 99,
-            user_id=auditeur_user.id, is_admin=False
-        )
+        tag = TagService.create_tag(db_session, TagCreate(name="assoc-test"), user_id=auditeur_user.id)
+        TagService.associate_tag(db_session, tag.id, "equipement", 99, user_id=auditeur_user.id, is_admin=False)
         tags = TagService.get_tags_for_entity(db_session, "equipement", 99)
         assert len(tags) == 1
         assert tags[0].name == "assoc-test"
 
     def test_dissociate_tag(self, db_session, auditeur_user):
         """Dissocier un tag d'une entité."""
-        tag = TagService.create_tag(
-            db_session, TagCreate(name="dissoc-test"), user_id=auditeur_user.id
-        )
-        TagService.associate_tag(
-            db_session, tag.id, "equipement", 100,
-            user_id=auditeur_user.id, is_admin=False
-        )
+        tag = TagService.create_tag(db_session, TagCreate(name="dissoc-test"), user_id=auditeur_user.id)
+        TagService.associate_tag(db_session, tag.id, "equipement", 100, user_id=auditeur_user.id, is_admin=False)
         result = TagService.dissociate_tag(
-            db_session, tag.id, "equipement", 100,
-            user_id=auditeur_user.id, is_admin=False
+            db_session, tag.id, "equipement", 100, user_id=auditeur_user.id, is_admin=False
         )
         assert result is True
         tags = TagService.get_tags_for_entity(db_session, "equipement", 100)

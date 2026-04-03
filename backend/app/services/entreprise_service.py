@@ -1,6 +1,7 @@
 """
 Service Entreprise : CRUD pour les entreprises et contacts.
 """
+
 from fastapi import HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -13,7 +14,6 @@ from ..schemas.entreprise import EntrepriseCreate, EntrepriseUpdate
 
 
 class EntrepriseService:
-
     @staticmethod
     def list_entreprises(
         db: Session,
@@ -25,15 +25,8 @@ class EntrepriseService:
         """Liste les entreprises avec pagination. Non-admin voit les siennes + celles liees a ses audits."""
         query = db.query(Entreprise)
         if user_id is not None and not is_admin:
-            audit_ent_ids = (
-                db.query(Audit.entreprise_id)
-                .filter(Audit.owner_id == user_id)
-                .distinct()
-                .scalar_subquery()
-            )
-            query = query.filter(
-                or_(Entreprise.owner_id == user_id, Entreprise.id.in_(audit_ent_ids))
-            )
+            audit_ent_ids = db.query(Audit.entreprise_id).filter(Audit.owner_id == user_id).distinct().scalar_subquery()
+            query = query.filter(or_(Entreprise.owner_id == user_id, Entreprise.id.in_(audit_ent_ids)))
         total = query.count()
         items = query.order_by(Entreprise.nom).offset(offset).limit(limit).all()
         return items, total

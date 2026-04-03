@@ -6,6 +6,7 @@ Coexiste avec attachments.py (legacy non chiffre).
 Les nouveaux fichiers passent par ces routes ; les anciens restent accessibles
 via le download qui detecte automatiquement le mode.
 """
+
 import logging
 from pathlib import Path
 
@@ -25,12 +26,36 @@ router = APIRouter()
 
 # Extensions autorisees (meme liste que attachments.py)
 ALLOWED_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg",
-    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-    ".txt", ".log", ".conf", ".cfg", ".ini", ".yaml", ".yml",
-    ".json", ".xml", ".csv", ".md",
-    ".zip", ".gz", ".tar",
-    ".pcap", ".cap",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".bmp",
+    ".webp",
+    ".svg",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    ".txt",
+    ".log",
+    ".conf",
+    ".cfg",
+    ".ini",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".xml",
+    ".csv",
+    ".md",
+    ".zip",
+    ".gz",
+    ".tar",
+    ".pcap",
+    ".cap",
 }
 
 _file_service = FileService()

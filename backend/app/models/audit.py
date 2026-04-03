@@ -1,6 +1,7 @@
 """
 Modèle Audit — Projet d'audit IT.
 """
+
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
@@ -28,21 +29,13 @@ class Audit(Base):
 
     # Informations générales
     nom_projet: Mapped[str] = mapped_column(String(200), nullable=False)
-    status: Mapped[AuditStatus] = mapped_column(
-        Enum(AuditStatus), default=AuditStatus.NOUVEAU, nullable=False
-    )
-    date_debut: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    status: Mapped[AuditStatus] = mapped_column(Enum(AuditStatus), default=AuditStatus.NOUVEAU, nullable=False)
+    date_debut: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     # FK
-    entreprise_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("entreprises.id"), nullable=False, index=True
-    )
+    entreprise_id: Mapped[int] = mapped_column(Integer, ForeignKey("entreprises.id"), nullable=False, index=True)
     # Isolation inter-techniciens
-    owner_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False, index=True
-    )
+    owner_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # Bloc Administratif
     lettre_mission_path: Mapped[str | None] = mapped_column(String(500))

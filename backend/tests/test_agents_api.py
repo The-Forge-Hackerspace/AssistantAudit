@@ -2,6 +2,7 @@
 Tests pour api/v1/agents.py et services/task_service.py.
 Couvre : creation, enrollment, heartbeat, dispatch, status, resultats.
 """
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -426,9 +427,7 @@ class TestUpdateTaskStatus:
         assert task.progress == 30
         assert task.started_at is not None
 
-    def test_update_status_completed(
-        self, client, agent_headers, active_agent, db_session, auditeur_user
-    ):
+    def test_update_status_completed(self, client, agent_headers, active_agent, db_session, auditeur_user):
         task = AgentTask(
             agent_id=active_agent.id,
             owner_id=auditeur_user.id,
@@ -451,9 +450,7 @@ class TestUpdateTaskStatus:
         assert task.progress == 100
         assert task.completed_at is not None
 
-    def test_update_wrong_agent_404(
-        self, client, db_session, auditeur_user, user2
-    ):
+    def test_update_wrong_agent_404(self, client, db_session, auditeur_user, user2):
         """Un agent ne peut pas modifier une tache d'un autre agent."""
         other_agent = Agent(
             name="Other-Agent",

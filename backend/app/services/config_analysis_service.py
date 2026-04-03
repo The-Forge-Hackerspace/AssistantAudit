@@ -2,6 +2,7 @@
 Service Config Analysis — Persistance et pré-remplissage d'audit
 à partir des résultats de parsing de configuration.
 """
+
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -150,6 +151,7 @@ def _check_config_access(db: Session, config: ConfigAnalysis, user_id: int | Non
     if user_id is None or is_admin:
         return True
     from ..core.helpers import user_has_access_to_entreprise
+
     equip = db.get(Equipement, config.equipement_id)
     if not equip:
         return False
@@ -160,8 +162,10 @@ def _check_config_access(db: Session, config: ConfigAnalysis, user_id: int | Non
 
 
 def get_config_analysis(
-    db: Session, config_id: int,
-    user_id: int | None = None, is_admin: bool = False,
+    db: Session,
+    config_id: int,
+    user_id: int | None = None,
+    is_admin: bool = False,
 ) -> Optional[ConfigAnalysis]:
     """Récupère une analyse de configuration par ID. Vérifie ownership."""
     config = db.get(ConfigAnalysis, config_id)
@@ -171,8 +175,10 @@ def get_config_analysis(
 
 
 def delete_config_analysis(
-    db: Session, config_id: int,
-    user_id: int | None = None, is_admin: bool = False,
+    db: Session,
+    config_id: int,
+    user_id: int | None = None,
+    is_admin: bool = False,
 ) -> bool:
     """Supprime une analyse de configuration. Vérifie ownership."""
     config = db.get(ConfigAnalysis, config_id)
@@ -216,11 +222,7 @@ def prefill_assessment_from_config(
     findings: list[dict] = config.findings or []
 
     # Récupérer tous les control_results de l'assessment
-    control_results = (
-        db.query(ControlResult)
-        .filter(ControlResult.assessment_id == assessment_id)
-        .all()
-    )
+    control_results = db.query(ControlResult).filter(ControlResult.assessment_id == assessment_id).all()
 
     # Créer un index ref_id → ControlResult
     ref_to_result: dict[str, ControlResult] = {}
@@ -252,8 +254,7 @@ def prefill_assessment_from_config(
             evidence_parts = []
             for f in matched_findings:
                 evidence_parts.append(
-                    f"[{f.get('severity', 'medium').upper()}] {f.get('title', '')}\n"
-                    f"{f.get('description', '')}"
+                    f"[{f.get('severity', 'medium').upper()}] {f.get('title', '')}\n{f.get('description', '')}"
                 )
                 if f.get("remediation"):
                     evidence_parts.append(f"→ Recommandation : {f['remediation']}")
@@ -265,12 +266,14 @@ def prefill_assessment_from_config(
             cr.assessed_at = datetime.now(timezone.utc)
             cr.assessed_by = "config_parser"
             non_compliant += 1
-            details.append({
-                "control_ref": control_ref,
-                "control_title": cr.control.title if cr.control else "",
-                "status": "non_compliant",
-                "findings_count": len(matched_findings),
-            })
+            details.append(
+                {
+                    "control_ref": control_ref,
+                    "control_title": cr.control.title if cr.control else "",
+                    "status": "non_compliant",
+                    "findings_count": len(matched_findings),
+                }
+            )
         else:
             # Aucun problème détecté pour ce contrôle
             cr.status = ComplianceStatus.COMPLIANT
@@ -283,19 +286,20 @@ def prefill_assessment_from_config(
             cr.assessed_at = datetime.now(timezone.utc)
             cr.assessed_by = "config_parser"
             compliant += 1
-            details.append({
-                "control_ref": control_ref,
-                "control_title": cr.control.title if cr.control else "",
-                "status": "compliant",
-                "findings_count": 0,
-            })
+            details.append(
+                {
+                    "control_ref": control_ref,
+                    "control_title": cr.control.title if cr.control else "",
+                    "status": "compliant",
+                    "findings_count": 0,
+                }
+            )
 
         prefilled += 1
 
     db.flush()
     logger.info(
-        f"Pré-remplissage terminé: {prefilled} contrôles "
-        f"({compliant} conformes, {non_compliant} non-conformes)"
+        f"Pré-remplissage terminé: {prefilled} contrôles ({compliant} conformes, {non_compliant} non-conformes)"
     )
 
     return {

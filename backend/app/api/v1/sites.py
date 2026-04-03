@@ -1,6 +1,7 @@
 """
 Routes Sites : CRUD des emplacements physiques.
 """
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -47,7 +48,10 @@ def create_site(
 ):
     """Crée un nouveau site pour une entreprise"""
     site = SiteService.create_site(
-        db, body, user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        body,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return SiteRead(
         id=site.id,
@@ -67,7 +71,10 @@ def get_site(
 ):
     """Détail d'un site"""
     site = SiteService.get_site(
-        db, site_id, user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        site_id,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return SiteRead(
         id=site.id,
@@ -88,7 +95,11 @@ def update_site(
 ):
     """Modifie un site"""
     site = SiteService.update_site(
-        db, site_id, body, user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        site_id,
+        body,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return SiteRead(
         id=site.id,

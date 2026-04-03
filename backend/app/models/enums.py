@@ -1,6 +1,7 @@
 """
 Enums partages entre les modeles.
 """
+
 from enum import Enum
 
 

@@ -7,9 +7,11 @@ et que POST/PUT stockent correctement le password en DB.
 
 
 class TestDomainPasswordNotExposed:
-
     def test_get_config_no_password_in_response(
-        self, client, db_session, auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_headers,
     ):
         """GET une config ORADAD → explicit_domains ne contient pas de champ password."""
         # Créer une config avec un domaine qui a un password
@@ -51,7 +53,10 @@ class TestDomainPasswordNotExposed:
         assert "password" not in domains[0]
 
     def test_password_stored_correctly_in_db(
-        self, client, db_session, auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_headers,
     ):
         """POST une config avec password → le password est stocké en DB."""
         from app.models.oradad_config import OradadConfig
@@ -84,7 +89,10 @@ class TestDomainPasswordNotExposed:
         assert domains[0]["password"] == "RealPassword456!"
 
     def test_list_configs_no_password(
-        self, client, db_session, auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_headers,
     ):
         """GET /configs (liste) → aucun password dans les domaines."""
         client.post(

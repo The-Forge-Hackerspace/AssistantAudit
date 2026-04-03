@@ -4,6 +4,7 @@ Routes WebSocket pour le streaming temps reel.
 - /ws/user : connexion frontend (technicien)
 - /ws/agent : connexion daemon Windows (agent)
 """
+
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -25,6 +26,7 @@ async def _receive_json_safe(websocket: WebSocket) -> dict | None:
         logger.warning(f"WS message too large ({len(raw)} bytes), ignoring")
         return None
     import json
+
     try:
         return json.loads(raw)
     except (json.JSONDecodeError, ValueError):
@@ -138,14 +140,19 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                 if msg_type == "task_status" and ws_data.get("task_uuid"):
                     try:
                         db = SessionLocal()
-                        task = db.query(AgentTask).filter(
-                            AgentTask.task_uuid == ws_data["task_uuid"],
-                            AgentTask.agent_id == trusted_agent_id,
-                        ).first()
+                        task = (
+                            db.query(AgentTask)
+                            .filter(
+                                AgentTask.task_uuid == ws_data["task_uuid"],
+                                AgentTask.agent_id == trusted_agent_id,
+                            )
+                            .first()
+                        )
                         if not task:
                             logger.warning(
-                                "Agent %s (id=%s) attempted task_status on task %s — not owned or not found",
-                                agent_uuid, trusted_agent_id, ws_data["task_uuid"],
+                                "Agent %s attempted task_status on task %s — not owned or not found",
+                                agent_uuid,
+                                ws_data["task_uuid"],
                             )
                         if task:
                             new_status = ws_data.get("status")
@@ -166,9 +173,7 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                         db.close()
                 # Forward vers le owner
                 if trusted_owner_id is not None:
-                    await ws_manager.send_to_user(
-                        trusted_owner_id, msg_type, ws_data
-                    )
+                    await ws_manager.send_to_user(trusted_owner_id, msg_type, ws_data)
 
             elif msg_type == "task_result":
                 ws_data = data.get("data", {})
@@ -176,14 +181,19 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                 if ws_data.get("task_uuid"):
                     try:
                         db = SessionLocal()
-                        task = db.query(AgentTask).filter(
-                            AgentTask.task_uuid == ws_data["task_uuid"],
-                            AgentTask.agent_id == trusted_agent_id,
-                        ).first()
+                        task = (
+                            db.query(AgentTask)
+                            .filter(
+                                AgentTask.task_uuid == ws_data["task_uuid"],
+                                AgentTask.agent_id == trusted_agent_id,
+                            )
+                            .first()
+                        )
                         if not task:
                             logger.warning(
-                                "Agent %s (id=%s) attempted task_result on task %s — not owned or not found",
-                                agent_uuid, trusted_agent_id, ws_data["task_uuid"],
+                                "Agent %s attempted task_result on task %s — not owned or not found",
+                                agent_uuid,
+                                ws_data["task_uuid"],
                             )
                         if task:
                             task.status = "completed"
@@ -200,9 +210,7 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                     finally:
                         db.close()
                 if trusted_owner_id is not None:
-                    await ws_manager.send_to_user(
-                        trusted_owner_id, "task_result", ws_data
-                    )
+                    await ws_manager.send_to_user(trusted_owner_id, "task_result", ws_data)
 
     except WebSocketDisconnect:
         await _handle_agent_disconnect(agent_uuid, trusted_owner_id)
@@ -227,10 +235,14 @@ async def _handle_agent_disconnect(agent_uuid: str, owner_id: int | None) -> Non
         if not agent:
             return
 
-        orphans = db.query(AgentTask).filter(
-            AgentTask.agent_id == agent.id,
-            AgentTask.status.in_(["running", "dispatched", "pending"]),
-        ).all()
+        orphans = (
+            db.query(AgentTask)
+            .filter(
+                AgentTask.agent_id == agent.id,
+                AgentTask.status.in_(["running", "dispatched", "pending"]),
+            )
+            .all()
+        )
 
         now = datetime.now(timezone.utc)
         for task in orphans:
@@ -241,11 +253,15 @@ async def _handle_agent_disconnect(agent_uuid: str, owner_id: int | None) -> Non
 
             # Notifier le frontend
             if owner_id is not None:
-                await ws_manager.send_to_user(owner_id, "task_status", {
-                    "task_uuid": task.task_uuid,
-                    "status": "failed",
-                    "error_message": "Agent deconnecte pendant l'execution",
-                })
+                await ws_manager.send_to_user(
+                    owner_id,
+                    "task_status",
+                    {
+                        "task_uuid": task.task_uuid,
+                        "status": "failed",
+                        "error_message": "Agent deconnecte pendant l'execution",
+                    },
+                )
 
         db.commit()
     except Exception:

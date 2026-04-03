@@ -153,7 +153,9 @@ class Monkey365ScanService:
                 device_code=config.device_code,
             )
 
-            executor = Monkey365Executor(executor_config, settings.MONKEY365_PATH or None, allow_auto_clone=settings.MONKEY365_AUTO_CLONE)
+            executor = Monkey365Executor(
+                executor_config, settings.MONKEY365_PATH or None, allow_auto_clone=settings.MONKEY365_AUTO_CLONE
+            )
 
             # No global lock — each scan writes to its own OutDir via -OutDir.
             # Register a process callback so cancel can kill pwsh.
@@ -261,6 +263,7 @@ class Monkey365ScanService:
         is_admin: bool = False,
     ) -> list[Monkey365ScanResult]:
         from ..core.helpers import user_has_access_to_entreprise
+
         if user_id is not None and not is_admin:
             if not user_has_access_to_entreprise(db, entreprise_id, user_id):
                 return []
@@ -271,17 +274,20 @@ class Monkey365ScanService:
             .order_by(Monkey365ScanResult.created_at.desc())
             .offset(skip)
             .limit(limit)
-            .all()
+            .all(),
         )
 
     @staticmethod
     def get_scan(
-        db: DBSession, scan_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: DBSession,
+        scan_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Monkey365ScanResult | None:
         result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, scan_id))
         if result and user_id is not None and not is_admin:
             from ..core.helpers import user_has_access_to_entreprise
+
             if not user_has_access_to_entreprise(db, result.entreprise_id, user_id):
                 return None
         return result
@@ -379,9 +385,7 @@ class Monkey365ScanService:
                         created = result.created_at
                         if created.tzinfo is None:
                             created = created.replace(tzinfo=timezone.utc)
-                        result.duration_seconds = max(
-                            0, int((result.completed_at - created).total_seconds())
-                        )
+                        result.duration_seconds = max(0, int((result.completed_at - created).total_seconds()))
                     db.commit()
             else:
                 result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, result_id))
@@ -407,8 +411,10 @@ class Monkey365ScanService:
 
     @staticmethod
     def delete_scan(
-        db: DBSession, scan_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: DBSession,
+        scan_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> bool:
         """Delete a Monkey365 scan and clean up associated files."""
         result = cast(Monkey365ScanResult | None, db.get(Monkey365ScanResult, scan_id))
@@ -416,6 +422,7 @@ class Monkey365ScanService:
             return False
         if user_id is not None and not is_admin:
             from ..core.helpers import user_has_access_to_entreprise
+
             if not user_has_access_to_entreprise(db, result.entreprise_id, user_id):
                 return False
 

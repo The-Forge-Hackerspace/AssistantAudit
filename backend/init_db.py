@@ -8,6 +8,7 @@ au schema directement (pas de create_all_tables). Il se contente de :
   2. Creer l'utilisateur admin par defaut
   3. Synchroniser les referentiels YAML via sync_from_directory
 """
+
 import io
 import os
 import subprocess
@@ -74,6 +75,7 @@ def init_database():
             if not admin_password:
                 import secrets
                 import string
+
                 alphabet = string.ascii_letters + string.digits + "!@#$%"
                 admin_password = "".join(secrets.choice(alphabet) for _ in range(16))
                 print("  [INFO] Mot de passe admin genere aleatoirement")

@@ -5,6 +5,7 @@ Service Framework : chargement, import/export de référentiels YAML, versioning
 Au démarrage du serveur, les référentiels sont automatiquement synchronisés en base.
 Un nouveau fichier YAML est détecté et importé sans modification de code.
 """
+
 import hashlib
 import logging
 from pathlib import Path
@@ -20,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class FrameworkService:
-
     # ------------------------------------------------------------------ #
     #  Listing / get
     # ------------------------------------------------------------------ #
@@ -84,11 +84,7 @@ class FrameworkService:
         version = fw_data.get("version", "1.0")
 
         # Vérifier si le framework existe déjà (même ref_id + version)
-        existing = (
-            db.query(Framework)
-            .filter(Framework.ref_id == ref_id, Framework.version == version)
-            .first()
-        )
+        existing = db.query(Framework).filter(Framework.ref_id == ref_id, Framework.version == version).first()
         if existing:
             # Si le fichier n'a pas changé, skip
             if existing.source_hash == file_hash:
@@ -195,7 +191,7 @@ class FrameworkService:
         - Importe les nouveaux fichiers YAML
         - Met à jour les frameworks dont le fichier a changé (hash différent)
         - Skipe les fichiers inchangés
-        
+
         Retourne un résumé : {imported, updated, unchanged, errors}
         """
         directory = Path(directory)
@@ -217,11 +213,7 @@ class FrameworkService:
                 version = fw_data.get("version", "1.0")
 
                 # Chercher en base
-                existing = (
-                    db.query(Framework)
-                    .filter(Framework.ref_id == ref_id, Framework.version == version)
-                    .first()
-                )
+                existing = db.query(Framework).filter(Framework.ref_id == ref_id, Framework.version == version).first()
 
                 if existing and existing.source_hash == file_hash:
                     result["unchanged"] += 1
@@ -302,9 +294,7 @@ class FrameworkService:
         return output_path
 
     @staticmethod
-    def clone_as_new_version(
-        db: Session, framework_id: int, new_version: str, new_name: str = None
-    ) -> Framework:
+    def clone_as_new_version(db: Session, framework_id: int, new_version: str, new_name: str = None) -> Framework:
         """
         Clone un framework existant en tant que nouvelle version.
         L'ancienne version est désactivée, la nouvelle hérite de tous
@@ -371,12 +361,7 @@ class FrameworkService:
     @staticmethod
     def list_versions(db: Session, ref_id: str) -> list[Framework]:
         """Liste toutes les versions d'un framework par ref_id"""
-        return (
-            db.query(Framework)
-            .filter(Framework.ref_id == ref_id)
-            .order_by(Framework.id.desc())
-            .all()
-        )
+        return db.query(Framework).filter(Framework.ref_id == ref_id).order_by(Framework.id.desc()).all()
 
     # ------------------------------------------------------------------ #
     #  CRUD manuel (éditeur de référentiels)
@@ -396,11 +381,7 @@ class FrameworkService:
         categories: list[dict] | None = None,
     ) -> Framework:
         """Crée un nouveau framework depuis l'éditeur (pas YAML)."""
-        existing = (
-            db.query(Framework)
-            .filter(Framework.ref_id == ref_id, Framework.version == version)
-            .first()
-        )
+        existing = db.query(Framework).filter(Framework.ref_id == ref_id, Framework.version == version).first()
         if existing:
             raise ValueError(f"Un référentiel '{ref_id}' v{version} existe déjà")
 

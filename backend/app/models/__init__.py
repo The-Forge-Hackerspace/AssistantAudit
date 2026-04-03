@@ -2,6 +2,7 @@
 Package models : tous les modèles SQLAlchemy.
 Importés ici pour qu'Alembic et create_all les détectent automatiquement.
 """
+
 from .ad_audit_result import ADAuditResultModel, ADAuditStatus
 from .agent import Agent
 from .agent_task import AgentTask

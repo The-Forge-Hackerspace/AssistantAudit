@@ -25,9 +25,7 @@ class ContextualJsonFormatter(jsonlogger.JsonFormatter):
     - Preserves stack traces for exceptions
     """
 
-    def add_fields(
-        self, log_record: Dict[str, Any], record: LogRecord, message_dict: Dict[str, Any]
-    ) -> None:
+    def add_fields(self, log_record: Dict[str, Any], record: LogRecord, message_dict: Dict[str, Any]) -> None:
         """Add custom fields to JSON log record"""
         super().add_fields(log_record, record, message_dict)
 

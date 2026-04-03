@@ -4,6 +4,7 @@ Tests du logging des échecs d'ownership RBAC.
 Vérifie que les access_denied produisent des WARNING structurés
 sans leaker de données sensibles.
 """
+
 import logging
 
 from app.models.audit import Audit
@@ -13,10 +14,15 @@ SECURITY_LOGGER = "security"
 
 
 class TestAccessDeniedLogging:
-
     def test_access_denied_logs_warning(
-        self, client, db_session, auditeur_user, auditeur_headers,
-        second_auditeur_user, second_auditeur_headers, caplog,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        auditeur_headers,
+        second_auditeur_user,
+        second_auditeur_headers,
+        caplog,
     ):
         """Un ownership failure produit un WARNING contenant 'access_denied'."""
         ent = Entreprise(nom="Ent Log Test", owner_id=auditeur_user.id)
@@ -36,8 +42,13 @@ class TestAccessDeniedLogging:
         assert any(str(second_auditeur_user.id) in r.message for r in warnings)
 
     def test_access_denied_log_contains_resource_info(
-        self, client, db_session, auditeur_user,
-        second_auditeur_user, second_auditeur_headers, caplog,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        second_auditeur_user,
+        second_auditeur_headers,
+        caplog,
     ):
         """Le log contient user_id de B, resource_type et resource_id."""
         ent = Entreprise(nom="Ent ResInfo", owner_id=auditeur_user.id)
@@ -59,15 +70,21 @@ class TestAccessDeniedLogging:
         assert str(audit.id) in msg
 
     def test_access_denied_log_no_sensitive_data(
-        self, client, db_session, auditeur_user,
-        second_auditeur_user, second_auditeur_headers, caplog,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        second_auditeur_user,
+        second_auditeur_headers,
+        caplog,
     ):
         """Le log ne contient pas de données métier (nom_projet, owner_id de A comme user=)."""
         ent = Entreprise(nom="Ent NoLeak", owner_id=auditeur_user.id)
         db_session.add(ent)
         db_session.flush()
         audit = Audit(
-            nom_projet="Projet Super Secret", entreprise_id=ent.id,
+            nom_projet="Projet Super Secret",
+            entreprise_id=ent.id,
             owner_id=auditeur_user.id,
         )
         db_session.add(audit)
@@ -87,7 +104,10 @@ class TestAccessDeniedLogging:
         assert f"user={auditeur_user.id}" not in msg
 
     def test_nonexistent_resource_no_access_denied_log(
-        self, client, second_auditeur_headers, caplog,
+        self,
+        client,
+        second_auditeur_headers,
+        caplog,
     ):
         """Un vrai 404 (ressource inexistante) ne produit pas de log access_denied."""
         with caplog.at_level(logging.WARNING, logger=SECURITY_LOGGER):
@@ -98,7 +118,12 @@ class TestAccessDeniedLogging:
         assert len(ad_logs) == 0
 
     def test_admin_bypass_no_access_denied_log(
-        self, client, db_session, auditeur_user, admin_headers, caplog,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        admin_headers,
+        caplog,
     ):
         """Un accès admin ne produit pas de log access_denied."""
         ent = Entreprise(nom="Ent Admin Bypass", owner_id=auditeur_user.id)
@@ -117,8 +142,13 @@ class TestAccessDeniedLogging:
         assert len(ad_logs) == 0
 
     def test_entreprise_access_denied_logged(
-        self, client, db_session, auditeur_user,
-        second_auditeur_user, second_auditeur_headers, caplog,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        second_auditeur_user,
+        second_auditeur_headers,
+        caplog,
     ):
         """Un échec d'accès entreprise produit un log avec 'Entreprise'."""
         ent = Entreprise(nom="Ent Priv", owner_id=auditeur_user.id)

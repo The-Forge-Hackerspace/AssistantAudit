@@ -1,11 +1,12 @@
 """
 Point d'entrée de l'application FastAPI — AssistantAudit v2.
 """
+
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -16,6 +17,7 @@ from .core.health_check import HealthCheckService
 from .core.logging_config import configure_structured_logging
 from .core.metrics import get_metrics, init_app_metrics
 from .core.metrics_middleware import PrometheusMiddleware
+from .core.rate_limit import api_rate_limiter, public_rate_limiter
 from .core.sentry_integration import init_sentry
 
 settings = get_settings()
@@ -27,10 +29,10 @@ async def lifespan(app: FastAPI):
     # Configure structured JSON logging
     configure_structured_logging(settings.LOG_LEVEL)
     logger = logging.getLogger(__name__)
-    
+
     # Initialize Prometheus metrics
     init_app_metrics(version=settings.APP_VERSION, environment=settings.ENV)
-    
+
     # Initialize Sentry error tracking (if DSN configured)
     init_sentry(
         dsn=settings.SENTRY_DSN,
@@ -52,18 +54,19 @@ async def lifespan(app: FastAPI):
 
     # Auto-sync des référentiels YAML → BDD au démarrage
     from .services.framework_service import FrameworkService
+
     db = SessionLocal()
     try:
         sync_result = FrameworkService.sync_from_directory(db, settings.FRAMEWORKS_DIR)
         db.commit()
-        total = sync_result['imported'] + sync_result['updated'] + sync_result['unchanged']
+        total = sync_result["imported"] + sync_result["updated"] + sync_result["unchanged"]
         logger.info(
             f"Sync référentiels : {total} frameworks "
             f"({sync_result['imported']} nouveaux, {sync_result['updated']} mis à jour, "
             f"{sync_result['unchanged']} inchangés)"
         )
-        if sync_result['errors']:
-            for err in sync_result['errors']:
+        if sync_result["errors"]:
+            for err in sync_result["errors"]:
                 logger.error(f"  Erreur sync : {err}")
     except Exception:
         db.rollback()
@@ -83,10 +86,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
-        description=(
-            "Outil d'audit d'infrastructure IT — "
-            "Référentiels, évaluations de conformité et outils intégrés."
-        ),
+        description=("Outil d'audit d'infrastructure IT — Référentiels, évaluations de conformité et outils intégrés."),
         docs_url=None if is_prod else "/docs",
         redoc_url=None if is_prod else "/redoc",
         openapi_url=None if is_prod else "/openapi.json",
@@ -107,9 +107,7 @@ def create_app() -> FastAPI:
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["X-XSS-Protection"] = "1; mode=block"
             response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-            response.headers["Permissions-Policy"] = (
-                "camera=(), microphone=(), geolocation=(), payment=()"
-            )
+            response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
             # CSP : restrictif mais compatible avec Swagger UI
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
@@ -122,9 +120,7 @@ def create_app() -> FastAPI:
             )
             # HSTS uniquement si HTTPS détecté
             if request.url.scheme == "https":
-                response.headers["Strict-Transport-Security"] = (
-                    "max-age=31536000; includeSubDomains"
-                )
+                response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
             # Masquer les versions serveur (fingerprinting)
             if "server" in response.headers:
                 del response.headers["server"]
@@ -149,10 +145,12 @@ def create_app() -> FastAPI:
 
     # Enregistrement du router API v1
     from .api.v1.router import api_router
+
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
     # WebSocket monte a la racine (agent se connecte a /ws/agent, pas /api/v1/ws/agent)
     from .api.v1.websocket import router as websocket_router
+
     app.include_router(websocket_router)
 
     # ── Prometheus metrics endpoint ────────────────────────────────────────
@@ -166,6 +164,47 @@ def create_app() -> FastAPI:
     def metrics(admin=Depends(get_current_admin)):
         """Expose Prometheus metrics (admin uniquement)"""
         return Response(content=get_metrics(), media_type="text/plain")
+
+    # ── Rate Limiting Middleware ────────────────────────────────────────────
+    # Routes publiques (health, ready, liveness, metrics) : 100 req/min
+    # Routes API authentifiées : 30 req/min
+    PUBLIC_PATHS = {"/health", "/ready", "/liveness", "/metrics"}
+
+    class RateLimitMiddleware(BaseHTTPMiddleware):
+        """Rate limiting par catégorie : public (100/min) vs API (30/min).
+        Les endpoints auth (login/enroll) ont leur propre limiter inline."""
+
+        async def dispatch(self, request: Request, call_next):
+            # WebSocket : pas de rate limiting
+            if request.scope.get("type") == "websocket":
+                return await call_next(request)
+
+            path = request.url.path
+
+            try:
+                # Routes publiques
+                if path in PUBLIC_PATHS:
+                    public_rate_limiter.check(request)
+                    public_rate_limiter.record_attempt(request)
+                # Routes API (sauf auth — géré inline dans les routes)
+                elif path.startswith(settings.API_V1_PREFIX):
+                    auth_prefix = f"{settings.API_V1_PREFIX}/auth/"
+                    agents_enroll = f"{settings.API_V1_PREFIX}/agents/enroll"
+                    if not path.startswith(auth_prefix) and path != agents_enroll:
+                        api_rate_limiter.check(request)
+                        api_rate_limiter.record_attempt(request)
+            except HTTPException as exc:
+                from starlette.responses import JSONResponse
+
+                return JSONResponse(
+                    status_code=exc.status_code,
+                    content={"detail": exc.detail},
+                    headers=exc.headers,
+                )
+
+            return await call_next(request)
+
+    app.add_middleware(RateLimitMiddleware)
 
     # ── Health check endpoints ────────────────────────────────────────────
     @app.get(
@@ -214,6 +253,7 @@ def create_app() -> FastAPI:
 
     # Enregistrement des gestionnaires d'exceptions globaux
     from .core.exception_handlers import register_exception_handlers
+
     register_exception_handlers(app)
 
     return app

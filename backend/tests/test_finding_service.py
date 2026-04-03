@@ -1,4 +1,5 @@
 """Tests unitaires — FindingService."""
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -71,23 +72,34 @@ def seed_data(db: Session):
     db.flush()
 
     ctrl_critical = Control(
-        ref_id="C-001", title="TLS obligatoire", category_id=cat.id,
-        severity=ControlSeverity.CRITICAL, check_type=CheckType.MANUAL,
+        ref_id="C-001",
+        title="TLS obligatoire",
+        category_id=cat.id,
+        severity=ControlSeverity.CRITICAL,
+        check_type=CheckType.MANUAL,
     )
     ctrl_medium = Control(
-        ref_id="C-002", title="Logs activés", category_id=cat.id,
-        severity=ControlSeverity.MEDIUM, check_type=CheckType.MANUAL,
+        ref_id="C-002",
+        title="Logs activés",
+        category_id=cat.id,
+        severity=ControlSeverity.MEDIUM,
+        check_type=CheckType.MANUAL,
     )
     ctrl_ok = Control(
-        ref_id="C-003", title="Firewall actif", category_id=cat.id,
-        severity=ControlSeverity.HIGH, check_type=CheckType.MANUAL,
+        ref_id="C-003",
+        title="Firewall actif",
+        category_id=cat.id,
+        severity=ControlSeverity.HIGH,
+        check_type=CheckType.MANUAL,
     )
     db.add_all([ctrl_critical, ctrl_medium, ctrl_ok])
     db.flush()
 
     # Equipement
     equip = Equipement(
-        type_equipement="serveur", hostname="srv01", ip_address="10.0.0.1",
+        type_equipement="serveur",
+        hostname="srv01",
+        ip_address="10.0.0.1",
         site_id=site.id,
     )
     db.add(equip)
@@ -95,30 +107,38 @@ def seed_data(db: Session):
 
     # Campaign + Assessment
     campaign = AssessmentCampaign(
-        name="Camp1", audit_id=audit.id, status=CampaignStatus.IN_PROGRESS,
+        name="Camp1",
+        audit_id=audit.id,
+        status=CampaignStatus.IN_PROGRESS,
     )
     db.add(campaign)
     db.flush()
 
     assessment = Assessment(
-        campaign_id=campaign.id, equipement_id=equip.id, framework_id=fw.id,
+        campaign_id=campaign.id,
+        equipement_id=equip.id,
+        framework_id=fw.id,
     )
     db.add(assessment)
     db.flush()
 
     # ControlResults
     cr_nc = ControlResult(
-        assessment_id=assessment.id, control_id=ctrl_critical.id,
+        assessment_id=assessment.id,
+        control_id=ctrl_critical.id,
         status=ComplianceStatus.NON_COMPLIANT,
-        comment="TLS 1.0 détecté", remediation_note="Activer TLS 1.2+",
+        comment="TLS 1.0 détecté",
+        remediation_note="Activer TLS 1.2+",
     )
     cr_pc = ControlResult(
-        assessment_id=assessment.id, control_id=ctrl_medium.id,
+        assessment_id=assessment.id,
+        control_id=ctrl_medium.id,
         status=ComplianceStatus.PARTIALLY_COMPLIANT,
         comment="Logs partiels",
     )
     cr_ok = ControlResult(
-        assessment_id=assessment.id, control_id=ctrl_ok.id,
+        assessment_id=assessment.id,
+        control_id=ctrl_ok.id,
         status=ComplianceStatus.COMPLIANT,
     )
     db.add_all([cr_nc, cr_pc, cr_ok])
@@ -136,6 +156,7 @@ def seed_data(db: Session):
 
 # ── Tests de génération ─────────────────────────────────────────────
 
+
 class TestGeneration:
     def test_generate_creates_findings_for_non_compliant(self, db, seed_data):
         """Génère un finding par ControlResult NON_COMPLIANT ou PARTIALLY_COMPLIANT."""
@@ -148,9 +169,7 @@ class TestGeneration:
     def test_generate_skips_existing(self, db, seed_data):
         """La deuxième génération ne crée pas de doublons."""
         FindingService.generate_from_assessment(db, seed_data["assessment"].id)
-        generated, skipped = FindingService.generate_from_assessment(
-            db, seed_data["assessment"].id
-        )
+        generated, skipped = FindingService.generate_from_assessment(db, seed_data["assessment"].id)
         assert generated == 0
         assert skipped == 2
 
@@ -167,6 +186,7 @@ class TestGeneration:
 
 
 # ── Tests de listing/filtrage ────────────────────────────────────────
+
 
 class TestListing:
     def test_list_with_status_filter(self, db, seed_data):
@@ -186,10 +206,12 @@ class TestListing:
         assert total > limit
 
         paginated, paginated_total = FindingService.list_findings(
-            db, limit=limit, offset=offset,
+            db,
+            limit=limit,
+            offset=offset,
         )
         assert paginated_total == total
-        expected_slice = all_findings[offset:offset + limit]
+        expected_slice = all_findings[offset : offset + limit]
         assert [f.id for f in paginated] == [f.id for f in expected_slice]
 
     def test_list_with_combined_filters(self, db, seed_data):
@@ -198,10 +220,7 @@ class TestListing:
         all_findings, total = FindingService.list_findings(db)
         assert total > 0
 
-        target = next(
-            f for f in all_findings
-            if f.status == FindingStatus.OPEN and f.equipment_id is not None
-        )
+        target = next(f for f in all_findings if f.status == FindingStatus.OPEN and f.equipment_id is not None)
         filtered, filtered_total = FindingService.list_findings(
             db,
             assessment_id=seed_data["assessment"].id,
@@ -229,6 +248,7 @@ class TestListing:
 
 # ── Tests de transition de statut ────────────────────────────────────
 
+
 class TestStatusTransition:
     def _get_first_finding(self, db, seed_data) -> Finding:
         FindingService.generate_from_assessment(db, seed_data["assessment"].id)
@@ -239,7 +259,9 @@ class TestStatusTransition:
         """Transition OPEN → ASSIGNED fonctionne."""
         finding = self._get_first_finding(db, seed_data)
         updated = FindingService.update_status(
-            db, finding, "assigned",
+            db,
+            finding,
+            "assigned",
             user_id=seed_data["user"].id,
             comment="Assigné à l'équipe réseau",
             assigned_to="Jean Dupont",
@@ -274,9 +296,7 @@ class TestStatusTransition:
         for s in ["assigned", "in_progress", "remediated", "verified"]:
             finding = FindingService.update_status(db, finding, s, user_id=uid)
 
-        finding = FindingService.update_status(
-            db, finding, "open", user_id=uid, comment="Régression détectée"
-        )
+        finding = FindingService.update_status(db, finding, "open", user_id=uid, comment="Régression détectée")
         assert finding.status == FindingStatus.OPEN
 
     def test_closed_to_open_creates_history(self, db, seed_data):
@@ -301,18 +321,26 @@ class TestStatusTransition:
 
         # Assigner
         finding = FindingService.update_status(
-            db, finding, "assigned", user_id=uid, assigned_to="Jean Dupont",
+            db,
+            finding,
+            "assigned",
+            user_id=uid,
+            assigned_to="Jean Dupont",
         )
         assert finding.assigned_to == "Jean Dupont"
 
         # Transition sans passer assigned_to
         finding = FindingService.update_status(
-            db, finding, "in_progress", user_id=uid,
+            db,
+            finding,
+            "in_progress",
+            user_id=uid,
         )
         assert finding.assigned_to == "Jean Dupont"  # préservé
 
 
 # ── Tests de liaison doublon ─────────────────────────────────────────
+
 
 class TestDuplicate:
     def test_link_duplicate(self, db, seed_data):

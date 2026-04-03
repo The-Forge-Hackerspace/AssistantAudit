@@ -4,6 +4,7 @@ Source : https://www.cert.ssi.gouv.fr/uploads/guide-ad.html
 Executer une fois au deploiement, puis lors des mises a jour du referentiel.
 Idempotent : peut etre relance sans dupliquer les entrees.
 """
+
 import sys
 from pathlib import Path
 
@@ -678,11 +679,7 @@ def seed(db: Session) -> dict[str, int]:
     updated = 0
 
     for data in ANSSI_CHECKPOINTS:
-        existing = (
-            db.query(AnssiCheckpoint)
-            .filter(AnssiCheckpoint.vuln_id == data["vuln_id"])
-            .first()
-        )
+        existing = db.query(AnssiCheckpoint).filter(AnssiCheckpoint.vuln_id == data["vuln_id"]).first()
         if existing:
             for key, value in data.items():
                 setattr(existing, key, value)
@@ -700,10 +697,7 @@ def main() -> None:
     try:
         result = seed(db)
         total = result["inserted"] + result["updated"]
-        print(
-            f"Referentiel ANSSI : {total} checkpoints "
-            f"({result['inserted']} inseres, {result['updated']} mis a jour)"
-        )
+        print(f"Referentiel ANSSI : {total} checkpoints ({result['inserted']} inseres, {result['updated']} mis a jour)")
     finally:
         db.close()
 

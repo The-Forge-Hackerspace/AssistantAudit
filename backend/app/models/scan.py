@@ -1,6 +1,7 @@
 """
 Modèles Scan Réseau — Nmap et analyse de découvertes.
 """
+
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
@@ -21,12 +22,8 @@ class ScanReseau(Base):
     nom: Mapped[str | None] = mapped_column(String(200))
     site_id: Mapped[int] = mapped_column(Integer, ForeignKey("sites.id"), nullable=False, index=True)
     # Isolation inter-techniciens
-    owner_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False, index=True
-    )
-    date_scan: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False, index=True
-    )
+    owner_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    date_scan: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False, index=True)
     raw_xml_output: Mapped[str | None] = mapped_column(EncryptedText)
     nmap_command: Mapped[str | None] = mapped_column(String(1000))
     type_scan: Mapped[str | None] = mapped_column(String(50))
@@ -39,9 +36,7 @@ class ScanReseau(Base):
 
     # Relations
     site: Mapped["Site"] = relationship(back_populates="scans")  # type: ignore[name-defined]
-    hosts: Mapped[list["ScanHost"]] = relationship(
-        back_populates="scan", cascade="all, delete-orphan", lazy="selectin"
-    )
+    hosts: Mapped[list["ScanHost"]] = relationship(back_populates="scan", cascade="all, delete-orphan", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<ScanReseau(id={self.id}, site_id={self.site_id}, type='{self.type_scan}')>"
@@ -62,15 +57,11 @@ class ScanHost(Base):
     decision: Mapped[str | None] = mapped_column(String(20))  # pending | kept | ignored
     chosen_type: Mapped[str | None] = mapped_column(String(50))
     equipement_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("equipements.id"), index=True)
-    date_decouverte: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    date_decouverte: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     # Relations
     scan: Mapped["ScanReseau"] = relationship(back_populates="hosts")
-    ports: Mapped[list["ScanPort"]] = relationship(
-        back_populates="host", cascade="all, delete-orphan", lazy="selectin"
-    )
+    ports: Mapped[list["ScanPort"]] = relationship(back_populates="host", cascade="all, delete-orphan", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<ScanHost(id={self.id}, ip='{self.ip_address}', decision='{self.decision}')>"

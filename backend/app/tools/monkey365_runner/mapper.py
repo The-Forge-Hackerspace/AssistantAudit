@@ -2,6 +2,7 @@
 Monkey365 Mapper — Mappe les findings Monkey365 vers les contrôles
 du référentiel AssistantAudit pour pré-remplir les résultats d'audit.
 """
+
 import logging
 from dataclasses import dataclass
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MappingResult:
     """Résultat du mapping d'un finding Monkey365 vers un ControlResult"""
+
     control_result_id: int
     control_ref_id: str
     monkey365_rule_id: str
@@ -78,9 +80,7 @@ class Monkey365Mapper:
                 continue
 
             old_status = control_result.status.value
-            new_status_enum = cls.STATUS_MAP.get(
-                finding.status_text, ComplianceStatus.NOT_ASSESSED
-            )
+            new_status_enum = cls.STATUS_MAP.get(finding.status_text, ComplianceStatus.NOT_ASSESSED)
 
             # Construire l'evidence avec les détails
             evidence_parts = []
@@ -105,27 +105,25 @@ class Monkey365Mapper:
             if finding.remediation and new_status_enum != ComplianceStatus.COMPLIANT:
                 control_result.remediation_note = finding.remediation[:2000]
 
-            mapping_results.append(MappingResult(
-                control_result_id=control_result.id,
-                control_ref_id=control_result.control.ref_id if control_result.control else "?",
-                monkey365_rule_id=finding.rule_id,
-                old_status=old_status,
-                new_status=new_status_enum.value,
-                evidence=evidence[:200],
-            ))
+            mapping_results.append(
+                MappingResult(
+                    control_result_id=control_result.id,
+                    control_ref_id=control_result.control.ref_id if control_result.control else "?",
+                    monkey365_rule_id=finding.rule_id,
+                    old_status=old_status,
+                    new_status=new_status_enum.value,
+                    evidence=evidence[:200],
+                )
+            )
             mapped_count += 1
 
         db.commit()
 
         logger.info(
-            f"Monkey365 Mapper : {mapped_count}/{len(findings)} findings mappés "
-            f"sur assessment #{assessment.id}"
+            f"Monkey365 Mapper : {mapped_count}/{len(findings)} findings mappés sur assessment #{assessment.id}"
         )
         if unmapped_rules:
-            logger.warning(
-                f"  Règles non mappées ({len(unmapped_rules)}) : "
-                f"{', '.join(unmapped_rules[:10])}"
-            )
+            logger.warning(f"  Règles non mappées ({len(unmapped_rules)}) : {', '.join(unmapped_rules[:10])}")
 
         return mapping_results
 
@@ -138,11 +136,13 @@ class Monkey365Mapper:
         unmapped = []
         for result in assessment.results:
             if result.control and not result.control.engine_rule_id:
-                unmapped.append({
-                    "control_result_id": result.id,
-                    "control_ref_id": result.control.ref_id,
-                    "control_title": result.control.title,
-                    "check_type": result.control.check_type.value,
-                    "status": result.status.value,
-                })
+                unmapped.append(
+                    {
+                        "control_result_id": result.id,
+                        "control_ref_id": result.control.ref_id,
+                        "control_title": result.control.title,
+                        "check_type": result.control.check_type.value,
+                        "status": result.status.value,
+                    }
+                )
         return unmapped

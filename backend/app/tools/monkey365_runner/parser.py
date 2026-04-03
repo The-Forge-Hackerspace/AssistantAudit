@@ -2,6 +2,7 @@
 Monkey365 Result Parser — Parse les résultats JSON de Monkey365
 et les convertit en structure normalisée pour AssistantAudit.
 """
+
 import json
 import logging
 from dataclasses import dataclass, field
@@ -14,13 +15,14 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Monkey365Finding:
     """Résultat normalisé d'un check Monkey365"""
-    rule_id: str                         # identifiant de la règle Monkey365
+
+    rule_id: str  # identifiant de la règle Monkey365
     title: str
     description: str = ""
-    level: str = "info"                   # Good | Warning | Fail | Info | Manual
-    severity: str = "medium"              # critical | high | medium | low | info
-    status_text: str = ""                 # texte brut du statut
-    output: str = ""                      # sortie brute du check
+    level: str = "info"  # Good | Warning | Fail | Info | Manual
+    severity: str = "medium"  # critical | high | medium | low | info
+    status_text: str = ""  # texte brut du statut
+    output: str = ""  # sortie brute du check
     affected_resources: list[str] = field(default_factory=list)
     remediation: str = ""
     rationale: str = ""
@@ -158,27 +160,22 @@ class Monkey365Parser:
             or rule_id
         )
 
-        description = (
-            finding_info.get("description")
-            or item.get("description")
-            or ""
-        )
+        description = finding_info.get("description") or item.get("description") or ""
 
         # statusCode OCSF : "pass" | "fail" | "warning" | "manual" | "info"
-        level = (
-            item.get("statusCode")
-            or item.get("level")
-            or item.get("result")
-            or "info"
-        )
+        level = item.get("statusCode") or item.get("level") or item.get("result") or "info"
 
         # Sévérité : chaîne (ex: "High") ou dict ou absent
         raw_severity = item.get("severity", "medium")
         if isinstance(raw_severity, dict):
             raw_severity = raw_severity.get("level", "medium")
         severity_map = {
-            "critical": "critical", "high": "high", "medium": "medium",
-            "low": "low", "info": "info", "informational": "info",
+            "critical": "critical",
+            "high": "high",
+            "medium": "medium",
+            "low": "low",
+            "info": "info",
+            "informational": "info",
             "unknown": "medium",
         }
         severity = severity_map.get(str(raw_severity).lower(), "medium")

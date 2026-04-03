@@ -1,6 +1,7 @@
 """
 Routes Frameworks (Référentiels) : CRUD, import/export YAML, versioning.
 """
+
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -128,7 +129,7 @@ def sync_frameworks(
             detail=f"Dossier de frameworks introuvable : {frameworks_dir}",
         )
     result = FrameworkService.sync_from_directory(db, frameworks_dir)
-    total = result['imported'] + result['updated'] + result['unchanged']
+    total = result["imported"] + result["updated"] + result["unchanged"]
     return MessageResponse(
         message=(
             f"{total} référentiel(s) traité(s) : "

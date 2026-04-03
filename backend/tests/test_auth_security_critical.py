@@ -26,7 +26,6 @@ from app.services.auth_service import AuthService
 
 
 class TestPasswordHashing:
-
     def test_hash_password_returns_different_hash(self):
         """Deux hash du meme mot de passe doivent etre differents (salt unique)."""
         h1 = hash_password("test_password_123")
@@ -54,7 +53,6 @@ class TestPasswordHashing:
 
 
 class TestJWTTokens:
-
     def test_access_token_roundtrip(self):
         token = create_access_token(subject=42)
         payload = decode_token(token)
@@ -90,6 +88,7 @@ class TestJWTTokens:
     def test_access_token_rejected_by_verify_agent(self):
         """Un token access ne doit PAS etre accepte comme agent."""
         from jose import JWTError
+
         token = create_access_token(subject=1)
         with pytest.raises(JWTError, match="Invalid token type"):
             verify_agent_token(token)
@@ -107,7 +106,6 @@ class TestJWTTokens:
 
 
 class TestEnrollmentTokens:
-
     def test_enrollment_token_verify_correct(self):
         code, code_hash, expiration = create_enrollment_token()
         assert len(code) == 8
@@ -120,6 +118,7 @@ class TestEnrollmentTokens:
 
     def test_enrollment_token_verify_expired(self):
         from datetime import datetime, timedelta, timezone
+
         code, code_hash, _ = create_enrollment_token()
         expired = datetime.now(timezone.utc) - timedelta(minutes=1)
         assert verify_enrollment_token(code, code_hash, expired) is False
@@ -135,10 +134,10 @@ class TestEnrollmentTokens:
 
 
 class TestRateLimiter:
-
     def _make_request(self, ip: str = "10.0.0.1"):
         """Cree un mock Request avec une IP."""
         from unittest.mock import MagicMock
+
         req = MagicMock()
         req.client.host = ip
         req.headers = {}
@@ -192,7 +191,6 @@ class TestRateLimiter:
 
 
 class TestAuthService:
-
     def test_authenticate_success(self, db_session):
         user = AuthService.create_user(db_session, "testuser", "test@example.com", "password123")
         result = AuthService.authenticate(db_session, "testuser", "password123")

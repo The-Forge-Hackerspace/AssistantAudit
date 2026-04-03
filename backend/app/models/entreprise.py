@@ -1,6 +1,7 @@
 """
 Modèles Entreprise & Contact — Gestion des clients.
 """
+
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
@@ -17,9 +18,7 @@ class Entreprise(Base):
     __tablename__ = "entreprises"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    owner_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False, index=True
-    )
+    owner_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # Informations de base
     nom: Mapped[str] = mapped_column(String(200), unique=True, nullable=False, index=True)
@@ -33,9 +32,7 @@ class Entreprise(Base):
     contraintes_reglementaires: Mapped[str | None] = mapped_column(Text)
 
     # Métadonnées
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     # Relations
     contacts: Mapped[list["Contact"]] = relationship(
@@ -68,9 +65,7 @@ class Contact(Base):
     is_main_contact: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # FK
-    entreprise_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("entreprises.id"), nullable=False
-    )
+    entreprise_id: Mapped[int] = mapped_column(Integer, ForeignKey("entreprises.id"), nullable=False)
     entreprise: Mapped["Entreprise"] = relationship(back_populates="contacts")
 
     def __repr__(self) -> str:

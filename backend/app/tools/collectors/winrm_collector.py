@@ -2,6 +2,7 @@
 Collecteur WinRM — Connexion à un serveur Windows via WinRM (pywinrm)
 et exécution de commandes PowerShell d'audit système.
 """
+
 import logging
 from dataclasses import dataclass, field
 
@@ -15,6 +16,7 @@ WINRM_TIMEOUT = 60
 @dataclass
 class WinRMCollectResult:
     """Résultat brut de la collecte WinRM."""
+
     success: bool = False
     error: str | None = None
     hostname: str = ""
@@ -39,25 +41,21 @@ WINDOWS_COMMANDS: dict[str, str] = {
         "LastBootUpTime, InstallDate | Format-List"
     ),
     "domain_info": (
-        "(Get-CimInstance Win32_ComputerSystem).Domain + '|' + "
-        "(Get-CimInstance Win32_ComputerSystem).PartOfDomain"
+        "(Get-CimInstance Win32_ComputerSystem).Domain + '|' + (Get-CimInstance Win32_ComputerSystem).PartOfDomain"
     ),
-
     # --- Mises à jour ---
     "installed_updates": (
         "Get-HotFix | Sort-Object InstalledOn -Descending | "
         "Select-Object -First 10 HotFixID, Description, InstalledOn | Format-Table -AutoSize"
     ),
     "last_update_date": (
-        "Get-HotFix | Sort-Object InstalledOn -Descending | "
-        "Select-Object -First 1 -ExpandProperty InstalledOn"
+        "Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 1 -ExpandProperty InstalledOn"
     ),
     "wsus_config": (
         "try { "
         "(Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate' "
         "-ErrorAction Stop).WUServer } catch { 'NOT_CONFIGURED' }"
     ),
-
     # --- Réseau ---
     "ip_config": (
         "Get-NetIPAddress -AddressFamily IPv4 | "
@@ -74,14 +72,12 @@ WINDOWS_COMMANDS: dict[str, str] = {
         "Select-Object LocalAddress, LocalPort, OwningProcess | "
         "Sort-Object LocalPort | Format-Table -AutoSize"
     ),
-
     # --- Pare-feu ---
     "firewall_profiles": (
         "Get-NetFirewallProfile | "
         "Select-Object Name, Enabled, DefaultInboundAction, DefaultOutboundAction | "
         "Format-Table -AutoSize"
     ),
-
     # --- RDP ---
     "rdp_enabled": (
         "try { "
@@ -93,11 +89,9 @@ WINDOWS_COMMANDS: dict[str, str] = {
         "(Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' "
         "-ErrorAction Stop).UserAuthentication } catch { 'UNKNOWN' }"
     ),
-
     # --- Comptes ---
     "admin_account": (
-        "Get-LocalUser | Where-Object { $_.SID -like '*-500' } | "
-        "Select-Object Name, Enabled, LastLogon | Format-List"
+        "Get-LocalUser | Where-Object { $_.SID -like '*-500' } | Select-Object Name, Enabled, LastLogon | Format-List"
     ),
     "local_users": (
         "Get-LocalUser | "
@@ -110,29 +104,22 @@ WINDOWS_COMMANDS: dict[str, str] = {
         "Get-LocalGroupMember -Group 'Administrators' -ErrorAction SilentlyContinue | "
         "Select-Object Name, ObjectClass | Format-Table -AutoSize"
     ),
-
     # --- Politique de mot de passe ---
     "password_policy": "net accounts",
-
     # --- Verrouillage de compte ---
-    "lockout_policy": (
-        "net accounts | Select-String -Pattern 'Lockout|verrouillage'"
-    ),
-
+    "lockout_policy": ("net accounts | Select-String -Pattern 'Lockout|verrouillage'"),
     # --- Rôles & Fonctionnalités ---
     "installed_roles": (
         "try { Get-WindowsFeature | Where-Object Installed | "
         "Select-Object Name, DisplayName | Format-Table -AutoSize } "
         "catch { 'NOT_SERVER_OS' }"
     ),
-
     # --- Services ---
     "services_running": (
         "Get-Service | Where-Object { $_.Status -eq 'Running' } | "
         "Select-Object Name, DisplayName, StartType | "
         "Sort-Object Name | Format-Table -AutoSize"
     ),
-
     # --- Journalisation ---
     "event_log_sizes": (
         "Get-WinEvent -ListLog Security, System, Application | "
@@ -140,7 +127,6 @@ WINDOWS_COMMANDS: dict[str, str] = {
         "Format-Table -AutoSize"
     ),
     "audit_policy": "auditpol /get /category:* 2>&1 | Select-Object -First 40",
-
     # --- Antivirus / Defender ---
     "defender_status": (
         "try { Get-MpComputerStatus | "
@@ -148,10 +134,9 @@ WINDOWS_COMMANDS: dict[str, str] = {
         "RealTimeProtectionEnabled, AntivirusSignatureLastUpdated | Format-List } "
         "catch { 'NOT_AVAILABLE' }"
     ),
-
     # --- Stockage ---
     "disk_usage": (
-        "Get-CimInstance Win32_LogicalDisk -Filter \"DriveType=3\" | "
+        'Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | '
         "Select-Object DeviceID, "
         "@{N='SizeGB';E={[math]::Round($_.Size/1GB,1)}}, "
         "@{N='FreeGB';E={[math]::Round($_.FreeSpace/1GB,1)}}, "
@@ -298,12 +283,14 @@ def _parse_winrm_results(result: WinRMCollectResult, raw: dict[str, str]) -> Non
             enabled = parts[1].strip().lower() == "true"
             if not enabled:
                 all_enabled = False
-            fw_profiles.append({
-                "name": parts[0],
-                "enabled": enabled,
-                "default_inbound": parts[2],
-                "default_outbound": parts[3],
-            })
+            fw_profiles.append(
+                {
+                    "name": parts[0],
+                    "enabled": enabled,
+                    "default_inbound": parts[2],
+                    "default_outbound": parts[3],
+                }
+            )
 
     security: dict = {
         "firewall_profiles": fw_profiles,
@@ -355,9 +342,7 @@ def _parse_winrm_results(result: WinRMCollectResult, raw: dict[str, str]) -> Non
     users["password_policy"] = pwd_policy
 
     # ── Verrouillage ──
-    lockout_threshold_str = pwd_policy.get(
-        "Lockout threshold", pwd_policy.get("Seuil de verrouillage du compte", "0")
-    )
+    lockout_threshold_str = pwd_policy.get("Lockout threshold", pwd_policy.get("Seuil de verrouillage du compte", "0"))
     try:
         lockout_threshold = int(lockout_threshold_str.strip())
     except (ValueError, AttributeError):
@@ -388,12 +373,14 @@ def _parse_winrm_results(result: WinRMCollectResult, raw: dict[str, str]) -> Non
                 size_mb = round(size_bytes / (1024 * 1024), 1)
             except (ValueError, IndexError):
                 size_mb = 0
-            logs.append({
-                "name": parts[0],
-                "max_size_mb": size_mb,
-                "record_count": parts[2] if len(parts) > 2 else "0",
-                "enabled": parts[3] if len(parts) > 3 else "Unknown",
-            })
+            logs.append(
+                {
+                    "name": parts[0],
+                    "max_size_mb": size_mb,
+                    "record_count": parts[2] if len(parts) > 2 else "0",
+                    "enabled": parts[3] if len(parts) > 3 else "Unknown",
+                }
+            )
 
     security["event_logs"] = logs
     security["event_logs_raw"] = event_logs_raw

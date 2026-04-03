@@ -1,4 +1,5 @@
 """Schémas VLAN — Définitions de VLANs par site."""
+
 from datetime import datetime
 from typing import Optional
 

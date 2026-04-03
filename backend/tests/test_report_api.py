@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def audit_for_report(db_session, auditeur_user):
     from app.models.audit import Audit
+
     audit = Audit(
         nom_projet="Audit réseau PME",
         entreprise_id=1,
@@ -23,20 +24,28 @@ class TestReportRoutes:
     """RPT-004 + RPT-012 : routes API rapports."""
 
     def test_create_report(self, client: TestClient, auditeur_headers, audit_for_report):
-        resp = client.post("/api/v1/reports", json={
-            "audit_id": audit_for_report.id,
-            "template_name": "complete",
-            "consultant_name": "ACME Consulting",
-        }, headers=auditeur_headers)
+        resp = client.post(
+            "/api/v1/reports",
+            json={
+                "audit_id": audit_for_report.id,
+                "template_name": "complete",
+                "consultant_name": "ACME Consulting",
+            },
+            headers=auditeur_headers,
+        )
         assert resp.status_code == 201
         data = resp.json()
         assert data["status"] == "draft"
         assert data["audit_id"] == audit_for_report.id
 
     def test_get_report_with_sections(self, client: TestClient, auditeur_headers, audit_for_report):
-        resp = client.post("/api/v1/reports", json={
-            "audit_id": audit_for_report.id,
-        }, headers=auditeur_headers)
+        resp = client.post(
+            "/api/v1/reports",
+            json={
+                "audit_id": audit_for_report.id,
+            },
+            headers=auditeur_headers,
+        )
         report_id = resp.json()["id"]
 
         resp = client.get(f"/api/v1/reports/{report_id}", headers=auditeur_headers)
@@ -45,9 +54,13 @@ class TestReportRoutes:
         assert len(data["sections"]) == 25
 
     def test_update_section_exclude(self, client: TestClient, auditeur_headers, audit_for_report):
-        resp = client.post("/api/v1/reports", json={
-            "audit_id": audit_for_report.id,
-        }, headers=auditeur_headers)
+        resp = client.post(
+            "/api/v1/reports",
+            json={
+                "audit_id": audit_for_report.id,
+            },
+            headers=auditeur_headers,
+        )
         report_id = resp.json()["id"]
 
         resp = client.put(
@@ -59,10 +72,14 @@ class TestReportRoutes:
         assert resp.json()["included"] is False
 
     def test_generate_pdf(self, client: TestClient, auditeur_headers, audit_for_report):
-        resp = client.post("/api/v1/reports", json={
-            "audit_id": audit_for_report.id,
-            "consultant_name": "Test Consultant",
-        }, headers=auditeur_headers)
+        resp = client.post(
+            "/api/v1/reports",
+            json={
+                "audit_id": audit_for_report.id,
+                "consultant_name": "Test Consultant",
+            },
+            headers=auditeur_headers,
+        )
         report_id = resp.json()["id"]
 
         resp = client.post(
@@ -76,9 +93,13 @@ class TestReportRoutes:
 
     def test_download_pdf(self, client: TestClient, auditeur_headers, audit_for_report):
         # Créer et générer
-        resp = client.post("/api/v1/reports", json={
-            "audit_id": audit_for_report.id,
-        }, headers=auditeur_headers)
+        resp = client.post(
+            "/api/v1/reports",
+            json={
+                "audit_id": audit_for_report.id,
+            },
+            headers=auditeur_headers,
+        )
         report_id = resp.json()["id"]
         client.post(f"/api/v1/reports/{report_id}/generate", json={}, headers=auditeur_headers)
 

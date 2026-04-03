@@ -46,6 +46,7 @@ def analyze_config(
         raise HTTPException(400, "Nom de fichier manquant")
 
     from ....core.config import get_settings
+
     _settings = get_settings()
     max_bytes = _settings.MAX_CONFIG_UPLOAD_SIZE_MB * 1024 * 1024
     raw = file.file.read(max_bytes + 1)
@@ -64,8 +65,7 @@ def analyze_config(
     if not vendor:
         raise HTTPException(
             422,
-            "Format de configuration non reconnu. "
-            "Formats supportés : FortiGate (texte), OPNsense (XML).",
+            "Format de configuration non reconnu. Formats supportés : FortiGate (texte), OPNsense (XML).",
         )
 
     parser = get_parser(content)
@@ -167,34 +167,29 @@ def list_analyses(
         from ....models.audit import Audit
         from ....models.equipement import Equipement
         from ....models.site import Site
-        accessible_ent_ids = (
-            db.query(Audit.entreprise_id)
-            .filter(Audit.owner_id == uid)
-            .distinct()
-            .scalar_subquery()
+
+        accessible_ent_ids = db.query(Audit.entreprise_id).filter(Audit.owner_id == uid).distinct().scalar_subquery()
+        query = (
+            query.join(Equipement, CA.equipement_id == Equipement.id)
+            .join(Site, Equipement.site_id == Site.id)
+            .filter(Site.entreprise_id.in_(accessible_ent_ids))
         )
-        query = query.join(Equipement, CA.equipement_id == Equipement.id).join(
-            Site, Equipement.site_id == Site.id
-        ).filter(Site.entreprise_id.in_(accessible_ent_ids))
-    analyses = (
-        query.order_by(CA.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
+    analyses = query.order_by(CA.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
     results = []
     for a in analyses:
-        results.append(ConfigAnalysisSummary(
-            id=a.id,
-            equipement_id=a.equipement_id,
-            filename=a.filename,
-            vendor=a.vendor,
-            hostname=a.hostname,
-            firmware_version=a.firmware_version,
-            findings_count=len(a.findings) if a.findings else 0,
-            created_at=a.created_at,
-        ))
+        results.append(
+            ConfigAnalysisSummary(
+                id=a.id,
+                equipement_id=a.equipement_id,
+                filename=a.filename,
+                vendor=a.vendor,
+                hostname=a.hostname,
+                firmware_version=a.firmware_version,
+                findings_count=len(a.findings) if a.findings else 0,
+                created_at=a.created_at,
+            )
+        )
     return results
 
 
@@ -258,19 +253,17 @@ def list_assessments_for_equipment(
     """
     from ....models.assessment import Assessment
 
-    assessments = (
-        db.query(Assessment)
-        .filter(Assessment.equipement_id == equipement_id)
-        .all()
-    )
+    assessments = db.query(Assessment).filter(Assessment.equipement_id == equipement_id).all()
     results = []
     for a in assessments:
         framework_name = a.framework.name if a.framework else "—"
-        results.append({
-            "id": a.id,
-            "campaign_id": a.campaign_id,
-            "framework_id": a.framework_id,
-            "framework_name": framework_name,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-        })
+        results.append(
+            {
+                "id": a.id,
+                "campaign_id": a.campaign_id,
+                "framework_id": a.framework_id,
+                "framework_name": framework_name,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+        )
     return results
