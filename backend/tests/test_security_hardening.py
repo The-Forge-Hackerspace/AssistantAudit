@@ -170,6 +170,29 @@ class TestRateLimitMiddlewareIntegration:
         # Le login a son propre limiter à 5/min, le 6ème doit être 429
         assert resp.status_code == 429
 
+    def test_agents_enroll_not_rate_limited_by_api_limiter(self, client: TestClient):
+        """POST /agents/enroll utilise son propre limiter (5/min), pas le API (30/min).
+
+        Le middleware exempte /agents/enroll du rate limiter API générique.
+        L'enroll a son propre limiter auth (5/min) dans le service.
+        On vérifie que les 5 premières requêtes passent (pas de 429 du API limiter)
+        et que la 6ème est bloquée par le limiter enroll (pas avant).
+        """
+        for i in range(5):
+            resp = client.post(
+                "/api/v1/agents/enroll",
+                json={"enrollment_code": "fake-code"},
+            )
+            assert resp.status_code != 429, (
+                f"Requête enroll #{i + 1} bloquée trop tôt"
+            )
+        # La 6ème doit être bloquée par le enroll_rate_limiter (auth: 5/min)
+        resp = client.post(
+            "/api/v1/agents/enroll",
+            json={"enrollment_code": "fake-code"},
+        )
+        assert resp.status_code == 429
+
 
 # ══════════════════════════════════════════════════════════════════════
 # 3. CORS PRODUCTION HARDENING

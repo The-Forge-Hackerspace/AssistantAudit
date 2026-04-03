@@ -81,12 +81,21 @@ def migrate_table(source_engine, target_engine, table_name: str, metadata: MetaD
     with Session(target_engine) as tgt_session:
         # Désactiver les contraintes FK le temps de l'insertion
         dialect = target_engine.dialect.name
+        fk_disabled = False
         if dialect == "postgresql":
-            tgt_session.execute(text("SET session_replication_role = 'replica'"))
+            try:
+                tgt_session.execute(text("SET session_replication_role = 'replica'"))
+                fk_disabled = True
+            except Exception:
+                logger.warning(
+                    "  Impossible de désactiver les FK (nécessite superuser). "
+                    "Les insertions respecteront l'ordre des contraintes."
+                )
+                tgt_session.rollback()
 
         tgt_session.execute(table.insert(), data)
 
-        if dialect == "postgresql":
+        if fk_disabled:
             tgt_session.execute(text("SET session_replication_role = 'origin'"))
 
         tgt_session.commit()
@@ -96,15 +105,25 @@ def migrate_table(source_engine, target_engine, table_name: str, metadata: MetaD
 
 
 def reset_sequences(target_engine, metadata: MetaData):
-    """Remet à jour les séquences PostgreSQL après insertion avec ID explicites."""
+    """Remet à jour les séquences PostgreSQL après insertion avec ID explicites.
+
+    Utilise pg_get_serial_sequence() pour introspecter le nom réel de la
+    séquence au lieu de deviner le pattern par défaut.
+    """
     with Session(target_engine) as session:
         for table_name, table in metadata.tables.items():
             for col in table.columns:
                 if col.autoincrement and col.primary_key:
-                    seq_name = f"{table_name}_{col.name}_seq"
+                    # Introspecter le nom réel de la séquence
+                    row = session.execute(
+                        text("SELECT pg_get_serial_sequence(:tbl, :col)"),
+                        {"tbl": table_name, "col": col.name},
+                    ).scalar()
+                    if not row:
+                        continue
                     session.execute(
                         text(
-                            f"SELECT setval('{seq_name}', "
+                            f"SELECT setval('{row}', "
                             f"COALESCE((SELECT MAX({col.name}) FROM {table_name}), 0) + 1, false)"
                         )
                     )
@@ -117,7 +136,9 @@ def run_alembic_upgrade(target_url: str):
     import subprocess
 
     logger.info("Application des migrations Alembic sur la cible...")
-    result = subprocess.run(
+    # target_url vient de argparse (CLI admin uniquement), passé en env var
+    # et non dans la commande — pas de risque d'injection de commande.
+    result = subprocess.run(  # noqa: S603
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         cwd=str(Path(__file__).resolve().parent.parent),
         env={**__import__("os").environ, "DATABASE_URL": target_url},

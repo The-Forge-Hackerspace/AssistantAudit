@@ -123,7 +123,6 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/backend
       ENCRYPTION_KEY: ${{ secrets.CI_ENCRYPTION_KEY }}
       SECRET_KEY: ci-test-secret-key
-      DATABASE_URL: ${{ matrix.db == 'postgres' && 'postgresql://test:test@localhost:5432/assistantaudit_test' || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -136,6 +135,10 @@ jobs:
 
       - name: Installer les dépendances backend
         run: pip install -r requirements.txt
+
+      - name: Configurer DATABASE_URL pour PostgreSQL
+        if: matrix.db == 'postgres'
+        run: echo "DATABASE_URL=postgresql://test:test@localhost:5432/assistantaudit_test" >> "$GITHUB_ENV"
 
       - name: Exécuter les tests backend avec couverture
         run: pytest tests/ -q --tb=short --cov=app --cov-report=xml
