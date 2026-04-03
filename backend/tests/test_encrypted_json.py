@@ -5,6 +5,7 @@ Tests unitaires pour EncryptedJSON (core/encryption.py)
 - Mode dev (ENCRYPTION_KEY vide)
 - Valeurs None
 """
+
 import json
 import os
 
@@ -26,6 +27,7 @@ TEST_KEY_HEX = os.urandom(32).hex()
 
 class EncryptedJsonRecord(Base):
     """Modele de test pour EncryptedJSON — utilise uniquement dans les tests."""
+
     __tablename__ = "test_encrypted_json_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -46,6 +48,7 @@ class TestEncryptedJSON:
         """DB en memoire avec ENCRYPTION_KEY configuree."""
         monkeypatch.setenv("ENCRYPTION_KEY", TEST_KEY_HEX)
         from app.core.config import get_settings
+
         get_settings.cache_clear()
 
         engine = create_engine(
@@ -69,6 +72,7 @@ class TestEncryptedJSON:
         monkeypatch.setenv("ENV", "development")
         monkeypatch.setenv("ENCRYPTION_KEY", "")
         from app.core.config import get_settings
+
         get_settings.cache_clear()
 
         engine = create_engine(

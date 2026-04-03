@@ -192,7 +192,7 @@ class TestHealthCheckIntegration:
     def test_all_health_endpoints_respond(self, client):
         """Verify all health check endpoints are accessible"""
         endpoints = ["/health", "/ready", "/liveness"]
-        
+
         for endpoint in endpoints:
             response = client.get(endpoint)
             # All should respond (200 or 503 for /ready)

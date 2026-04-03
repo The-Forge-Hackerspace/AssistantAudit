@@ -1,6 +1,7 @@
 """
 Service Agent : CRUD agents, enrollment, heartbeat, operations sur taches/artifacts.
 """
+
 import hashlib
 import logging
 from datetime import datetime, timezone
@@ -31,7 +32,6 @@ settings = get_settings()
 
 
 class AgentService:
-
     # ── CRUD Agent ───────────────────────────────────────────────────────
 
     @staticmethod
@@ -44,7 +44,10 @@ class AgentService:
 
     @staticmethod
     def get_agent(
-        db: Session, agent_id: int, user_id: int, is_admin: bool = False,
+        db: Session,
+        agent_id: int,
+        user_id: int,
+        is_admin: bool = False,
     ) -> Agent:
         """Recupere un agent par ID avec verification ownership."""
         query = db.query(Agent).filter(Agent.id == agent_id)
@@ -57,7 +60,10 @@ class AgentService:
 
     @staticmethod
     def create_agent(
-        db: Session, data: AgentCreateRequest, user_id: int, user_role: str,
+        db: Session,
+        data: AgentCreateRequest,
+        user_id: int,
+        user_role: str,
     ) -> tuple[Agent, str]:
         """Cree un agent et genere le code d'enrollment. Retourne (agent, code_clair)."""
         owner_id = user_id
@@ -87,14 +93,15 @@ class AgentService:
         db.flush()
         db.refresh(agent)
 
-        logger.info(
-            f"Agent created: uuid={agent.agent_uuid}, owner={owner_id}, by={user_id}"
-        )
+        logger.info(f"Agent created: uuid={agent.agent_uuid}, owner={owner_id}, by={user_id}")
         return agent, code
 
     @staticmethod
     def revoke_agent(
-        db: Session, agent_uuid: str, user_id: int, is_admin: bool = False,
+        db: Session,
+        agent_uuid: str,
+        user_id: int,
+        is_admin: bool = False,
     ) -> Agent:
         """Revoque un agent. Admin peut revoquer n'importe lequel."""
         query = db.query(Agent).filter(Agent.agent_uuid == agent_uuid)
@@ -113,13 +120,17 @@ class AgentService:
         ca_key_path = Path(settings.CA_KEY_PATH)
         if ca_cert_path.exists() and ca_key_path.exists():
             from ..core.cert_manager import CertManager
-            revoked_agents = db.query(Agent).filter(
-                Agent.status == "revoked",
-                Agent.cert_serial.isnot(None),
-            ).all()
+
+            revoked_agents = (
+                db.query(Agent)
+                .filter(
+                    Agent.status == "revoked",
+                    Agent.cert_serial.isnot(None),
+                )
+                .all()
+            )
             revoked_serials = [
-                (int(a.cert_serial, 16), a.revoked_at or datetime.now(timezone.utc))
-                for a in revoked_agents
+                (int(a.cert_serial, 16), a.revoked_at or datetime.now(timezone.utc)) for a in revoked_agents
             ]
             if revoked_serials:
                 mgr = CertManager(ca_cert_path, ca_key_path)
@@ -130,7 +141,10 @@ class AgentService:
 
     @staticmethod
     def update_agent_status(
-        db: Session, agent: Agent, body: HeartbeatRequest, request: Request,
+        db: Session,
+        agent: Agent,
+        body: HeartbeatRequest,
+        request: Request,
     ) -> None:
         """Met a jour last_seen et metadonnees d'un agent (heartbeat)."""
         agent.last_seen = datetime.now(timezone.utc)
@@ -151,11 +165,16 @@ class AgentService:
         enroll_rate_limiter.record_attempt(request)
 
         code_hash = hashlib.sha256(enrollment_code.encode()).hexdigest()
-        matched_agent = db.query(Agent).filter(
-            Agent.status == "pending",
-            Agent.enrollment_used == False,  # noqa: E712
-            Agent.enrollment_token_hash == code_hash,
-        ).with_for_update().first()
+        matched_agent = (
+            db.query(Agent)
+            .filter(
+                Agent.status == "pending",
+                Agent.enrollment_used == False,  # noqa: E712
+                Agent.enrollment_token_hash == code_hash,
+            )
+            .with_for_update()
+            .first()
+        )
 
         if matched_agent is None:
             raise HTTPException(
@@ -181,6 +200,7 @@ class AgentService:
         ca_key_path = Path(settings.CA_KEY_PATH)
         if ca_cert_path.exists() and ca_key_path.exists():
             from ..core.cert_manager import CertManager
+
             mgr = CertManager(ca_cert_path, ca_key_path)
             cert_pem, key_pem = mgr.sign_agent_cert(matched_agent.agent_uuid)
 
@@ -222,7 +242,10 @@ class AgentService:
 
     @staticmethod
     def list_tasks(
-        db: Session, user_id: int, is_admin: bool = False, tool: str | None = None,
+        db: Session,
+        user_id: int,
+        is_admin: bool = False,
+        tool: str | None = None,
     ) -> list[dict]:
         """Liste les taches agent avec resolution site/entreprise."""
         from ..models.entreprise import Entreprise
@@ -268,7 +291,10 @@ class AgentService:
 
     @staticmethod
     def delete_task(
-        db: Session, task_uuid: str, user_id: int, is_admin: bool = False,
+        db: Session,
+        task_uuid: str,
+        user_id: int,
+        is_admin: bool = False,
     ) -> None:
         """Supprime une tache. Verifie ownership."""
         task = db.query(AgentTask).filter(AgentTask.task_uuid == task_uuid).first()
@@ -284,23 +310,34 @@ class AgentService:
     @staticmethod
     def get_agent_task(db: Session, task_uuid: str, agent_id: int) -> AgentTask:
         """Recupere une tache par UUID pour un agent donne."""
-        task = db.query(AgentTask).filter(
-            AgentTask.task_uuid == task_uuid,
-            AgentTask.agent_id == agent_id,
-        ).first()
+        task = (
+            db.query(AgentTask)
+            .filter(
+                AgentTask.task_uuid == task_uuid,
+                AgentTask.agent_id == agent_id,
+            )
+            .first()
+        )
         if task is None:
             raise HTTPException(status_code=404, detail="Tache introuvable")
         return task
 
     @staticmethod
     def update_task_status(
-        db: Session, task_uuid: str, agent_id: int, body: TaskStatusUpdate,
+        db: Session,
+        task_uuid: str,
+        agent_id: int,
+        body: TaskStatusUpdate,
     ) -> AgentTask:
         """Met a jour le status/progress d'une tache. Retourne la tache mise a jour."""
-        task = db.query(AgentTask).filter(
-            AgentTask.task_uuid == task_uuid,
-            AgentTask.agent_id == agent_id,
-        ).first()
+        task = (
+            db.query(AgentTask)
+            .filter(
+                AgentTask.task_uuid == task_uuid,
+                AgentTask.agent_id == agent_id,
+            )
+            .first()
+        )
         if task is None:
             raise HTTPException(status_code=404, detail="Tache introuvable")
 
@@ -324,13 +361,20 @@ class AgentService:
 
     @staticmethod
     def submit_task_result(
-        db: Session, task_uuid: str, agent_id: int, body: TaskResultSubmit,
+        db: Session,
+        task_uuid: str,
+        agent_id: int,
+        body: TaskResultSubmit,
     ) -> AgentTask:
         """Soumet les resultats d'une tache. Retourne la tache mise a jour."""
-        task = db.query(AgentTask).filter(
-            AgentTask.task_uuid == task_uuid,
-            AgentTask.agent_id == agent_id,
-        ).first()
+        task = (
+            db.query(AgentTask)
+            .filter(
+                AgentTask.task_uuid == task_uuid,
+                AgentTask.agent_id == agent_id,
+            )
+            .first()
+        )
         if task is None:
             raise HTTPException(status_code=404, detail="Tache introuvable")
 
@@ -358,10 +402,14 @@ class AgentService:
         content_type: str,
     ) -> TaskArtifact:
         """Chiffre et stocke un artifact pour une tache."""
-        task = db.query(AgentTask).filter(
-            AgentTask.task_uuid == task_uuid,
-            AgentTask.agent_id == agent_id,
-        ).first()
+        task = (
+            db.query(AgentTask)
+            .filter(
+                AgentTask.task_uuid == task_uuid,
+                AgentTask.agent_id == agent_id,
+            )
+            .first()
+        )
         if task is None:
             raise HTTPException(status_code=404, detail="Tache introuvable")
         if task.status == "cancelled":
@@ -369,11 +417,13 @@ class AgentService:
 
         # Chiffrer avec envelope encryption
         from ..core.file_encryption import EnvelopeEncryption
+
         envelope = EnvelopeEncryption()
         encrypted_data, encrypted_dek, dek_nonce = envelope.encrypt_file(content)
 
         # Stocker sur disque
         import uuid as uuid_mod
+
         file_uuid = str(uuid_mod.uuid4())
         blobs_dir = Path(settings.DATA_DIR) / "blobs"
         blobs_dir.mkdir(parents=True, exist_ok=True)
@@ -395,15 +445,15 @@ class AgentService:
         db.flush()
         db.refresh(artifact)
 
-        logger.info(
-            f"Artifact uploaded: task={task_uuid}, file={original_filename} "
-            f"({len(content)} bytes)"
-        )
+        logger.info(f"Artifact uploaded: task={task_uuid}, file={original_filename} ({len(content)} bytes)")
         return artifact
 
     @staticmethod
     def list_artifacts(
-        db: Session, task_uuid: str, user_id: int, is_admin: bool = False,
+        db: Session,
+        task_uuid: str,
+        user_id: int,
+        is_admin: bool = False,
     ) -> list[TaskArtifact]:
         """Liste les artifacts d'une tache avec verification ownership."""
         task = db.query(AgentTask).filter(AgentTask.task_uuid == task_uuid).first()

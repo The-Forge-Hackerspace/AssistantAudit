@@ -1,6 +1,7 @@
 """
 Routes de gestion des utilisateurs — admin uniquement.
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 

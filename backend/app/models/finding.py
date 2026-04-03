@@ -4,6 +4,7 @@ Modèles Finding — Suivi des non-conformités.
 Un Finding représente une non-conformité détectée lors d'une évaluation.
 FindingStatusHistory trace l'audit trail des changements de statut.
 """
+
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
@@ -28,6 +29,7 @@ def _utcnow() -> datetime:
 
 class FindingStatus(str, PyEnum):
     """Cycle de vie d'un finding."""
+
     OPEN = "open"
     ASSIGNED = "assigned"
     IN_PROGRESS = "in_progress"
@@ -52,6 +54,7 @@ class Finding(Base):
     Non-conformité détectée lors d'une évaluation.
     Vit indépendamment du ControlResult source (cycle de vie propre).
     """
+
     __tablename__ = "findings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -60,12 +63,8 @@ class Finding(Base):
     control_result_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("control_results.id"), nullable=False, index=True
     )
-    assessment_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("assessments.id"), nullable=False, index=True
-    )
-    equipment_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("equipements.id"), nullable=False, index=True
-    )
+    assessment_id: Mapped[int] = mapped_column(Integer, ForeignKey("assessments.id"), nullable=False, index=True)
+    equipment_id: Mapped[int] = mapped_column(Integer, ForeignKey("equipements.id"), nullable=False, index=True)
 
     # Données du finding
     title: Mapped[str] = mapped_column(String(500), nullable=False)
@@ -80,31 +79,25 @@ class Finding(Base):
     assigned_to: Mapped[str | None] = mapped_column(String(200))
 
     # Déduplication
-    duplicate_of_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("findings.id"), nullable=True
-    )
+    duplicate_of_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("findings.id"), nullable=True)
 
     # Métadonnées
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
     )
-    created_by: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
     # Relations
     control_result: Mapped["ControlResult"] = relationship(lazy="selectin")  # type: ignore[name-defined]
     assessment: Mapped["Assessment"] = relationship(lazy="selectin")  # type: ignore[name-defined]
     equipment: Mapped["Equipement"] = relationship(lazy="selectin")  # type: ignore[name-defined]
-    duplicate_of: Mapped["Finding | None"] = relationship(
-        remote_side=[id], lazy="selectin"
-    )
+    duplicate_of: Mapped["Finding | None"] = relationship(remote_side=[id], lazy="selectin")
     status_history: Mapped[list["FindingStatusHistory"]] = relationship(
-        back_populates="finding", cascade="all, delete-orphan",
-        lazy="selectin", order_by="FindingStatusHistory.created_at"
+        back_populates="finding",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="FindingStatusHistory.created_at",
     )
     creator: Mapped["User | None"] = relationship(lazy="selectin")  # type: ignore[name-defined]
 
@@ -133,26 +126,17 @@ class Finding(Base):
 
 class FindingStatusHistory(Base):
     """Audit trail des changements de statut d'un finding."""
+
     __tablename__ = "finding_status_history"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    finding_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("findings.id"), nullable=False, index=True
-    )
-    old_status: Mapped[FindingStatus] = mapped_column(
-        Enum(FindingStatus), nullable=False
-    )
-    new_status: Mapped[FindingStatus] = mapped_column(
-        Enum(FindingStatus), nullable=False
-    )
-    changed_by: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
+    finding_id: Mapped[int] = mapped_column(Integer, ForeignKey("findings.id"), nullable=False, index=True)
+    old_status: Mapped[FindingStatus] = mapped_column(Enum(FindingStatus), nullable=False)
+    new_status: Mapped[FindingStatus] = mapped_column(Enum(FindingStatus), nullable=False)
+    changed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     comment: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     # Relations
     finding: Mapped["Finding"] = relationship(back_populates="status_history")

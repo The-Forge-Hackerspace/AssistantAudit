@@ -117,9 +117,7 @@ class TestUpdateUser:
             "full_name": "Updated Name",
             "role": "lecteur",
         }
-        response = client.put(
-            f"/api/v1/users/{auditeur_user.id}", json=payload, headers=admin_headers
-        )
+        response = client.put(f"/api/v1/users/{auditeur_user.id}", json=payload, headers=admin_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["full_name"] == "Updated Name"
@@ -127,15 +125,11 @@ class TestUpdateUser:
 
     def test_admin_can_change_user_password(self, client, admin_headers, lecteur_user):
         payload = {"password": "NewPassword123!"}
-        response = client.put(
-            f"/api/v1/users/{lecteur_user.id}", json=payload, headers=admin_headers
-        )
+        response = client.put(f"/api/v1/users/{lecteur_user.id}", json=payload, headers=admin_headers)
         assert response.status_code == 200
 
     def test_update_nonexistent_user_returns_404(self, client, admin_headers):
-        response = client.put(
-            "/api/v1/users/99999", json={"full_name": "Ghost"}, headers=admin_headers
-        )
+        response = client.put("/api/v1/users/99999", json={"full_name": "Ghost"}, headers=admin_headers)
         assert response.status_code == 404
 
     def test_auditeur_cannot_update_user(self, client, auditeur_headers, lecteur_user):
@@ -149,16 +143,12 @@ class TestUpdateUser:
 
 class TestDeleteUser:
     def test_admin_can_deactivate_user(self, client, admin_headers, lecteur_user):
-        response = client.delete(
-            f"/api/v1/users/{lecteur_user.id}", headers=admin_headers
-        )
+        response = client.delete(f"/api/v1/users/{lecteur_user.id}", headers=admin_headers)
         assert response.status_code == 200
         assert "désactivé" in response.json()["message"]
 
     def test_admin_cannot_deactivate_self(self, client, admin_headers, admin_user):
-        response = client.delete(
-            f"/api/v1/users/{admin_user.id}", headers=admin_headers
-        )
+        response = client.delete(f"/api/v1/users/{admin_user.id}", headers=admin_headers)
         assert response.status_code == 400
         assert "vous-même" in response.json()["detail"].lower()
 
@@ -167,7 +157,5 @@ class TestDeleteUser:
         assert response.status_code == 404
 
     def test_auditeur_cannot_delete_user(self, client, auditeur_headers, lecteur_user):
-        response = client.delete(
-            f"/api/v1/users/{lecteur_user.id}", headers=auditeur_headers
-        )
+        response = client.delete(f"/api/v1/users/{lecteur_user.id}", headers=auditeur_headers)
         assert response.status_code == 403

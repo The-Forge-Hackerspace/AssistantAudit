@@ -7,6 +7,7 @@ Limite les requêtes par IP avec des seuils configurables par catégorie :
 
 En production avec plusieurs workers, remplacer par Redis-backed (slowapi).
 """
+
 import logging
 import time
 from collections import defaultdict
@@ -65,9 +66,7 @@ class _RateLimiter:
                 del self._attempts[ip]
 
             # Nettoyer les blocages expirés
-            expired_blocks = [
-                ip for ip, until in self._blocked.items() if until < now
-            ]
+            expired_blocks = [ip for ip, until in self._blocked.items() if until < now]
             for ip in expired_blocks:
                 del self._blocked[ip]
 
@@ -79,6 +78,7 @@ class _RateLimiter:
         le spoofing du header.
         """
         from .config import get_settings
+
         _settings = get_settings()
         if _settings.ENV in ("production", "preprod", "staging"):
             forwarded = request.headers.get("X-Forwarded-For")
@@ -100,9 +100,7 @@ class _RateLimiter:
             if ip in self._blocked:
                 remaining = int(self._blocked[ip] - now)
                 if remaining > 0:
-                    logger.warning(
-                        f"[RATE_LIMIT] IP {ip} bloquée, reste {remaining}s"
-                    )
+                    logger.warning(f"[RATE_LIMIT] IP {ip} bloquée, reste {remaining}s")
                     raise HTTPException(
                         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                         detail=f"Trop de requêtes. Réessayez dans {remaining} secondes.",
@@ -113,17 +111,14 @@ class _RateLimiter:
 
             # Nettoyer les tentatives hors fenêtre pour cette IP
             cutoff = now - self.window_seconds
-            self._attempts[ip] = [
-                t for t in self._attempts[ip] if t > cutoff
-            ]
+            self._attempts[ip] = [t for t in self._attempts[ip] if t > cutoff]
 
             # Vérifier le nombre de tentatives
             if len(self._attempts[ip]) >= self.max_attempts:
                 self._blocked[ip] = now + self.block_seconds
                 self._attempts[ip].clear()
                 logger.warning(
-                    f"[RATE_LIMIT] IP {ip} bloquée pour {self.block_seconds}s "
-                    f"après {self.max_attempts} requêtes"
+                    f"[RATE_LIMIT] IP {ip} bloquée pour {self.block_seconds}s après {self.max_attempts} requêtes"
                 )
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,

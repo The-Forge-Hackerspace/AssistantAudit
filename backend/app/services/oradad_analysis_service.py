@@ -2,6 +2,7 @@
 Service d'analyse ORADAD — parse les archives tar ORADAD et verifie
 les donnees contre le referentiel ANSSI.
 """
+
 import csv
 import io
 import logging
@@ -25,12 +26,12 @@ UAC_USE_DES_KEY_ONLY = 0x200000
 
 # Well-known privileged group RIDs
 PRIVILEGED_GROUP_RIDS = {
-    "512",   # Domain Admins
-    "519",   # Enterprise Admins
-    "518",   # Schema Admins
-    "516",   # Domain Controllers
-    "498",   # Enterprise Read-only Domain Controllers
-    "500",   # Administrator (built-in)
+    "512",  # Domain Admins
+    "519",  # Enterprise Admins
+    "518",  # Schema Admins
+    "516",  # Domain Controllers
+    "498",  # Enterprise Read-only Domain Controllers
+    "500",  # Administrator (built-in)
 }
 
 # Default primaryGroupID values
@@ -88,18 +89,12 @@ class OradadAnalysisService:
         return result
 
     @staticmethod
-    def run_anssi_checks(
-        db: Session, parsed_data: dict[str, list[dict[str, str]]]
-    ) -> list[dict]:
+    def run_anssi_checks(db: Session, parsed_data: dict[str, list[dict[str, str]]]) -> list[dict]:
         """
         Verifie chaque point de controle ANSSI auto_checkable contre les donnees parsees.
         Retourne une liste de findings.
         """
-        checkpoints = (
-            db.query(AnssiCheckpoint)
-            .filter(AnssiCheckpoint.auto_checkable.is_(True))
-            .all()
-        )
+        checkpoints = db.query(AnssiCheckpoint).filter(AnssiCheckpoint.auto_checkable.is_(True)).all()
 
         # Map vuln_id → check function
         check_dispatch = {
@@ -153,9 +148,7 @@ class OradadAnalysisService:
         # Score 0-100: start at 100, deduct based on severity_score of failed checks
         max_severity = sum(f.get("severity_score", 0) for f in findings if f.get("severity_score"))
         failed_severity = sum(
-            f.get("severity_score", 0)
-            for f in findings
-            if f["status"] == "fail" and f.get("severity_score")
+            f.get("severity_score", 0) for f in findings if f["status"] == "fail" and f.get("severity_score")
         )
         score = round(100 * (1 - failed_severity / max_severity)) if max_severity > 0 else 100
 
@@ -213,14 +206,10 @@ class OradadAnalysisService:
         return None
 
     @staticmethod
-    def _check_privileged_members(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_privileged_members(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         users = data.get("users", [])
         priv_users = [
-            u for u in users
-            if OradadAnalysisService._is_privileged(u)
-            and OradadAnalysisService._is_active(u)
+            u for u in users if OradadAnalysisService._is_privileged(u) and OradadAnalysisService._is_active(u)
         ]
         count = len(priv_users)
         status = "fail" if count > 50 else "pass"
@@ -235,9 +224,7 @@ class OradadAnalysisService:
         }
 
     @staticmethod
-    def _check_dont_expire_priv(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_dont_expire_priv(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         users = data.get("users", [])
         affected = [
             u.get("sAMAccountName", "")
@@ -257,9 +244,7 @@ class OradadAnalysisService:
         }
 
     @staticmethod
-    def _check_spn_priv(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_spn_priv(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         users = data.get("users", [])
         affected = [
             u.get("sAMAccountName", "")
@@ -279,9 +264,7 @@ class OradadAnalysisService:
         }
 
     @staticmethod
-    def _check_preauth_priv(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_preauth_priv(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         users = data.get("users", [])
         affected = [
             u.get("sAMAccountName", "")
@@ -301,9 +284,7 @@ class OradadAnalysisService:
         }
 
     @staticmethod
-    def _check_password_change_priv(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_password_change_priv(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         users = data.get("users", [])
         now = datetime.now(timezone.utc)
         three_years_seconds = 3 * 365.25 * 86400
@@ -313,9 +294,7 @@ class OradadAnalysisService:
                 continue
             if not OradadAnalysisService._is_active(u):
                 continue
-            pwd_last = OradadAnalysisService._parse_ad_timestamp(
-                u.get("pwdLastSet", "0")
-            )
+            pwd_last = OradadAnalysisService._parse_ad_timestamp(u.get("pwdLastSet", "0"))
             if pwd_last and (now - pwd_last).total_seconds() > three_years_seconds:
                 affected.append(u.get("sAMAccountName", ""))
         return {
@@ -329,9 +308,7 @@ class OradadAnalysisService:
         }
 
     @staticmethod
-    def _check_dormant_accounts(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_dormant_accounts(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         users = data.get("users", [])
         now = datetime.now(timezone.utc)
         one_year_seconds = 365.25 * 86400
@@ -349,9 +326,7 @@ class OradadAnalysisService:
 
         dormant = []
         for u in active_users:
-            last_logon = OradadAnalysisService._parse_ad_timestamp(
-                u.get("lastLogonTimestamp", "0")
-            )
+            last_logon = OradadAnalysisService._parse_ad_timestamp(u.get("lastLogonTimestamp", "0"))
             if last_logon and (now - last_logon).total_seconds() > one_year_seconds:
                 dormant.append(u.get("sAMAccountName", ""))
             elif not last_logon:
@@ -369,9 +344,7 @@ class OradadAnalysisService:
         }
 
     @staticmethod
-    def _check_delegation_t4d(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_delegation_t4d(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         """Comptes avec TRUSTED_FOR_DELEGATION (hors DC)."""
         affected = []
         for obj_type in ("users", "computers"):
@@ -396,15 +369,12 @@ class OradadAnalysisService:
         }
 
     @staticmethod
-    def _check_dont_expire_all(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_dont_expire_all(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         users = data.get("users", [])
         affected = [
             u.get("sAMAccountName", "")
             for u in users
-            if OradadAnalysisService._is_active(u)
-            and (OradadAnalysisService._get_uac(u) & UAC_DONT_EXPIRE_PASSWD)
+            if OradadAnalysisService._is_active(u) and (OradadAnalysisService._get_uac(u) & UAC_DONT_EXPIRE_PASSWD)
         ]
         return {
             "vuln_id": cp.vuln_id,
@@ -417,9 +387,7 @@ class OradadAnalysisService:
         }
 
     @staticmethod
-    def _check_krbtgt(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_krbtgt(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         users = data.get("users", [])
         now = datetime.now(timezone.utc)
         one_year_seconds = 365.25 * 86400
@@ -437,9 +405,7 @@ class OradadAnalysisService:
             }
 
         user = krbtgt[0]
-        pwd_last = OradadAnalysisService._parse_ad_timestamp(
-            user.get("pwdLastSet", "0")
-        )
+        pwd_last = OradadAnalysisService._parse_ad_timestamp(user.get("pwdLastSet", "0"))
         if pwd_last and (now - pwd_last).total_seconds() > one_year_seconds:
             age_days = int((now - pwd_last).total_seconds() / 86400)
             return {
@@ -463,9 +429,7 @@ class OradadAnalysisService:
         }
 
     @staticmethod
-    def _check_protected_users(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_protected_users(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         users = data.get("users", [])
         affected = []
         for u in users:
@@ -487,9 +451,7 @@ class OradadAnalysisService:
         }
 
     @staticmethod
-    def _check_reversible_password(
-        cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]
-    ) -> dict:
+    def _check_reversible_password(cp: AnssiCheckpoint, data: dict[str, list[dict[str, str]]]) -> dict:
         users = data.get("users", [])
         affected = [
             u.get("sAMAccountName", "")

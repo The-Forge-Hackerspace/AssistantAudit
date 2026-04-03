@@ -5,6 +5,7 @@ liées aux résultats de contrôle.
 Structure de stockage :
   data/{entreprise_nom}/{site_nom}/{equipement_identifiant}/
 """
+
 import logging
 import mimetypes
 import re
@@ -30,9 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _get_attachment_with_ownership(
-    db: Session, attachment_id: int, user: User
-) -> Attachment:
+def _get_attachment_with_ownership(db: Session, attachment_id: int, user: User) -> Attachment:
     """
     Recupere un Attachment avec verification d'ownership via la chaine :
     Attachment -> ControlResult -> Assessment -> Campaign -> Audit -> owner_id.
@@ -41,8 +40,7 @@ def _get_attachment_with_ownership(
     query = db.query(Attachment).filter(Attachment.id == attachment_id)
     if user.role != "admin":
         query = (
-            query
-            .join(ControlResult, Attachment.control_result_id == ControlResult.id)
+            query.join(ControlResult, Attachment.control_result_id == ControlResult.id)
             .join(Assessment, ControlResult.assessment_id == Assessment.id)
             .join(AssessmentCampaign, Assessment.campaign_id == AssessmentCampaign.id)
             .join(Audit, AssessmentCampaign.audit_id == Audit.id)
@@ -53,36 +51,66 @@ def _get_attachment_with_ownership(
         raise HTTPException(status_code=404, detail="Piece jointe introuvable")
     return att
 
+
 # Extensions autorisées
 ALLOWED_EXTENSIONS = {
     # Images
-    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".bmp",
+    ".webp",
+    ".svg",
     # Documents
-    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
     # Texte / Config
-    ".txt", ".log", ".conf", ".cfg", ".ini", ".yaml", ".yml",
-    ".json", ".xml", ".csv", ".md",
+    ".txt",
+    ".log",
+    ".conf",
+    ".cfg",
+    ".ini",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".xml",
+    ".csv",
+    ".md",
     # Archives
-    ".zip", ".gz", ".tar",
+    ".zip",
+    ".gz",
+    ".tar",
     # Réseau / Sécurité
-    ".pcap", ".cap",
+    ".pcap",
+    ".cap",
 }
 
 # Types MIME prévisualisables inline
 PREVIEWABLE_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/svg+xml"}
 PREVIEWABLE_TEXT_TYPES = {
-    "text/plain", "text/csv", "text/markdown",
-    "application/json", "application/xml", "text/xml",
-    "application/x-yaml", "text/yaml",
+    "text/plain",
+    "text/csv",
+    "text/markdown",
+    "application/json",
+    "application/xml",
+    "text/xml",
+    "application/x-yaml",
+    "text/yaml",
 }
 
 
 def _sanitize_dirname(name: str) -> str:
     """Transforme un nom en nom de dossier sûr pour le filesystem."""
     # Remplacer les caractères dangereux
-    safe = re.sub(r'[<>:"/\\|?*]', '_', name)
-    safe = re.sub(r'\s+', '_', safe)
-    safe = safe.strip('. _')
+    safe = re.sub(r'[<>:"/\\|?*]', "_", name)
+    safe = re.sub(r"\s+", "_", safe)
+    safe = safe.strip(". _")
     return safe or "unknown"
 
 
@@ -95,11 +123,7 @@ def _build_storage_path(db: Session, control_result: ControlResult) -> Path:
     # Charger la chaîne complète avec joinedload pour éviter les lazy-load issues
     assessment = (
         db.query(Assessment)
-        .options(
-            joinedload(Assessment.equipement)
-            .joinedload(Equipement.site)
-            .joinedload(Site.entreprise)
-        )
+        .options(joinedload(Assessment.equipement).joinedload(Equipement.site).joinedload(Site.entreprise))
         .filter(Assessment.id == control_result.assessment_id)
         .first()
     )
@@ -142,6 +166,7 @@ def _attachment_to_read(att: Attachment, request_base: str = "") -> AttachmentRe
 
 
 # ── Upload ──
+
 
 @router.post(
     "/control-result/{result_id}/upload",
@@ -195,7 +220,7 @@ def upload_attachment(
 
     # Nom unique pour éviter les conflits
     stored_name = f"{uuid.uuid4().hex[:12]}_{original_name}"
-    stored_name = re.sub(r'[<>:"/\\|?*]', '_', stored_name)  # sanitize
+    stored_name = re.sub(r'[<>:"/\\|?*]', "_", stored_name)  # sanitize
     file_path = storage_dir / stored_name
     file_path.write_bytes(content)
 
@@ -221,15 +246,13 @@ def upload_attachment(
     db.flush()
     db.refresh(attachment)
 
-    logger.info(
-        f"Attachment uploaded: {original_name} ({len(content)} bytes) "
-        f"→ {rel_path} by {current_user.username}"
-    )
+    logger.info(f"Attachment uploaded: {original_name} ({len(content)} bytes) → {rel_path} by {current_user.username}")
 
     return _attachment_to_read(attachment)
 
 
 # ── List ──
+
 
 @router.get(
     "/control-result/{result_id}",
@@ -245,14 +268,10 @@ def list_attachments(
     if not cr:
         raise HTTPException(status_code=404, detail="Résultat de contrôle introuvable")
 
-    query = (
-        db.query(Attachment)
-        .filter(Attachment.control_result_id == result_id)
-    )
+    query = db.query(Attachment).filter(Attachment.control_result_id == result_id)
     if current_user.role != "admin":
         query = (
-            query
-            .join(ControlResult, Attachment.control_result_id == ControlResult.id)
+            query.join(ControlResult, Attachment.control_result_id == ControlResult.id)
             .join(Assessment, ControlResult.assessment_id == Assessment.id)
             .join(AssessmentCampaign, Assessment.campaign_id == AssessmentCampaign.id)
             .join(Audit, AssessmentCampaign.audit_id == Audit.id)
@@ -263,6 +282,7 @@ def list_attachments(
 
 
 # ── Download ──
+
 
 @router.get("/{attachment_id}/download")
 def download_attachment(
@@ -292,6 +312,7 @@ def download_attachment(
 
 
 # ── Preview (inline) ──
+
 
 @router.get("/{attachment_id}/preview")
 def preview_attachment(
@@ -328,6 +349,7 @@ def preview_attachment(
 
 
 # ── Delete ──
+
 
 @router.delete("/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_attachment(

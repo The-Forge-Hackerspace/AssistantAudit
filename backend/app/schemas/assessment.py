@@ -1,6 +1,7 @@
 """
 Schémas Assessment — Campagne & résultats d'évaluation.
 """
+
 from datetime import datetime
 from typing import Optional
 
@@ -20,6 +21,7 @@ class ControlResultBase(BaseModel):
 
 class ControlResultUpdate(ControlResultBase):
     """Mise à jour d'un résultat de contrôle par l'auditeur"""
+
     pass
 
 
@@ -107,6 +109,7 @@ class CampaignRead(BaseModel):
 
 class CampaignSummary(BaseModel):
     """Version allégée"""
+
     id: int
     name: str
     status: str
@@ -121,11 +124,13 @@ class CampaignSummary(BaseModel):
 # --- M365 Scan ---
 class M365ScanSimulateRequest(BaseModel):
     """Injection manuelle de findings pour test/simulation"""
+
     findings: list[dict] = Field(..., description="Liste de findings Monkey365 simulés")
 
 
 class M365ScanResponse(BaseModel):
     """Résultat d'un scan M365"""
+
     scan_id: str
     status: str
     findings_count: int = 0

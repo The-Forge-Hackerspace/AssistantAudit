@@ -12,6 +12,7 @@ pas les fichiers (potentiellement des centaines de Mo).
 
 Si FILE_ENCRYPTION_KEY est vide, le chiffrement est desactive (mode dev uniquement).
 """
+
 import logging
 import os
 
@@ -47,11 +48,10 @@ class EnvelopeEncryption:
     def __init__(self, key_hex: str | None = None):
         if key_hex is None:
             from app.core.config import get_settings
+
             key_hex = get_settings().FILE_ENCRYPTION_KEY
         if not key_hex:
-            logger.warning(
-                "FILE_ENCRYPTION_KEY non configuree — chiffrement fichier desactive (dev only)"
-            )
+            logger.warning("FILE_ENCRYPTION_KEY non configuree — chiffrement fichier desactive (dev only)")
             self.kek = None
         else:
             self.kek = _validate_kek(key_hex)
@@ -90,9 +90,7 @@ class EnvelopeEncryption:
 
         return encrypted_file, encrypted_dek, dek_nonce
 
-    def decrypt_file(
-        self, encrypted_file_data: bytes, encrypted_dek: bytes, dek_nonce: bytes
-    ) -> bytes:
+    def decrypt_file(self, encrypted_file_data: bytes, encrypted_dek: bytes, dek_nonce: bytes) -> bytes:
         """
         Dechiffre des donnees fichier.
 
@@ -116,9 +114,7 @@ class EnvelopeEncryption:
         return aesgcm_file.decrypt(file_nonce, file_ciphertext, None)
 
     @staticmethod
-    def rotate_kek(
-        encrypted_dek: bytes, dek_nonce: bytes, old_kek_hex: str, new_kek_hex: str
-    ) -> tuple[bytes, bytes]:
+    def rotate_kek(encrypted_dek: bytes, dek_nonce: bytes, old_kek_hex: str, new_kek_hex: str) -> tuple[bytes, bytes]:
         """
         Re-chiffre une DEK avec une nouvelle KEK.
         Appele lors de la rotation de cle — itere sur tous les Attachments.

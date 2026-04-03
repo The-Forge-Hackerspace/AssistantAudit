@@ -2,6 +2,7 @@
 Tests unitaires pour les modeles Agent et AgentTask.
 CRUD, relations, contraintes d'unicite, valeurs par defaut.
 """
+
 import uuid
 
 import pytest
@@ -401,12 +402,8 @@ class TestRelationships:
         assert agent.owner.username == "tech_jean"
 
     def test_agent_to_tasks(self, db: Session, agent: Agent, user: User):
-        t1 = AgentTask(
-            agent_id=agent.id, owner_id=user.id, tool="nmap", parameters={}
-        )
-        t2 = AgentTask(
-            agent_id=agent.id, owner_id=user.id, tool="oradad", parameters={}
-        )
+        t1 = AgentTask(agent_id=agent.id, owner_id=user.id, tool="nmap", parameters={})
+        t2 = AgentTask(agent_id=agent.id, owner_id=user.id, tool="oradad", parameters={})
         db.add_all([t1, t2])
         db.commit()
         db.refresh(agent)
@@ -416,9 +413,7 @@ class TestRelationships:
         assert tools == {"nmap", "oradad"}
 
     def test_task_to_agent(self, db: Session, agent: Agent, user: User):
-        task = AgentTask(
-            agent_id=agent.id, owner_id=user.id, tool="nmap", parameters={}
-        )
+        task = AgentTask(agent_id=agent.id, owner_id=user.id, tool="nmap", parameters={})
         db.add(task)
         db.commit()
         db.refresh(task)
@@ -427,9 +422,7 @@ class TestRelationships:
         assert task.agent.name == "PC-Bureau-Jean"
 
     def test_task_to_owner(self, db: Session, agent: Agent, user: User):
-        task = AgentTask(
-            agent_id=agent.id, owner_id=user.id, tool="nmap", parameters={}
-        )
+        task = AgentTask(agent_id=agent.id, owner_id=user.id, tool="nmap", parameters={})
         db.add(task)
         db.commit()
         db.refresh(task)
@@ -438,9 +431,7 @@ class TestRelationships:
         assert task.owner.username == "tech_jean"
 
     def test_cascade_delete_agent_deletes_tasks(self, db: Session, agent: Agent, user: User):
-        t1 = AgentTask(
-            agent_id=agent.id, owner_id=user.id, tool="nmap", parameters={}
-        )
+        t1 = AgentTask(agent_id=agent.id, owner_id=user.id, tool="nmap", parameters={})
         db.add(t1)
         db.commit()
         task_id = t1.id

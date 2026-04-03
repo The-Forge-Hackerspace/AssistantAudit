@@ -5,11 +5,11 @@ Stocke les données collectées sur un domaine AD (comptes, groupes,
 GPO, politique de MdP, LAPS…) pour analyse et pré-remplissage des
 contrôles d'audit.
 """
+
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
-from sqlalchemy import JSON
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -28,19 +28,14 @@ class ADAuditStatus(str, PyEnum):
 
 class ADAuditResultModel(Base):
     """Résultat d'un audit Active Directory, lié à un équipement (serveur DC)."""
+
     __tablename__ = "ad_audit_results"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    equipement_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("equipements.id"), nullable=True, index=True
-    )
+    equipement_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("equipements.id"), nullable=True, index=True)
     # Isolation inter-techniciens
-    owner_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False, index=True
-    )
-    status: Mapped[ADAuditStatus] = mapped_column(
-        Enum(ADAuditStatus), default=ADAuditStatus.RUNNING, nullable=False
-    )
+    owner_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    status: Mapped[ADAuditStatus] = mapped_column(Enum(ADAuditStatus), default=ADAuditStatus.RUNNING, nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text)
 
     # Connexion
@@ -78,9 +73,7 @@ class ADAuditResultModel(Base):
     summary: Mapped[dict | None] = mapped_column(JSON)
 
     # Métadonnées
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
 

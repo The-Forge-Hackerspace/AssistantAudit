@@ -1,6 +1,7 @@
 """
 Schémas Entreprise & Contact.
 """
+
 from datetime import datetime
 from typing import Optional
 

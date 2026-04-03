@@ -68,7 +68,10 @@ def associate_tag(
 ):
     """Associe un tag à une entité (équipement, finding, etc.)."""
     assoc = TagService.associate_tag(
-        db, body.tag_id, body.taggable_type, body.taggable_id,
+        db,
+        body.tag_id,
+        body.taggable_type,
+        body.taggable_id,
         user_id=current_user.id,
         is_admin=current_user.role == "admin",
     )
@@ -85,7 +88,10 @@ def dissociate_tag(
 ):
     """Retire un tag d'une entité."""
     TagService.dissociate_tag(
-        db, tag_id, taggable_type, taggable_id,
+        db,
+        tag_id,
+        taggable_type,
+        taggable_id,
         user_id=current_user.id,
         is_admin=current_user.role == "admin",
     )
@@ -113,7 +119,9 @@ def update_tag(
 ):
     """Met à jour un tag."""
     tag = TagService.update_tag(
-        db, tag_id, body,
+        db,
+        tag_id,
+        body,
         user_id=current_user.id,
         is_admin=current_user.role == "admin",
     )
@@ -128,7 +136,8 @@ def delete_tag(
 ):
     """Supprime un tag et toutes ses associations."""
     name = TagService.delete_tag(
-        db, tag_id,
+        db,
+        tag_id,
         user_id=current_user.id,
         is_admin=current_user.role == "admin",
     )

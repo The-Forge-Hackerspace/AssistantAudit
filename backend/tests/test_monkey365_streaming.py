@@ -7,6 +7,7 @@ Couvre :
 - Executor streaming async avec subprocess mocke
 - Route POST /monkey365/stream (retour immediat, ownership)
 """
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -103,10 +104,7 @@ class TestStreamingExecutor:
         assert result["scan_id"] == 42
 
         # Verifier que device_code a ete envoye
-        device_code_calls = [
-            call for call in ws_callback.call_args_list
-            if call.args[0] == "device_code"
-        ]
+        device_code_calls = [call for call in ws_callback.call_args_list if call.args[0] == "device_code"]
         assert len(device_code_calls) == 1
         data = device_code_calls[0].args[1]
         assert data["url"] == "https://microsoft.com/devicelogin"
@@ -140,10 +138,7 @@ class TestStreamingExecutor:
             with patch("asyncio.create_subprocess_exec", return_value=mock_process):
                 await executor.run_scan_streaming(tenant_id="t", auth_method=AuthMethod.DEVICE_CODE)
 
-        scan_log_calls = [
-            call for call in ws_callback.call_args_list
-            if call.args[0] == "scan_log"
-        ]
+        scan_log_calls = [call for call in ws_callback.call_args_list if call.args[0] == "scan_log"]
         assert len(scan_log_calls) == 3
         assert scan_log_calls[0].args[1]["line"] == "Line 1"
         assert scan_log_calls[2].args[1]["line"] == "Line 3"
@@ -169,10 +164,7 @@ class TestStreamingExecutor:
                 result = await executor.run_scan_streaming(tenant_id="t", auth_method=AuthMethod.DEVICE_CODE)
 
         assert result["status"] == "success"
-        complete_calls = [
-            call for call in ws_callback.call_args_list
-            if call.args[0] == "scan_complete"
-        ]
+        complete_calls = [call for call in ws_callback.call_args_list if call.args[0] == "scan_complete"]
         assert len(complete_calls) == 1
         assert complete_calls[0].args[1]["scan_id"] == 5
 
@@ -199,10 +191,7 @@ class TestStreamingExecutor:
         assert result["status"] == "error"
         assert result["returncode"] == 1
 
-        error_calls = [
-            call for call in ws_callback.call_args_list
-            if call.args[0] == "scan_error"
-        ]
+        error_calls = [call for call in ws_callback.call_args_list if call.args[0] == "scan_error"]
         assert len(error_calls) == 1
         assert "PowerShell error" in error_calls[0].args[1]["error"]
 
@@ -324,6 +313,7 @@ class TestBuildPsScript:
 class TestStreamingRoute:
     def _create_entreprise(self, db_session, owner_id):
         from app.models.entreprise import Entreprise
+
         ent = Entreprise(nom="TestCorp", secteur_activite="IT", owner_id=owner_id)
         db_session.add(ent)
         db_session.commit()
@@ -332,6 +322,7 @@ class TestStreamingRoute:
 
     def _create_audit_for_user(self, db_session, entreprise_id, user_id):
         from app.models.audit import Audit
+
         audit = Audit(
             nom_projet="Test Audit",
             entreprise_id=entreprise_id,
@@ -342,17 +333,14 @@ class TestStreamingRoute:
         db_session.refresh(audit)
         return audit
 
-    def test_streaming_route_returns_201(
-        self, client, db_session, auditeur_user, auditeur_headers
-    ):
+    def test_streaming_route_returns_201(self, client, db_session, auditeur_user, auditeur_headers):
         """La route retourne immediatement avec scan_id et status=authenticating."""
         ent = self._create_entreprise(db_session, owner_id=auditeur_user.id)
         self._create_audit_for_user(db_session, ent.id, auditeur_user.id)
 
-        with patch(
-            "app.api.v1.tools.monkey365.Monkey365ScanService.create_streaming_scan"
-        ) as mock_create, patch(
-            "app.api.v1.tools.monkey365.asyncio.create_task"
+        with (
+            patch("app.api.v1.tools.monkey365.Monkey365ScanService.create_streaming_scan") as mock_create,
+            patch("app.api.v1.tools.monkey365.asyncio.create_task"),
         ):
             mock_result = MagicMock()
             mock_result.id = 99
@@ -378,7 +366,12 @@ class TestStreamingRoute:
         assert data["auth_method"] == "device_code"
 
     def test_streaming_route_no_ownership_returns_404(
-        self, client, db_session, auditeur_user, auditeur_headers, admin_user,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        auditeur_headers,
+        admin_user,
     ):
         """404 si l'utilisateur n'est ni proprietaire ni lie par audit."""
         ent = self._create_entreprise(db_session, owner_id=admin_user.id)
@@ -394,16 +387,13 @@ class TestStreamingRoute:
         )
         assert response.status_code == 404
 
-    def test_streaming_route_admin_bypasses_ownership(
-        self, client, db_session, admin_user, admin_headers
-    ):
+    def test_streaming_route_admin_bypasses_ownership(self, client, db_session, admin_user, admin_headers):
         """Les admins peuvent lancer un scan sans ownership."""
         ent = self._create_entreprise(db_session, owner_id=admin_user.id)
 
-        with patch(
-            "app.api.v1.tools.monkey365.Monkey365ScanService.create_streaming_scan"
-        ) as mock_create, patch(
-            "app.api.v1.tools.monkey365.asyncio.create_task"
+        with (
+            patch("app.api.v1.tools.monkey365.Monkey365ScanService.create_streaming_scan") as mock_create,
+            patch("app.api.v1.tools.monkey365.asyncio.create_task"),
         ):
             mock_result = MagicMock()
             mock_result.id = 1
@@ -423,9 +413,7 @@ class TestStreamingRoute:
 
         assert response.status_code == 201
 
-    def test_streaming_route_unknown_entreprise_returns_404(
-        self, client, auditeur_headers
-    ):
+    def test_streaming_route_unknown_entreprise_returns_404(self, client, auditeur_headers):
         """404 si l'entreprise n'existe pas."""
         response = client.post(
             "/api/v1/tools/monkey365/stream",
@@ -448,9 +436,7 @@ class TestStreamingRoute:
         )
         assert response.status_code in (401, 403)
 
-    def test_streaming_route_lecteur_forbidden(
-        self, client, lecteur_headers
-    ):
+    def test_streaming_route_lecteur_forbidden(self, client, lecteur_headers):
         """403 pour un lecteur (role insuffisant)."""
         response = client.post(
             "/api/v1/tools/monkey365/stream",

@@ -16,6 +16,7 @@ Prérequis :
     - psycopg2-binary doit être installé (déjà dans requirements.txt).
     - Les migrations Alembic doivent être à jour.
 """
+
 import argparse
 import logging
 import sys

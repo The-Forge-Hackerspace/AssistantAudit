@@ -1,6 +1,7 @@
 """
 Schemas Agent : gestion des agents et taches.
 """
+
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -11,9 +12,7 @@ from pydantic import BaseModel, Field, field_serializer
 
 class AgentCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    allowed_tools: list[str] = Field(
-        default=["nmap", "oradad", "config-oradad", "ad_collector"]
-    )
+    allowed_tools: list[str] = Field(default=["nmap", "oradad", "config-oradad", "ad_collector"])
     target_user_id: Optional[int] = None
 
 

@@ -3,6 +3,7 @@ Service Equipement : CRUD des assets d'infrastructure.
 
 Gere les sous-types STI (reseau, serveur, firewall) via polymorphisme.
 """
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -62,7 +63,10 @@ def equipement_to_read(eq: Equipement) -> EquipementRead:
 
 
 def _check_site_access(
-    db: Session, site_id: int, user_id: int | None, is_admin: bool,
+    db: Session,
+    site_id: int,
+    user_id: int | None,
+    is_admin: bool,
 ) -> None:
     """Verifie l'acces au site via la chaine Site → Entreprise → Audit."""
     if user_id is not None and not is_admin:
@@ -72,7 +76,6 @@ def _check_site_access(
 
 
 class EquipementService:
-
     @staticmethod
     def list_equipements(
         db: Session,
@@ -90,14 +93,9 @@ class EquipementService:
 
         if user_id is not None and not is_admin:
             accessible_ent_ids = (
-                db.query(Audit.entreprise_id)
-                .filter(Audit.owner_id == user_id)
-                .distinct()
-                .scalar_subquery()
+                db.query(Audit.entreprise_id).filter(Audit.owner_id == user_id).distinct().scalar_subquery()
             )
-            query = query.join(Site, Equipement.site_id == Site.id).filter(
-                Site.entreprise_id.in_(accessible_ent_ids)
-            )
+            query = query.join(Site, Equipement.site_id == Site.id).filter(Site.entreprise_id.in_(accessible_ent_ids))
             if site_id is not None:
                 query = query.filter(Equipement.site_id == site_id)
             if entreprise_id is not None:
@@ -106,29 +104,22 @@ class EquipementService:
             if site_id is not None:
                 query = query.filter(Equipement.site_id == site_id)
             if entreprise_id is not None:
-                query = query.join(Site, Equipement.site_id == Site.id).filter(
-                    Site.entreprise_id == entreprise_id
-                )
+                query = query.join(Site, Equipement.site_id == Site.id).filter(Site.entreprise_id == entreprise_id)
 
         if type_equipement is not None:
             query = query.filter(Equipement.type_equipement == type_equipement)
         if status_audit is not None:
-            query = query.filter(
-                Equipement.status_audit == EquipementAuditStatus(status_audit)
-            )
+            query = query.filter(Equipement.status_audit == EquipementAuditStatus(status_audit))
         total = query.count()
-        items = (
-            query.order_by(Equipement.ip_address)
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
+        items = query.order_by(Equipement.ip_address).offset(offset).limit(limit).all()
         return items, total
 
     @staticmethod
     def get_equipement(
-        db: Session, equipement_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        equipement_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Equipement:
         """Recupere un equipement par ID. Non-admin doit avoir acces via la chaine."""
         equipement = get_or_404(db, Equipement, equipement_id)
@@ -137,8 +128,10 @@ class EquipementService:
 
     @staticmethod
     def create_equipement(
-        db: Session, data: EquipementCreate,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        data: EquipementCreate,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Equipement:
         """Cree un equipement dans un site. Verifie l'acces et l'unicite site+IP."""
         get_or_404(db, Site, data.site_id)
@@ -180,8 +173,11 @@ class EquipementService:
 
     @staticmethod
     def update_equipement(
-        db: Session, equipement_id: int, data: EquipementUpdate,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        equipement_id: int,
+        data: EquipementUpdate,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Equipement:
         """Met a jour un equipement. Verifie l'acces via la chaine."""
         equipement = get_or_404(db, Equipement, equipement_id)

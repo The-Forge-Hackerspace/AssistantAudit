@@ -12,6 +12,7 @@ Couvre :
 - Fichier volumineux (1 MB+)
 - Routes API (POST upload, GET download, DELETE)
 """
+
 import os
 import uuid
 from io import BytesIO
@@ -53,6 +54,7 @@ def tmp_blobs_dir(tmp_path, monkeypatch):
     frameworks.mkdir()
 
     from app.core.config import get_settings
+
     real_settings = get_settings()
 
     monkeypatch.setattr(real_settings, "DATA_DIR", str(tmp_path))
@@ -64,6 +66,7 @@ def tmp_blobs_dir(tmp_path, monkeypatch):
 def file_service(monkeypatch):
     """FileService en mode passthrough (pas de FILE_ENCRYPTION_KEY)."""
     from app.core.config import get_settings
+
     real_settings = get_settings()
     monkeypatch.setattr(real_settings, "FILE_ENCRYPTION_KEY", "")
     return FileService()
@@ -74,6 +77,7 @@ def file_service_encrypted(monkeypatch):
     """FileService avec chiffrement actif."""
     test_kek = os.urandom(32).hex()
     from app.core.config import get_settings
+
     real_settings = get_settings()
     monkeypatch.setattr(real_settings, "FILE_ENCRYPTION_KEY", test_kek)
     return FileService()
@@ -87,9 +91,7 @@ def full_chain(db_session: Session):
     """
     uid = str(uuid.uuid4())[:8]
 
-    owner = UserFactory.create(
-        db_session, username=f"owner_{uid}", email=f"owner_{uid}@test.local", role="auditeur"
-    )
+    owner = UserFactory.create(db_session, username=f"owner_{uid}", email=f"owner_{uid}@test.local", role="auditeur")
     other_user = UserFactory.create(
         db_session, username=f"other_{uid}", email=f"other_{uid}@test.local", role="auditeur"
     )
@@ -100,16 +102,12 @@ def full_chain(db_session: Session):
     category = FrameworkCategoryFactory.create(db_session, framework_id=framework.id)
     control = ControlFactory.create(db_session, category_id=category.id, ref_id=f"CTL_{uid}")
 
-    audit = AuditFactory.create(
-        db_session, nom_projet=f"Audit {uid}", entreprise_id=entreprise.id, owner_id=owner.id
-    )
+    audit = AuditFactory.create(db_session, nom_projet=f"Audit {uid}", entreprise_id=entreprise.id, owner_id=owner.id)
     campaign = AssessmentCampaignFactory.create(db_session, audit_id=audit.id)
     assessment = AssessmentFactory.create(
         db_session, campaign_id=campaign.id, equipement_id=equipement.id, framework_id=framework.id
     )
-    control_result = ControlResultFactory.create(
-        db_session, assessment_id=assessment.id, control_id=control.id
-    )
+    control_result = ControlResultFactory.create(db_session, assessment_id=assessment.id, control_id=control.id)
 
     return {
         "owner": owner,
@@ -127,9 +125,7 @@ def full_chain(db_session: Session):
 class TestFileServiceUpload:
     """Tests pour FileService.upload_file."""
 
-    def test_upload_creates_attachment_and_file(
-        self, db_session, full_chain, file_service, tmp_blobs_dir
-    ):
+    def test_upload_creates_attachment_and_file(self, db_session, full_chain, file_service, tmp_blobs_dir):
         content = b"Hello, this is test evidence."
         attachment = file_service.upload_file(
             db=db_session,
@@ -152,9 +148,7 @@ class TestFileServiceUpload:
         blob_path = tmp_blobs_dir / "blobs" / f"{attachment.file_uuid}.enc"
         assert blob_path.exists()
 
-    def test_upload_no_ownership_returns_404(
-        self, db_session, full_chain, file_service, tmp_blobs_dir
-    ):
+    def test_upload_no_ownership_returns_404(self, db_session, full_chain, file_service, tmp_blobs_dir):
         with pytest.raises(HTTPException) as exc_info:
             file_service.upload_file(
                 db=db_session,
@@ -166,9 +160,7 @@ class TestFileServiceUpload:
             )
         assert exc_info.value.status_code == 404
 
-    def test_upload_nonexistent_control_result_returns_404(
-        self, db_session, full_chain, file_service, tmp_blobs_dir
-    ):
+    def test_upload_nonexistent_control_result_returns_404(self, db_session, full_chain, file_service, tmp_blobs_dir):
         with pytest.raises(HTTPException) as exc_info:
             file_service.upload_file(
                 db=db_session,
@@ -180,9 +172,7 @@ class TestFileServiceUpload:
             )
         assert exc_info.value.status_code == 404
 
-    def test_upload_with_description(
-        self, db_session, full_chain, file_service, tmp_blobs_dir
-    ):
+    def test_upload_with_description(self, db_session, full_chain, file_service, tmp_blobs_dir):
         attachment = file_service.upload_file(
             db=db_session,
             content=b"data",
@@ -199,9 +189,7 @@ class TestFileServiceUpload:
 class TestFileServiceUploadEncrypted:
     """Tests avec chiffrement actif."""
 
-    def test_upload_encrypted_stores_dek(
-        self, db_session, full_chain, file_service_encrypted, tmp_blobs_dir
-    ):
+    def test_upload_encrypted_stores_dek(self, db_session, full_chain, file_service_encrypted, tmp_blobs_dir):
         content = b"Sensitive evidence data"
         attachment = file_service_encrypted.upload_file(
             db=db_session,
@@ -228,9 +216,7 @@ class TestFileServiceUploadEncrypted:
 class TestFileServiceDownload:
     """Tests pour FileService.download_file."""
 
-    def test_download_new_file_passthrough(
-        self, db_session, full_chain, file_service, tmp_blobs_dir
-    ):
+    def test_download_new_file_passthrough(self, db_session, full_chain, file_service, tmp_blobs_dir):
         original_content = b"Evidence content for download test"
         attachment = file_service.upload_file(
             db=db_session,
@@ -273,9 +259,7 @@ class TestFileServiceDownload:
         assert content == original_content
         assert filename == "classified.docx"
 
-    def test_download_other_user_returns_404(
-        self, db_session, full_chain, file_service, tmp_blobs_dir
-    ):
+    def test_download_other_user_returns_404(self, db_session, full_chain, file_service, tmp_blobs_dir):
         attachment = file_service.upload_file(
             db=db_session,
             content=b"private data",
@@ -294,13 +278,12 @@ class TestFileServiceDownload:
             )
         assert exc_info.value.status_code == 404
 
-    def test_download_legacy_file_without_dek(
-        self, db_session, full_chain, tmp_blobs_dir, file_service
-    ):
+    def test_download_legacy_file_without_dek(self, db_session, full_chain, tmp_blobs_dir, file_service):
         """Test backward compat : fichier ancien sans encrypted_dek."""
         # Creer un fichier legacy directement
         # Le FRAMEWORKS_DIR est tmp_blobs_dir/frameworks, donc le data dir parent est tmp_blobs_dir
         from app.core.config import get_settings
+
         settings = get_settings()
         base_data = Path(settings.FRAMEWORKS_DIR).parent / "data"
         legacy_dir = base_data / "legacy"
@@ -337,9 +320,7 @@ class TestFileServiceDownload:
         assert content == legacy_content
         assert filename == "old_file.txt"
 
-    def test_download_nonexistent_attachment_returns_404(
-        self, db_session, full_chain, file_service, tmp_blobs_dir
-    ):
+    def test_download_nonexistent_attachment_returns_404(self, db_session, full_chain, file_service, tmp_blobs_dir):
         with pytest.raises(HTTPException) as exc_info:
             file_service.download_file(
                 db=db_session,
@@ -352,9 +333,7 @@ class TestFileServiceDownload:
 class TestFileServiceDelete:
     """Tests pour FileService.delete_file."""
 
-    def test_delete_removes_file_and_record(
-        self, db_session, full_chain, file_service, tmp_blobs_dir
-    ):
+    def test_delete_removes_file_and_record(self, db_session, full_chain, file_service, tmp_blobs_dir):
         attachment = file_service.upload_file(
             db=db_session,
             content=b"to be deleted",
@@ -383,9 +362,7 @@ class TestFileServiceDelete:
         # Enregistrement supprime de la base
         assert db_session.get(Attachment, attachment_id) is None
 
-    def test_delete_other_user_returns_404(
-        self, db_session, full_chain, file_service, tmp_blobs_dir
-    ):
+    def test_delete_other_user_returns_404(self, db_session, full_chain, file_service, tmp_blobs_dir):
         attachment = file_service.upload_file(
             db=db_session,
             content=b"data",
@@ -408,9 +385,7 @@ class TestFileServiceDelete:
 class TestFileServiceLargeFile:
     """Test fichier volumineux."""
 
-    def test_upload_download_1mb_file(
-        self, db_session, full_chain, file_service, tmp_blobs_dir
-    ):
+    def test_upload_download_1mb_file(self, db_session, full_chain, file_service, tmp_blobs_dir):
         large_content = os.urandom(1024 * 1024)  # 1 MB
         attachment = file_service.upload_file(
             db=db_session,
@@ -431,9 +406,7 @@ class TestFileServiceLargeFile:
         )
         assert content == large_content
 
-    def test_upload_download_1mb_encrypted(
-        self, db_session, full_chain, file_service_encrypted, tmp_blobs_dir
-    ):
+    def test_upload_download_1mb_encrypted(self, db_session, full_chain, file_service_encrypted, tmp_blobs_dir):
         large_content = os.urandom(1024 * 1024)  # 1 MB
         attachment = file_service_encrypted.upload_file(
             db=db_session,
@@ -477,9 +450,7 @@ class TestFilesAPI:
         assessment = AssessmentFactory.create(
             db_session, campaign_id=campaign.id, equipement_id=equipement.id, framework_id=framework.id
         )
-        cr = ControlResultFactory.create(
-            db_session, assessment_id=assessment.id, control_id=control.id
-        )
+        cr = ControlResultFactory.create(db_session, assessment_id=assessment.id, control_id=control.id)
         return cr
 
     def test_upload_endpoint(self, client, db_session, auditeur_user, tmp_blobs_dir, monkeypatch):
@@ -489,6 +460,7 @@ class TestFilesAPI:
 
         # Monkeypatch FILE_ENCRYPTION_KEY pour mode passthrough
         from app.core.config import get_settings
+
         monkeypatch.setattr(get_settings(), "FILE_ENCRYPTION_KEY", "")
 
         response = client.post(

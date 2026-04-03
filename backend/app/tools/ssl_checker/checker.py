@@ -4,6 +4,7 @@ SSL/TLS Checker — Vérification de certificats et protocoles.
 Utilise uniquement la stdlib Python (ssl + socket).
 Supporte SNI, vérification d'expiration, chaîne de confiance, protocoles supportés.
 """
+
 import logging
 import socket
 import ssl
@@ -174,11 +175,13 @@ def _check_protocols(host: str, port: int, timeout: int) -> list[ProtocolInfo]:
     for proto_name, proto_const in _PROTOCOL_MAP:
         if proto_name == "TLSv1.3":
             supported = _check_tls13(host, port, timeout)
-            results.append(ProtocolInfo(
-                name=proto_name,
-                supported=supported,
-                is_secure=True,
-            ))
+            results.append(
+                ProtocolInfo(
+                    name=proto_name,
+                    supported=supported,
+                    is_secure=True,
+                )
+            )
             continue
 
         try:
@@ -196,11 +199,13 @@ def _check_protocols(host: str, port: int, timeout: int) -> list[ProtocolInfo]:
 
         is_secure = proto_name in ("TLSv1.2", "TLSv1.3")
 
-        results.append(ProtocolInfo(
-            name=proto_name,
-            supported=supported,
-            is_secure=is_secure,
-        ))
+        results.append(
+            ProtocolInfo(
+                name=proto_name,
+                supported=supported,
+                is_secure=is_secure,
+            )
+        )
 
     return results
 
@@ -227,68 +232,79 @@ def _analyze(cert: CertificateInfo, protocols: list[ProtocolInfo]) -> list[Secur
 
     # ── Certificat ──
     if cert.error:
-        findings.append(SecurityFinding(
-            severity="high",
-            category="Certificat",
-            title="Impossible de vérifier le certificat",
-            description=f"Erreur lors de la récupération : {cert.error}",
-            remediation="Vérifier que le service TLS est correctement configuré.",
-        ))
+        findings.append(
+            SecurityFinding(
+                severity="high",
+                category="Certificat",
+                title="Impossible de vérifier le certificat",
+                description=f"Erreur lors de la récupération : {cert.error}",
+                remediation="Vérifier que le service TLS est correctement configuré.",
+            )
+        )
     else:
         if cert.is_expired:
-            findings.append(SecurityFinding(
-                severity="critical",
-                category="Certificat",
-                title="Certificat expiré",
-                description=(
-                    f"Le certificat a expiré (expiration : {cert.not_after}). "
-                    "Un certificat expiré provoque des erreurs de connexion et compromet la confiance."
-                ),
-                remediation="Renouveler le certificat immédiatement.",
-            ))
+            findings.append(
+                SecurityFinding(
+                    severity="critical",
+                    category="Certificat",
+                    title="Certificat expiré",
+                    description=(
+                        f"Le certificat a expiré (expiration : {cert.not_after}). "
+                        "Un certificat expiré provoque des erreurs de connexion et compromet la confiance."
+                    ),
+                    remediation="Renouveler le certificat immédiatement.",
+                )
+            )
         elif cert.days_remaining is not None and 0 < cert.days_remaining <= 30:
-            findings.append(SecurityFinding(
-                severity="high",
-                category="Certificat",
-                title=f"Certificat expire dans {cert.days_remaining} jours",
-                description=(
-                    f"Le certificat expirera le {cert.not_after}. "
-                    "Un renouvellement urgent est nécessaire."
-                ),
-                remediation="Planifier le renouvellement du certificat.",
-            ))
+            findings.append(
+                SecurityFinding(
+                    severity="high",
+                    category="Certificat",
+                    title=f"Certificat expire dans {cert.days_remaining} jours",
+                    description=(
+                        f"Le certificat expirera le {cert.not_after}. Un renouvellement urgent est nécessaire."
+                    ),
+                    remediation="Planifier le renouvellement du certificat.",
+                )
+            )
         elif cert.days_remaining is not None and 0 < cert.days_remaining <= 90:
-            findings.append(SecurityFinding(
-                severity="medium",
-                category="Certificat",
-                title=f"Certificat expire dans {cert.days_remaining} jours",
-                description=f"Expiration prévue le {cert.not_after}.",
-                remediation="Prévoir le renouvellement du certificat.",
-            ))
+            findings.append(
+                SecurityFinding(
+                    severity="medium",
+                    category="Certificat",
+                    title=f"Certificat expire dans {cert.days_remaining} jours",
+                    description=f"Expiration prévue le {cert.not_after}.",
+                    remediation="Prévoir le renouvellement du certificat.",
+                )
+            )
 
         if cert.self_signed:
-            findings.append(SecurityFinding(
-                severity="high",
-                category="Certificat",
-                title="Certificat auto-signé",
-                description=(
-                    "Le certificat est auto-signé. Il ne sera pas reconnu par les navigateurs "
-                    "et ne fournit aucune assurance sur l'identité du serveur."
-                ),
-                remediation="Obtenir un certificat auprès d'une autorité de certification reconnue.",
-            ))
+            findings.append(
+                SecurityFinding(
+                    severity="high",
+                    category="Certificat",
+                    title="Certificat auto-signé",
+                    description=(
+                        "Le certificat est auto-signé. Il ne sera pas reconnu par les navigateurs "
+                        "et ne fournit aucune assurance sur l'identité du serveur."
+                    ),
+                    remediation="Obtenir un certificat auprès d'une autorité de certification reconnue.",
+                )
+            )
 
         if not cert.is_trusted and not cert.self_signed:
-            findings.append(SecurityFinding(
-                severity="high",
-                category="Certificat",
-                title="Certificat non approuvé",
-                description=(
-                    "Le certificat n'est pas signé par une autorité de certification de confiance. "
-                    "La chaîne de confiance est rompue."
-                ),
-                remediation="Vérifier la chaîne de certificats et installer les certificats intermédiaires manquants.",
-            ))
+            findings.append(
+                SecurityFinding(
+                    severity="high",
+                    category="Certificat",
+                    title="Certificat non approuvé",
+                    description=(
+                        "Le certificat n'est pas signé par une autorité de certification de confiance. "
+                        "La chaîne de confiance est rompue."
+                    ),
+                    remediation="Vérifier la chaîne de certificats et installer les certificats intermédiaires manquants.",
+                )
+            )
 
     # ── Protocoles ──
     deprecated_supported = []
@@ -297,36 +313,42 @@ def _analyze(cert: CertificateInfo, protocols: list[ProtocolInfo]) -> list[Secur
             deprecated_supported.append(proto.name)
 
     if deprecated_supported:
-        findings.append(SecurityFinding(
-            severity="high" if "SSLv3" in deprecated_supported else "medium",
-            category="Protocoles",
-            title=f"Protocole(s) obsolète(s) supporté(s) : {', '.join(deprecated_supported)}",
-            description=(
-                f"Le serveur supporte les protocoles obsolètes : {', '.join(deprecated_supported)}. "
-                "Ces protocoles contiennent des vulnérabilités connues (POODLE, BEAST, etc.)."
-            ),
-            remediation="Désactiver SSLv3, TLSv1.0, TLSv1.1. N'autoriser que TLSv1.2 et TLSv1.3.",
-        ))
+        findings.append(
+            SecurityFinding(
+                severity="high" if "SSLv3" in deprecated_supported else "medium",
+                category="Protocoles",
+                title=f"Protocole(s) obsolète(s) supporté(s) : {', '.join(deprecated_supported)}",
+                description=(
+                    f"Le serveur supporte les protocoles obsolètes : {', '.join(deprecated_supported)}. "
+                    "Ces protocoles contiennent des vulnérabilités connues (POODLE, BEAST, etc.)."
+                ),
+                remediation="Désactiver SSLv3, TLSv1.0, TLSv1.1. N'autoriser que TLSv1.2 et TLSv1.3.",
+            )
+        )
 
     tls13 = next((p for p in protocols if p.name == "TLSv1.3"), None)
     if tls13 and not tls13.supported:
-        findings.append(SecurityFinding(
-            severity="low",
-            category="Protocoles",
-            title="TLS 1.3 non supporté",
-            description="Le serveur ne supporte pas TLS 1.3, le protocole le plus récent et le plus sûr.",
-            remediation="Activer TLS 1.3 pour bénéficier des dernières améliorations de sécurité.",
-        ))
+        findings.append(
+            SecurityFinding(
+                severity="low",
+                category="Protocoles",
+                title="TLS 1.3 non supporté",
+                description="Le serveur ne supporte pas TLS 1.3, le protocole le plus récent et le plus sûr.",
+                remediation="Activer TLS 1.3 pour bénéficier des dernières améliorations de sécurité.",
+            )
+        )
 
     secure_protocols = [p for p in protocols if p.supported and p.is_secure]
     if not secure_protocols:
-        findings.append(SecurityFinding(
-            severity="critical",
-            category="Protocoles",
-            title="Aucun protocole sécurisé supporté",
-            description="Le serveur ne supporte ni TLS 1.2 ni TLS 1.3.",
-            remediation="Mettre à jour la configuration TLS pour supporter au minimum TLS 1.2.",
-        ))
+        findings.append(
+            SecurityFinding(
+                severity="critical",
+                category="Protocoles",
+                title="Aucun protocole sécurisé supporté",
+                description="Le serveur ne supporte ni TLS 1.2 ni TLS 1.3.",
+                remediation="Mettre à jour la configuration TLS pour supporter au minimum TLS 1.2.",
+            )
+        )
 
     return findings
 

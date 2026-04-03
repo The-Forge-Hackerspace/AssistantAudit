@@ -2,6 +2,7 @@
 Global exception handlers pour FastAPI.
 Centralise la gestion des erreurs avec des réponses standardisées.
 """
+
 import logging
 import traceback
 
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class ValidationErrorResponse:
     """Réponse standardisée pour les erreurs de validation."""
+
     def __init__(self, detail: str, errors: list = None):
         self.detail = detail
         self.errors = errors or []
@@ -61,6 +63,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
         # En dev (DEBUG), retourner le detail ; en production, message generique seul
         from app.core.config import get_settings
+
         _env = get_settings().ENV
         if _env == "development":
             content = {

@@ -2,6 +2,7 @@
 Utilitaires partages pour les routes et services.
 Centralise les patterns repetes (404 checks, ownership, etc.).
 """
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -33,6 +34,7 @@ def check_owner(resource, owner_id: int, *, is_admin: bool = False) -> None:
     resource_owner = getattr(resource, "owner_id", None) or getattr(resource, "user_id", None)
     if resource_owner != owner_id:
         from .audit_logger import log_access_denied
+
         resource_type = type(resource).__name__
         resource_id = getattr(resource, "id", "?")
         log_access_denied(owner_id, resource_type, resource_id)
@@ -43,12 +45,18 @@ def user_has_access_to_entreprise(db: Session, entreprise_id: int, user_id: int)
     """Verifie si un user est proprietaire de l'entreprise ou a un audit lie."""
     from ..models.audit import Audit
     from ..models.entreprise import Entreprise
+
     # Check direct ownership first (fast path)
     ent = db.get(Entreprise, entreprise_id)
     if ent and ent.owner_id == user_id:
         return True
     # Fallback: audit chain (backward compat)
-    return db.query(Audit).filter(
-        Audit.entreprise_id == entreprise_id,
-        Audit.owner_id == user_id,
-    ).first() is not None
+    return (
+        db.query(Audit)
+        .filter(
+            Audit.entreprise_id == entreprise_id,
+            Audit.owner_id == user_id,
+        )
+        .first()
+        is not None
+    )

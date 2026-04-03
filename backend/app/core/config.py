@@ -2,6 +2,7 @@
 Configuration de l'application via Pydantic Settings.
 Charge automatiquement les variables depuis .env
 """
+
 import logging
 import os
 import secrets
@@ -28,6 +29,7 @@ def _validate_hex_key(value: str, name: str, expected_len: int = 64) -> None:
             f"{name} contient des caractères non-hexadécimaux. "
             f"Générez avec : python -c 'import os; print(os.urandom(32).hex())'"
         )
+
 
 # Racine du projet (2 niveaux au-dessus de ce fichier)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -67,7 +69,7 @@ class Settings(BaseSettings):
     # --- Chiffrement au repos (AES-256-GCM) ---
     # 64 caractères hex = 32 bytes = 256 bits. Générer avec :
     # python -c 'import os; print(os.urandom(32).hex())'
-    ENCRYPTION_KEY: str = ""       # Clé pour EncryptedText (colonnes sensibles en base)
+    ENCRYPTION_KEY: str = ""  # Clé pour EncryptedText (colonnes sensibles en base)
     FILE_ENCRYPTION_KEY: str = ""  # KEK pour envelope encryption (fichiers sur disque)
 
     # --- Certificats mTLS (communication serveur ↔ agent) ---
@@ -103,8 +105,7 @@ class Settings(BaseSettings):
         # Avertissement si SECRET_KEY trop courte en non-production
         if len(self.SECRET_KEY) < 32 and self.ENV not in ("production", "preprod", "staging"):
             logger.warning(
-                "SECRET_KEY fait moins de 32 caractères (%d). "
-                "Utilisez une clé plus longue pour plus de sécurité.",
+                "SECRET_KEY fait moins de 32 caractères (%d). Utilisez une clé plus longue pour plus de sécurité.",
                 len(self.SECRET_KEY),
             )
 
@@ -136,21 +137,22 @@ class Settings(BaseSettings):
         if is_safe_env:
             if "*" in self.CORS_ORIGINS:
                 raise ValueError(
-                    "CORS_ORIGINS ne doit pas contenir '*' en production. "
-                    "Listez explicitement les origines autorisées."
+                    "CORS_ORIGINS ne doit pas contenir '*' en production. Listez explicitement les origines autorisées."
                 )
             for origin in self.CORS_ORIGINS:
                 if not origin.startswith(("http://", "https://")):
                     raise ValueError(
-                        f"CORS_ORIGINS invalide : '{origin}' — "
-                        "chaque origine doit commencer par http:// ou https://"
+                        f"CORS_ORIGINS invalide : '{origin}' — chaque origine doit commencer par http:// ou https://"
                     )
 
     # --- CORS ---
     CORS_ALLOW_METHODS: list[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     CORS_ALLOW_HEADERS: list[str] = [
-        "Authorization", "Content-Type", "Accept",
-        "Origin", "X-Requested-With",
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
     ]
 
     # --- Upload ---
@@ -171,7 +173,6 @@ class Settings(BaseSettings):
     MONKEY365_PATH: str = ""  # chemin vers Invoke-Monkey365.ps1
     MONKEY365_TIMEOUT: int = 600  # secondes
     MONKEY365_AUTO_CLONE: bool = False  # autoriser le clonage git automatique de monkey365
-
 
     # --- Données / Stockage ---
     DATA_DIR: str = "./data"  # base directory for scan output storage

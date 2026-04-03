@@ -73,7 +73,8 @@ def launch_monkey365_scan(
     )
     logger.info(
         "Monkey365 scan #%s lancé en background (entreprise=%s)",
-        result.id, request.entreprise_id,
+        result.id,
+        request.entreprise_id,
     )
     return result
 
@@ -93,7 +94,8 @@ def list_monkey365_scans(
         entreprise_id=entreprise_id,
         skip=(page - 1) * page_size,
         limit=page_size,
-        user_id=uid, is_admin=adm,
+        user_id=uid,
+        is_admin=adm,
     )
 
 
@@ -270,7 +272,9 @@ async def launch_monkey365_streaming_scan(
 
     logger.info(
         "[MONKEY365-STREAM] Scan #%s lance (user=%s, entreprise=%s)",
-        result.id, current_user.id, request.entreprise_id,
+        result.id,
+        current_user.id,
+        request.entreprise_id,
     )
     return Monkey365StreamingScanResponse(
         id=result.id,

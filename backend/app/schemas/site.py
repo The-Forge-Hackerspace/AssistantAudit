@@ -1,6 +1,7 @@
 """
 Schémas Site — Emplacements physiques d'une entreprise.
 """
+
 from typing import Optional
 
 from pydantic import BaseModel, Field

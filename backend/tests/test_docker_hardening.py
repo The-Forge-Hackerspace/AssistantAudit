@@ -51,27 +51,20 @@ class TestCiTrivyScanConfigValid:
         assert "scan" in jobs, "Job 'scan' absent du workflow CI"
 
         scan_steps = jobs["scan"].get("steps", [])
-        trivy_steps = [
-            s for s in scan_steps
-            if "aquasecurity/trivy-action" in s.get("uses", "")
-        ]
+        trivy_steps = [s for s in scan_steps if "aquasecurity/trivy-action" in s.get("uses", "")]
         assert len(trivy_steps) >= 1, "Aucune step utilisant trivy-action trouvée"
 
     def test_trivy_exit_code_blocks_pipeline(self, ci_config):
         """exit-code: '1' pour que le pipeline échoue sur détection."""
         trivy_step = _find_trivy_step(ci_config)
         exit_code = str(trivy_step.get("with", {}).get("exit-code", ""))
-        assert exit_code == "1", (
-            f"exit-code doit être '1' (bloquant), trouvé : '{exit_code}'"
-        )
+        assert exit_code == "1", f"exit-code doit être '1' (bloquant), trouvé : '{exit_code}'"
 
     def test_trivy_severity_critical(self, ci_config):
         """severity: CRITICAL — seuil correct."""
         trivy_step = _find_trivy_step(ci_config)
         severity = trivy_step.get("with", {}).get("severity", "")
-        assert "CRITICAL" in severity, (
-            f"Severity doit inclure 'CRITICAL', trouvé : '{severity}'"
-        )
+        assert "CRITICAL" in severity, f"Severity doit inclure 'CRITICAL', trouvé : '{severity}'"
 
     def test_scan_depends_on_build(self, ci_config):
         """Le job scan dépend du job build (chaîne correcte)."""
@@ -79,9 +72,7 @@ class TestCiTrivyScanConfigValid:
         needs = scan_job.get("needs", [])
         if isinstance(needs, str):
             needs = [needs]
-        assert "build" in needs, (
-            f"Le job scan doit dépendre de build, trouvé : {needs}"
-        )
+        assert "build" in needs, f"Le job scan doit dépendre de build, trouvé : {needs}"
 
 
 # -------------------------------------------------------------------------
@@ -100,20 +91,13 @@ class TestCiTrivyScanBlocksOnCritical:
         """Format de sortie lisible (table ou sarif)."""
         trivy_step = _find_trivy_step(ci_config)
         fmt = trivy_step.get("with", {}).get("format", "")
-        assert fmt in ("table", "sarif", "json"), (
-            f"Format Trivy doit être lisible, trouvé : '{fmt}'"
-        )
+        assert fmt in ("table", "sarif", "json"), f"Format Trivy doit être lisible, trouvé : '{fmt}'"
 
     def test_trivy_results_uploaded_as_artifact(self, ci_config):
         """Les résultats Trivy sont uploadés comme artefact CI."""
         scan_steps = ci_config["jobs"]["scan"]["steps"]
-        upload_steps = [
-            s for s in scan_steps
-            if "upload-artifact" in s.get("uses", "")
-        ]
-        assert len(upload_steps) >= 1, (
-            "Aucune step upload-artifact dans le job scan"
-        )
+        upload_steps = [s for s in scan_steps if "upload-artifact" in s.get("uses", "")]
+        assert len(upload_steps) >= 1, "Aucune step upload-artifact dans le job scan"
 
 
 # -------------------------------------------------------------------------
@@ -138,9 +122,7 @@ class TestCiTrivyActionShaPinned:
         uses_ref = trivy_step["uses"]
         # Format attendu: aquasecurity/trivy-action@<sha_hex_40+>
         sha_pattern = re.compile(r"@[0-9a-f]{40,}")
-        assert sha_pattern.search(uses_ref), (
-            f"trivy-action doit être épinglé par SHA, trouvé : '{uses_ref}'"
-        )
+        assert sha_pattern.search(uses_ref), f"trivy-action doit être épinglé par SHA, trouvé : '{uses_ref}'"
 
 
 # -------------------------------------------------------------------------
@@ -149,43 +131,46 @@ class TestCiTrivyActionShaPinned:
 class TestDockerignoreExcludesSecrets:
     """Valide que .dockerignore empêche l'inclusion de fichiers sensibles."""
 
-    @pytest.mark.parametrize("pattern", [
-        ".env",
-        ".env.*",
-        "*.db",
-        "*.sqlite",
-        "certs/",
-        ".git",
-    ])
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            ".env",
+            ".env.*",
+            "*.db",
+            "*.sqlite",
+            "certs/",
+            ".git",
+        ],
+    )
     def test_sensitive_pattern_excluded(self, dockerignore_content, pattern):
         """Le pattern sensible est présent dans .dockerignore."""
         # Normalise : supprime les commentaires et lignes vides
         lines = [
-            line.strip() for line in dockerignore_content.splitlines()
+            line.strip()
+            for line in dockerignore_content.splitlines()
             if line.strip() and not line.strip().startswith("#")
         ]
-        assert pattern in lines, (
-            f"Pattern '{pattern}' absent de .dockerignore"
-        )
+        assert pattern in lines, f"Pattern '{pattern}' absent de .dockerignore"
 
 
 class TestDockerfileNoSecretCopy:
     """Valide que le Dockerfile ne copie pas explicitement de fichiers secrets."""
 
-    @pytest.mark.parametrize("forbidden_pattern", [
-        r"COPY\s+.*\.env",
-        r"COPY\s+.*\.env\.",
-        r"COPY\s+.*credentials",
-        r"COPY\s+.*\.key\s",
-        r"COPY\s+.*\.pem\s",
-        r"ADD\s+.*\.env",
-    ])
+    @pytest.mark.parametrize(
+        "forbidden_pattern",
+        [
+            r"COPY\s+.*\.env",
+            r"COPY\s+.*\.env\.",
+            r"COPY\s+.*credentials",
+            r"COPY\s+.*\.key\s",
+            r"COPY\s+.*\.pem\s",
+            r"ADD\s+.*\.env",
+        ],
+    )
     def test_no_secret_copy_directive(self, dockerfile_content, forbidden_pattern):
         """Aucune directive COPY/ADD ne référence des fichiers secrets."""
         matches = re.findall(forbidden_pattern, dockerfile_content, re.IGNORECASE)
-        assert not matches, (
-            f"Directive dangereuse trouvée dans Dockerfile : {matches}"
-        )
+        assert not matches, f"Directive dangereuse trouvée dans Dockerfile : {matches}"
 
 
 # -------------------------------------------------------------------------

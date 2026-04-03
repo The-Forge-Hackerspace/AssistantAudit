@@ -2,6 +2,7 @@
 Modele AgentTask — Tache dispatchee vers un agent local.
 Represente une execution d'outil (nmap, oradad, ad_collector) par un agent.
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -24,20 +25,12 @@ class AgentTask(Base):
     __tablename__ = "agent_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    task_uuid: Mapped[str] = mapped_column(
-        String(36), unique=True, nullable=False, default=_new_uuid
-    )
+    task_uuid: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, default=_new_uuid)
 
     # Qui
-    agent_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("agents.id"), nullable=False, index=True
-    )
-    owner_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False, index=True
-    )
-    audit_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("audits.id"), index=True
-    )
+    agent_id: Mapped[int] = mapped_column(Integer, ForeignKey("agents.id"), nullable=False, index=True)
+    owner_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    audit_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("audits.id"), index=True)
 
     # Quoi
     tool: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -54,9 +47,7 @@ class AgentTask(Base):
     error_message: Mapped[str | None] = mapped_column(Text)
 
     # Timing
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

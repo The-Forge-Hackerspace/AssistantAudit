@@ -244,6 +244,7 @@ def delete_site_connection(
 
 # ── VLAN Definitions ──
 
+
 @router.get("/vlans", response_model=list[VlanDefinitionRead])
 def list_vlans(
     site_id: int = Query(...),

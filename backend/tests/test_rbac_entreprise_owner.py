@@ -7,9 +7,11 @@ que l'isolation fonctionne par owner_id, et que l'admin voit tout.
 
 
 class TestEntrepriseOwnerIsolation:
-
     def test_new_entreprise_visible_without_audit(
-        self, client, db_session, auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_headers,
     ):
         """Une entreprise créée est visible dans la liste sans audit lié."""
         r = client.post(
@@ -27,7 +29,11 @@ class TestEntrepriseOwnerIsolation:
         assert ent_id in ids
 
     def test_other_user_cannot_see_entreprise_in_list(
-        self, client, db_session, auditeur_headers, second_auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_headers,
+        second_auditeur_headers,
     ):
         """Auditeur B ne voit pas les entreprises d'auditeur A."""
         r = client.post(
@@ -43,7 +49,11 @@ class TestEntrepriseOwnerIsolation:
         assert ent_id not in ids
 
     def test_other_user_get_returns_404(
-        self, client, db_session, auditeur_headers, second_auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_headers,
+        second_auditeur_headers,
     ):
         """Auditeur B ne peut pas GET une entreprise d'auditeur A → 404."""
         r = client.post(
@@ -60,7 +70,11 @@ class TestEntrepriseOwnerIsolation:
         assert r.status_code == 404
 
     def test_other_user_update_returns_404(
-        self, client, db_session, auditeur_headers, second_auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_headers,
+        second_auditeur_headers,
     ):
         """Auditeur B ne peut pas mettre à jour une entreprise d'auditeur A → 404."""
         r = client.post(
@@ -78,7 +92,11 @@ class TestEntrepriseOwnerIsolation:
         assert r.status_code == 404
 
     def test_admin_sees_all_entreprises(
-        self, client, db_session, auditeur_headers, admin_headers,
+        self,
+        client,
+        db_session,
+        auditeur_headers,
+        admin_headers,
     ):
         """L'admin voit les entreprises de tous les utilisateurs."""
         r = client.post(
@@ -93,7 +111,11 @@ class TestEntrepriseOwnerIsolation:
         assert ent_id in ids
 
     def test_admin_can_get_any_entreprise(
-        self, client, db_session, auditeur_headers, admin_headers,
+        self,
+        client,
+        db_session,
+        auditeur_headers,
+        admin_headers,
     ):
         """L'admin peut GET n'importe quelle entreprise."""
         r = client.post(

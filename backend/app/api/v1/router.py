@@ -1,6 +1,7 @@
 """
 Router principal API v1 : agrège tous les sous-routers.
 """
+
 from fastapi import APIRouter
 
 from .agents import router as agents_router

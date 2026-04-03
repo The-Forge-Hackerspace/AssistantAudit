@@ -3,9 +3,10 @@ Tests unitaires pour core/cert_manager.py
 - Generation CA, signature certificats agent, fingerprint, serial, chain of trust.
 Utilise tmp_path pour tous les fichiers — ne touche pas aux vrais certs/.
 """
+
+from datetime import datetime, timezone
 from pathlib import Path
 
-from datetime import datetime, timedelta, timezone
 import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -147,6 +148,7 @@ class TestSignAgentCert:
 
         # Verification cryptographique : la cle publique de la CA verifie la signature
         from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+
         ca_cert.public_key().verify(
             agent_cert.signature,
             agent_cert.tbs_certificate_bytes,

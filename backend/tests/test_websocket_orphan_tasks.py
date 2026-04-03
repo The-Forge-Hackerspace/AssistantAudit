@@ -2,6 +2,7 @@
 Tests pour le relais task_progress et la detection des taches orphelines
 quand un agent se deconnecte du WebSocket.
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -45,6 +46,7 @@ def agent_with_tasks(db_session, auditeur_user):
 
 class _NoCloseSession:
     """Proxy qui intercepte close() pour ne pas fermer la session de test."""
+
     def __init__(self, session):
         self._session = session
 
@@ -56,6 +58,7 @@ class _NoCloseSession:
 
 class _FakeSessionLocal:
     """Wrapper pour que SessionLocal() retourne la session de test existante."""
+
     def __init__(self, session):
         self._proxy = _NoCloseSession(session)
 
@@ -88,14 +91,10 @@ def patch_session_local(db_session):
 class TestTaskProgressRelay:
     """Verifie que task_progress est relaye vers le bon user."""
 
-    def test_task_progress_relayed_to_owner(
-        self, client, auditeur_user, agent_with_tasks, patch_session_local
-    ):
+    def test_task_progress_relayed_to_owner(self, client, auditeur_user, agent_with_tasks, patch_session_local):
         """Un message task_progress d'un agent est relaye vers le frontend de l'owner."""
         agent, tasks = agent_with_tasks
-        agent_token = create_agent_token(
-            agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id
-        )
+        agent_token = create_agent_token(agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id)
         user_token = create_access_token(subject=auditeur_user.id)
 
         # Connecter le user frontend
@@ -105,14 +104,16 @@ class TestTaskProgressRelay:
                 agent_ws.send_json({"type": "heartbeat"})
                 agent_ws.receive_json()  # heartbeat_ack
 
-                agent_ws.send_json({
-                    "type": "task_progress",
-                    "data": {
-                        "task_uuid": tasks["running"].task_uuid,
-                        "progress": 42,
-                        "message": "Scanning port 80",
-                    },
-                })
+                agent_ws.send_json(
+                    {
+                        "type": "task_progress",
+                        "data": {
+                            "task_uuid": tasks["running"].task_uuid,
+                            "progress": 42,
+                            "message": "Scanning port 80",
+                        },
+                    }
+                )
 
             # Le user doit recevoir le message relaye
             msg = user_ws.receive_json()
@@ -125,29 +126,27 @@ class TestTaskProgressRelay:
     ):
         """L'owner_id est extrait du JWT agent, pas du message."""
         agent, tasks = agent_with_tasks
-        agent_token = create_agent_token(
-            agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id
-        )
+        agent_token = create_agent_token(agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id)
 
         # Pas de user connecte — le message est bufferise pour le bon owner
         with client.websocket_connect(f"/ws/agent?token={agent_token}") as agent_ws:
             agent_ws.send_json({"type": "heartbeat"})
             agent_ws.receive_json()
 
-            agent_ws.send_json({
-                "type": "task_progress",
-                "data": {
-                    "task_uuid": tasks["running"].task_uuid,
-                    "progress": 50,
-                },
-            })
+            agent_ws.send_json(
+                {
+                    "type": "task_progress",
+                    "data": {
+                        "task_uuid": tasks["running"].task_uuid,
+                        "progress": 50,
+                    },
+                }
+            )
 
         # Verifie que le buffer est pour le bon user_id (du JWT, pas du message)
         assert auditeur_user.id in ws_manager.user_event_buffer
         events = ws_manager.user_event_buffer[auditeur_user.id]
-        assert any(
-            ev["type"] == "task_progress" for _, ev in events
-        )
+        assert any(ev["type"] == "task_progress" for _, ev in events)
 
 
 class TestOrphanTaskDetection:
@@ -158,9 +157,7 @@ class TestOrphanTaskDetection:
     ):
         """Deconnexion agent -> taches running/dispatched/pending passent en failed."""
         agent, tasks = agent_with_tasks
-        agent_token = create_agent_token(
-            agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id
-        )
+        agent_token = create_agent_token(agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id)
 
         # Connecter puis deconnecter l'agent
         with client.websocket_connect(f"/ws/agent?token={agent_token}") as agent_ws:
@@ -184,9 +181,7 @@ class TestOrphanTaskDetection:
     ):
         """Les taches deja completed/failed ne sont pas modifiees."""
         agent, tasks = agent_with_tasks
-        agent_token = create_agent_token(
-            agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id
-        )
+        agent_token = create_agent_token(agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id)
 
         with client.websocket_connect(f"/ws/agent?token={agent_token}") as agent_ws:
             agent_ws.send_json({"type": "heartbeat"})
@@ -202,14 +197,10 @@ class TestOrphanTaskDetection:
         # L'error_message d'origine ne doit pas etre ecrase
         assert failed_task.error_message is None or "deconnecte" not in (failed_task.error_message or "")
 
-    def test_disconnect_notifies_frontend(
-        self, client, auditeur_user, agent_with_tasks, patch_session_local
-    ):
+    def test_disconnect_notifies_frontend(self, client, auditeur_user, agent_with_tasks, patch_session_local):
         """Deconnexion agent -> le frontend est notifie du status failed pour chaque tache orpheline."""
         agent, tasks = agent_with_tasks
-        agent_token = create_agent_token(
-            agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id
-        )
+        agent_token = create_agent_token(agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id)
 
         # Pas de user connecte — les notifications seront bufferisees
         with client.websocket_connect(f"/ws/agent?token={agent_token}") as agent_ws:
@@ -236,9 +227,7 @@ class TestOrphanTaskDetection:
     ):
         """Le handler de deconnexion utilise sa propre session DB (SessionLocal)."""
         agent, tasks = agent_with_tasks
-        agent_token = create_agent_token(
-            agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id
-        )
+        agent_token = create_agent_token(agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id)
 
         with client.websocket_connect(f"/ws/agent?token={agent_token}") as agent_ws:
             agent_ws.send_json({"type": "heartbeat"})

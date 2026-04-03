@@ -1,6 +1,7 @@
 """
 Schémas User : authentification et gestion utilisateurs.
 """
+
 import re
 from datetime import datetime
 from typing import Optional
@@ -22,9 +23,7 @@ def _validate_password_complexity(password: str) -> str:
     if not re.search(r"[^A-Za-z0-9]", password):
         missing.append("au moins 1 caractere special")
     if missing:
-        raise ValueError(
-            "Mot de passe trop faible : " + ", ".join(missing)
-        )
+        raise ValueError("Mot de passe trop faible : " + ", ".join(missing))
     return password
 
 

@@ -1,6 +1,7 @@
 """
 Schémas Attachment — Pièces jointes des résultats de contrôle.
 """
+
 from datetime import datetime
 from typing import Optional
 
@@ -28,4 +29,5 @@ class AttachmentRead(BaseModel):
 
 class AttachmentCreate(BaseModel):
     """Envoyé en multipart, mais la description peut venir en form field"""
+
     description: Optional[str] = None

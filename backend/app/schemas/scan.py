@@ -1,6 +1,7 @@
 """
 Schémas Pydantic pour les scans réseau (Nmap) et les outils intégrés.
 """
+
 from datetime import datetime
 from enum import Enum
 from typing import Literal, Optional
@@ -14,8 +15,10 @@ EQUIPEMENT_TYPE_PATTERN = "^(" + "|".join(EQUIPEMENT_TYPE_VALUES) + ")$"
 
 # ─── Scan Réseau ──────────────────────────────────────────────
 
+
 class ScanCreate(BaseModel):
     """Paramètres pour lancer un scan Nmap."""
+
     nom: Optional[str] = Field(None, description="Nom du scan (ex: VLAN 10 - MGT)")
     site_id: int
     target: str = Field(
@@ -24,9 +27,7 @@ class ScanCreate(BaseModel):
         pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._:/\-]{0,254}$",
         examples=["192.168.1.0/24", "10.0.0.1", "server.local"],
     )
-    scan_type: Literal["discovery", "port_scan", "full", "custom"] = Field(
-        "discovery", description="Type de scan Nmap"
-    )
+    scan_type: Literal["discovery", "port_scan", "full", "custom"] = Field("discovery", description="Type de scan Nmap")
     custom_args: Optional[str] = Field(None, max_length=2000, description="Arguments Nmap personnalises (mode custom)")
     notes: Optional[str] = Field(None, max_length=2000)
 
@@ -83,6 +84,7 @@ class ScanRead(BaseModel):
 
 class ScanSummary(BaseModel):
     """Résumé d'un scan sans les hosts détaillés."""
+
     id: int
     nom: Optional[str] = None
     site_id: int
@@ -101,6 +103,7 @@ class ScanSummary(BaseModel):
 
 class ScanHostDecision(BaseModel):
     """Décision sur un host découvert : garder, ignorer, lier à un équipement."""
+
     decision: str = Field(..., description="kept | ignored")
     chosen_type: Optional[str] = Field(
         None,
@@ -123,8 +126,10 @@ class ScanHostLink(BaseModel):
 
 # ─── Config Parser ────────────────────────────────────────────
 
+
 class InterfaceInfo(BaseModel):
     """Interface réseau découverte dans une config."""
+
     name: str
     ip_address: Optional[str] = None
     netmask: Optional[str] = None
@@ -136,6 +141,7 @@ class InterfaceInfo(BaseModel):
 
 class FirewallRuleInfo(BaseModel):
     """Règle de pare-feu extraite d'une config."""
+
     rule_id: str
     name: Optional[str] = None
     source_interface: Optional[str] = None
@@ -151,6 +157,7 @@ class FirewallRuleInfo(BaseModel):
 
 class SecurityFinding(BaseModel):
     """Constat de sécurité trouvé par un analyseur."""
+
     severity: str = "medium"  # critical | high | medium | low | info
     category: str = ""
     title: str
@@ -161,6 +168,7 @@ class SecurityFinding(BaseModel):
 
 class ConfigAnalysisResult(BaseModel):
     """Résultat complet de l'analyse d'une configuration."""
+
     vendor: str
     device_type: str = "firewall"
     hostname: Optional[str] = None
@@ -174,6 +182,7 @@ class ConfigAnalysisResult(BaseModel):
 
 class ConfigUploadResponse(BaseModel):
     """Réponse après upload et analyse d'une config."""
+
     filename: str
     vendor: str
     equipement_id: Optional[int] = None
@@ -183,8 +192,10 @@ class ConfigUploadResponse(BaseModel):
 
 # ─── SSL/TLS Checker ─────────────────────────────────────────
 
+
 class SSLCheckRequest(BaseModel):
     """Paramètres pour vérifier SSL/TLS d'un hôte."""
+
     host: str
     port: int = Field(443, ge=1, le=65535)
     timeout: Optional[int] = Field(10, ge=1, le=60)
@@ -192,6 +203,7 @@ class SSLCheckRequest(BaseModel):
 
 class CertificateInfo(BaseModel):
     """Informations sur le certificat SSL."""
+
     subject: str
     issuer: str
     organization: str = ""
@@ -210,6 +222,7 @@ class CertificateInfo(BaseModel):
 
 class ProtocolInfo(BaseModel):
     """Support d'un protocole SSL/TLS."""
+
     name: str  # TLSv1.0, TLSv1.1, TLSv1.2, TLSv1.3
     supported: bool
     is_secure: bool
@@ -217,6 +230,7 @@ class ProtocolInfo(BaseModel):
 
 class SSLCheckResult(BaseModel):
     """Résultat complet d'une vérification SSL/TLS."""
+
     host: str
     port: int
     certificate: Optional[CertificateInfo] = None
@@ -226,8 +240,10 @@ class SSLCheckResult(BaseModel):
 
 # ─── Config Analysis (liée à un équipement) ──────────────────
 
+
 class ConfigAnalysisRead(BaseModel):
     """Analyse de configuration persistée et liée à un équipement."""
+
     id: int
     equipement_id: int
     filename: str
@@ -247,6 +263,7 @@ class ConfigAnalysisRead(BaseModel):
 
 class ConfigAnalysisSummary(BaseModel):
     """Résumé d'une analyse de configuration."""
+
     id: int
     equipement_id: int
     filename: str
@@ -261,6 +278,7 @@ class ConfigAnalysisSummary(BaseModel):
 
 class PrefillResult(BaseModel):
     """Résultat du pré-remplissage d'audit depuis une analyse de config."""
+
     controls_prefilled: int
     controls_compliant: int
     controls_non_compliant: int
@@ -270,8 +288,10 @@ class PrefillResult(BaseModel):
 
 # ─── Collecte SSH / WinRM ─────────────────────────────────────
 
+
 class CollectCreate(BaseModel):
     """Paramètres pour lancer une collecte SSH ou WinRM."""
+
     equipement_id: int
     method: Literal["ssh", "winrm"] = Field(..., description="Methode de collecte")
     target_host: str = Field(..., max_length=255, description="IP ou hostname du serveur")
@@ -289,6 +309,7 @@ class CollectCreate(BaseModel):
 
 class CollectResultSummary(BaseModel):
     """Résumé d'une collecte pour la liste."""
+
     id: int
     equipement_id: int
     method: str
@@ -309,6 +330,7 @@ class CollectResultSummary(BaseModel):
 
 class CollectResultRead(BaseModel):
     """Détail complet d'une collecte."""
+
     id: int
     equipement_id: int
     method: str
@@ -337,8 +359,10 @@ class CollectResultRead(BaseModel):
 
 # ─── Audit Active Directory (LDAP) ────────────────────────────
 
+
 class ADAuditCreate(BaseModel):
     """Parametres pour lancer un audit AD."""
+
     equipement_id: Optional[int] = Field(None, description="Equipement (DC) associe")
     target_host: str = Field(..., max_length=255, description="IP ou hostname du controleur de domaine")
     target_port: int = Field(389, ge=1, le=65535, description="Port LDAP (389) ou LDAPS (636)")
@@ -351,6 +375,7 @@ class ADAuditCreate(BaseModel):
 
 class ADAuditFindingRead(BaseModel):
     """Un constat d'audit AD."""
+
     control_ref: str
     title: str
     description: str = ""
@@ -364,6 +389,7 @@ class ADAuditFindingRead(BaseModel):
 
 class ADAuditResultSummary(BaseModel):
     """Résumé d'un audit AD pour la liste."""
+
     id: int
     equipement_id: Optional[int] = None
     status: str
@@ -385,6 +411,7 @@ class ADAuditResultSummary(BaseModel):
 
 class ADAuditResultRead(BaseModel):
     """Détail complet d'un audit AD."""
+
     id: int
     equipement_id: Optional[int] = None
     status: str
@@ -422,6 +449,7 @@ class ADAuditResultRead(BaseModel):
 
 # ─── Monkey365 Audit ─────────────────────────────────────────
 
+
 class Monkey365ExportFormat(str, Enum):
     JSON = "JSON"
     HTML = "HTML"
@@ -429,8 +457,13 @@ class Monkey365ExportFormat(str, Enum):
 
 
 class Monkey365ConfigSchema(BaseModel):
-    spo_sites: list[str] = Field(default_factory=list, description="SharePoint sites to scan (e.g., https://domain.sharepoint.com)")
-    export_to: list[Monkey365ExportFormat] = Field(default_factory=lambda: [Monkey365ExportFormat.JSON, Monkey365ExportFormat.HTML], description="Formats d'export : JSON, HTML, CSV")
+    spo_sites: list[str] = Field(
+        default_factory=list, description="SharePoint sites to scan (e.g., https://domain.sharepoint.com)"
+    )
+    export_to: list[Monkey365ExportFormat] = Field(
+        default_factory=lambda: [Monkey365ExportFormat.JSON, Monkey365ExportFormat.HTML],
+        description="Formats d'export : JSON, HTML, CSV",
+    )
     device_code: bool = Field(default=False, description="Utiliser Device Code Flow au lieu de l'auth interactive")
 
     @field_validator("export_to", mode="after")
@@ -443,12 +476,14 @@ class Monkey365ConfigSchema(BaseModel):
 
 class Monkey365ScanCreate(BaseModel):
     """Paramètres pour lancer un audit Monkey365."""
+
     entreprise_id: int = Field(..., description="ID de l'entreprise")
     config: Monkey365ConfigSchema = Field(..., description="Configuration Monkey365")
 
 
 class Monkey365ScanResultSummary(BaseModel):
     """Résumé d'un audit Monkey365 pour la liste."""
+
     id: int
     entreprise_id: int
     status: str
@@ -464,6 +499,7 @@ class Monkey365ScanResultSummary(BaseModel):
 
 class Monkey365ScanResultRead(BaseModel):
     """Détail complet d'un audit Monkey365."""
+
     id: int
     entreprise_id: int
     status: str
@@ -482,17 +518,20 @@ class Monkey365ScanResultRead(BaseModel):
 
 class Monkey365ScanLogs(BaseModel):
     """Logs PowerShell d'un scan Monkey365 (lecture en direct du fichier log)."""
+
     lines: list[str]
     total_lines: int
 
 
 class Monkey365ImportRequest(BaseModel):
     """Paramètres pour importer un scan Monkey365 dans un audit existant."""
+
     audit_id: int = Field(..., description="ID de l'audit cible")
 
 
 class Monkey365ImportResult(BaseModel):
     """Résultat de l'import d'un scan Monkey365 dans un audit."""
+
     campaign_id: int
     assessment_id: int
     controls_mapped: int
@@ -500,6 +539,7 @@ class Monkey365ImportResult(BaseModel):
 
 
 # ─── Monkey365 Streaming (Device Code Flow) ─────────────────
+
 
 class Monkey365AuthMethod(str, Enum):
     DEVICE_CODE = "device_code"
@@ -509,6 +549,7 @@ class Monkey365AuthMethod(str, Enum):
 
 class Monkey365StreamingScanCreate(BaseModel):
     """Parametres pour lancer un scan Monkey365 streaming avec Device Code Flow."""
+
     entreprise_id: int = Field(..., description="ID de l'entreprise")
     tenant_id: str = Field(
         ...,
@@ -542,6 +583,7 @@ class Monkey365StreamingScanCreate(BaseModel):
     def validate_subscriptions(cls, v: list[str]) -> list[str]:
         """Valide que chaque subscription est un identifiant safe (UUID ou slug)."""
         import re
+
         safe = re.compile(r"^[a-zA-Z0-9\-._]+$")
         for sub in v:
             if not sub or len(sub) > 255 or not safe.match(sub):
@@ -551,6 +593,7 @@ class Monkey365StreamingScanCreate(BaseModel):
 
 class Monkey365StreamingScanResponse(BaseModel):
     """Reponse immediate au lancement d'un scan streaming."""
+
     id: int
     scan_id: str
     status: str

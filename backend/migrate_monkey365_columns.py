@@ -4,6 +4,7 @@ Migration: Add missing columns to monkey365_scan_results table.
 Adds: auth_mode, force_msal_desktop, powershell_config, archive_path
 Each ALTER TABLE is idempotent — silently skips columns that already exist.
 """
+
 import sqlite3
 import sys
 from pathlib import Path
@@ -13,10 +14,13 @@ BASE_DIR = Path(__file__).resolve().parent / "app"
 DB_PATH = Path(__file__).resolve().parent / "instance" / "assistantaudit.db"
 
 MIGRATIONS = [
-    ("auth_mode",           "ALTER TABLE monkey365_scan_results ADD COLUMN auth_mode VARCHAR(50)"),
-    ("force_msal_desktop",  "ALTER TABLE monkey365_scan_results ADD COLUMN force_msal_desktop BOOLEAN NOT NULL DEFAULT 0"),
-    ("powershell_config",   "ALTER TABLE monkey365_scan_results ADD COLUMN powershell_config JSON"),
-    ("archive_path",        "ALTER TABLE monkey365_scan_results ADD COLUMN archive_path VARCHAR(500)"),
+    ("auth_mode", "ALTER TABLE monkey365_scan_results ADD COLUMN auth_mode VARCHAR(50)"),
+    (
+        "force_msal_desktop",
+        "ALTER TABLE monkey365_scan_results ADD COLUMN force_msal_desktop BOOLEAN NOT NULL DEFAULT 0",
+    ),
+    ("powershell_config", "ALTER TABLE monkey365_scan_results ADD COLUMN powershell_config JSON"),
+    ("archive_path", "ALTER TABLE monkey365_scan_results ADD COLUMN archive_path VARCHAR(500)"),
 ]
 
 

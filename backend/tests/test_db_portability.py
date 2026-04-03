@@ -4,8 +4,6 @@ Tests de portabilité SQLite / PostgreSQL.
 Vérifie que les modèles et la configuration sont compatibles
 avec les deux backends de base de données.
 """
-import importlib
-import pkgutil
 
 import pytest
 from sqlalchemy import JSON, inspect, text
@@ -54,8 +52,7 @@ class TestPortableImports:
             for col in columns:
                 if "json" in type(col["type"]).__name__.lower():
                     assert isinstance(col["type"], type(JSON())), (
-                        f"Colonne {table_name}.{col['name']} utilise un type JSON "
-                        f"non-portable : {type(col['type'])}"
+                        f"Colonne {table_name}.{col['name']} utilise un type JSON non-portable : {type(col['type'])}"
                     )
 
 
@@ -111,9 +108,7 @@ class TestAlembicPortability:
 
         env_py = Path(__file__).parent.parent / "alembic" / "env.py"
         source = env_py.read_text()
-        assert "render_as_batch=True" in source, (
-            "render_as_batch=True requis dans alembic/env.py pour SQLite"
-        )
+        assert "render_as_batch=True" in source, "render_as_batch=True requis dans alembic/env.py pour SQLite"
 
     def test_migrations_use_batch(self):
         """Les fichiers de migration doivent utiliser batch_alter_table pour alter_column."""

@@ -7,6 +7,7 @@ Couvre :
 - T003 : CORS strict en production (pas de wildcard)
 - T004 : Tests automatisés
 """
+
 import os
 from unittest.mock import MagicMock, patch
 
@@ -15,7 +16,6 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.core.rate_limit import RATE_LIMITS, _RateLimiter
-
 
 # ══════════════════════════════════════════════════════════════════════
 # 1. SECURITY HEADERS
@@ -183,9 +183,7 @@ class TestRateLimitMiddlewareIntegration:
                 "/api/v1/agents/enroll",
                 json={"enrollment_code": "fake-code"},
             )
-            assert resp.status_code != 429, (
-                f"Requête enroll #{i + 1} bloquée trop tôt"
-            )
+            assert resp.status_code != 429, f"Requête enroll #{i + 1} bloquée trop tôt"
         # La 6ème doit être bloquée par le enroll_rate_limiter (auth: 5/min)
         resp = client.post(
             "/api/v1/agents/enroll",
@@ -205,49 +203,69 @@ class TestCorsValidation:
     def test_wildcard_origin_rejected_in_production(self):
         """CORS_ORIGINS avec '*' doit être rejeté en production."""
         with pytest.raises(ValueError, match="ne doit pas contenir"):
-            with patch.dict(os.environ, {
-                "ENV": "production",
-                "SECRET_KEY": "a" * 64,
-                "ENCRYPTION_KEY": "ab" * 32,
-                "FILE_ENCRYPTION_KEY": "cd" * 32,
-                "CORS_ORIGINS": '["*"]',
-            }, clear=False):
+            with patch.dict(
+                os.environ,
+                {
+                    "ENV": "production",
+                    "SECRET_KEY": "a" * 64,
+                    "ENCRYPTION_KEY": "ab" * 32,
+                    "FILE_ENCRYPTION_KEY": "cd" * 32,
+                    "CORS_ORIGINS": '["*"]',
+                },
+                clear=False,
+            ):
                 from app.core.config import Settings
+
                 Settings()
 
     def test_invalid_origin_rejected_in_production(self):
         """Une origine sans http/https doit être rejetée en production."""
         with pytest.raises(ValueError, match="CORS_ORIGINS invalide"):
-            with patch.dict(os.environ, {
-                "ENV": "production",
-                "SECRET_KEY": "a" * 64,
-                "ENCRYPTION_KEY": "ab" * 32,
-                "FILE_ENCRYPTION_KEY": "cd" * 32,
-                "CORS_ORIGINS": '["not-a-url"]',
-            }, clear=False):
+            with patch.dict(
+                os.environ,
+                {
+                    "ENV": "production",
+                    "SECRET_KEY": "a" * 64,
+                    "ENCRYPTION_KEY": "ab" * 32,
+                    "FILE_ENCRYPTION_KEY": "cd" * 32,
+                    "CORS_ORIGINS": '["not-a-url"]',
+                },
+                clear=False,
+            ):
                 from app.core.config import Settings
+
                 Settings()
 
     def test_valid_origins_accepted_in_production(self):
         """Des origines valides sont acceptées en production."""
-        with patch.dict(os.environ, {
-            "ENV": "production",
-            "SECRET_KEY": "a" * 64,
-            "ENCRYPTION_KEY": "ab" * 32,
-            "FILE_ENCRYPTION_KEY": "cd" * 32,
-            "CORS_ORIGINS": '["https://audit.example.com"]',
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                "ENV": "production",
+                "SECRET_KEY": "a" * 64,
+                "ENCRYPTION_KEY": "ab" * 32,
+                "FILE_ENCRYPTION_KEY": "cd" * 32,
+                "CORS_ORIGINS": '["https://audit.example.com"]',
+            },
+            clear=False,
+        ):
             from app.core.config import Settings
+
             s = Settings()
             assert s.CORS_ORIGINS == ["https://audit.example.com"]
 
     def test_wildcard_allowed_in_development(self):
         """En développement, le wildcard est toléré."""
-        with patch.dict(os.environ, {
-            "ENV": "development",
-            "CORS_ORIGINS": '["*"]',
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                "ENV": "development",
+                "CORS_ORIGINS": '["*"]',
+            },
+            clear=False,
+        ):
             from app.core.config import Settings
+
             s = Settings()
             assert "*" in s.CORS_ORIGINS
 

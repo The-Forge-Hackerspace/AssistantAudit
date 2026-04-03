@@ -2,6 +2,7 @@
 Service Monkey365 — Simulation de scan pour développement et tests.
 Le flux de scan réel utilise Monkey365ScanService (monkey365_scan_service.py).
 """
+
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -19,8 +20,9 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ScanResult:
     """Résultat complet d'un scan + mapping"""
+
     scan_id: str
-    status: str                           # success | error | timeout
+    status: str  # success | error | timeout
     findings_count: int = 0
     mapped_count: int = 0
     unmapped_count: int = 0
@@ -49,16 +51,11 @@ class Monkey365Service:
 
         assessment = AssessmentService.get_assessment(db, assessment_id)
         if not assessment:
-            return ScanResult(
-                scan_id=scan_id, status="error",
-                error=f"Assessment {assessment_id} introuvable"
-            )
+            return ScanResult(scan_id=scan_id, status="error", error=f"Assessment {assessment_id} introuvable")
 
         findings = Monkey365Parser.parse_raw_results(simulated_findings)
 
-        mapping_results = Monkey365Mapper.map_findings_to_assessment(
-            db, assessment, findings, assessed_by="simulation"
-        )
+        mapping_results = Monkey365Mapper.map_findings_to_assessment(db, assessment, findings, assessed_by="simulation")
         manual_controls = Monkey365Mapper.get_unmapped_controls(assessment)
 
         return ScanResult(

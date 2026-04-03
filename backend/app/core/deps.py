@@ -4,6 +4,7 @@ Dépendances FastAPI réutilisables :
   - Utilisateur courant (authentifié via JWT)
   - Pagination
 """
+
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -103,10 +104,14 @@ async def get_current_agent(
 
     from ..models.agent import Agent
 
-    agent = db.query(Agent).filter(
-        Agent.agent_uuid == payload["sub"],
-        Agent.status == "active",
-    ).first()
+    agent = (
+        db.query(Agent)
+        .filter(
+            Agent.agent_uuid == payload["sub"],
+            Agent.status == "active",
+        )
+        .first()
+    )
     if agent is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -122,7 +127,8 @@ async def get_current_agent(
         if days_left < 30:
             logging.getLogger(__name__).warning(
                 "Agent %s certificate expires in %d days",
-                agent.agent_uuid, days_left,
+                agent.agent_uuid,
+                days_left,
             )
 
     return agent

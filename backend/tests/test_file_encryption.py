@@ -3,6 +3,7 @@ Tests unitaires pour core/file_encryption.py
 - EnvelopeEncryption : encrypt/decrypt fichier, rotation de KEK
 - Mode dev sans cle (passthrough)
 """
+
 import os
 
 import pytest
@@ -22,6 +23,7 @@ def envelope(monkeypatch):
     """EnvelopeEncryption avec une KEK de test."""
     monkeypatch.setenv("FILE_ENCRYPTION_KEY", KEK_A)
     from app.core.config import get_settings
+
     get_settings.cache_clear()
     yield EnvelopeEncryption()
     get_settings.cache_clear()
@@ -33,6 +35,7 @@ def envelope_no_key(monkeypatch):
     monkeypatch.setenv("ENV", "development")
     monkeypatch.setenv("FILE_ENCRYPTION_KEY", "")
     from app.core.config import get_settings
+
     get_settings.cache_clear()
     yield EnvelopeEncryption()
     get_settings.cache_clear()
@@ -139,6 +142,7 @@ class TestEnvelopeEncryption:
         """Dechiffrement avec une mauvaise KEK echoue."""
         monkeypatch.setenv("FILE_ENCRYPTION_KEY", KEK_A)
         from app.core.config import get_settings
+
         get_settings.cache_clear()
         envelope_a = EnvelopeEncryption()
 
@@ -167,9 +171,7 @@ class TestKekRotation:
         encrypted_file, encrypted_dek, dek_nonce = envelope.encrypt_file(data)
 
         # Rotation : re-chiffrer la DEK avec KEK_B
-        new_encrypted_dek, new_dek_nonce = EnvelopeEncryption.rotate_kek(
-            encrypted_dek, dek_nonce, KEK_A, KEK_B
-        )
+        new_encrypted_dek, new_dek_nonce = EnvelopeEncryption.rotate_kek(encrypted_dek, dek_nonce, KEK_A, KEK_B)
 
         # Le fichier sur disque n'a PAS change
         # Dechiffrer avec la nouvelle DEK (chiffree sous KEK_B)
@@ -198,9 +200,7 @@ class TestKekRotation:
         encrypted_dek = aesgcm_a.encrypt(dek_nonce, dek, None)
 
         # Rotation vers KEK_B
-        new_encrypted_dek, new_nonce = EnvelopeEncryption.rotate_kek(
-            encrypted_dek, dek_nonce, KEK_A, KEK_B
-        )
+        new_encrypted_dek, new_nonce = EnvelopeEncryption.rotate_kek(encrypted_dek, dek_nonce, KEK_A, KEK_B)
 
         # Dechiffrer avec KEK_B : on doit retrouver la meme DEK
         aesgcm_b = AESGCM(bytes.fromhex(KEK_B))

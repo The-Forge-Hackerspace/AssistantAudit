@@ -5,6 +5,7 @@ Une AssessmentCampaign regroupe les évaluations d'un audit.
 Chaque Assessment lie un équipement à un framework.
 Chaque ControlResult est le résultat d'un contrôle sur un équipement.
 """
+
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
@@ -20,6 +21,7 @@ def _utcnow() -> datetime:
 
 class CampaignStatus(str, PyEnum):
     """Statuts d'une campagne d'évaluation"""
+
     DRAFT = "draft"
     IN_PROGRESS = "in_progress"
     REVIEW = "review"
@@ -29,6 +31,7 @@ class CampaignStatus(str, PyEnum):
 
 class ComplianceStatus(str, PyEnum):
     """Résultat de conformité d'un contrôle"""
+
     NOT_ASSESSED = "not_assessed"
     COMPLIANT = "compliant"
     NON_COMPLIANT = "non_compliant"
@@ -41,24 +44,19 @@ class AssessmentCampaign(Base):
     Campagne d'évaluation : regroupe les assessments d'un audit donné.
     Par exemple : "Campagne audit infra Q1 2026 - Client X"
     """
+
     __tablename__ = "assessment_campaigns"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[CampaignStatus] = mapped_column(
-        Enum(CampaignStatus), default=CampaignStatus.DRAFT, nullable=False
-    )
+    status: Mapped[CampaignStatus] = mapped_column(Enum(CampaignStatus), default=CampaignStatus.DRAFT, nullable=False)
 
     # FK
-    audit_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("audits.id"), nullable=False, index=True
-    )
+    audit_id: Mapped[int] = mapped_column(Integer, ForeignKey("audits.id"), nullable=False, index=True)
 
     # Métadonnées
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -79,8 +77,7 @@ class AssessmentCampaign(Base):
             all_results.extend(assessment.results)
 
         assessed = [
-            r for r in all_results
-            if r.status not in (ComplianceStatus.NOT_ASSESSED, ComplianceStatus.NOT_APPLICABLE)
+            r for r in all_results if r.status not in (ComplianceStatus.NOT_ASSESSED, ComplianceStatus.NOT_APPLICABLE)
         ]
         if not assessed:
             return None
@@ -95,29 +92,22 @@ class Assessment(Base):
     Évaluation d'un équipement selon un référentiel.
     Lie un équipement + un framework au sein d'une campagne.
     """
+
     __tablename__ = "assessments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # FK
-    campaign_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("assessment_campaigns.id"), nullable=False, index=True
-    )
-    equipement_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("equipements.id"), nullable=False, index=True
-    )
-    framework_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("frameworks.id"), nullable=False, index=True
-    )
+    campaign_id: Mapped[int] = mapped_column(Integer, ForeignKey("assessment_campaigns.id"), nullable=False, index=True)
+    equipement_id: Mapped[int] = mapped_column(Integer, ForeignKey("equipements.id"), nullable=False, index=True)
+    framework_id: Mapped[int] = mapped_column(Integer, ForeignKey("frameworks.id"), nullable=False, index=True)
 
     # Score
     score: Mapped[float | None] = mapped_column(Float)
     notes: Mapped[str | None] = mapped_column(Text)
 
     # Métadonnées
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     assessed_by: Mapped[str | None] = mapped_column(String(200))
 
     # Relations
@@ -148,8 +138,7 @@ class Assessment(Base):
     def compliance_score(self) -> float | None:
         """Score de conformité pour cet assessment (0-100)"""
         assessed = [
-            r for r in self.results
-            if r.status not in (ComplianceStatus.NOT_ASSESSED, ComplianceStatus.NOT_APPLICABLE)
+            r for r in self.results if r.status not in (ComplianceStatus.NOT_ASSESSED, ComplianceStatus.NOT_APPLICABLE)
         ]
         if not assessed:
             return None
@@ -163,17 +152,14 @@ class ControlResult(Base):
     Résultat d'un contrôle individuel pour un assessment donné.
     C'est ici qu'on stocke : conforme/non-conforme, preuve, commentaire, etc.
     """
+
     __tablename__ = "control_results"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # FK
-    assessment_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("assessments.id"), nullable=False, index=True
-    )
-    control_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("controls.id"), nullable=False, index=True
-    )
+    assessment_id: Mapped[int] = mapped_column(Integer, ForeignKey("assessments.id"), nullable=False, index=True)
+    control_id: Mapped[int] = mapped_column(Integer, ForeignKey("controls.id"), nullable=False, index=True)
 
     # Résultat
     status: Mapped[ComplianceStatus] = mapped_column(

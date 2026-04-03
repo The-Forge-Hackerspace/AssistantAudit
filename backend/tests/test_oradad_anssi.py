@@ -1,6 +1,7 @@
 """
 Tests pour le modele AnssiCheckpoint, le script de seed et le service OradadAnalysisService.
 """
+
 import csv
 import io
 import tarfile
@@ -171,9 +172,7 @@ class TestSeedScript:
     def test_seed_updates_values(self, db_session: Session):
         seed(db_session)
         # Verify a specific checkpoint
-        cp = db_session.query(AnssiCheckpoint).filter_by(
-            vuln_id="vuln1_privileged_members"
-        ).first()
+        cp = db_session.query(AnssiCheckpoint).filter_by(vuln_id="vuln1_privileged_members").first()
         assert cp is not None
         assert cp.level == 1
         assert cp.category == "accounts"
@@ -196,11 +195,13 @@ class TestParseTar:
         assert result["users"][0]["sAMAccountName"] == "admin1"
 
     def test_parse_multiple_types(self):
-        tar_data = _make_tar({
-            "user.tsv": [{"sAMAccountName": "u1", "userAccountControl": "512"}],
-            "group.tsv": [{"sAMAccountName": "g1", "member": "u1"}],
-            "computer.tsv": [{"sAMAccountName": "PC1$", "userAccountControl": "4096"}],
-        })
+        tar_data = _make_tar(
+            {
+                "user.tsv": [{"sAMAccountName": "u1", "userAccountControl": "512"}],
+                "group.tsv": [{"sAMAccountName": "g1", "member": "u1"}],
+                "computer.tsv": [{"sAMAccountName": "PC1$", "userAccountControl": "4096"}],
+            }
+        )
         result = OradadAnalysisService.parse_oradad_tar(tar_data)
         assert len(result["users"]) == 1
         assert len(result["groups"]) == 1
@@ -284,10 +285,7 @@ class TestAnssiChecks:
 
     def test_dormant_accounts_pass(self, db_session: Session):
         recent = datetime.now(timezone.utc) - timedelta(days=30)
-        users = [
-            _make_user(f"active{i}", last_logon=_ad_timestamp(recent))
-            for i in range(10)
-        ]
+        users = [_make_user(f"active{i}", last_logon=_ad_timestamp(recent)) for i in range(10)]
         data = {"users": users}
         findings = OradadAnalysisService.run_anssi_checks(db_session, data)
         f = next(f for f in findings if f["vuln_id"] == "vuln1_user_accounts_dormant")
@@ -310,7 +308,10 @@ class TestAnssiChecks:
             ],
             "computers": [
                 # DC — should be excluded
-                {"sAMAccountName": "DC1$", "userAccountControl": str(UAC_SERVER_TRUST_ACCOUNT | UAC_TRUSTED_FOR_DELEGATION)},
+                {
+                    "sAMAccountName": "DC1$",
+                    "userAccountControl": str(UAC_SERVER_TRUST_ACCOUNT | UAC_TRUSTED_FOR_DELEGATION),
+                },
                 # Non-DC server with unconstrained delegation
                 {"sAMAccountName": "SRV1$", "userAccountControl": str(4096 | UAC_TRUSTED_FOR_DELEGATION)},
             ],

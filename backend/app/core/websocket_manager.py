@@ -8,6 +8,7 @@ Gere deux types de connexions :
 Les evenements destines a un user deconnecte sont bufferises (30 min, max 1000)
 et rejoues a la reconnexion.
 """
+
 import logging
 from datetime import datetime, timezone
 
@@ -135,14 +136,11 @@ class ConnectionManager:
 
         # Cleanup TTL
         now = datetime.now(timezone.utc)
-        buf[:] = [
-            (ts, ev) for ts, ev in buf
-            if (now - ts).total_seconds() < BUFFER_TTL_SECONDS
-        ]
+        buf[:] = [(ts, ev) for ts, ev in buf if (now - ts).total_seconds() < BUFFER_TTL_SECONDS]
 
         # Cleanup taille (garder les plus recents)
         if len(buf) >= BUFFER_MAX_SIZE:
-            buf[:] = buf[-(BUFFER_MAX_SIZE - 1):]
+            buf[:] = buf[-(BUFFER_MAX_SIZE - 1) :]
 
         buf.append((now, event))
 
@@ -154,10 +152,7 @@ class ConnectionManager:
 
         # Cleanup TTL avant replay
         now = datetime.now(timezone.utc)
-        valid = [
-            (ts, ev) for ts, ev in buf
-            if (now - ts).total_seconds() < BUFFER_TTL_SECONDS
-        ]
+        valid = [(ts, ev) for ts, ev in buf if (now - ts).total_seconds() < BUFFER_TTL_SECONDS]
 
         for idx, (_, event) in enumerate(valid):
             try:

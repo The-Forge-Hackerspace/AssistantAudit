@@ -1,6 +1,7 @@
 """
 Tests pour les permissions du fichier ca.key (chmod 600).
 """
+
 import logging
 import os
 

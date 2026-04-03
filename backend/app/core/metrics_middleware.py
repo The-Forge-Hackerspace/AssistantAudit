@@ -15,7 +15,7 @@ from .metrics import MetricsCollector
 class PrometheusMiddleware(BaseHTTPMiddleware):
     """
     FastAPI middleware that collects Prometheus metrics for all HTTP requests.
-    
+
     Tracks:
     - Request count by method, endpoint, and status
     - Request duration by method and endpoint
@@ -48,7 +48,7 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         # Get request details
         method = request.method
         path = request.url.path
-        
+
         # Normalize path for metrics (replace IDs with placeholder)
         endpoint = self._normalize_path(path)
 
@@ -99,13 +99,13 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         """
         Normalize URL path for metrics aggregation.
         Replace numeric IDs with {id} placeholder.
-        
+
         Examples:
             /campaigns/123 → /campaigns/{id}
             /audits/456/sites → /audits/{id}/sites
         """
         import re
-        
+
         # Replace consecutive digits with {id}
         normalized = re.sub(r"/\d+(?=/|$)", "/{id}", path)
         return normalized

@@ -76,10 +76,10 @@ def test_slugify_unicode_handling():
 def test_get_scan_output_path_structure():
     """Test get_scan_output_path generates correct path structure."""
     result = get_scan_output_path("Test Company", "scan-001")
-    
+
     # Verify it's a Path object
     assert isinstance(result, Path), f"Expected Path object, got {type(result)}"
-    
+
     # Verify path components (from end backwards)
     parts = result.parts
     assert parts[-1] == "scan-001", f"Expected scan_id 'scan-001', got '{parts[-1]}'"
@@ -91,7 +91,7 @@ def test_get_scan_output_path_structure():
 def test_get_scan_output_path_custom_tool():
     """Test get_scan_output_path with custom tool parameter."""
     result = get_scan_output_path("Test Company", "scan-001", tool="Azure")
-    
+
     parts = result.parts
     assert parts[-2] == "Azure", f"Expected tool 'Azure', got '{parts[-2]}'"
 
@@ -106,9 +106,9 @@ def test_ensure_scan_directory_creates_path(tmp_path, monkeypatch):
     # Mock settings to use tmp_path
     with patch("app.core.storage.get_settings") as mock_settings:
         mock_settings.return_value.DATA_DIR = str(tmp_path)
-        
+
         result = ensure_scan_directory("Test Company", "scan-001")
-        
+
         assert result.exists(), f"Directory {result} was not created"
         assert result.is_dir(), f"{result} is not a directory"
 
@@ -117,9 +117,9 @@ def test_ensure_scan_directory_returns_path(tmp_path):
     """Test ensure_scan_directory returns Path object."""
     with patch("app.core.storage.get_settings") as mock_settings:
         mock_settings.return_value.DATA_DIR = str(tmp_path)
-        
+
         result = ensure_scan_directory("Test Company", "scan-001")
-        
+
         assert isinstance(result, Path), f"Expected Path object, got {type(result)}"
 
 
@@ -127,11 +127,11 @@ def test_ensure_scan_directory_idempotent(tmp_path):
     """Test ensure_scan_directory can be called multiple times safely."""
     with patch("app.core.storage.get_settings") as mock_settings:
         mock_settings.return_value.DATA_DIR = str(tmp_path)
-        
+
         # Call twice
         result1 = ensure_scan_directory("Test Company", "scan-001")
         result2 = ensure_scan_directory("Test Company", "scan-001")
-        
+
         assert result1 == result2, "Multiple calls should return same path"
         assert result1.exists(), "Directory should still exist"
 
@@ -145,10 +145,10 @@ def test_write_meta_json_creates_file(tmp_path):
     """Test write_meta_json creates JSON file."""
     output_dir = tmp_path / "test_output"
     output_dir.mkdir()
-    
+
     metadata = {"tool": "M365", "status": "running", "scan_id": "abc-123"}
     result = write_meta_json(output_dir, metadata)
-    
+
     assert result.exists(), f"File {result} was not created"
     assert result.name == "meta.json", f"Expected 'meta.json', got '{result.name}'"
 
@@ -157,14 +157,14 @@ def test_write_meta_json_content_matches(tmp_path):
     """Test write_meta_json writes correct JSON content."""
     output_dir = tmp_path / "test_output"
     output_dir.mkdir()
-    
+
     metadata = {"tool": "M365", "status": "completed", "findings": 42}
     meta_file = write_meta_json(output_dir, metadata)
-    
+
     # Read back and verify
     with open(meta_file, "r", encoding="utf-8") as f:
         loaded = json.load(f)
-    
+
     assert loaded == metadata, f"Expected {metadata}, got {loaded}"
 
 
@@ -172,13 +172,13 @@ def test_write_meta_json_pretty_printed(tmp_path):
     """Test write_meta_json uses pretty-print formatting."""
     output_dir = tmp_path / "test_output"
     output_dir.mkdir()
-    
+
     metadata = {"key1": "value1", "key2": "value2"}
     meta_file = write_meta_json(output_dir, metadata)
-    
+
     # Read raw content
     content = meta_file.read_text(encoding="utf-8")
-    
+
     # Should have newlines (pretty-printed)
     assert "\n" in content, "Expected pretty-printed JSON with newlines"
     # Should have indentation
@@ -189,13 +189,13 @@ def test_write_meta_json_unicode_support(tmp_path):
     """Test write_meta_json handles unicode correctly."""
     output_dir = tmp_path / "test_output"
     output_dir.mkdir()
-    
+
     metadata = {"entreprise": "Société Générale", "ville": "Paris"}
     meta_file = write_meta_json(output_dir, metadata)
-    
+
     # Read back and verify unicode preserved
     with open(meta_file, "r", encoding="utf-8") as f:
         loaded = json.load(f)
-    
+
     assert loaded["entreprise"] == "Société Générale", "Unicode should be preserved"
     assert loaded["ville"] == "Paris", "Unicode should be preserved"

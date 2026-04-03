@@ -5,11 +5,11 @@ Stocke les données collectées automatiquement sur un serveur
 (infos système, réseau, sécurité, services, etc.) pour
 analyse et pré-remplissage des contrôles d'audit.
 """
+
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
-from sqlalchemy import JSON
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -33,18 +33,13 @@ class CollectStatus(str, PyEnum):
 
 class CollectResult(Base):
     """Résultat d'une collecte système via SSH ou WinRM, lié à un équipement."""
+
     __tablename__ = "collect_results"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    equipement_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("equipements.id"), nullable=False, index=True
-    )
-    method: Mapped[CollectMethod] = mapped_column(
-        Enum(CollectMethod), nullable=False
-    )
-    status: Mapped[CollectStatus] = mapped_column(
-        Enum(CollectStatus), default=CollectStatus.RUNNING, nullable=False
-    )
+    equipement_id: Mapped[int] = mapped_column(Integer, ForeignKey("equipements.id"), nullable=False, index=True)
+    method: Mapped[CollectMethod] = mapped_column(Enum(CollectMethod), nullable=False)
+    status: Mapped[CollectStatus] = mapped_column(Enum(CollectStatus), default=CollectStatus.RUNNING, nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text)
 
     # Connexion
@@ -68,9 +63,7 @@ class CollectResult(Base):
     summary: Mapped[dict | None] = mapped_column(JSON)
 
     # Métadonnées
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
 
@@ -79,6 +72,5 @@ class CollectResult(Base):
 
     def __repr__(self) -> str:
         return (
-            f"<CollectResult(id={self.id}, method='{self.method}', "
-            f"status='{self.status}', equip={self.equipement_id})>"
+            f"<CollectResult(id={self.id}, method='{self.method}', status='{self.status}', equip={self.equipement_id})>"
         )

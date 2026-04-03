@@ -54,10 +54,7 @@ def launch_ad_audit(
         auth_method=params.auth_method,
     )
 
-    logger.info(
-        f"AD Audit #{audit.id} lancé en background "
-        f"(LDAP → {params.target_host}:{params.target_port})"
-    )
+    logger.info(f"AD Audit #{audit.id} lancé en background (LDAP → {params.target_host}:{params.target_port})")
     return audit
 
 
@@ -88,7 +85,10 @@ def get_ad_audit(
 ):
     """Récupère le détail d'un audit AD."""
     audit = get_ad_audit_result(
-        db, audit_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        audit_id,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     if not audit:
         raise HTTPException(404, f"Audit AD #{audit_id} introuvable")
@@ -103,7 +103,10 @@ def delete_ad_audit(
 ):
     """Supprime un audit AD."""
     if not delete_ad_audit_result(
-        db, audit_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        audit_id,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     ):
         raise HTTPException(404, f"Audit AD #{audit_id} introuvable")
     return MessageResponse(message=f"Audit AD #{audit_id} supprimé")

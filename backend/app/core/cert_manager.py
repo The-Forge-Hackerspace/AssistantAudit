@@ -10,6 +10,7 @@ Usage :
     mgr = CertManager(ca_cert_path, ca_key_path)
     cert_pem, key_pem = mgr.sign_agent_cert(agent_uuid)
 """
+
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -20,8 +21,8 @@ logger = logging.getLogger(__name__)
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from cryptography.x509 import CertificateRevocationListBuilder, RevokedCertificateBuilder
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 
 class CertManager:
@@ -35,7 +36,8 @@ class CertManager:
                 if mode != 0o600:
                     logger.warning(
                         "CA private key %s has insecure permissions %o, should be 600",
-                        self.ca_key_path, mode,
+                        self.ca_key_path,
+                        mode,
                     )
             except OSError:
                 pass
@@ -52,10 +54,12 @@ class CertManager:
 
         key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
 
-        subject = issuer = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, cn),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "AssistantAudit"),
-        ])
+        subject = issuer = x509.Name(
+            [
+                x509.NameAttribute(NameOID.COMMON_NAME, cn),
+                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "AssistantAudit"),
+            ]
+        )
 
         cert = (
             x509.CertificateBuilder()
@@ -65,9 +69,7 @@ class CertManager:
             .serial_number(x509.random_serial_number())
             .not_valid_before(datetime.now(timezone.utc))
             .not_valid_after(datetime.now(timezone.utc) + timedelta(days=3650))
-            .add_extension(
-                x509.BasicConstraints(ca=True, path_length=0), critical=True
-            )
+            .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
             .add_extension(
                 x509.KeyUsage(
                     key_cert_sign=True,
@@ -107,16 +109,16 @@ class CertManager:
             (cert_pem, key_pem)
         """
         ca_cert = x509.load_pem_x509_certificate(self.ca_cert_path.read_bytes())
-        ca_key = serialization.load_pem_private_key(
-            self.ca_key_path.read_bytes(), password=None
-        )
+        ca_key = serialization.load_pem_private_key(self.ca_key_path.read_bytes(), password=None)
 
         agent_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
-        subject = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, f"agent-{agent_uuid}"),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "AssistantAudit"),
-        ])
+        subject = x509.Name(
+            [
+                x509.NameAttribute(NameOID.COMMON_NAME, f"agent-{agent_uuid}"),
+                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "AssistantAudit"),
+            ]
+        )
 
         cert = (
             x509.CertificateBuilder()
@@ -131,9 +133,7 @@ class CertManager:
                 critical=True,
             )
             .add_extension(
-                x509.SubjectAlternativeName([
-                    x509.UniformResourceIdentifier(f"urn:agent:{agent_uuid}")
-                ]),
+                x509.SubjectAlternativeName([x509.UniformResourceIdentifier(f"urn:agent:{agent_uuid}")]),
                 critical=False,
             )
             .sign(ca_key, hashes.SHA256())
@@ -158,9 +158,7 @@ class CertManager:
         Retourne le PEM de la CRL.
         """
         ca_cert = x509.load_pem_x509_certificate(self.ca_cert_path.read_bytes())
-        ca_key = serialization.load_pem_private_key(
-            self.ca_key_path.read_bytes(), password=None
-        )
+        ca_key = serialization.load_pem_private_key(self.ca_key_path.read_bytes(), password=None)
 
         now = datetime.now(timezone.utc)
         builder = CertificateRevocationListBuilder()
@@ -169,12 +167,7 @@ class CertManager:
         builder = builder.next_update(now + timedelta(days=30))
 
         for serial, revoked_at in revoked_serials:
-            revoked_cert = (
-                RevokedCertificateBuilder()
-                .serial_number(serial)
-                .revocation_date(revoked_at)
-                .build()
-            )
+            revoked_cert = RevokedCertificateBuilder().serial_number(serial).revocation_date(revoked_at).build()
             builder = builder.add_revoked_certificate(revoked_cert)
 
         crl = builder.sign(ca_key, hashes.SHA256())

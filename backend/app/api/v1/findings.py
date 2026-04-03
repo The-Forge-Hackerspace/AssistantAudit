@@ -1,4 +1,5 @@
 """Endpoints API — Findings (non-conformités)."""
+
 import math
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -94,9 +95,7 @@ def generate_findings(
 ):
     """Génère des findings depuis les ControlResult non-conformes d'un assessment."""
     uid, _ = _rbac(current_user)
-    generated, skipped = FindingService.generate_from_assessment(
-        db, body.assessment_id, user_id=uid
-    )
+    generated, skipped = FindingService.generate_from_assessment(db, body.assessment_id, user_id=uid)
     db.commit()
     return FindingGenerateResponse(
         generated=generated,
@@ -121,16 +120,15 @@ def update_finding_status(
     uid, _ = _rbac(current_user)
     try:
         updated = FindingService.update_status(
-            db, finding,
+            db,
+            finding,
             new_status_str=body.status,
             user_id=uid,
             comment=body.comment,
             assigned_to=body.assigned_to,
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
     db.commit()
     db.refresh(updated)
@@ -153,9 +151,7 @@ def link_duplicate(
     try:
         updated = FindingService.link_duplicate(db, finding, body.duplicate_of_id)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
     db.commit()
     db.refresh(updated)

@@ -30,12 +30,12 @@ def db_engine():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    
+
     # Create all tables
     Base.metadata.create_all(bind=engine)
-    
+
     yield engine
-    
+
     # Teardown
     Base.metadata.drop_all(bind=engine)
 
@@ -45,9 +45,9 @@ def db_session(db_engine) -> Generator[Session, None, None]:
     """Provide a clean database session for each test"""
     TestSessionLocal = sessionmaker(bind=db_engine, autocommit=False, autoflush=False)
     session = TestSessionLocal()
-    
+
     yield session
-    
+
     session.close()
 
 
@@ -57,15 +57,15 @@ def app(db_session):
     # Import here to avoid loading at conftest import time
     from app.core.database import get_db
     from app.main import create_app
-    
+
     # Create app
     app = create_app()
-    
+
     # Override dependencies
     app.dependency_overrides[get_db] = lambda: db_session
-    
+
     yield app
-    
+
     # Cleanup
     app.dependency_overrides.clear()
 
@@ -259,6 +259,7 @@ def _reset_rate_limiters():
         login_rate_limiter,
         public_rate_limiter,
     )
+
     login_rate_limiter.reset_all()
     enroll_rate_limiter.reset_all()
     api_rate_limiter.reset_all()

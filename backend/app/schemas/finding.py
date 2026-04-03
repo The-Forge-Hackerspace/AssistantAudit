@@ -1,4 +1,5 @@
 """Schemas Pydantic — Findings."""
+
 from datetime import datetime
 from typing import Optional
 
@@ -7,6 +8,7 @@ from pydantic import BaseModel, Field
 
 class FindingStatusUpdate(BaseModel):
     """Mise à jour du statut d'un finding."""
+
     status: str = Field(..., pattern=r"^(open|assigned|in_progress|remediated|verified|closed)$")
     comment: Optional[str] = None
     assigned_to: Optional[str] = None
@@ -14,11 +16,13 @@ class FindingStatusUpdate(BaseModel):
 
 class FindingLinkDuplicate(BaseModel):
     """Liaison de finding dupliqué."""
+
     duplicate_of_id: int
 
 
 class FindingBase(BaseModel):
     """Champs communs des findings."""
+
     title: str
     description: Optional[str] = None
     severity: str = Field(..., pattern=r"^(critical|high|medium|low|info)$")
@@ -28,6 +32,7 @@ class FindingBase(BaseModel):
 
 class FindingCreate(FindingBase):
     """Création manuelle d'un finding."""
+
     control_result_id: int
     assessment_id: int
     equipment_id: int
@@ -35,6 +40,7 @@ class FindingCreate(FindingBase):
 
 class FindingStatusHistoryResponse(BaseModel):
     """Réponse d'un changement de statut."""
+
     id: int
     old_status: str
     new_status: str
@@ -47,6 +53,7 @@ class FindingStatusHistoryResponse(BaseModel):
 
 class FindingResponse(BaseModel):
     """Réponse d'un finding (liste)."""
+
     id: int
     title: str
     description: Optional[str] = None
@@ -71,6 +78,7 @@ class FindingResponse(BaseModel):
 
 class FindingDetail(FindingResponse):
     """Réponse détaillée d'un finding."""
+
     remediation_note: Optional[str] = None
     created_by: Optional[int] = None
     status_history: list[FindingStatusHistoryResponse] = []
@@ -80,11 +88,13 @@ class FindingDetail(FindingResponse):
 
 class FindingGenerateRequest(BaseModel):
     """Requête de génération de findings depuis une campagne."""
+
     assessment_id: int
 
 
 class FindingGenerateResponse(BaseModel):
     """Réponse de génération de findings."""
+
     generated: int
     skipped: int
     message: str
@@ -92,6 +102,7 @@ class FindingGenerateResponse(BaseModel):
 
 class FindingCountsByStatus(BaseModel):
     """Compteurs par statut."""
+
     open: int = 0
     assigned: int = 0
     in_progress: int = 0

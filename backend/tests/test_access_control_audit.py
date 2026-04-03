@@ -4,6 +4,7 @@ Audit securite 4/8 : Controle d'acces — tests d'integration reels.
 Verifie l'isolation inter-roles (admin/auditeur/lecteur) et inter-tenants
 sur tous les endpoints critiques.
 """
+
 import pytest
 
 from app.core.security import create_access_token, create_agent_token, hash_password
@@ -80,7 +81,6 @@ def agent(db_session, auditeur_user):
 
 
 class TestAuditAccess:
-
     def test_admin_sees_all_audits(self, client, admin_headers, audit):
         """Admin voit tous les audits, y compris ceux d'autres users."""
         r = client.get("/api/v1/audits", headers=admin_headers)
@@ -133,7 +133,6 @@ class TestAuditAccess:
 
 
 class TestAuditOwnership:
-
     def test_audits_owner_filtering(self, client, auditeur_headers, auditeur2_headers, audit):
         """
         FIXED: GET /audits filtre par owner_id.
@@ -152,7 +151,6 @@ class TestAuditOwnership:
 
 
 class TestAgentAccess:
-
     def test_lecteur_cannot_create_agent(self, client, lecteur_headers):
         """Lecteur ne peut pas creer d'agent."""
         r = client.post(
@@ -162,9 +160,7 @@ class TestAgentAccess:
         )
         assert r.status_code == 403
 
-    def test_auditeur_sees_own_agents_only(
-        self, client, auditeur_headers, auditeur2_headers, agent
-    ):
+    def test_auditeur_sees_own_agents_only(self, client, auditeur_headers, auditeur2_headers, agent):
         """Auditeur ne voit que ses propres agents."""
         # auditeur_test voit son agent
         r = client.get("/api/v1/agents/", headers=auditeur_headers)
@@ -182,13 +178,9 @@ class TestAgentAccess:
         assert r.status_code == 200
         assert len(r.json()) >= 1
 
-    def test_auditeur_cannot_revoke_other_agent(
-        self, client, auditeur2_headers, agent
-    ):
+    def test_auditeur_cannot_revoke_other_agent(self, client, auditeur2_headers, agent):
         """Auditeur ne peut pas revoquer l'agent d'un autre — retourne 404."""
-        r = client.delete(
-            f"/api/v1/agents/{agent.agent_uuid}", headers=auditeur2_headers
-        )
+        r = client.delete(f"/api/v1/agents/{agent.agent_uuid}", headers=auditeur2_headers)
         assert r.status_code == 404
 
 
@@ -198,10 +190,7 @@ class TestAgentAccess:
 
 
 class TestTaskDispatch:
-
-    def test_dispatch_to_other_users_agent_returns_404(
-        self, client, auditeur2_headers, agent
-    ):
+    def test_dispatch_to_other_users_agent_returns_404(self, client, auditeur2_headers, agent):
         """
         auditeur2 dispatch vers l'agent de auditeur1 → 404 (agent introuvable).
         Pas 403, pour ne pas reveler l'existence de l'agent.
@@ -217,9 +206,7 @@ class TestTaskDispatch:
         )
         assert r.status_code == 404
 
-    def test_dispatch_tool_not_allowed_returns_403(
-        self, client, auditeur_headers, agent
-    ):
+    def test_dispatch_tool_not_allowed_returns_403(self, client, auditeur_headers, agent):
         """
         FINDING: dispatch avec un outil non autorise retourne 403.
         Ceci revele que l'agent existe.
@@ -243,7 +230,6 @@ class TestTaskDispatch:
 
 
 class TestUserAccess:
-
     def test_lecteur_cannot_list_users(self, client, lecteur_headers):
         """Lecteur ne peut pas lister les utilisateurs."""
         r = client.get("/api/v1/users/", headers=lecteur_headers)
@@ -256,9 +242,7 @@ class TestUserAccess:
 
     def test_auditeur_cannot_delete_user(self, client, auditeur_headers, lecteur_user):
         """Auditeur ne peut pas supprimer un utilisateur."""
-        r = client.delete(
-            f"/api/v1/users/{lecteur_user.id}", headers=auditeur_headers
-        )
+        r = client.delete(f"/api/v1/users/{lecteur_user.id}", headers=auditeur_headers)
         assert r.status_code == 403
 
     def test_admin_can_list_users(self, client, admin_headers, auditeur_user):
@@ -274,7 +258,6 @@ class TestUserAccess:
 
 
 class TestOradadAccess:
-
     def test_lecteur_cannot_create_config(self, client, lecteur_headers):
         """Lecteur ne peut pas creer de config ORADAD."""
         r = client.post(
@@ -296,7 +279,6 @@ class TestOradadAccess:
 
 
 class TestPublicEndpoints:
-
     def test_enroll_is_public(self, client):
         """POST /agents/enroll est accessible sans auth (retourne 400, pas 401)."""
         r = client.post(
@@ -318,7 +300,6 @@ class TestPublicEndpoints:
 
 
 class TestTokenTypeIsolation:
-
     def test_agent_token_rejected_on_user_route(self, client, agent):
         """Un token agent ne doit pas fonctionner sur une route user."""
         agent_token = create_agent_token(agent.agent_uuid, agent.user_id)

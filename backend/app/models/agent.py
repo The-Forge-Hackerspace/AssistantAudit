@@ -2,6 +2,7 @@
 Modele Agent — Daemon Windows enregistre aupres du serveur.
 Un agent est lie a un technicien (User) et execute des outils locaux.
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -23,34 +24,22 @@ class Agent(Base):
     __tablename__ = "agents"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    agent_uuid: Mapped[str] = mapped_column(
-        String(36), unique=True, nullable=False, default=_new_uuid
-    )
+    agent_uuid: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, default=_new_uuid)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Liaison au technicien — 1:N (un tech peut avoir plusieurs agents)
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False, index=True
-    )
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # Securite mTLS
-    cert_fingerprint: Mapped[str | None] = mapped_column(
-        String(64), unique=True
-    )  # SHA-256 du cert client
-    cert_serial: Mapped[str | None] = mapped_column(
-        String(64)
-    )  # serial number du certificat pour revocation
+    cert_fingerprint: Mapped[str | None] = mapped_column(String(64), unique=True)  # SHA-256 du cert client
+    cert_serial: Mapped[str | None] = mapped_column(String(64))  # serial number du certificat pour revocation
     cert_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )  # date d'expiration du certificat client
 
     # Enrollment
-    enrollment_token_hash: Mapped[str | None] = mapped_column(
-        String(128)
-    )  # SHA-256 du token d'enrollment
-    enrollment_token_expires: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    enrollment_token_hash: Mapped[str | None] = mapped_column(String(128))  # SHA-256 du token d'enrollment
+    enrollment_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     enrollment_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Statut : pending (cree, pas encore enrolle), active, revoked, offline
@@ -71,12 +60,8 @@ class Agent(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), onupdate=_utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=_utcnow)
 
     # Relations
     owner: Mapped["User"] = relationship(back_populates="agents")  # type: ignore[name-defined]

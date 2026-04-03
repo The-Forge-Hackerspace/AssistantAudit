@@ -3,6 +3,7 @@ Tests d'isolation cross-agent sur les messages WebSocket task_status et task_res
 
 Verifie qu'un agent ne peut pas modifier les taches d'un autre agent via WebSocket.
 """
+
 import logging
 
 import pytest
@@ -89,6 +90,7 @@ def _patch_session_local(db_session, monkeypatch):
 def _clear_global_ws_manager():
     """Reset global ws_manager state entre les tests."""
     from app.core.websocket_manager import ws_manager
+
     ws_manager.user_connections.clear()
     ws_manager.agent_connections.clear()
     ws_manager.user_event_buffer.clear()
@@ -102,18 +104,26 @@ class TestTaskStatusCrossAgent:
     """Agent A envoie task_status pour une tache d'agent B → rejete."""
 
     def test_cross_agent_task_status_rejected(
-        self, client, agent_a, agent_b, task_for_agent_b, db_session, admin_user,
+        self,
+        client,
+        agent_a,
+        agent_b,
+        task_for_agent_b,
+        db_session,
+        admin_user,
     ):
         """Agent A ne peut pas modifier le status d'une tache d'agent B."""
         token = create_agent_token(agent_uuid=agent_a.agent_uuid, owner_id=admin_user.id)
         with client.websocket_connect(f"/ws/agent?token={token}") as ws:
-            ws.send_json({
-                "type": "task_status",
-                "data": {
-                    "task_uuid": task_for_agent_b.task_uuid,
-                    "status": "running",
-                },
-            })
+            ws.send_json(
+                {
+                    "type": "task_status",
+                    "data": {
+                        "task_uuid": task_for_agent_b.task_uuid,
+                        "status": "running",
+                    },
+                }
+            )
             # Envoyer un heartbeat pour confirmer que la connexion fonctionne
             ws.send_json({"type": "heartbeat"})
             resp = ws.receive_json()
@@ -124,19 +134,27 @@ class TestTaskStatusCrossAgent:
         assert task_for_agent_b.status == "dispatched"
 
     def test_cross_agent_task_status_logs_warning(
-        self, client, agent_a, task_for_agent_b, db_session, admin_user, caplog,
+        self,
+        client,
+        agent_a,
+        task_for_agent_b,
+        db_session,
+        admin_user,
+        caplog,
     ):
         """Un warning est emis quand un agent tente de modifier une tache etrangere."""
         token = create_agent_token(agent_uuid=agent_a.agent_uuid, owner_id=admin_user.id)
         with caplog.at_level(logging.WARNING):
             with client.websocket_connect(f"/ws/agent?token={token}") as ws:
-                ws.send_json({
-                    "type": "task_status",
-                    "data": {
-                        "task_uuid": task_for_agent_b.task_uuid,
-                        "status": "running",
-                    },
-                })
+                ws.send_json(
+                    {
+                        "type": "task_status",
+                        "data": {
+                            "task_uuid": task_for_agent_b.task_uuid,
+                            "status": "running",
+                        },
+                    }
+                )
                 ws.send_json({"type": "heartbeat"})
                 ws.receive_json()
 
@@ -147,18 +165,26 @@ class TestTaskResultCrossAgent:
     """Agent A envoie task_result pour une tache d'agent B → rejete."""
 
     def test_cross_agent_task_result_rejected(
-        self, client, agent_a, agent_b, task_for_agent_b, db_session, admin_user,
+        self,
+        client,
+        agent_a,
+        agent_b,
+        task_for_agent_b,
+        db_session,
+        admin_user,
     ):
         """Agent A ne peut pas completer une tache d'agent B."""
         token = create_agent_token(agent_uuid=agent_a.agent_uuid, owner_id=admin_user.id)
         with client.websocket_connect(f"/ws/agent?token={token}") as ws:
-            ws.send_json({
-                "type": "task_result",
-                "data": {
-                    "task_uuid": task_for_agent_b.task_uuid,
-                    "result_summary": {"injected": True},
-                },
-            })
+            ws.send_json(
+                {
+                    "type": "task_result",
+                    "data": {
+                        "task_uuid": task_for_agent_b.task_uuid,
+                        "result_summary": {"injected": True},
+                    },
+                }
+            )
             ws.send_json({"type": "heartbeat"})
             resp = ws.receive_json()
             assert resp["type"] == "heartbeat_ack"
@@ -169,19 +195,27 @@ class TestTaskResultCrossAgent:
         assert task_for_agent_b.result_summary is None
 
     def test_cross_agent_task_result_logs_warning(
-        self, client, agent_a, task_for_agent_b, db_session, admin_user, caplog,
+        self,
+        client,
+        agent_a,
+        task_for_agent_b,
+        db_session,
+        admin_user,
+        caplog,
     ):
         """Un warning est emis pour task_result cross-agent."""
         token = create_agent_token(agent_uuid=agent_a.agent_uuid, owner_id=admin_user.id)
         with caplog.at_level(logging.WARNING):
             with client.websocket_connect(f"/ws/agent?token={token}") as ws:
-                ws.send_json({
-                    "type": "task_result",
-                    "data": {
-                        "task_uuid": task_for_agent_b.task_uuid,
-                        "result_summary": {"injected": True},
-                    },
-                })
+                ws.send_json(
+                    {
+                        "type": "task_result",
+                        "data": {
+                            "task_uuid": task_for_agent_b.task_uuid,
+                            "result_summary": {"injected": True},
+                        },
+                    }
+                )
                 ws.send_json({"type": "heartbeat"})
                 ws.receive_json()
 
@@ -192,18 +226,25 @@ class TestOwnTaskStillWorks:
     """Agent A envoie task_status/task_result pour sa propre tache → fonctionne."""
 
     def test_own_task_status_succeeds(
-        self, client, agent_a, task_for_agent_a, db_session, admin_user,
+        self,
+        client,
+        agent_a,
+        task_for_agent_a,
+        db_session,
+        admin_user,
     ):
         """Agent A peut modifier le status de sa propre tache."""
         token = create_agent_token(agent_uuid=agent_a.agent_uuid, owner_id=admin_user.id)
         with client.websocket_connect(f"/ws/agent?token={token}") as ws:
-            ws.send_json({
-                "type": "task_status",
-                "data": {
-                    "task_uuid": task_for_agent_a.task_uuid,
-                    "status": "running",
-                },
-            })
+            ws.send_json(
+                {
+                    "type": "task_status",
+                    "data": {
+                        "task_uuid": task_for_agent_a.task_uuid,
+                        "status": "running",
+                    },
+                }
+            )
             ws.send_json({"type": "heartbeat"})
             resp = ws.receive_json()
             assert resp["type"] == "heartbeat_ack"
@@ -214,18 +255,25 @@ class TestOwnTaskStillWorks:
         assert task_for_agent_a.started_at is not None
 
     def test_own_task_result_succeeds(
-        self, client, agent_a, task_for_agent_a, db_session, admin_user,
+        self,
+        client,
+        agent_a,
+        task_for_agent_a,
+        db_session,
+        admin_user,
     ):
         """Agent A peut envoyer le resultat de sa propre tache."""
         token = create_agent_token(agent_uuid=agent_a.agent_uuid, owner_id=admin_user.id)
         with client.websocket_connect(f"/ws/agent?token={token}") as ws:
-            ws.send_json({
-                "type": "task_result",
-                "data": {
-                    "task_uuid": task_for_agent_a.task_uuid,
-                    "result_summary": {"hosts_found": 3},
-                },
-            })
+            ws.send_json(
+                {
+                    "type": "task_result",
+                    "data": {
+                        "task_uuid": task_for_agent_a.task_uuid,
+                        "result_summary": {"hosts_found": 3},
+                    },
+                }
+            )
             ws.send_json({"type": "heartbeat"})
             resp = ws.receive_json()
             assert resp["type"] == "heartbeat_ack"

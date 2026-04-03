@@ -1,6 +1,7 @@
 """
 Service d'authentification : login, création d'utilisateur, gestion des tokens.
 """
+
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -15,17 +16,20 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
-
     @staticmethod
     def authenticate(db: Session, username: str, password: str) -> Optional[User]:
         """Authentifie un utilisateur par identifiant (username ou email) + mot de passe"""
         identifier = username.strip()
-        user = db.query(User).filter(
-            or_(
-                User.username == identifier,
-                User.email.ilike(identifier),
+        user = (
+            db.query(User)
+            .filter(
+                or_(
+                    User.username == identifier,
+                    User.email.ilike(identifier),
+                )
             )
-        ).first()
+            .first()
+        )
         if user is None or not verify_password(password, user.password_hash):
             logger.warning(f"Tentative de connexion échouée pour: {identifier}")
             return None
@@ -55,8 +59,9 @@ class AuthService:
         }
 
     @staticmethod
-    def create_user(db: Session, username: str, email: str, password: str,
-                    full_name: str = None, role: str = "auditeur") -> User:
+    def create_user(
+        db: Session, username: str, email: str, password: str, full_name: str = None, role: str = "auditeur"
+    ) -> User:
         """Crée un nouvel utilisateur"""
         user = User(
             username=username,

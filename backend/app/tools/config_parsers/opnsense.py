@@ -4,6 +4,7 @@ Config Parser — OPNsense.
 Parse les exports de configuration OPNsense (format XML).
 Extrait : hostname, firmware, interfaces, règles de filtrage, constats de sécurité.
 """
+
 import logging
 from typing import Optional
 from xml.etree.ElementTree import Element
@@ -38,13 +39,15 @@ class OPNsenseParser(ConfigParserBase):
                 serial_number=None,
                 interfaces=[],
                 firewall_rules=[],
-                findings=[SecurityFinding(
-                    severity="critical",
-                    category="Parsing",
-                    title="Fichier XML invalide",
-                    description=f"Le fichier de configuration n'a pas pu être parsé : {exc}",
-                    remediation="Vérifier que le fichier exporté est bien au format XML OPNsense.",
-                )],
+                findings=[
+                    SecurityFinding(
+                        severity="critical",
+                        category="Parsing",
+                        title="Fichier XML invalide",
+                        description=f"Le fichier de configuration n'a pas pu être parsé : {exc}",
+                        remediation="Vérifier que le fichier exporté est bien au format XML OPNsense.",
+                    )
+                ],
                 summary={},
             )
 
@@ -98,15 +101,17 @@ class OPNsenseParser(ConfigParserBase):
             subnet_bits = self._get_text(child, "subnet")
             netmask = self._cidr_to_netmask(int(subnet_bits)) if subnet_bits and subnet_bits.isdigit() else None
 
-            interfaces.append(InterfaceInfo(
-                name=descr or name,
-                ip_address=ip,
-                netmask=netmask,
-                vlan=None,
-                status=iface_status,
-                allowed_access=[],
-                description=f"Interface {name}",
-            ))
+            interfaces.append(
+                InterfaceInfo(
+                    name=descr or name,
+                    ip_address=ip,
+                    netmask=netmask,
+                    vlan=None,
+                    status=iface_status,
+                    allowed_access=[],
+                    description=f"Interface {name}",
+                )
+            )
 
         return interfaces
 
@@ -125,11 +130,7 @@ class OPNsenseParser(ConfigParserBase):
             if src is not None:
                 src_addr = "any"
             else:
-                src_addr = (
-                    self._get_text(rule_el, "source/network")
-                    or self._get_text(rule_el, "source/address")
-                    or "?"
-                )
+                src_addr = self._get_text(rule_el, "source/network") or self._get_text(rule_el, "source/address") or "?"
 
             dst = self._get_text(rule_el, "destination/any")
             if dst is not None:
@@ -151,19 +152,21 @@ class OPNsenseParser(ConfigParserBase):
             if dst_port:
                 service = f"{protocol}/{dst_port}"
 
-            rules.append(FirewallRuleInfo(
-                rule_id=str(idx),
-                name=descr,
-                source_interface=interface,
-                dest_interface=None,
-                source_address=src_addr,
-                dest_address=dst_addr,
-                service=service,
-                action=rule_type,
-                schedule=None,
-                enabled=not disabled,
-                log_traffic=log,
-            ))
+            rules.append(
+                FirewallRuleInfo(
+                    rule_id=str(idx),
+                    name=descr,
+                    source_interface=interface,
+                    dest_interface=None,
+                    source_address=src_addr,
+                    dest_address=dst_addr,
+                    service=service,
+                    action=rule_type,
+                    schedule=None,
+                    enabled=not disabled,
+                    log_traffic=log,
+                )
+            )
 
         return rules
 
@@ -182,73 +185,83 @@ class OPNsenseParser(ConfigParserBase):
             if rule.source_address == "any" and rule.dest_address == "any":
                 svc = rule.service or "any"
                 if svc in ("any", "any/any"):
-                    findings.append(SecurityFinding(
-                        severity="critical",
-                        category="Règles de filtrage",
-                        title=f"Règle #{rule.rule_id} : any→any PASS",
-                        description=(
-                            f"La règle '{rule.name or rule.rule_id}' autorise tout le trafic. "
-                            "Cela désactive le filtrage pour ce flux."
-                        ),
-                        remediation="Restreindre la règle aux services et adresses nécessaires.",
-                    ))
+                    findings.append(
+                        SecurityFinding(
+                            severity="critical",
+                            category="Règles de filtrage",
+                            title=f"Règle #{rule.rule_id} : any→any PASS",
+                            description=(
+                                f"La règle '{rule.name or rule.rule_id}' autorise tout le trafic. "
+                                "Cela désactive le filtrage pour ce flux."
+                            ),
+                            remediation="Restreindre la règle aux services et adresses nécessaires.",
+                        )
+                    )
 
         # ── 2. Règles sans journalisation ──
         rules_no_log = [r for r in rules if r.enabled and r.action == "pass" and not r.log_traffic]
         if rules_no_log:
-            findings.append(SecurityFinding(
-                severity="medium",
-                category="Journalisation",
-                title=f"{len(rules_no_log)} règle(s) PASS sans journalisation",
-                description=(
-                    f"Règles concernées : "
-                    f"{', '.join(r.rule_id for r in rules_no_log[:10])}"
-                    f"{'...' if len(rules_no_log) > 10 else ''}."
-                ),
-                remediation="Activer la journalisation sur les règles critiques.",
-            ))
+            findings.append(
+                SecurityFinding(
+                    severity="medium",
+                    category="Journalisation",
+                    title=f"{len(rules_no_log)} règle(s) PASS sans journalisation",
+                    description=(
+                        f"Règles concernées : "
+                        f"{', '.join(r.rule_id for r in rules_no_log[:10])}"
+                        f"{'...' if len(rules_no_log) > 10 else ''}."
+                    ),
+                    remediation="Activer la journalisation sur les règles critiques.",
+                )
+            )
 
         # ── 3. SSH admin désactivé → pas un finding, mais si Telnet/HTTP dans webgui ──
         webgui = root.find(".//system/webgui")
         if webgui is not None:
             protocol = self._get_text(webgui, "protocol")
             if protocol and protocol.lower() == "http":
-                findings.append(SecurityFinding(
-                    severity="high",
-                    category="Administration",
-                    title="Interface web en HTTP (non chiffré)",
-                    description=(
-                        "L'interface d'administration OPNsense est configurée en HTTP. "
-                        "Les identifiants transitent en clair."
-                    ),
-                    remediation="Configurer HTTPS pour l'interface d'administration.",
-                ))
+                findings.append(
+                    SecurityFinding(
+                        severity="high",
+                        category="Administration",
+                        title="Interface web en HTTP (non chiffré)",
+                        description=(
+                            "L'interface d'administration OPNsense est configurée en HTTP. "
+                            "Les identifiants transitent en clair."
+                        ),
+                        remediation="Configurer HTTPS pour l'interface d'administration.",
+                    )
+                )
 
         # ── 4. DNS resolver ──
         dns_servers = root.findall(".//system/dnsserver")
         if not dns_servers:
-            findings.append(SecurityFinding(
-                severity="low",
-                category="Réseau",
-                title="Aucun serveur DNS configuré",
-                description="Aucun serveur DNS n'est configuré dans la configuration système.",
-                remediation="Configurer au moins deux serveurs DNS fiables.",
-            ))
+            findings.append(
+                SecurityFinding(
+                    severity="low",
+                    category="Réseau",
+                    title="Aucun serveur DNS configuré",
+                    description="Aucun serveur DNS n'est configuré dans la configuration système.",
+                    remediation="Configurer au moins deux serveurs DNS fiables.",
+                )
+            )
 
         # ── 5. Utilisateur admin par défaut ──
         for user in root.findall(".//system/user"):
             username = self._get_text(user, "name")
             if username == "root":
-                findings.append(SecurityFinding(
-                    severity="medium",
-                    category="Authentification",
-                    title="Utilisateur 'root' présent",
-                    description=(
-                        "Le compte root par défaut est toujours actif. "
-                        "Il est recommandé de créer des comptes nominatifs."
-                    ),
-                    remediation="Créer des comptes nominatifs et limiter l'usage de root.",
-                ))
+                findings.append(
+                    SecurityFinding(
+                        severity="medium",
+                        category="Authentification",
+                        title="Utilisateur 'root' présent",
+                        description=(
+                            "Le compte root par défaut est toujours actif. "
+                            "Il est recommandé de créer des comptes nominatifs."
+                        ),
+                        remediation="Créer des comptes nominatifs et limiter l'usage de root.",
+                    )
+                )
                 break
 
         return findings

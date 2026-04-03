@@ -7,6 +7,7 @@ Le fichier physique est stocké dans :
 
 La base de données ne stocke que le chemin relatif.
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -22,14 +23,17 @@ def _utcnow() -> datetime:
 
 class Attachment(Base):
     """Pièce jointe uploadée pour un résultat de contrôle."""
+
     __tablename__ = "attachments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # FK vers le résultat de contrôle
     control_result_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("control_results.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        Integer,
+        ForeignKey("control_results.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # Fichier
@@ -51,9 +55,7 @@ class Attachment(Base):
     kek_version: Mapped[int | None] = mapped_column(Integer, default=1)
 
     # Métadonnées
-    uploaded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     # TODO: Migrer uploaded_by vers Integer FK users.id dans une etape ulterieure
     uploaded_by: Mapped[str | None] = mapped_column(String(200))
 

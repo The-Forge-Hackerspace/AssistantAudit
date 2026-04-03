@@ -188,26 +188,18 @@ class MetricsCollector:
     ):
         """Record HTTP request metrics"""
         http_requests_total.labels(method=method, endpoint=endpoint, status=status).inc()
-        http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(
-            duration
-        )
+        http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(duration)
         if request_size:
-            http_request_size_bytes.labels(method=method, endpoint=endpoint).observe(
-                request_size
-            )
+            http_request_size_bytes.labels(method=method, endpoint=endpoint).observe(request_size)
         if response_size:
-            http_response_size_bytes.labels(method=method, endpoint=endpoint).observe(
-                response_size
-            )
+            http_response_size_bytes.labels(method=method, endpoint=endpoint).observe(response_size)
         last_request_timestamp.set(time.time())
 
     @staticmethod
     def record_db_query(operation: str, table: str, duration: float):
         """Record database query metrics"""
         db_queries_total.labels(operation=operation, table=table).inc()
-        db_query_duration_seconds.labels(operation=operation, table=table).observe(
-            duration
-        )
+        db_query_duration_seconds.labels(operation=operation, table=table).observe(duration)
 
     @staticmethod
     def record_assessment_result(compliance_status: str, score: float = None):
@@ -251,12 +243,13 @@ class MetricsCollector:
 def metrics_timer(operation: str, table: str = "unknown") -> Callable:
     """
     Decorator to time database operations.
-    
+
     Usage:
         @metrics_timer("SELECT", "users")
         def get_user(user_id):
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         def wrapper(*args, **kwargs) -> Any:
             start = time.time()
@@ -266,7 +259,9 @@ def metrics_timer(operation: str, table: str = "unknown") -> Callable:
             finally:
                 duration = time.time() - start
                 MetricsCollector.record_db_query(operation, table, duration)
+
         return wrapper
+
     return decorator
 
 
@@ -278,7 +273,7 @@ def metrics_timer(operation: str, table: str = "unknown") -> Callable:
 def get_metrics() -> bytes:
     """
     Generate Prometheus-format metrics output.
-    
+
     Returns:
         Bytes containing metrics in Prometheus exposition format
     """
@@ -288,7 +283,7 @@ def get_metrics() -> bytes:
 def init_app_metrics(version: str, environment: str):
     """
     Initialize application metrics.
-    
+
     Args:
         version: Application version
         environment: Environment name (dev, test, staging, prod)

@@ -2,6 +2,7 @@
 Service Collecte — Orchestration des collectes SSH/WinRM,
 analyse des résultats et pré-remplissage des contrôles d'audit.
 """
+
 import logging
 import time
 from datetime import datetime, timezone
@@ -462,6 +463,7 @@ OPNSENSE_CONTROL_MAP: list[dict] = [
 # Fonctions d'évaluation automatique
 # ══════════════════════════════════════════════════════════════
 
+
 def _evaluate_windows_check(check_name: str, collect: CollectResult) -> tuple[bool, str]:
     """
     Évalue un contrôle Windows à partir des données collectées.
@@ -488,6 +490,7 @@ def _evaluate_windows_check(check_name: str, collect: CollectResult) -> tuple[bo
         try:
             # Tenter le parsing de la date
             from dateutil import parser as dateparser
+
             last_dt = dateparser.parse(last)
             if last_dt:
                 diff = (datetime.now() - last_dt.replace(tzinfo=None)).days
@@ -529,9 +532,7 @@ def _evaluate_windows_check(check_name: str, collect: CollectResult) -> tuple[bo
     if check_name == "firewall_all_enabled":
         enabled = security.get("firewall_all_enabled", False)
         profiles = security.get("firewall_profiles", [])
-        desc = ", ".join(
-            f"{p['name']}={'On' if p.get('enabled') else 'Off'}" for p in profiles
-        ) if profiles else "N/A"
+        desc = ", ".join(f"{p['name']}={'On' if p.get('enabled') else 'Off'}" for p in profiles) if profiles else "N/A"
         if enabled:
             return True, f"Pare-feu actif sur tous les profils ({desc})"
         return False, f"Pare-feu non actif sur tous les profils ({desc})"
@@ -593,7 +594,10 @@ def _evaluate_linux_check(check_name: str, collect: CollectResult) -> tuple[bool
             if distro_key in distro:
                 for eol_ver in eol_versions:
                     if version_id.startswith(eol_ver):
-                        return False, f"Distribution: {os_info.get('distro')} {version_id} — potentiellement en fin de vie"
+                        return (
+                            False,
+                            f"Distribution: {os_info.get('distro')} {version_id} — potentiellement en fin de vie",
+                        )
         return True, f"Distribution: {os_info.get('distro', 'N/A')} {version_id}"
 
     if check_name == "no_pending_security_updates":
@@ -763,9 +767,12 @@ def _evaluate_opnsense_check(check_name: str, collect: CollectResult) -> tuple[b
         ipsec = services.get("ipsec_status", "").strip()
         wg = services.get("wireguard_status", "").strip()
         vpns = []
-        if ovpn and ovpn.upper() not in ("", "NONE"): vpns.append("OpenVPN")
-        if ipsec and ipsec.upper() not in ("", "NONE"): vpns.append("IPsec")
-        if wg and wg.upper() not in ("", "NONE"): vpns.append("WireGuard")
+        if ovpn and ovpn.upper() not in ("", "NONE"):
+            vpns.append("OpenVPN")
+        if ipsec and ipsec.upper() not in ("", "NONE"):
+            vpns.append("IPsec")
+        if wg and wg.upper() not in ("", "NONE"):
+            vpns.append("WireGuard")
         if vpns:
             return True, f"VPN configuré : {', '.join(vpns)}"
         return False, "Aucun VPN configuré"
@@ -886,6 +893,7 @@ def _evaluate_opnsense_check(check_name: str, collect: CollectResult) -> tuple[b
 # Analyse des findings
 # ══════════════════════════════════════════════════════════════
 
+
 def _analyze_collect_findings(collect: CollectResult) -> list[dict]:
     """
     Analyse les données collectées et génère des findings de sécurité.
@@ -913,15 +921,17 @@ def _analyze_collect_findings(collect: CollectResult) -> list[dict]:
         passed, detail = evaluate_fn(check_name, collect)
 
         if not passed:
-            findings.append({
-                "control_ref": mapping["control_ref"],
-                "title": f"Non-conformité détectée : {mapping['control_ref']}",
-                "description": detail,
-                "severity": mapping.get("severity", "medium"),
-                "category": "Sécurité",
-                "remediation": mapping.get("evidence_fail", ""),
-                "status": "non_compliant",
-            })
+            findings.append(
+                {
+                    "control_ref": mapping["control_ref"],
+                    "title": f"Non-conformité détectée : {mapping['control_ref']}",
+                    "description": detail,
+                    "severity": mapping.get("severity", "medium"),
+                    "category": "Sécurité",
+                    "remediation": mapping.get("evidence_fail", ""),
+                    "status": "non_compliant",
+                }
+            )
 
     return findings
 
@@ -948,9 +958,9 @@ def _generate_summary(collect: CollectResult, findings: list[dict]) -> dict:
             "compliant": 0,
             "non_compliant": 0,
             "compliance_score": None,
-            "firewall_rules_count": security.get("firewall_rules_count",
-                                                   security.get("filter_rules_count",
-                                                                security.get("policy_count", 0))),
+            "firewall_rules_count": security.get(
+                "firewall_rules_count", security.get("filter_rules_count", security.get("policy_count", 0))
+            ),
         }
     elif is_windows:
         control_map_ref = WINDOWS_CONTROL_MAP
@@ -998,6 +1008,7 @@ def _generate_summary(collect: CollectResult, findings: list[dict]) -> dict:
 # ══════════════════════════════════════════════════════════════
 # CRUD + Orchestration
 # ══════════════════════════════════════════════════════════════
+
 
 def create_pending_collect(
     db: Session,
@@ -1132,10 +1143,7 @@ def execute_collect_background(
                         eq.os_version_detail = detail
 
         db.commit()
-        logger.info(
-            f"Collecte #{collect_id} terminée: {collect.status.value} "
-            f"en {elapsed}s"
-        )
+        logger.info(f"Collecte #{collect_id} terminée: {collect.status.value} en {elapsed}s")
 
     except Exception as e:
         logger.error(f"Erreur collecte #{collect_id}: {e}", exc_info=True)
@@ -1157,6 +1165,7 @@ def _check_equip_access(db: Session, equipement_id: int, user_id: int | None, is
     if user_id is None or is_admin:
         return True
     from ..core.helpers import user_has_access_to_entreprise
+
     equip = db.get(Equipement, equipement_id)
     if not equip:
         return False
@@ -1180,21 +1189,23 @@ def list_collect_results(
         q = q.filter(CollectResult.equipement_id == equipement_id)
     if user_id is not None and not is_admin:
         from ..models.audit import Audit
+
         accessible_ent_ids = (
-            db.query(Audit.entreprise_id)
-            .filter(Audit.owner_id == user_id)
-            .distinct()
-            .scalar_subquery()
+            db.query(Audit.entreprise_id).filter(Audit.owner_id == user_id).distinct().scalar_subquery()
         )
-        q = q.join(Equipement, CollectResult.equipement_id == Equipement.id).join(
-            Site, Equipement.site_id == Site.id
-        ).filter(Site.entreprise_id.in_(accessible_ent_ids))
+        q = (
+            q.join(Equipement, CollectResult.equipement_id == Equipement.id)
+            .join(Site, Equipement.site_id == Site.id)
+            .filter(Site.entreprise_id.in_(accessible_ent_ids))
+        )
     return q.order_by(CollectResult.created_at.desc()).offset(skip).limit(limit).all()
 
 
 def get_collect_result(
-    db: Session, collect_id: int,
-    user_id: int | None = None, is_admin: bool = False,
+    db: Session,
+    collect_id: int,
+    user_id: int | None = None,
+    is_admin: bool = False,
 ) -> Optional[CollectResult]:
     """Récupère une collecte par ID. Vérifie ownership."""
     collect = db.get(CollectResult, collect_id)
@@ -1204,8 +1215,10 @@ def get_collect_result(
 
 
 def delete_collect_result(
-    db: Session, collect_id: int,
-    user_id: int | None = None, is_admin: bool = False,
+    db: Session,
+    collect_id: int,
+    user_id: int | None = None,
+    is_admin: bool = False,
 ) -> bool:
     """Supprime une collecte. Vérifie ownership."""
     collect = db.get(CollectResult, collect_id)
@@ -1246,11 +1259,7 @@ def prefill_assessment_from_collect(
     control_map = WINDOWS_CONTROL_MAP if is_windows else LINUX_CONTROL_MAP
 
     # Récupérer les control_results de l'assessment
-    control_results = (
-        db.query(ControlResult)
-        .filter(ControlResult.assessment_id == assessment_id)
-        .all()
-    )
+    control_results = db.query(ControlResult).filter(ControlResult.assessment_id == assessment_id).all()
     ref_to_result: dict[str, ControlResult] = {}
     for cr in control_results:
         if cr.control and cr.control.ref_id:
@@ -1293,12 +1302,14 @@ def prefill_assessment_from_collect(
         cr.assessed_by = f"collect_{source.lower()}"
         prefilled += 1
 
-        details.append({
-            "control_ref": control_ref,
-            "control_title": cr.control.title if cr.control else "",
-            "status": status_label,
-            "findings_count": 0 if passed else 1,
-        })
+        details.append(
+            {
+                "control_ref": control_ref,
+                "control_title": cr.control.title if cr.control else "",
+                "status": status_label,
+                "findings_count": 0 if passed else 1,
+            }
+        )
 
     db.flush()
     logger.info(

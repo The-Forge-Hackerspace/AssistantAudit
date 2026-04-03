@@ -5,6 +5,7 @@ Vérifie que decide_host, link_host, import_all_hosts et launch_scan
 respectent l'ownership (host → scan → ScanReseau.owner_id pour les hosts,
 Site → Entreprise → Audit.owner_id pour le lancement).
 """
+
 from app.models.audit import Audit
 from app.models.entreprise import Entreprise
 from app.models.equipement import Equipement
@@ -12,6 +13,7 @@ from app.models.scan import ScanHost, ScanReseau
 from app.models.site import Site
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
 
 def _create_site_with_ownership(db, owner, *, ent_name):
     """Crée la chaîne entreprise → audit (ownership) → site pour un owner donné."""
@@ -37,14 +39,18 @@ def _create_scan_with_host(db, owner, *, ent_name, ip="10.0.0.1"):
     db.add(site)
     db.flush()
     scan = ScanReseau(
-        site_id=site.id, owner_id=owner.id,
-        type_scan="discovery", statut="completed",
+        site_id=site.id,
+        owner_id=owner.id,
+        type_scan="discovery",
+        statut="completed",
     )
     db.add(scan)
     db.flush()
     host = ScanHost(
-        scan_id=scan.id, ip_address=ip,
-        status="up", decision="pending",
+        scan_id=scan.id,
+        ip_address=ip,
+        status="up",
+        decision="pending",
     )
     db.add(host)
     db.commit()
@@ -59,13 +65,18 @@ def _create_scan_with_host(db, owner, *, ent_name, ip="10.0.0.1"):
 
 
 class TestDecideHostIsolation:
-
     def test_owner_can_decide_own_host(
-        self, client, db_session, auditeur_user, auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        auditeur_headers,
     ):
         """Non-régression : un auditeur peut décider sur ses propres hosts."""
         _, host = _create_scan_with_host(
-            db_session, auditeur_user, ent_name="Ent DecideOwn",
+            db_session,
+            auditeur_user,
+            ent_name="Ent DecideOwn",
         )
         r = client.put(
             f"/api/v1/scans/hosts/{host.id}/decision",
@@ -76,12 +87,17 @@ class TestDecideHostIsolation:
         assert r.json()["decision"] == "kept"
 
     def test_other_user_decide_host_returns_404(
-        self, client, db_session, auditeur_user,
+        self,
+        client,
+        db_session,
+        auditeur_user,
         second_auditeur_headers,
     ):
         """Auditeur B ne peut pas modifier la décision d'un host d'auditeur A."""
         _, host = _create_scan_with_host(
-            db_session, auditeur_user, ent_name="Ent DecideCross",
+            db_session,
+            auditeur_user,
+            ent_name="Ent DecideCross",
         )
         r = client.put(
             f"/api/v1/scans/hosts/{host.id}/decision",
@@ -91,11 +107,17 @@ class TestDecideHostIsolation:
         assert r.status_code == 404
 
     def test_admin_can_decide_any_host(
-        self, client, db_session, auditeur_user, admin_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        admin_headers,
     ):
         """L'admin peut modifier la décision sur n'importe quel host."""
         _, host = _create_scan_with_host(
-            db_session, auditeur_user, ent_name="Ent DecideAdmin",
+            db_session,
+            auditeur_user,
+            ent_name="Ent DecideAdmin",
         )
         r = client.put(
             f"/api/v1/scans/hosts/{host.id}/decision",
@@ -112,16 +134,22 @@ class TestDecideHostIsolation:
 
 
 class TestLinkHostIsolation:
-
     def test_owner_can_link_own_host(
-        self, client, db_session, auditeur_user, auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        auditeur_headers,
     ):
         """Non-régression : un auditeur peut lier ses propres hosts."""
         scan, host = _create_scan_with_host(
-            db_session, auditeur_user, ent_name="Ent LinkOwn",
+            db_session,
+            auditeur_user,
+            ent_name="Ent LinkOwn",
         )
         equip = Equipement(
-            site_id=scan.site_id, type_equipement="serveur",
+            site_id=scan.site_id,
+            type_equipement="serveur",
             ip_address="10.0.0.99",
         )
         db_session.add(equip)
@@ -136,15 +164,21 @@ class TestLinkHostIsolation:
         assert r.json()["equipement_id"] == equip.id
 
     def test_other_user_link_host_returns_404(
-        self, client, db_session, auditeur_user,
+        self,
+        client,
+        db_session,
+        auditeur_user,
         second_auditeur_headers,
     ):
         """Auditeur B ne peut pas lier un host d'auditeur A à un équipement."""
         scan, host = _create_scan_with_host(
-            db_session, auditeur_user, ent_name="Ent LinkCross",
+            db_session,
+            auditeur_user,
+            ent_name="Ent LinkCross",
         )
         equip = Equipement(
-            site_id=scan.site_id, type_equipement="serveur",
+            site_id=scan.site_id,
+            type_equipement="serveur",
             ip_address="10.0.0.88",
         )
         db_session.add(equip)
@@ -158,14 +192,21 @@ class TestLinkHostIsolation:
         assert r.status_code == 404
 
     def test_admin_can_link_any_host(
-        self, client, db_session, auditeur_user, admin_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        admin_headers,
     ):
         """L'admin peut lier n'importe quel host."""
         scan, host = _create_scan_with_host(
-            db_session, auditeur_user, ent_name="Ent LinkAdmin",
+            db_session,
+            auditeur_user,
+            ent_name="Ent LinkAdmin",
         )
         equip = Equipement(
-            site_id=scan.site_id, type_equipement="serveur",
+            site_id=scan.site_id,
+            type_equipement="serveur",
             ip_address="10.0.0.77",
         )
         db_session.add(equip)
@@ -185,13 +226,18 @@ class TestLinkHostIsolation:
 
 
 class TestImportAllHostsIsolation:
-
     def test_owner_can_import_own_scan(
-        self, client, db_session, auditeur_user, auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        auditeur_headers,
     ):
         """Non-régression : un auditeur peut importer les hosts de son scan."""
         scan, _ = _create_scan_with_host(
-            db_session, auditeur_user, ent_name="Ent ImportOwn",
+            db_session,
+            auditeur_user,
+            ent_name="Ent ImportOwn",
         )
         r = client.post(
             f"/api/v1/scans/{scan.id}/import-all",
@@ -201,12 +247,17 @@ class TestImportAllHostsIsolation:
         assert "créé" in r.json()["message"]
 
     def test_other_user_import_returns_404(
-        self, client, db_session, auditeur_user,
+        self,
+        client,
+        db_session,
+        auditeur_user,
         second_auditeur_headers,
     ):
         """Auditeur B ne peut pas importer les hosts du scan d'auditeur A."""
         scan, _ = _create_scan_with_host(
-            db_session, auditeur_user, ent_name="Ent ImportCross",
+            db_session,
+            auditeur_user,
+            ent_name="Ent ImportCross",
         )
         r = client.post(
             f"/api/v1/scans/{scan.id}/import-all",
@@ -215,11 +266,17 @@ class TestImportAllHostsIsolation:
         assert r.status_code == 404
 
     def test_admin_can_import_any_scan(
-        self, client, db_session, auditeur_user, admin_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        admin_headers,
     ):
         """L'admin peut importer les hosts de n'importe quel scan."""
         scan, _ = _create_scan_with_host(
-            db_session, auditeur_user, ent_name="Ent ImportAdmin",
+            db_session,
+            auditeur_user,
+            ent_name="Ent ImportAdmin",
         )
         r = client.post(
             f"/api/v1/scans/{scan.id}/import-all",
@@ -234,13 +291,18 @@ class TestImportAllHostsIsolation:
 
 
 class TestLaunchScanIsolation:
-
     def test_owner_can_launch_scan_on_own_site(
-        self, client, db_session, auditeur_user, auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        auditeur_headers,
     ):
         """Non-régression : un auditeur peut lancer un scan sur son propre site."""
         site = _create_site_with_ownership(
-            db_session, auditeur_user, ent_name="Ent LaunchOwn",
+            db_session,
+            auditeur_user,
+            ent_name="Ent LaunchOwn",
         )
         r = client.post(
             "/api/v1/scans",
@@ -250,12 +312,17 @@ class TestLaunchScanIsolation:
         assert r.status_code == 202
 
     def test_other_user_launch_scan_returns_404(
-        self, client, db_session, auditeur_user,
+        self,
+        client,
+        db_session,
+        auditeur_user,
         second_auditeur_headers,
     ):
         """Auditeur B ne peut pas lancer un scan sur le site d'auditeur A."""
         site = _create_site_with_ownership(
-            db_session, auditeur_user, ent_name="Ent LaunchCross",
+            db_session,
+            auditeur_user,
+            ent_name="Ent LaunchCross",
         )
         r = client.post(
             "/api/v1/scans",
@@ -265,11 +332,17 @@ class TestLaunchScanIsolation:
         assert r.status_code == 404
 
     def test_admin_can_launch_scan_on_any_site(
-        self, client, db_session, auditeur_user, admin_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        admin_headers,
     ):
         """L'admin peut lancer un scan sur n'importe quel site."""
         site = _create_site_with_ownership(
-            db_session, auditeur_user, ent_name="Ent LaunchAdmin",
+            db_session,
+            auditeur_user,
+            ent_name="Ent LaunchAdmin",
         )
         r = client.post(
             "/api/v1/scans",

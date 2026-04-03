@@ -1,6 +1,7 @@
 """
 Modèle Site — Emplacements physiques d'une entreprise.
 """
+
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,9 +17,7 @@ class Site(Base):
     adresse: Mapped[str | None] = mapped_column(String(500))
 
     # FK
-    entreprise_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("entreprises.id"), nullable=False, index=True
-    )
+    entreprise_id: Mapped[int] = mapped_column(Integer, ForeignKey("entreprises.id"), nullable=False, index=True)
 
     # Relations
     entreprise: Mapped["Entreprise"] = relationship(back_populates="sites")  # type: ignore[name-defined]

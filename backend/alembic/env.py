@@ -2,6 +2,7 @@
 Alembic env.py — Configuration des migrations.
 Lit DATABASE_URL depuis la config applicative (Settings).
 """
+
 import sys
 from logging.config import fileConfig
 from pathlib import Path
@@ -27,6 +28,7 @@ target_metadata = Base.metadata
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode — generates SQL script."""
     from app.core.config import get_settings
+
     settings = get_settings()
     context.configure(
         url=settings.DATABASE_URL,
