@@ -135,7 +135,7 @@ function truncateUuid(uuid: string): string {
 
 // ── Page ──
 export default function AgentsPage() {
-  const { user } = useAuth();
+  const { user, refresh: refreshAuth } = useAuth();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -385,6 +385,7 @@ export default function AgentsPage() {
     try {
       await agentsApi.revoke(revokeTarget.agent_uuid);
       await fetchAgents();
+      await refreshAuth();
       toast.success("Agent révoqué");
     } catch {
       toast.error("Erreur lors de la révocation");
