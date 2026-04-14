@@ -92,15 +92,25 @@ def list_agents(
 @router.delete("/{agent_uuid}", status_code=200)
 def revoke_agent(
     agent_uuid: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_auditeur),
 ):
     """Revoque un agent. Admin peut revoquer n'importe quel agent, auditeur seulement les siens."""
-    AgentService.revoke_agent(
+    agent = AgentService.revoke_agent(
         db,
         agent_uuid,
         user_id=current_user.id,
         is_admin=current_user.role == "admin",
+    )
+    # Notifier le frontend en temps reel
+    from ...core.websocket_manager import ws_manager
+
+    background_tasks.add_task(
+        ws_manager.send_to_user,
+        agent.user_id,
+        "agent_status",
+        {"agent_uuid": agent_uuid, "status": "revoked"},
     )
     # TODO: scheduled purge — delete agents where revoked_at < now() - 30 days
     return {"detail": "Agent revoque"}
