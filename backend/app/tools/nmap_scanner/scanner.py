@@ -252,7 +252,22 @@ class NmapScanner:
             return NmapScanResult(success=False, target=target, error="Nmap non installé ou introuvable dans le PATH")
 
     def _build_args(self, target: str, scan_type: str, extra_args: Optional[list[str]]) -> list[str]:
-        """Construit la ligne de commande Nmap avec validation des arguments."""
+        """Construit la ligne de commande Nmap avec validation des arguments.
+
+        Défense en profondeur contre l'injection :
+        - `target` validé en amont par une regex stricte (IP / CIDR / hostname)
+        - interdiction des préfixes '-' qui seraient interprétés comme options
+        - arguments supplémentaires filtrés via `sanitize_nmap_args`
+        - `subprocess.run(..., shell=False)` : aucun parsing shell
+        """
+        # Valider le target AVANT toute construction d'argv (no '-', no space, whitelist stricte).
+        if not target or target.startswith("-"):
+            raise ValueError("Target Nmap invalide")
+        if not re.match(r"^[a-zA-Z0-9._:/\-]+$", target):
+            raise ValueError("Target Nmap invalide")
+        if len(target) > 255:
+            raise ValueError("Target Nmap trop long")
+
         base = ["nmap", "-oX", "-"]  # sortie XML sur stdout
 
         type_args = {
@@ -268,10 +283,9 @@ class NmapScanner:
             safe_args = sanitize_nmap_args(extra_args)
             base.extend(safe_args)
 
-        # Valider le target (IP, CIDR, hostname)
-        if not re.match(r"^[a-zA-Z0-9._:/\-]+$", target):
-            raise ValueError(f"Target Nmap invalide : '{target}'")
-
+        # Marqueur de fin d'options : tout ce qui suit est traité comme opérande (cible),
+        # jamais comme une option, même si la whitelist manquait un cas.
+        base.append("--")
         base.append(target)
         return base
 

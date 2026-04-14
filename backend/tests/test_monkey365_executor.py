@@ -157,7 +157,7 @@ def test_build_script_spo_sites_included(tmp_path):
     script = executor.build_script("test-scan")
 
     assert "SpoSites" in script
-    assert "contoso.sharepoint.com" in script
+    assert "https://contoso.sharepoint.com" in script
 
 
 def test_build_script_no_spo_sites_when_empty(tmp_path):

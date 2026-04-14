@@ -4,6 +4,12 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+
+# Principe de moindre privilege : lecture seule du contenu,
+# pas d'acces aux autres scopes (issues, PR, packages, etc.).
+permissions:
+  contents: read
+
 jobs:
   test:
     timeout-minutes: 60
