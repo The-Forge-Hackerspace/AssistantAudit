@@ -72,15 +72,12 @@ def init_database():
             print("  [SKIP] L'utilisateur 'admin' existe deja")
         else:
             admin_password = os.getenv("ADMIN_PASSWORD")
-            generated_password = False
             if not admin_password:
-                import secrets
-                import string
-
-                alphabet = string.ascii_letters + string.digits + "!@#$%"
-                admin_password = "".join(secrets.choice(alphabet) for _ in range(16))
-                generated_password = True
-                print("  [INFO] Mot de passe admin genere aleatoirement")
+                print(
+                    "  [ERREUR] Variable d'environnement ADMIN_PASSWORD requise "
+                    "pour creer l'utilisateur admin. Definissez-la avant de relancer."
+                )
+                sys.exit(1)
 
             admin = User(
                 username="admin",
@@ -92,17 +89,6 @@ def init_database():
             db.add(admin)
             db.commit()
             print("  [OK] Utilisateur admin cree (login: admin)")
-            if generated_password:
-                # Ecrire dans un fichier local a permissions restreintes (lecture proprietaire uniquement)
-                # plutot que de logguer le mot de passe en clair sur stdout.
-                password_file = Path("admin_initial_password.txt")
-                password_file.write_text(admin_password, encoding="utf-8")
-                try:
-                    os.chmod(password_file, 0o600)
-                except OSError:
-                    pass  # Sous Windows, chmod 0o600 peut echouer
-                print(f"  [INFO] Mot de passe initial ecrit dans {password_file.resolve()}")
-                print("  [INFO] A supprimer apres premiere connexion.")
 
         # 3. Synchroniser les référentiels (hash-based, skip inchanges)
         print("\n[3/3] Synchronisation des referentiels YAML...")

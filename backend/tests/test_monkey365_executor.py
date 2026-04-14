@@ -6,6 +6,7 @@ with the simplified interactive-only configuration.
 """
 
 import json
+import re
 from unittest.mock import MagicMock, patch
 
 from app.tools.monkey365_runner.executor import (
@@ -157,7 +158,8 @@ def test_build_script_spo_sites_included(tmp_path):
     script = executor.build_script("test-scan")
 
     assert "SpoSites" in script
-    assert "https://contoso.sharepoint.com" in script
+    # Verification stricte via regex (URL complete entouree de quotes PowerShell)
+    assert re.search(r"'https://contoso\.sharepoint\.com'", script) is not None
 
 
 def test_build_script_no_spo_sites_when_empty(tmp_path):

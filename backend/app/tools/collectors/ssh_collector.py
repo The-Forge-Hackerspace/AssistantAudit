@@ -10,7 +10,6 @@ Profils supportés :
 """
 
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -299,16 +298,10 @@ def collect_via_ssh(
     except Exception:
         pass
 
-    # Par defaut, rejeter les host keys inconnues (securite forte).
-    # Opt-in via ASSIS_SSH_ALLOW_UNKNOWN_HOSTS=1 pour autoriser la collecte sur
-    # des environnements nouvellement provisionnes (logge un warning).
-    if os.environ.get("ASSIS_SSH_ALLOW_UNKNOWN_HOSTS") == "1":
-        logger.warning(
-            "ASSIS_SSH_ALLOW_UNKNOWN_HOSTS=1 : acceptation des host keys inconnues (MITM possible)"
-        )
-        client.set_missing_host_key_policy(paramiko.WarningPolicy())
-    else:
-        client.set_missing_host_key_policy(paramiko.RejectPolicy())
+    # Securite : toujours rejeter les host keys inconnues (protection MITM).
+    # Pour autoriser un nouvel hote, l'administrateur doit explicitement
+    # pre-remplir known_hosts (ssh-keyscan) avant la collecte.
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())
 
     try:
         # Préparer les paramètres de connexion
