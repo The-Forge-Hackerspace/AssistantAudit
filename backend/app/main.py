@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .core.audit_logger import AuditLoggingMiddleware
@@ -232,10 +233,11 @@ def create_app() -> FastAPI:
         """
         status = HealthCheckService.get_ready_status()
         status_code = 200 if status["ready"] else 503
-        return Response(
-            content=str(status),
+        # Ne renvoyer qu'un résumé booléen : les détails (erreurs DB, chemins internes)
+        # ne doivent pas sortir côté client ; ils restent côté logs serveur.
+        return JSONResponse(
+            content={"ready": bool(status.get("ready"))},
             status_code=status_code,
-            media_type="application/json",
         )
 
     @app.get(

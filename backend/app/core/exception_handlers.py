@@ -4,7 +4,6 @@ Centralise la gestion des erreurs avec des réponses standardisées.
 """
 
 import logging
-import traceback
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
@@ -61,23 +60,12 @@ def register_exception_handlers(app: FastAPI) -> None:
             exc_info=exc,
         )
 
-        # En dev (DEBUG), retourner le detail ; en production, message generique seul
-        from app.core.config import get_settings
-
-        _env = get_settings().ENV
-        if _env == "development":
-            content = {
-                "detail": str(exc),
-                "error_type": "internal_server_error",
-                "traceback": traceback.format_exc(),
-            }
-        else:
-            content = {
-                "detail": "Une erreur interne s'est produite.",
-                "error_type": "internal_server_error",
-            }
-
+        # Ne jamais exposer str(exc) ni traceback au client : ces données peuvent contenir
+        # des chemins internes, du SQL, des secrets. Le détail reste dans les logs serveur.
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=content,
+            content={
+                "detail": "Une erreur interne s'est produite.",
+                "error_type": "internal_server_error",
+            },
         )
