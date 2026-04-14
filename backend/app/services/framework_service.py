@@ -57,14 +57,25 @@ class FrameworkService:
         return hashlib.sha256(path.read_bytes()).hexdigest()
 
     @staticmethod
+    def _validate_yaml_path(yaml_path: Path) -> Path:
+        """Valide qu'un chemin YAML pointe bien à l'intérieur du dossier frameworks autorisé."""
+        frameworks_dir = Path(get_settings().FRAMEWORKS_DIR).resolve()
+        resolved = yaml_path.resolve()
+        if not resolved.is_relative_to(frameworks_dir):
+            raise ValueError("Chemin YAML hors du dossier frameworks autorisé")
+        if resolved.suffix.lower() not in (".yml", ".yaml"):
+            raise ValueError("Extension de fichier YAML invalide")
+        return resolved
+
+    @staticmethod
     def import_from_yaml(db: Session, yaml_path: str | Path) -> Framework:
         """
         Importe un référentiel depuis un fichier YAML.
         Crée ou met à jour le framework en base de données.
         """
-        yaml_path = Path(yaml_path)
+        yaml_path = FrameworkService._validate_yaml_path(Path(yaml_path))
         if not yaml_path.exists():
-            raise FileNotFoundError(f"Fichier YAML introuvable : {yaml_path}")
+            raise FileNotFoundError("Fichier YAML introuvable")
 
         with open(yaml_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
