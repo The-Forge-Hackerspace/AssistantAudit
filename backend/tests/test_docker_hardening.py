@@ -184,3 +184,4 @@ def _find_trivy_step(ci_config):
         if isinstance(uses, str) and "aquasecurity/trivy-action" in uses:
             return step
     pytest.fail("Step trivy-action introuvable dans le job scan")
+    return None  # unreachable, satisfait l'analyse de flux statique

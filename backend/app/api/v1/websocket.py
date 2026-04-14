@@ -5,6 +5,7 @@ Routes WebSocket pour le streaming temps reel.
 - /ws/agent : connexion daemon Windows (agent)
 """
 
+import hashlib
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -78,6 +79,10 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
     if agent_uuid is None:
         return
 
+    # Identifiant opaque pour les logs : SHA-256 tronque, casse la taint CodeQL
+    # (agent_uuid derive du JWT et est traque comme secret par py/clear-text-logging-sensitive-data)
+    agent_log_id = hashlib.sha256(agent_uuid.encode("utf-8")).hexdigest()[:12]
+
     # owner_id de confiance : extrait du JWT a la connexion, pas du message client
     trusted_owner_id = ws_manager.get_agent_owner(agent_uuid)
 
@@ -96,12 +101,12 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
         if _agent:
             trusted_agent_id = _agent.id
     except Exception:
-        logger.exception("Failed to resolve agent_id for %s", agent_uuid)
+        logger.exception("Failed to resolve agent_id for %s", agent_log_id)
     finally:
         db.close()
 
     if trusted_agent_id is None:
-        logger.warning("Agent %s not found in DB, closing WS", agent_uuid)
+        logger.warning("Agent %s not found in DB, closing WS", agent_log_id)
         await websocket.close(code=4001, reason="Agent not found")
         return
 
@@ -130,7 +135,7 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                             agent.last_ip = client_host
                         db.commit()
                 except Exception:
-                    logger.exception("Failed to update last_seen for agent %s", agent_uuid)
+                    logger.exception("Failed to update last_seen for agent %s", agent_log_id)
                 finally:
                     db.close()
 
@@ -151,7 +156,7 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                         if not task:
                             logger.warning(
                                 "Agent %s attempted task_status on task %s — not owned or not found",
-                                agent_uuid,
+                                agent_log_id,
                                 ws_data["task_uuid"],
                             )
                         if task:
@@ -192,7 +197,7 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                         if not task:
                             logger.warning(
                                 "Agent %s attempted task_result on task %s — not owned or not found",
-                                agent_uuid,
+                                agent_log_id,
                                 ws_data["task_uuid"],
                             )
                         if task:
@@ -215,12 +220,13 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
     except WebSocketDisconnect:
         await _handle_agent_disconnect(agent_uuid, trusted_owner_id)
     except Exception:
-        logger.exception(f"WebSocket agent error: uuid={agent_uuid}")
+        logger.exception("WebSocket agent error: agent=%s", agent_log_id)
         await _handle_agent_disconnect(agent_uuid, trusted_owner_id)
 
 
 async def _handle_agent_disconnect(agent_uuid: str, owner_id: int | None) -> None:
     """Nettoie a la deconnexion : marque les taches running comme failed."""
+    agent_log_id = hashlib.sha256(agent_uuid.encode("utf-8")).hexdigest()[:12]
     from datetime import datetime, timezone
 
     from ...core.database import SessionLocal
@@ -249,7 +255,7 @@ async def _handle_agent_disconnect(agent_uuid: str, owner_id: int | None) -> Non
             task.status = "failed"
             task.error_message = "Agent deconnecte pendant l'execution"
             task.completed_at = now
-            logger.warning("Orphan task marked failed: %s (agent %s)", task.task_uuid, agent_uuid)
+            logger.warning("Orphan task marked failed: %s (agent %s)", task.task_uuid, agent_log_id)
 
             # Notifier le frontend
             if owner_id is not None:
@@ -265,6 +271,6 @@ async def _handle_agent_disconnect(agent_uuid: str, owner_id: int | None) -> Non
 
         db.commit()
     except Exception:
-        logger.exception("Failed to handle orphan tasks for agent %s", agent_uuid)
+        logger.exception("Failed to handle orphan tasks for agent %s", agent_log_id)
     finally:
         db.close()

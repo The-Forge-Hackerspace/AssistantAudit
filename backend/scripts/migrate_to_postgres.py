@@ -200,9 +200,18 @@ def main():
 
     # 3. Déterminer l'ordre de migration
     tables_to_migrate = [t for t in MIGRATION_ORDER if t in source_tables]
-    # Ajouter les tables non listées dans MIGRATION_ORDER
+    # Ajouter les tables non listées dans MIGRATION_ORDER, mais uniquement si
+    # elles existent côté cible (sinon l'INSERT échouerait en cours de route).
+    target_tables = set(get_table_names(target_engine))
     extra = [t for t in source_tables if t not in MIGRATION_ORDER and t != "alembic_version"]
-    tables_to_migrate.extend(extra)
+    extra_present = [t for t in extra if t in target_tables]
+    skipped = [t for t in extra if t not in target_tables]
+    if skipped:
+        logger.warning(
+            "Tables source ignorées (absentes de la cible PostgreSQL) : %s",
+            sorted(skipped),
+        )
+    tables_to_migrate.extend(extra_present)
 
     if args.dry_run:
         logger.info("=== MODE DRY-RUN ===")

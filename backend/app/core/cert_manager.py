@@ -167,6 +167,10 @@ class CertManager:
         builder = builder.next_update(now + timedelta(days=30))
 
         for serial, revoked_at in revoked_serials:
+            # Normaliser en UTC-aware : SQLite peut renvoyer des datetimes naifs sur les colonnes DateTime(timezone=True),
+            # alors que cryptography exige un datetime UTC-aware pour revocation_date().
+            if revoked_at.tzinfo is None:
+                revoked_at = revoked_at.replace(tzinfo=timezone.utc)
             revoked_cert = RevokedCertificateBuilder().serial_number(serial).revocation_date(revoked_at).build()
             builder = builder.add_revoked_certificate(revoked_cert)
 
