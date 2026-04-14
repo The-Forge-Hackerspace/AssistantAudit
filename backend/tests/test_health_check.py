@@ -79,8 +79,8 @@ class TestReadyEndpoint:
         assert "ready" in content.lower()
 
     @patch("app.core.health_check.SessionLocal")
-    def test_ready_endpoint_includes_components(self, mock_session_local, client):
-        """Verify /ready endpoint includes component status"""
+    def test_ready_endpoint_returns_ready_flag_only(self, mock_session_local, client):
+        """Verify /ready endpoint exposes uniquement un flag booléen (pas de détails internes)."""
         # Mock successful database connection
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -89,8 +89,8 @@ class TestReadyEndpoint:
         mock_session_local.return_value = mock_db
 
         response = client.get("/ready")
-        content = response.text
-        assert "components" in content.lower()
+        payload = response.json()
+        assert payload == {"ready": True}
 
 
 class TestLivenessEndpoint:

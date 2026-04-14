@@ -298,7 +298,10 @@ def collect_via_ssh(
     except Exception:
         pass
 
-    client.set_missing_host_key_policy(paramiko.WarningPolicy())
+    # Securite : toujours rejeter les host keys inconnues (protection MITM).
+    # Pour autoriser un nouvel hote, l'administrateur doit explicitement
+    # pre-remplir known_hosts (ssh-keyscan) avant la collecte.
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())
 
     try:
         # Préparer les paramètres de connexion

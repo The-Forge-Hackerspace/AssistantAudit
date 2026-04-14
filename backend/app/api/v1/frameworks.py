@@ -233,13 +233,17 @@ def import_single_framework(
     _: User = Depends(get_current_admin),
 ):
     """Importe un référentiel YAML spécifique"""
+    # Validation stricte : le filename ne doit être qu'un basename sans séparateur ni "..".
+    if filename != Path(filename).name or filename in ("", ".", "..") or not filename.endswith((".yml", ".yaml")):
+        raise HTTPException(status_code=400, detail="Nom de fichier invalide")
+
     frameworks_dir = Path(settings.FRAMEWORKS_DIR).resolve()
     yaml_path = (frameworks_dir / filename).resolve()
-    # Protection path traversal
+    # Défense en profondeur : vérifier que le chemin résolu reste dans le dossier autorisé.
     if not yaml_path.is_relative_to(frameworks_dir):
         raise HTTPException(status_code=400, detail="Nom de fichier invalide")
     if not yaml_path.exists():
-        raise HTTPException(status_code=404, detail=f"Fichier '{filename}' introuvable")
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
     try:
         framework = FrameworkService.import_from_yaml(db, yaml_path)
         return framework

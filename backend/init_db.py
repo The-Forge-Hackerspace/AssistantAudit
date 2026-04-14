@@ -73,12 +73,11 @@ def init_database():
         else:
             admin_password = os.getenv("ADMIN_PASSWORD")
             if not admin_password:
-                import secrets
-                import string
-
-                alphabet = string.ascii_letters + string.digits + "!@#$%"
-                admin_password = "".join(secrets.choice(alphabet) for _ in range(16))
-                print("  [INFO] Mot de passe admin genere aleatoirement")
+                print(
+                    "  [ERREUR] Variable d'environnement ADMIN_PASSWORD requise "
+                    "pour creer l'utilisateur admin. Definissez-la avant de relancer."
+                )
+                sys.exit(1)
 
             admin = User(
                 username="admin",
@@ -90,7 +89,6 @@ def init_database():
             db.add(admin)
             db.commit()
             print("  [OK] Utilisateur admin cree (login: admin)")
-            print(f"  [INFO] Mot de passe initial: {admin_password}")
 
         # 3. Synchroniser les référentiels (hash-based, skip inchanges)
         print("\n[3/3] Synchronisation des referentiels YAML...")

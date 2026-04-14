@@ -44,7 +44,7 @@ class ConnectionManager:
         user_id = int(payload["sub"])
         await websocket.accept()
         self.user_connections[user_id] = websocket
-        logger.info(f"WebSocket user connected: user_id={user_id}")
+        logger.info("WebSocket user connected")
 
         # Rejouer les evenements bufferises
         await self._replay_buffered_events(user_id, websocket)
@@ -53,7 +53,7 @@ class ConnectionManager:
 
     def disconnect_user(self, user_id: int) -> None:
         self.user_connections.pop(user_id, None)
-        logger.info(f"WebSocket user disconnected: user_id={user_id}")
+        logger.info("WebSocket user disconnected")
 
     async def send_to_user(self, user_id: int, event_type: str, data: dict) -> None:
         """
