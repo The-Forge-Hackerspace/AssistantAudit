@@ -18,6 +18,7 @@ class ReportSectionRead(BaseModel):
 
 class ReportSectionUpdate(BaseModel):
     """Permet d'activer/désactiver une section ou de modifier son contenu."""
+
     included: Optional[bool] = None
     title: Optional[str] = Field(None, max_length=200)
     custom_content: Optional[str] = None
@@ -51,9 +52,11 @@ class AuditReportRead(BaseModel):
 
 class AuditReportDetail(AuditReportRead):
     """Rapport avec toutes ses sections."""
+
     sections: list[ReportSectionRead] = []
 
 
 class ReportGenerateRequest(BaseModel):
     """Demande de génération PDF/Word."""
+
     format: str = Field(default="pdf", pattern=r"^(pdf|docx|both)$")

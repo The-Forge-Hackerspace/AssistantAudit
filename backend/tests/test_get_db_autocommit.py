@@ -4,13 +4,13 @@ Tests unitaires — get_db() auto-commit on success, auto-rollback on exception.
 Teste le générateur get_db() directement (pas via le client HTTP,
 car conftest override get_db avec lambda: db_session).
 """
+
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 
 class TestGetDbAutoCommit:
-
     def test_commit_on_success(self):
         """get_db() commit la session quand le générateur se termine normalement."""
         mock_session = MagicMock()

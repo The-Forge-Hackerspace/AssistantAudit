@@ -1,6 +1,7 @@
 """
 Service NetworkMap : liens reseau, layouts, connexions inter-site, VLANs.
 """
+
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -13,7 +14,10 @@ from ..models.site import Site
 
 
 def _check_site_access(
-    db: Session, site_id: int, user_id: int | None, is_admin: bool,
+    db: Session,
+    site_id: int,
+    user_id: int | None,
+    is_admin: bool,
 ) -> None:
     if user_id is not None and not is_admin:
         site = db.get(Site, site_id)
@@ -22,7 +26,10 @@ def _check_site_access(
 
 
 def _check_ent_access(
-    db: Session, entreprise_id: int, user_id: int | None, is_admin: bool,
+    db: Session,
+    entreprise_id: int,
+    user_id: int | None,
+    is_admin: bool,
 ) -> None:
     if user_id is not None and not is_admin:
         if not user_has_access_to_entreprise(db, entreprise_id, user_id):
@@ -30,12 +37,14 @@ def _check_ent_access(
 
 
 class NetworkMapService:
-
     # ── Links ────────────────────────────────────────────────────────────
 
     @staticmethod
     def _validate_link_endpoints_same_site(
-        db: Session, site_id: int, source_id: int, target_id: int,
+        db: Session,
+        site_id: int,
+        source_id: int,
+        target_id: int,
     ) -> None:
         source = db.get(Equipement, source_id)
         target = db.get(Equipement, target_id)
@@ -48,8 +57,10 @@ class NetworkMapService:
 
     @staticmethod
     def list_links(
-        db: Session, site_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        site_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> list[NetworkLink]:
         get_or_404(db, Site, site_id)
         _check_site_access(db, site_id, user_id, is_admin)
@@ -57,8 +68,10 @@ class NetworkMapService:
 
     @staticmethod
     def get_link(
-        db: Session, link_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        link_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> NetworkLink:
         link = get_or_404(db, NetworkLink, link_id, detail="Lien introuvable")
         _check_site_access(db, link.site_id, user_id, is_admin)
@@ -66,13 +79,18 @@ class NetworkMapService:
 
     @staticmethod
     def create_link(
-        db: Session, data,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        data,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> NetworkLink:
         get_or_404(db, Site, data.site_id)
         _check_site_access(db, data.site_id, user_id, is_admin)
         NetworkMapService._validate_link_endpoints_same_site(
-            db, data.site_id, data.source_equipement_id, data.target_equipement_id,
+            db,
+            data.site_id,
+            data.source_equipement_id,
+            data.target_equipement_id,
         )
         link = NetworkLink(**data.model_dump())
         db.add(link)
@@ -82,8 +100,11 @@ class NetworkMapService:
 
     @staticmethod
     def update_link(
-        db: Session, link_id: int, data,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        link_id: int,
+        data,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> NetworkLink:
         link = get_or_404(db, NetworkLink, link_id, detail="Lien introuvable")
         _check_site_access(db, link.site_id, user_id, is_admin)
@@ -95,8 +116,10 @@ class NetworkMapService:
 
     @staticmethod
     def delete_link(
-        db: Session, link_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        link_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> None:
         link = get_or_404(db, NetworkLink, link_id, detail="Lien introuvable")
         _check_site_access(db, link.site_id, user_id, is_admin)
@@ -107,8 +130,10 @@ class NetworkMapService:
 
     @staticmethod
     def get_site_map_data(
-        db: Session, site_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        site_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> dict:
         """Recupere equipements, liens et layout pour un site."""
         get_or_404(db, Site, site_id)
@@ -125,8 +150,11 @@ class NetworkMapService:
 
     @staticmethod
     def save_layout(
-        db: Session, site_id: int, layout_data: dict,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        site_id: int,
+        layout_data: dict,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> None:
         get_or_404(db, Site, site_id)
         _check_site_access(db, site_id, user_id, is_admin)
@@ -146,35 +174,37 @@ class NetworkMapService:
 
     @staticmethod
     def get_overview_data(
-        db: Session, entreprise_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        entreprise_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> dict:
         """Recupere sites et connexions pour une vue multi-site."""
         get_or_404(db, Entreprise, entreprise_id)
         _check_ent_access(db, entreprise_id, user_id, is_admin)
         sites = db.query(Site).filter(Site.entreprise_id == entreprise_id).all()
-        connections = db.query(SiteConnection).filter(
-            SiteConnection.entreprise_id == entreprise_id
-        ).all()
+        connections = db.query(SiteConnection).filter(SiteConnection.entreprise_id == entreprise_id).all()
         return {"sites": sites, "connections": connections}
 
     # ── Site connections ─────────────────────────────────────────────────
 
     @staticmethod
     def list_connections(
-        db: Session, entreprise_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        entreprise_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> list[SiteConnection]:
         get_or_404(db, Entreprise, entreprise_id)
         _check_ent_access(db, entreprise_id, user_id, is_admin)
-        return db.query(SiteConnection).filter(
-            SiteConnection.entreprise_id == entreprise_id
-        ).all()
+        return db.query(SiteConnection).filter(SiteConnection.entreprise_id == entreprise_id).all()
 
     @staticmethod
     def get_connection(
-        db: Session, connection_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        connection_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> SiteConnection:
         conn = get_or_404(db, SiteConnection, connection_id, detail="Connexion inter-site introuvable")
         _check_ent_access(db, conn.entreprise_id, user_id, is_admin)
@@ -182,8 +212,10 @@ class NetworkMapService:
 
     @staticmethod
     def create_connection(
-        db: Session, data,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        data,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> SiteConnection:
         get_or_404(db, Entreprise, data.entreprise_id)
         _check_ent_access(db, data.entreprise_id, user_id, is_admin)
@@ -222,11 +254,17 @@ class NetworkMapService:
 
     @staticmethod
     def update_connection(
-        db: Session, connection_id: int, data,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        connection_id: int,
+        data,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> SiteConnection:
         connection = get_or_404(
-            db, SiteConnection, connection_id, detail="Connexion inter-site introuvable",
+            db,
+            SiteConnection,
+            connection_id,
+            detail="Connexion inter-site introuvable",
         )
         _check_ent_access(db, connection.entreprise_id, user_id, is_admin)
         for field, value in data.model_dump(exclude_unset=True).items():
@@ -241,11 +279,16 @@ class NetworkMapService:
 
     @staticmethod
     def delete_connection(
-        db: Session, connection_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        connection_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> None:
         connection = get_or_404(
-            db, SiteConnection, connection_id, detail="Connexion inter-site introuvable",
+            db,
+            SiteConnection,
+            connection_id,
+            detail="Connexion inter-site introuvable",
         )
         _check_ent_access(db, connection.entreprise_id, user_id, is_admin)
         db.delete(connection)
@@ -255,22 +298,21 @@ class NetworkMapService:
 
     @staticmethod
     def list_vlans(
-        db: Session, site_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        site_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> list[VlanDefinition]:
         get_or_404(db, Site, site_id)
         _check_site_access(db, site_id, user_id, is_admin)
-        return (
-            db.query(VlanDefinition)
-            .filter(VlanDefinition.site_id == site_id)
-            .order_by(VlanDefinition.vlan_id)
-            .all()
-        )
+        return db.query(VlanDefinition).filter(VlanDefinition.site_id == site_id).order_by(VlanDefinition.vlan_id).all()
 
     @staticmethod
     def get_vlan(
-        db: Session, vlan_def_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        vlan_def_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> VlanDefinition:
         vlan = get_or_404(db, VlanDefinition, vlan_def_id, detail="Définition VLAN introuvable")
         _check_site_access(db, vlan.site_id, user_id, is_admin)
@@ -278,8 +320,10 @@ class NetworkMapService:
 
     @staticmethod
     def create_vlan(
-        db: Session, data,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        data,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> VlanDefinition:
         get_or_404(db, Site, data.site_id)
         _check_site_access(db, data.site_id, user_id, is_admin)
@@ -298,8 +342,11 @@ class NetworkMapService:
 
     @staticmethod
     def update_vlan(
-        db: Session, vlan_def_id: int, data,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        vlan_def_id: int,
+        data,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> VlanDefinition:
         vlan = get_or_404(db, VlanDefinition, vlan_def_id, detail="Définition VLAN introuvable")
         _check_site_access(db, vlan.site_id, user_id, is_admin)
@@ -318,8 +365,10 @@ class NetworkMapService:
 
     @staticmethod
     def delete_vlan(
-        db: Session, vlan_def_id: int,
-        user_id: int | None = None, is_admin: bool = False,
+        db: Session,
+        vlan_def_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> None:
         vlan = get_or_404(db, VlanDefinition, vlan_def_id, detail="Définition VLAN introuvable")
         _check_site_access(db, vlan.site_id, user_id, is_admin)

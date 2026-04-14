@@ -32,7 +32,7 @@ class HealthCheckService:
     def get_health_status() -> Dict[str, Any]:
         """
         Get basic health status of the application.
-        
+
         Returns:
             dict with status, timestamp, and version
         """
@@ -45,21 +45,21 @@ class HealthCheckService:
     def check_database_connectivity() -> Dict[str, Any]:
         """
         Check database connectivity and responsiveness.
-        
+
         Returns:
             dict with database status and response time
         """
         start_time = time.time()
-        
+
         try:
             db: Session = SessionLocal()
             try:
                 # Simple query to verify connection
                 result = db.execute(text("SELECT 1"))
                 result.fetchone()
-                
+
                 response_time = time.time() - start_time
-                
+
                 return {
                     "status": "connected",
                     "response_time_ms": round(response_time * 1000, 2),
@@ -69,7 +69,7 @@ class HealthCheckService:
         except Exception as exc:
             logger.error(f"Database connectivity check failed: {exc}", exc_info=True)
             response_time = time.time() - start_time
-            
+
             return {
                 "status": "disconnected",
                 "response_time_ms": round(response_time * 1000, 2),
@@ -80,17 +80,17 @@ class HealthCheckService:
     def get_ready_status() -> Dict[str, Any]:
         """
         Get detailed readiness status including all dependencies.
-        
+
         Returns:
             dict with overall ready status and component status
         """
         health = HealthCheckService.get_health_status()
         db_check = HealthCheckService.check_database_connectivity()
-        
+
         # Determine if ready based on components
         db_ready = db_check.get("status") == "connected"
         overall_ready = db_ready
-        
+
         return {
             "ready": overall_ready,
             "timestamp": health["timestamp"],
@@ -111,7 +111,7 @@ class HealthCheckService:
     def get_liveness_status() -> Dict[str, Any]:
         """
         Get liveness status for Kubernetes.
-        
+
         Returns:
             dict with liveness status (same as health status)
         """

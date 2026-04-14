@@ -1,6 +1,7 @@
 """
 Service OradadConfig : CRUD profils de configuration, taches ORADAD, analyse.
 """
+
 import logging
 
 from fastapi import HTTPException, status
@@ -14,12 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 class OradadConfigService:
-
     # ── Config CRUD ──────────────────────────────────────────────────────
 
     @staticmethod
     def list_configs(
-        db: Session, owner_id: int, is_admin: bool = False,
+        db: Session,
+        owner_id: int,
+        is_admin: bool = False,
     ) -> list[OradadConfig]:
         query = db.query(OradadConfig)
         if not is_admin:
@@ -28,7 +30,10 @@ class OradadConfigService:
 
     @staticmethod
     def get_config(
-        db: Session, config_id: int, owner_id: int, is_admin: bool = False,
+        db: Session,
+        config_id: int,
+        owner_id: int,
+        is_admin: bool = False,
     ) -> OradadConfig:
         config = db.query(OradadConfig).filter(OradadConfig.id == config_id).first()
         if config is None:
@@ -61,7 +66,11 @@ class OradadConfigService:
 
     @staticmethod
     def update_config(
-        db: Session, config_id: int, data, owner_id: int, is_admin: bool = False,
+        db: Session,
+        config_id: int,
+        data,
+        owner_id: int,
+        is_admin: bool = False,
     ) -> OradadConfig:
         config = OradadConfigService.get_config(db, config_id, owner_id, is_admin)
         update_data = data.model_dump(exclude_unset=True)
@@ -74,8 +83,9 @@ class OradadConfigService:
                 for new_d in new_domains:
                     if new_d.get("password") == "••••••":
                         for old_d in existing_domains:
-                            if (old_d.get("server") == new_d.get("server")
-                                    and old_d.get("domain_name") == new_d.get("domain_name")):
+                            if old_d.get("server") == new_d.get("server") and old_d.get("domain_name") == new_d.get(
+                                "domain_name"
+                            ):
                                 new_d["password"] = old_d.get("password", "")
                                 break
                 config.set_domains_list(new_domains)
@@ -91,7 +101,10 @@ class OradadConfigService:
 
     @staticmethod
     def delete_config(
-        db: Session, config_id: int, owner_id: int, is_admin: bool = False,
+        db: Session,
+        config_id: int,
+        owner_id: int,
+        is_admin: bool = False,
     ) -> None:
         config = OradadConfigService.get_config(db, config_id, owner_id, is_admin)
         db.delete(config)
@@ -101,12 +114,19 @@ class OradadConfigService:
 
     @staticmethod
     def get_task(
-        db: Session, task_uuid: str, owner_id: int, is_admin: bool = False,
+        db: Session,
+        task_uuid: str,
+        owner_id: int,
+        is_admin: bool = False,
     ) -> AgentTask:
-        task = db.query(AgentTask).filter(
-            AgentTask.task_uuid == task_uuid,
-            AgentTask.tool == "oradad",
-        ).first()
+        task = (
+            db.query(AgentTask)
+            .filter(
+                AgentTask.task_uuid == task_uuid,
+                AgentTask.tool == "oradad",
+            )
+            .first()
+        )
         if task is None:
             raise HTTPException(status_code=404, detail="Tache ORADAD introuvable")
         if task.owner_id != owner_id and not is_admin:
@@ -115,7 +135,9 @@ class OradadConfigService:
 
     @staticmethod
     def list_tasks(
-        db: Session, owner_id: int, is_admin: bool = False,
+        db: Session,
+        owner_id: int,
+        is_admin: bool = False,
     ) -> list[AgentTask]:
         query = db.query(AgentTask).filter(AgentTask.tool == "oradad")
         if not is_admin:
@@ -172,7 +194,9 @@ class OradadConfigService:
 
         logger.info(
             "Analyse ANSSI terminee pour la tache %s — score: %s, level: %s",
-            task.task_uuid, report["score"], report["level"],
+            task.task_uuid,
+            report["score"],
+            report["level"],
         )
 
         return report

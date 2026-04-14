@@ -1,6 +1,7 @@
 """
 Tests pour POST /auth/refresh et validate_refresh_token.
 """
+
 from datetime import timedelta
 
 import pytest

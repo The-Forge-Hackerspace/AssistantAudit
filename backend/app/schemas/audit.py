@@ -1,6 +1,7 @@
 """
 Schémas Audit.
 """
+
 from datetime import datetime
 from typing import Optional
 
@@ -72,6 +73,7 @@ class AuditRead(AuditBase):
 
 class AuditDetail(AuditRead):
     """Vue détaillée avec les campagnes résumées"""
+
     entreprise_nom: Optional[str] = None
 
     model_config = {"from_attributes": True}

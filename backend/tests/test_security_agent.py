@@ -2,6 +2,7 @@
 Tests pour les extensions agent/enrollment de core/security.py et core/deps.py.
 Verifie que les fonctions existantes (user tokens) ne sont pas cassees.
 """
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -92,6 +93,7 @@ class TestAgentToken:
         from jose import jwt
 
         from app.core.config import get_settings
+
         settings = get_settings()
 
         payload = {
@@ -101,9 +103,7 @@ class TestAgentToken:
             "exp": datetime.now(timezone.utc) - timedelta(hours=1),
             "iat": datetime.now(timezone.utc) - timedelta(days=31),
         }
-        expired_token = jwt.encode(
-            payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM
-        )
+        expired_token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
         with pytest.raises(JWTError):
             verify_agent_token(expired_token)
 
@@ -153,6 +153,7 @@ class TestEnrollmentToken:
     def test_hash_is_deterministic(self):
         """Le meme code produit le meme hash."""
         import hashlib
+
         code = "TESTCODE"
         expected = hashlib.sha256(code.encode()).hexdigest()
         assert verify_enrollment_token(code, expected, datetime.now(timezone.utc) + timedelta(minutes=5))

@@ -1,6 +1,7 @@
 """
 Tests pour core/websocket_manager.py et api/v1/websocket.py.
 """
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -27,6 +28,7 @@ def manager():
 def _clear_global_ws_manager():
     """Reset global ws_manager state between tests to avoid cross-test pollution."""
     from app.core.websocket_manager import ws_manager
+
     ws_manager.user_connections.clear()
     ws_manager.agent_connections.clear()
     ws_manager.user_event_buffer.clear()
@@ -152,8 +154,7 @@ class TestBuffering:
         """Le buffer est tronque a BUFFER_MAX_SIZE."""
         now = datetime.now(timezone.utc)
         manager.user_event_buffer[1] = [
-            (now, {"type": f"event_{i}", "data": {}, "timestamp": ""})
-            for i in range(BUFFER_MAX_SIZE)
+            (now, {"type": f"event_{i}", "data": {}, "timestamp": ""}) for i in range(BUFFER_MAX_SIZE)
         ]
 
         await manager.send_to_user(1, "overflow", {"msg": "last"})

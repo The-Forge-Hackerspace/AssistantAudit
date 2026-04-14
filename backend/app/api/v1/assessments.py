@@ -1,6 +1,7 @@
 """
 Routes Assessments : campagnes, évaluations, résultats de contrôle.
 """
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -31,6 +32,7 @@ def _rbac(current_user: User) -> tuple[int, bool]:
 
 # --- Campagnes ---
 
+
 @router.get("/campaigns", response_model=PaginatedResponse[CampaignSummary])
 def list_campaigns(
     audit_id: int = None,
@@ -41,20 +43,26 @@ def list_campaigns(
     """Liste les campagnes d'évaluation"""
     uid, adm = _rbac(current_user)
     campaigns, total = AssessmentService.list_campaigns(
-        db, audit_id=audit_id, offset=pagination.offset, limit=pagination.page_size,
-        user_id=uid, is_admin=adm,
+        db,
+        audit_id=audit_id,
+        offset=pagination.offset,
+        limit=pagination.page_size,
+        user_id=uid,
+        is_admin=adm,
     )
     items = []
     for c in campaigns:
-        items.append(CampaignSummary(
-            id=c.id,
-            name=c.name,
-            status=c.status.value,
-            audit_id=c.audit_id,
-            created_at=c.created_at,
-            compliance_score=c.compliance_score,
-            total_assessments=len(c.assessments),
-        ))
+        items.append(
+            CampaignSummary(
+                id=c.id,
+                name=c.name,
+                status=c.status.value,
+                audit_id=c.audit_id,
+                created_at=c.created_at,
+                compliance_score=c.compliance_score,
+                total_assessments=len(c.assessments),
+            )
+        )
     return PaginatedResponse(
         items=items,
         total=total,
@@ -73,8 +81,12 @@ def create_campaign(
     """Crée une nouvelle campagne d'évaluation"""
     uid, adm = _rbac(current_user)
     campaign = AssessmentService.create_campaign(
-        db, name=body.name, audit_id=body.audit_id, description=body.description,
-        user_id=uid, is_admin=adm,
+        db,
+        name=body.name,
+        audit_id=body.audit_id,
+        description=body.description,
+        user_id=uid,
+        is_admin=adm,
     )
     return CampaignSummary(
         id=campaign.id,
@@ -112,7 +124,11 @@ def update_campaign(
     uid, adm = _rbac(current_user)
     try:
         campaign = AssessmentService.update_campaign(
-            db, campaign_id, body, user_id=uid, is_admin=adm,
+            db,
+            campaign_id,
+            body,
+            user_id=uid,
+            is_admin=adm,
         )
         return CampaignSummary(
             id=campaign.id,
@@ -173,6 +189,7 @@ def delete_campaign(
 
 # --- Assessments ---
 
+
 @router.post("", response_model=AssessmentRead, status_code=status.HTTP_201_CREATED)
 def create_assessment(
     body: AssessmentCreate,
@@ -191,7 +208,8 @@ def create_assessment(
             equipement_id=body.equipement_id,
             framework_id=body.framework_id,
             assessed_by=current_user.username,
-            user_id=uid, is_admin=adm,
+            user_id=uid,
+            is_admin=adm,
         )
         return assessment
     except ValueError as e:
@@ -228,6 +246,7 @@ def delete_assessment(
 
 # --- Résultats de contrôle ---
 
+
 @router.put("/results/{result_id}", response_model=MessageResponse)
 def update_control_result(
     result_id: int,
@@ -246,7 +265,8 @@ def update_control_result(
             comment=body.comment,
             remediation_note=body.remediation_note,
             assessed_by=current_user.username,
-            user_id=uid, is_admin=adm,
+            user_id=uid,
+            is_admin=adm,
         )
         return MessageResponse(message="Résultat mis à jour")
     except ValueError as e:
@@ -254,6 +274,7 @@ def update_control_result(
 
 
 # --- Scoring ---
+
 
 @router.get("/{assessment_id}/score", response_model=ScoreResponse)
 def get_assessment_score(
@@ -285,6 +306,7 @@ def get_campaign_score(
 
 # --- Monkey365 / M365 Scan ---
 
+
 @router.post("/{assessment_id}/scan/simulate", response_model=M365ScanResponse)
 def simulate_m365_scan(
     assessment_id: int,
@@ -297,7 +319,9 @@ def simulate_m365_scan(
     Utile pour le développement et les tests sans tenant M365.
     """
     result = Monkey365Service.simulate_scan(
-        db, assessment_id, body.findings,
+        db,
+        assessment_id,
+        body.findings,
     )
     return M365ScanResponse(
         scan_id=result.scan_id,

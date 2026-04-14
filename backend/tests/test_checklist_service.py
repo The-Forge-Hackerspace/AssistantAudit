@@ -21,7 +21,7 @@ def checklist_setup(db_session, auditeur_user):
 
     items = []
     for i in range(3):
-        item = ChecklistItem(section_id=s1.id, label=f"Item {i+1}", order=i, ref_code=f"1.{i+1}")
+        item = ChecklistItem(section_id=s1.id, label=f"Item {i + 1}", order=i, ref_code=f"1.{i + 1}")
         db_session.add(item)
         items.append(item)
     db_session.flush()
@@ -65,12 +65,15 @@ class TestChecklistServiceInstances:
                 template_id=checklist_setup["template"].id,
                 audit_id=checklist_setup["audit"].id,
             ),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         with pytest.raises(Exception) as exc:
             ChecklistService.get_instance(
-                db_session, instance.id,
-                user_id=second_auditeur_user.id, is_admin=False,
+                db_session,
+                instance.id,
+                user_id=second_auditeur_user.id,
+                is_admin=False,
             )
         assert exc.value.status_code == 404
 
@@ -85,12 +88,16 @@ class TestChecklistServiceResponses:
                 template_id=checklist_setup["template"].id,
                 audit_id=checklist_setup["audit"].id,
             ),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         response = ChecklistService.respond_to_item(
-            db_session, instance.id, checklist_setup["items"][0].id,
+            db_session,
+            instance.id,
+            checklist_setup["items"][0].id,
             ChecklistResponseUpdate(status="OK", note="Vérifié"),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         assert response.status == "OK"
         assert response.note == "Vérifié"
@@ -102,13 +109,17 @@ class TestChecklistServiceResponses:
                 template_id=checklist_setup["template"].id,
                 audit_id=checklist_setup["audit"].id,
             ),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         assert instance.status == "draft"
         ChecklistService.respond_to_item(
-            db_session, instance.id, checklist_setup["items"][0].id,
+            db_session,
+            instance.id,
+            checklist_setup["items"][0].id,
             ChecklistResponseUpdate(status="OK"),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         db_session.refresh(instance)
         assert instance.status == "in_progress"
@@ -120,18 +131,25 @@ class TestChecklistServiceResponses:
                 template_id=checklist_setup["template"].id,
                 audit_id=checklist_setup["audit"].id,
             ),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         # Répondre à 2 items sur 3
         ChecklistService.respond_to_item(
-            db_session, instance.id, checklist_setup["items"][0].id,
+            db_session,
+            instance.id,
+            checklist_setup["items"][0].id,
             ChecklistResponseUpdate(status="OK"),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         ChecklistService.respond_to_item(
-            db_session, instance.id, checklist_setup["items"][1].id,
+            db_session,
+            instance.id,
+            checklist_setup["items"][1].id,
             ChecklistResponseUpdate(status="NOK"),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         progress = ChecklistService.get_progress(db_session, instance.id)
         assert progress["total_items"] == 3
@@ -149,17 +167,24 @@ class TestChecklistServiceResponses:
                 template_id=checklist_setup["template"].id,
                 audit_id=checklist_setup["audit"].id,
             ),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         ChecklistService.respond_to_item(
-            db_session, instance.id, checklist_setup["items"][0].id,
+            db_session,
+            instance.id,
+            checklist_setup["items"][0].id,
             ChecklistResponseUpdate(status="NOK"),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         resp = ChecklistService.respond_to_item(
-            db_session, instance.id, checklist_setup["items"][0].id,
+            db_session,
+            instance.id,
+            checklist_setup["items"][0].id,
             ChecklistResponseUpdate(status="OK", note="Corrigé"),
-            user_id=auditeur_user.id, is_admin=False,
+            user_id=auditeur_user.id,
+            is_admin=False,
         )
         assert resp.status == "OK"
         assert resp.note == "Corrigé"

@@ -104,15 +104,10 @@ def seed(db=None):
     if db is None:
         db = SessionLocal()
     try:
-        existing = db.query(ChecklistTemplate).filter(
-            ChecklistTemplate.name == CHECKLIST_SERVER_ROOM["name"]
-        ).first()
+        existing = db.query(ChecklistTemplate).filter(ChecklistTemplate.name == CHECKLIST_SERVER_ROOM["name"]).first()
 
         if existing:
-            print(
-                f"Checklist '{CHECKLIST_SERVER_ROOM['name']}' déjà présente "
-                f"(id={existing.id}), rien à faire."
-            )
+            print(f"Checklist '{CHECKLIST_SERVER_ROOM['name']}' déjà présente (id={existing.id}), rien à faire.")
             return
 
         tpl = ChecklistTemplate(

@@ -1,6 +1,7 @@
 """
 Service Scan Réseau — Orchestration des scans Nmap et persistance des résultats.
 """
+
 import logging
 from typing import Optional
 
@@ -135,10 +136,7 @@ def execute_scan_background(
         # Mettre à jour le scan avec les résultats
         scan.raw_xml_output = result.raw_xml
         scan.nombre_hosts_trouves = len(result.hosts)
-        scan.nombre_ports_ouverts = sum(
-            len([p for p in h.ports if p.state == "open"])
-            for h in result.hosts
-        )
+        scan.nombre_ports_ouverts = sum(len([p for p in h.ports if p.state == "open"]) for h in result.hosts)
         scan.duree_scan_secondes = result.duration_seconds
         scan.statut = "completed"
         db.flush()
@@ -285,10 +283,7 @@ def update_host_decision(
             db.add(equip)
             db.flush()
             host.equipement_id = equip.id
-            logger.info(
-                f"Équipement créé depuis scan: {host.ip_address} "
-                f"(type={chosen_type}, id={equip.id})"
-            )
+            logger.info(f"Équipement créé depuis scan: {host.ip_address} (type={chosen_type}, id={equip.id})")
 
     db.flush()
     db.refresh(host)

@@ -8,6 +8,7 @@ Gere deux modes :
 Le service verifie systematiquement l'ownership via la chaine :
   Attachment -> ControlResult -> Assessment -> Campaign -> Audit -> owner_id
 """
+
 import logging
 from pathlib import Path
 from uuid import uuid4
@@ -38,9 +39,7 @@ class FileService:
     def __init__(self) -> None:
         self.envelope = EnvelopeEncryption()
 
-    def _verify_control_result_ownership(
-        self, db: Session, control_result_id: int, user_id: int
-    ) -> ControlResult:
+    def _verify_control_result_ownership(self, db: Session, control_result_id: int, user_id: int) -> ControlResult:
         """
         Verifie que le control_result appartient au user via la chaine :
         ControlResult -> Assessment -> Campaign -> Audit -> owner_id.
@@ -61,9 +60,7 @@ class FileService:
             raise HTTPException(status_code=404, detail="Ressource introuvable")
         return cr
 
-    def _get_attachment_with_ownership(
-        self, db: Session, attachment_id: int, user_id: int
-    ) -> Attachment:
+    def _get_attachment_with_ownership(self, db: Session, attachment_id: int, user_id: int) -> Attachment:
         """
         Recupere un Attachment avec verification d'ownership via la chaine complete.
         Retourne 404 (pas 403) si non trouve ou pas au bon user.
@@ -140,13 +137,14 @@ class FileService:
 
         logger.info(
             "Fichier uploade: %s (%d octets) -> blobs/%s.enc par user %s",
-            filename, len(content), file_uuid, user_id,
+            filename,
+            len(content),
+            file_uuid,
+            user_id,
         )
         return attachment
 
-    def download_file(
-        self, db: Session, attachment_id: int, user_id: int
-    ) -> tuple[bytes, str, str]:
+    def download_file(self, db: Session, attachment_id: int, user_id: int) -> tuple[bytes, str, str]:
         """
         Dechiffre et retourne un fichier avec verification d'ownership.
 
@@ -168,9 +166,7 @@ class FileService:
             raw_data = blob_path.read_bytes()
             if attachment.encrypted_dek is not None and len(attachment.encrypted_dek) > 0:
                 # Fichier chiffre : dechiffrer avec envelope
-                content = self.envelope.decrypt_file(
-                    raw_data, attachment.encrypted_dek, attachment.dek_nonce
-                )
+                content = self.envelope.decrypt_file(raw_data, attachment.encrypted_dek, attachment.dek_nonce)
             else:
                 # Fichier en mode passthrough (dev) : pas de chiffrement
                 content = raw_data

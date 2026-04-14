@@ -4,6 +4,7 @@ Tests RBAC — isolation de list_attachments par ownership.
 Vérifie que list_attachments filtre via la chaîne FK :
 Attachment → ControlResult → Assessment → Campaign → Audit → owner_id.
 """
+
 import uuid
 
 from app.models.attachment import Attachment
@@ -22,6 +23,7 @@ from tests.factories import (
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
+
 def _create_attachment_chain(db, owner, *, uid=None):
     """Crée la chaîne complète jusqu'à un Attachment pour un owner donné."""
     uid = uid or str(uuid.uuid4())[:8]
@@ -33,11 +35,17 @@ def _create_attachment_chain(db, owner, *, uid=None):
     ctrl = ControlFactory.create(db, category_id=cat.id, ref_id=f"CTL_{uid}")
 
     audit = AuditFactory.create(
-        db, nom_projet=f"Audit {uid}", entreprise_id=ent.id, owner_id=owner.id,
+        db,
+        nom_projet=f"Audit {uid}",
+        entreprise_id=ent.id,
+        owner_id=owner.id,
     )
     campaign = AssessmentCampaignFactory.create(db, audit_id=audit.id)
     assessment = AssessmentFactory.create(
-        db, campaign_id=campaign.id, equipement_id=equip.id, framework_id=fw.id,
+        db,
+        campaign_id=campaign.id,
+        equipement_id=equip.id,
+        framework_id=fw.id,
     )
     cr = ControlResultFactory.create(db, assessment_id=assessment.id, control_id=ctrl.id)
 
@@ -63,9 +71,12 @@ def _create_attachment_chain(db, owner, *, uid=None):
 
 
 class TestListAttachmentsIsolation:
-
     def test_owner_sees_own_attachments(
-        self, client, db_session, auditeur_user, auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        auditeur_headers,
     ):
         """Non-régression : un auditeur voit ses propres pièces jointes."""
         cr, att = _create_attachment_chain(db_session, auditeur_user)
@@ -78,7 +89,11 @@ class TestListAttachmentsIsolation:
         assert att.id in ids
 
     def test_other_user_sees_empty_list(
-        self, client, db_session, auditeur_user, second_auditeur_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        second_auditeur_headers,
     ):
         """Auditeur B ne voit pas les attachments d'auditeur A (liste vide)."""
         cr, _ = _create_attachment_chain(db_session, auditeur_user)
@@ -90,7 +105,11 @@ class TestListAttachmentsIsolation:
         assert r.json() == []
 
     def test_admin_sees_all_attachments(
-        self, client, db_session, auditeur_user, admin_headers,
+        self,
+        client,
+        db_session,
+        auditeur_user,
+        admin_headers,
     ):
         """L'admin voit les attachments de n'importe quel auditeur."""
         cr, att = _create_attachment_chain(db_session, auditeur_user)

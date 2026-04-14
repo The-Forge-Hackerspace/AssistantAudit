@@ -1,6 +1,7 @@
 """
 Routes d'authentification : login, register, refresh, profile.
 """
+
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -130,9 +131,7 @@ def register(
 ):
     """Créer un nouvel utilisateur (admin seulement)"""
     # Vérifier unicité
-    existing = db.query(User).filter(
-        (User.username == body.username) | (User.email == body.email)
-    ).first()
+    existing = db.query(User).filter((User.username == body.username) | (User.email == body.email)).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -162,9 +161,7 @@ def change_password(
     current_user: User = Depends(get_current_user),
 ):
     """Changer son mot de passe"""
-    success = AuthService.change_password(
-        db, current_user, body.current_password, body.new_password
-    )
+    success = AuthService.change_password(db, current_user, body.current_password, body.new_password)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

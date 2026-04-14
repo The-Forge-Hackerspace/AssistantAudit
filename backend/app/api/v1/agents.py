@@ -1,6 +1,7 @@
 """
 Routes API pour la gestion des agents et le dispatch de taches.
 """
+
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
@@ -46,7 +47,10 @@ def create_agent(
     """Cree un agent et genere un code d'enrollment (valide 10 min).
     Admin peut creer pour un autre user via target_user_id."""
     agent, code = AgentService.create_agent(
-        db, body, user_id=current_user.id, user_role=current_user.role,
+        db,
+        body,
+        user_id=current_user.id,
+        user_role=current_user.role,
     )
     return AgentCreateResponse(
         agent_uuid=agent.agent_uuid,
@@ -62,7 +66,9 @@ def list_agents(
 ):
     """Liste les agents. Admin voit tous les agents, auditeur voit les siens."""
     agents = AgentService.list_agents(
-        db, user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return [
         AgentResponse(
@@ -86,12 +92,25 @@ def list_agents(
 @router.delete("/{agent_uuid}", status_code=200)
 def revoke_agent(
     agent_uuid: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_auditeur),
 ):
     """Revoque un agent. Admin peut revoquer n'importe quel agent, auditeur seulement les siens."""
-    AgentService.revoke_agent(
-        db, agent_uuid, user_id=current_user.id, is_admin=current_user.role == "admin",
+    agent = AgentService.revoke_agent(
+        db,
+        agent_uuid,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
+    )
+    # Notifier le frontend en temps reel
+    from ...core.websocket_manager import ws_manager
+
+    background_tasks.add_task(
+        ws_manager.send_to_user,
+        agent.user_id,
+        "agent_status",
+        {"agent_uuid": agent_uuid, "status": "revoked"},
     )
     # TODO: scheduled purge — delete agents where revoked_at < now() - 30 days
     return {"detail": "Agent revoque"}
@@ -149,7 +168,10 @@ def list_tasks(
     """Liste les taches agent du user courant (admin voit tout). Filtrable par tool.
     Enrichit chaque tache avec site_name et entreprise_name resolus depuis les parametres."""
     return AgentService.list_tasks(
-        db, user_id=current_user.id, is_admin=current_user.role == "admin", tool=tool,
+        db,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
+        tool=tool,
     )
 
 
@@ -161,7 +183,10 @@ def delete_task(
 ):
     """Supprime une tache agent. Ownership verifiee."""
     AgentService.delete_task(
-        db, task_uuid, user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        task_uuid,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return {"detail": "Tache supprimee"}
 
@@ -192,8 +217,12 @@ def dispatch_agent_task(
 
     # Notifier l'agent via WebSocket (en arrière-plan)
     from ...core.websocket_manager import ws_manager
+
     background_tasks.add_task(
-        ws_manager.send_to_agent, body.agent_uuid, "new_task", {
+        ws_manager.send_to_agent,
+        body.agent_uuid,
+        "new_task",
+        {
             "task_uuid": task.task_uuid,
             "tool": task.tool,
             "parameters": task.parameters,
@@ -216,8 +245,12 @@ def update_task_status(
 
     # Notifier le user proprietaire via WebSocket (en arrière-plan)
     from ...core.websocket_manager import ws_manager
+
     background_tasks.add_task(
-        ws_manager.send_to_user, task.owner_id, "task_status", {
+        ws_manager.send_to_user,
+        task.owner_id,
+        "task_status",
+        {
             "task_uuid": task_uuid,
             "status": body.status,
             "progress": task.progress,
@@ -240,8 +273,12 @@ def submit_task_result(
 
     # Notifier le user (en arrière-plan)
     from ...core.websocket_manager import ws_manager
+
     background_tasks.add_task(
-        ws_manager.send_to_user, task.owner_id, "task_result", {
+        ws_manager.send_to_user,
+        task.owner_id,
+        "task_result",
+        {
             "task_uuid": task_uuid,
             "status": task.status,
             "result_summary": task.result_summary,
@@ -276,7 +313,7 @@ def upload_artifact(
         if total_size > MAX_ARTIFACT_SIZE:
             raise HTTPException(
                 status_code=413,
-                detail=f"Fichier trop volumineux (>{MAX_ARTIFACT_SIZE // (1024*1024)} Mo)",
+                detail=f"Fichier trop volumineux (>{MAX_ARTIFACT_SIZE // (1024 * 1024)} Mo)",
             )
         chunks.append(chunk)
     content = b"".join(chunks)
@@ -316,7 +353,10 @@ def list_artifacts(
     Verifie ownership via agent -> owner_id.
     """
     artifacts = AgentService.list_artifacts(
-        db, task_uuid, user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        task_uuid,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return [
         ArtifactRead(

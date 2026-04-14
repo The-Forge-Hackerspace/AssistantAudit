@@ -4,6 +4,7 @@ Modèles Framework (Référentiel) — Le cœur de l'approche CISO-like.
 Un Framework contient des catégories, qui contiennent des contrôles (points de vérification).
 Les frameworks sont chargés depuis des fichiers YAML et persistés en base pour le suivi.
 """
+
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
@@ -19,6 +20,7 @@ def _utcnow() -> datetime:
 
 class ControlSeverity(str, PyEnum):
     """Niveau de sévérité d'un point de contrôle"""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -28,6 +30,7 @@ class ControlSeverity(str, PyEnum):
 
 class CheckType(str, PyEnum):
     """Type de vérification : manuelle, automatique, ou semi-auto"""
+
     MANUAL = "manual"
     AUTOMATIC = "automatic"
     SEMI_AUTOMATIC = "semi-automatic"
@@ -39,10 +42,9 @@ class Framework(Base):
     Chaque type d'équipement ou domaine (firewall, M365, AD, etc.)
     possède son propre référentiel de contrôles.
     """
+
     __tablename__ = "frameworks"
-    __table_args__ = (
-        UniqueConstraint("ref_id", "version", name="uq_framework_ref_version"),
-    )
+    __table_args__ = (UniqueConstraint("ref_id", "version", name="uq_framework_ref_version"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ref_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
@@ -58,24 +60,20 @@ class Framework(Base):
     source_hash: Mapped[str | None] = mapped_column(String(64))  # SHA-256 du fichier YAML
 
     # Versioning
-    parent_version_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("frameworks.id"), nullable=True
-    )
+    parent_version_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("frameworks.id"), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
     )
 
     # Relations
     categories: Mapped[list["FrameworkCategory"]] = relationship(
-        back_populates="framework", cascade="all, delete-orphan",
-        lazy="selectin", order_by="FrameworkCategory.order"
+        back_populates="framework", cascade="all, delete-orphan", lazy="selectin", order_by="FrameworkCategory.order"
     )
     parent_version: Mapped["Framework | None"] = relationship(
-        remote_side="Framework.id", foreign_keys=[parent_version_id],
+        remote_side="Framework.id",
+        foreign_keys=[parent_version_id],
     )
 
     def __repr__(self) -> str:
@@ -88,6 +86,7 @@ class Framework(Base):
 
 class FrameworkCategory(Base):
     """Catégorie de contrôles au sein d'un référentiel."""
+
     __tablename__ = "framework_categories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -96,15 +95,12 @@ class FrameworkCategory(Base):
     order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # FK
-    framework_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("frameworks.id"), nullable=False, index=True
-    )
+    framework_id: Mapped[int] = mapped_column(Integer, ForeignKey("frameworks.id"), nullable=False, index=True)
 
     # Relations
     framework: Mapped["Framework"] = relationship(back_populates="categories")
     controls: Mapped[list["Control"]] = relationship(
-        back_populates="category", cascade="all, delete-orphan",
-        lazy="selectin", order_by="Control.order"
+        back_populates="category", cascade="all, delete-orphan", lazy="selectin", order_by="Control.order"
     )
 
     def __repr__(self) -> str:
@@ -117,6 +113,7 @@ class Control(Base):
     Chaque contrôle a un ID unique (ex: FW-001), une sévérité,
     et peut être vérifié manuellement ou automatiquement.
     """
+
     __tablename__ = "controls"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -126,9 +123,7 @@ class Control(Base):
     severity: Mapped[ControlSeverity] = mapped_column(
         Enum(ControlSeverity), default=ControlSeverity.MEDIUM, nullable=False
     )
-    check_type: Mapped[CheckType] = mapped_column(
-        Enum(CheckType), default=CheckType.MANUAL, nullable=False
-    )
+    check_type: Mapped[CheckType] = mapped_column(Enum(CheckType), default=CheckType.MANUAL, nullable=False)
     order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Vérification automatique
@@ -141,9 +136,7 @@ class Control(Base):
     evidence_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # FK
-    category_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("framework_categories.id"), nullable=False, index=True
-    )
+    category_id: Mapped[int] = mapped_column(Integer, ForeignKey("framework_categories.id"), nullable=False, index=True)
 
     # Relations
     category: Mapped["FrameworkCategory"] = relationship(back_populates="controls")

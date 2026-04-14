@@ -1,6 +1,7 @@
 """
 Scanner Nmap — outil de découverte réseau intégré.
 """
+
 import logging
 import re
 import subprocess
@@ -17,28 +18,76 @@ logger = logging.getLogger(__name__)
 # --exec, etc.) sont bloqués par défaut.
 ALLOWED_NMAP_FLAGS = {
     # Scan types
-    "-sS", "-sT", "-sU", "-sA", "-sW", "-sM", "-sN", "-sF", "-sX",
-    "-sV", "-sC", "-sn", "-sP", "-sL", "-sO",
+    "-sS",
+    "-sT",
+    "-sU",
+    "-sA",
+    "-sW",
+    "-sM",
+    "-sN",
+    "-sF",
+    "-sX",
+    "-sV",
+    "-sC",
+    "-sn",
+    "-sP",
+    "-sL",
+    "-sO",
     # Port specification
-    "-p", "--top-ports", "-F",
+    "-p",
+    "--top-ports",
+    "-F",
     # Timing
-    "-T0", "-T1", "-T2", "-T3", "-T4", "-T5",
-    "--min-rate", "--max-rate", "--min-parallelism", "--max-parallelism",
-    "--host-timeout", "--scan-delay", "--max-scan-delay",
+    "-T0",
+    "-T1",
+    "-T2",
+    "-T3",
+    "-T4",
+    "-T5",
+    "--min-rate",
+    "--max-rate",
+    "--min-parallelism",
+    "--max-parallelism",
+    "--host-timeout",
+    "--scan-delay",
+    "--max-scan-delay",
     # Detection
-    "-O", "-A", "--osscan-guess", "--version-intensity",
-    "--version-light", "--version-all",
+    "-O",
+    "-A",
+    "--osscan-guess",
+    "--version-intensity",
+    "--version-light",
+    "--version-all",
     # Output control (safe ones only — XML stdout already handled)
-    "-v", "-vv", "-d", "--reason", "--open",
+    "-v",
+    "-vv",
+    "-d",
+    "--reason",
+    "--open",
     # Host discovery
-    "-Pn", "-PS", "-PA", "-PU", "-PY", "-PE", "-PP", "-PM",
-    "-PR", "--disable-arp-ping", "--traceroute",
+    "-Pn",
+    "-PS",
+    "-PA",
+    "-PU",
+    "-PY",
+    "-PE",
+    "-PP",
+    "-PM",
+    "-PR",
+    "--disable-arp-ping",
+    "--traceroute",
     # DNS
-    "-n", "-R", "--dns-servers",
+    "-n",
+    "-R",
+    "--dns-servers",
     # Misc safe
-    "--max-retries", "--min-rtt-timeout", "--max-rtt-timeout",
-    "--initial-rtt-timeout", "--defeat-rst-ratelimit",
-    "-6", "-e",
+    "--max-retries",
+    "--min-rtt-timeout",
+    "--max-rtt-timeout",
+    "--initial-rtt-timeout",
+    "--defeat-rst-ratelimit",
+    "-6",
+    "-e",
 }
 
 # Regex : un flag Nmap valide commence par "-" et contient [a-zA-Z0-9-]
@@ -49,16 +98,29 @@ _VALUE_PATTERN = re.compile(r"^[a-zA-Z0-9_.:/\-,]+$")
 
 # Flags explicitement interdits (même s'ils matchent le pattern)
 BLOCKED_NMAP_FLAGS = {
-    "--script", "--script-args", "--script-args-file", "--script-trace",
-    "--script-updatedb", "--script-help",
-    "-oN", "-oG", "-oX", "-oA", "-oS",           # output vers fichiers
-    "--stylesheet",                                 # XSLT injection
-    "--interactive", "--exec",                      # exécution arbitraire
-    "--datadir", "--servicedb", "--versiondb",      # chemins arbitraires
-    "--resume",                                      # reprise depuis fichier
+    "--script",
+    "--script-args",
+    "--script-args-file",
+    "--script-trace",
+    "--script-updatedb",
+    "--script-help",
+    "-oN",
+    "-oG",
+    "-oX",
+    "-oA",
+    "-oS",  # output vers fichiers
+    "--stylesheet",  # XSLT injection
+    "--interactive",
+    "--exec",  # exécution arbitraire
+    "--datadir",
+    "--servicedb",
+    "--versiondb",  # chemins arbitraires
+    "--resume",  # reprise depuis fichier
     "--iflist",
-    "--send-eth", "--send-ip",
-    "--privileged", "--unprivileged",
+    "--send-eth",
+    "--send-ip",
+    "--privileged",
+    "--unprivileged",
 }
 
 
@@ -85,18 +147,14 @@ def sanitize_nmap_args(extra_args: Optional[list[str]]) -> list[str]:
             for known in sorted(ALLOWED_NMAP_FLAGS, key=len, reverse=True):
                 if arg.startswith(known) and len(arg) > len(known):
                     flag_base = known
-                    value_part = arg[len(known):]
+                    value_part = arg[len(known) :]
                     if not _VALUE_PATTERN.match(value_part):
-                        raise ValueError(
-                            f"Valeur invalide dans l'argument Nmap : '{arg}'"
-                        )
+                        raise ValueError(f"Valeur invalide dans l'argument Nmap : '{arg}'")
                     break
 
             # Vérifier flags bloqués
             if flag_base in BLOCKED_NMAP_FLAGS:
-                raise ValueError(
-                    f"Argument Nmap interdit pour raison de sécurité : '{flag_base}'"
-                )
+                raise ValueError(f"Argument Nmap interdit pour raison de sécurité : '{flag_base}'")
 
             # Vérifier whitelist
             if flag_base in ALLOWED_NMAP_FLAGS:
@@ -104,19 +162,14 @@ def sanitize_nmap_args(extra_args: Optional[list[str]]) -> list[str]:
             elif _FLAG_PATTERN.match(arg):
                 # Flag inconnu mais syntaxe valide → bloquer par sécurité
                 raise ValueError(
-                    f"Argument Nmap non autorisé : '{arg}'. "
-                    f"Contactez un administrateur pour l'ajouter à la whitelist."
+                    f"Argument Nmap non autorisé : '{arg}'. Contactez un administrateur pour l'ajouter à la whitelist."
                 )
             else:
-                raise ValueError(
-                    f"Argument Nmap invalide : '{arg}'"
-                )
+                raise ValueError(f"Argument Nmap invalide : '{arg}'")
         else:
             # C'est une valeur (port range, nombre, etc.) — valider le format
             if not _VALUE_PATTERN.match(arg):
-                raise ValueError(
-                    f"Valeur d'argument Nmap invalide : '{arg}'"
-                )
+                raise ValueError(f"Valeur d'argument Nmap invalide : '{arg}'")
             sanitized.append(arg)
 
     return sanitized
@@ -185,30 +238,20 @@ class NmapScanner:
             )
 
             if process.returncode != 0 and not process.stdout:
-                return NmapScanResult(
-                    success=False, target=target, error=process.stderr
-                )
+                return NmapScanResult(success=False, target=target, error=process.stderr)
 
             result = self._parse_xml(process.stdout, target)
             return result
 
         except ValueError as e:
             logger.warning(f"Arguments Nmap rejetés : {e}")
-            return NmapScanResult(
-                success=False, target=target, error=str(e)
-            )
+            return NmapScanResult(success=False, target=target, error=str(e))
         except subprocess.TimeoutExpired:
-            return NmapScanResult(
-                success=False, target=target, error=f"Timeout après {self.timeout}s"
-            )
+            return NmapScanResult(success=False, target=target, error=f"Timeout après {self.timeout}s")
         except FileNotFoundError:
-            return NmapScanResult(
-                success=False, target=target, error="Nmap non installé ou introuvable dans le PATH"
-            )
+            return NmapScanResult(success=False, target=target, error="Nmap non installé ou introuvable dans le PATH")
 
-    def _build_args(
-        self, target: str, scan_type: str, extra_args: Optional[list[str]]
-    ) -> list[str]:
+    def _build_args(self, target: str, scan_type: str, extra_args: Optional[list[str]]) -> list[str]:
         """Construit la ligne de commande Nmap avec validation des arguments."""
         base = ["nmap", "-oX", "-"]  # sortie XML sur stdout
 
@@ -237,9 +280,7 @@ class NmapScanner:
         try:
             root = ET.fromstring(xml_output)
         except Exception as e:
-            return NmapScanResult(
-                success=False, target=target, error=f"Erreur parsing XML : {e}"
-            )
+            return NmapScanResult(success=False, target=target, error=f"Erreur parsing XML : {e}")
 
         hosts = []
         for host_elem in root.findall("host"):
@@ -275,23 +316,27 @@ class NmapScanner:
             for port_elem in host_elem.findall("ports/port"):
                 state = port_elem.find("state")
                 service = port_elem.find("service")
-                ports.append(DiscoveredPort(
-                    port_number=int(port_elem.get("portid", 0)),
-                    protocol=port_elem.get("protocol", "tcp"),
-                    state=state.get("state", "") if state is not None else "",
-                    service_name=service.get("name", "") if service is not None else "",
-                    product=service.get("product", "") if service is not None else "",
-                    version=service.get("version", "") if service is not None else "",
-                ))
+                ports.append(
+                    DiscoveredPort(
+                        port_number=int(port_elem.get("portid", 0)),
+                        protocol=port_elem.get("protocol", "tcp"),
+                        state=state.get("state", "") if state is not None else "",
+                        service_name=service.get("name", "") if service is not None else "",
+                        product=service.get("product", "") if service is not None else "",
+                        version=service.get("version", "") if service is not None else "",
+                    )
+                )
 
-            hosts.append(DiscoveredHost(
-                ip_address=ip,
-                hostname=hostname,
-                mac_address=mac,
-                vendor=vendor,
-                os_guess=os_guess,
-                ports=ports,
-            ))
+            hosts.append(
+                DiscoveredHost(
+                    ip_address=ip,
+                    hostname=hostname,
+                    mac_address=mac,
+                    vendor=vendor,
+                    os_guess=os_guess,
+                    ports=ports,
+                )
+            )
 
         # Durée
         runstats = root.find("runstats/finished")

@@ -78,5 +78,5 @@ def test_script_uses_force_flag_for_reload(tmp_path):
 
     script = executor.build_script("test-scan")
 
-    import_section = script[script.find("Import-Module"):script.find("Import-Module") + 100]
+    import_section = script[script.find("Import-Module") : script.find("Import-Module") + 100]
     assert "-Force" in import_section

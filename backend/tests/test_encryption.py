@@ -3,6 +3,7 @@ Tests unitaires pour core/encryption.py
 - AES256GCMCipher : encrypt/decrypt
 - EncryptedText : TypeDecorator SQLAlchemy
 """
+
 import json
 import os
 
@@ -114,6 +115,7 @@ class TestAES256GCMCipher:
 
 class SecretNote(Base):
     """Modele de test pour EncryptedText — utilise uniquement dans les tests."""
+
     __tablename__ = "test_secret_notes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -130,6 +132,7 @@ class TestEncryptedText:
         monkeypatch.setenv("ENCRYPTION_KEY", TEST_KEY_HEX)
         # Invalider le cache de get_settings pour que la nouvelle env var soit prise en compte
         from app.core.config import get_settings
+
         get_settings.cache_clear()
 
         engine = create_engine(
@@ -154,6 +157,7 @@ class TestEncryptedText:
         monkeypatch.setenv("ENV", "development")
         monkeypatch.setenv("ENCRYPTION_KEY", "")
         from app.core.config import get_settings
+
         get_settings.cache_clear()
 
         engine = create_engine(
@@ -223,6 +227,7 @@ class TestEncryptedText:
 
         # Lire la valeur brute en base (contourne le TypeDecorator)
         from sqlalchemy import text
+
         raw = encrypted_db.execute(
             text("SELECT secret_content FROM test_secret_notes WHERE id = :id"),
             {"id": note.id},
@@ -240,6 +245,7 @@ class TestEncryptedText:
         unencrypted_db.commit()
 
         from sqlalchemy import text
+
         raw = unencrypted_db.execute(
             text("SELECT secret_content FROM test_secret_notes WHERE id = :id"),
             {"id": note.id},

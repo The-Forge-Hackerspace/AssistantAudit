@@ -24,6 +24,7 @@ def _utcnow():
 
 class Tag(Base):
     """Tag réutilisable avec nom, couleur, scope."""
+
     __tablename__ = "tags"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -32,20 +33,12 @@ class Tag(Base):
     # scope: "global" = visible par tous, "audit" = lié à un audit spécifique
     scope: Mapped[str] = mapped_column(String(10), nullable=False, default="global")
     # audit_id null si scope=global, rempli si scope=audit
-    audit_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("audits.id", ondelete="CASCADE"), index=True
-    )
-    created_by: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), index=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    audit_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("audits.id", ondelete="CASCADE"), index=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     # Relations
-    associations: Mapped[list["TagAssociation"]] = relationship(
-        back_populates="tag", cascade="all, delete-orphan"
-    )
+    associations: Mapped[list["TagAssociation"]] = relationship(back_populates="tag", cascade="all, delete-orphan")
 
     __table_args__ = (
         # Un tag global a un nom unique ; un tag d'audit est unique par audit
@@ -68,19 +61,16 @@ class Tag(Base):
 
 class TagAssociation(Base):
     """Liaison polymorphe tag ↔ entité (équipement, finding, checklist, etc.)."""
+
     __tablename__ = "tag_associations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    tag_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("tags.id", ondelete="CASCADE"), nullable=False, index=True)
     # Type de l'entité taggée : "equipement", "control_result", "checklist_response", etc.
     taggable_type: Mapped[str] = mapped_column(String(50), nullable=False)
     # ID de l'entité taggée
     taggable_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     # Relations
     tag: Mapped["Tag"] = relationship(back_populates="associations")

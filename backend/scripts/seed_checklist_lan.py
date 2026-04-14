@@ -30,19 +30,34 @@ CHECKLIST_LAN = {
             "name": "Équipements réseau (inventaire rapide)",
             "order": 1,
             "items": [
-                {"ref": "2.1", "label": "Pare-feu / routeur : modèle, constructeur, firmware, IP management, accès admin fonctionnel"},
+                {
+                    "ref": "2.1",
+                    "label": "Pare-feu / routeur : modèle, constructeur, firmware, IP management, accès admin fonctionnel",
+                },
                 {"ref": "2.2", "label": "Switch cœur : modèle, IP, VLANs trunk, STP/LACP"},
-                {"ref": "2.3", "label": "Switches d'accès : nombre, VLANs port access, PoE, administration centralisée"},
-                {"ref": "2.4", "label": "Wi-Fi : contrôleur, AP standalone/managés, SSID internes/invités, séparation Wi-Fi/LAN"},
+                {
+                    "ref": "2.3",
+                    "label": "Switches d'accès : nombre, VLANs port access, PoE, administration centralisée",
+                },
+                {
+                    "ref": "2.4",
+                    "label": "Wi-Fi : contrôleur, AP standalone/managés, SSID internes/invités, séparation Wi-Fi/LAN",
+                },
             ],
         },
         {
             "name": "IPAM / VLANs",
             "order": 2,
             "items": [
-                {"ref": "3.1", "label": "VLAN ID, nom, usage (Users/Servers/WiFi/VoIP/Mgmt) identifié pour chaque VLAN"},
+                {
+                    "ref": "3.1",
+                    "label": "VLAN ID, nom, usage (Users/Servers/WiFi/VoIP/Mgmt) identifié pour chaque VLAN",
+                },
                 {"ref": "3.2", "label": "Subnet associé, DHCP (où ?), routage inter-VLAN maîtrisé"},
-                {"ref": "3.3", "label": "Incohérences : VLAN sans subnet, subnet sans VLAN, chevauchements IP, DHCP non documenté"},
+                {
+                    "ref": "3.3",
+                    "label": "Incohérences : VLAN sans subnet, subnet sans VLAN, chevauchements IP, DHCP non documenté",
+                },
             ],
         },
         {
@@ -121,9 +136,7 @@ def seed_checklist_lan():
     db = SessionLocal()
     try:
         # Idempotent : ne crée pas si le template existe déjà
-        existing = db.query(ChecklistTemplate).filter(
-            ChecklistTemplate.name == CHECKLIST_LAN["name"]
-        ).first()
+        existing = db.query(ChecklistTemplate).filter(ChecklistTemplate.name == CHECKLIST_LAN["name"]).first()
 
         if existing:
             print(f"Checklist '{CHECKLIST_LAN['name']}' déjà présente (id={existing.id}), rien à faire.")

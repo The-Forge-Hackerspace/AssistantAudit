@@ -20,6 +20,7 @@ Prérequis :
 - FILE_ENCRYPTION_KEY doit contenir la NOUVELLE KEK dans l'environnement
 - ENCRYPTION_KEY doit contenir la NOUVELLE clé de chiffrement dans l'environnement
 """
+
 import logging
 import sys
 from pathlib import Path
@@ -73,6 +74,7 @@ ENCRYPTED_COLUMNS: list[tuple[type, str, type]] = [
 # Phase 1 : Rotation ENCRYPTION_KEY (colonnes EncryptedText/EncryptedJSON)
 # ===================================================================
 
+
 def rotate_encryption_key(
     old_key_hex: str,
     new_key_hex: str,
@@ -99,9 +101,7 @@ def rotate_encryption_key(
         # Charger uniquement les IDs pour éviter le déchiffrement automatique
         # du TypeDecorator (qui utiliserait la nouvelle clé sur des données
         # encore chiffrées avec l'ancienne clé).
-        ids = session.execute(
-            select(table.c.id).where(table.c[col_name].isnot(None))
-        ).scalars().all()
+        ids = session.execute(select(table.c.id).where(table.c[col_name].isnot(None))).scalars().all()
 
         row_success = 0
 
@@ -120,19 +120,14 @@ def rotate_encryption_key(
                 if apply:
                     # Écrire la valeur brute en bypassant le TypeDecorator via literal
                     session.execute(
-                        update(table)
-                        .where(table.c.id == row_id)
-                        .values({col_name: literal(new_ciphertext)})
+                        update(table).where(table.c.id == row_id).values({col_name: literal(new_ciphertext)})
                     )
 
                 row_success += 1
-                logger.debug(
-                    "  OK %s.%s id=%s", table_name, col_name, row_id
-                )
+                logger.debug("  OK %s.%s id=%s", table_name, col_name, row_id)
             except Exception as exc:
                 raise RuntimeError(
-                    f"Clé ancienne incorrecte ou donnée corrompue pour "
-                    f"{table_name}.{col_name} id={row_id} — {exc}"
+                    f"Clé ancienne incorrecte ou donnée corrompue pour {table_name}.{col_name} id={row_id} — {exc}"
                 ) from exc
 
         logger.info("  %s.%s : %d OK", table_name, col_name, row_success)
@@ -144,6 +139,7 @@ def rotate_encryption_key(
 # ===================================================================
 # Phase 2 : Rotation KEK (FILE_ENCRYPTION_KEY) — re-chiffre les DEK
 # ===================================================================
+
 
 def rotate_kek(
     old_key_hex: str,
@@ -157,9 +153,7 @@ def rotate_kek(
     Retourne le nombre de fichiers traités.
     Lève RuntimeError au premier échec pour permettre le rollback transactionnel.
     """
-    attachments = session.query(Attachment).filter(
-        Attachment.encrypted_dek.isnot(None)
-    ).all()
+    attachments = session.query(Attachment).filter(Attachment.encrypted_dek.isnot(None)).all()
 
     logger.info("Trouvé %d fichiers avec DEK chiffré", len(attachments))
 
@@ -190,14 +184,13 @@ def rotate_kek(
 # Phase 3 : Vérification pré-rotation
 # ===================================================================
 
+
 def verify_pre_rotation(session: Session, rotation_type: str) -> None:
     """
     Vérification rapide avant rotation : compte les enregistrements concernés.
     """
     if rotation_type in ("kek", "all"):
-        count = session.query(Attachment).filter(
-            Attachment.encrypted_dek.isnot(None)
-        ).count()
+        count = session.query(Attachment).filter(Attachment.encrypted_dek.isnot(None)).count()
         logger.info("Vérification KEK : %d Attachments avec DEK chiffré", count)
 
     if rotation_type in ("encryption", "all"):
@@ -206,13 +199,16 @@ def verify_pre_rotation(session: Session, rotation_type: str) -> None:
             count = session.query(model_cls).filter(col_attr.isnot(None)).count()
             logger.info(
                 "Vérification ENCRYPTION_KEY : %s.%s → %d enregistrements",
-                model_cls.__tablename__, col_name, count,
+                model_cls.__tablename__,
+                col_name,
+                count,
             )
 
 
 # ===================================================================
 # Orchestrateur principal
 # ===================================================================
+
 
 def run_rotation(
     rotation_type: str,

@@ -1,6 +1,7 @@
 """
 Route Health : vérification de l'état de l'application.
 """
+
 from fastapi import APIRouter
 
 from ...core.config import get_settings

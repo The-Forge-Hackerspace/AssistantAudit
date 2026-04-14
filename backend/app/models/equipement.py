@@ -1,4 +1,5 @@
 """Modèles Equipement — Équipements d'infrastructure avec héritage STI."""
+
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
@@ -48,6 +49,7 @@ EQUIPEMENT_TYPE_VALUES: tuple[str, ...] = (
 
 class Equipement(Base):
     """Modèle de base : équipement réseau / infrastructure (héritage STI)."""
+
     __tablename__ = "equipements"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -67,9 +69,7 @@ class Equipement(Base):
     )
 
     # Métadonnées
-    date_decouverte: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    date_decouverte: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     date_derniere_maj: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
     )
@@ -105,9 +105,7 @@ class Equipement(Base):
         lazy="selectin",
     )
 
-    __table_args__ = (
-        UniqueConstraint("site_id", "ip_address", name="uq_site_ip"),
-    )
+    __table_args__ = (UniqueConstraint("site_id", "ip_address", name="uq_site_ip"),)
     __mapper_args__ = {
         "polymorphic_identity": "equipement",
         "polymorphic_on": type_equipement,
@@ -119,6 +117,7 @@ class Equipement(Base):
 
 class EquipementReseau(Equipement):
     """Switch, routeur, borne WiFi, etc."""
+
     __tablename__ = "equipements_reseau"
 
     id: Mapped[int] = mapped_column(Integer, ForeignKey("equipements.id"), primary_key=True)
@@ -130,6 +129,7 @@ class EquipementReseau(Equipement):
 
 class EquipementServeur(Equipement):
     """Serveur Windows, Linux, Hyperviseur."""
+
     __tablename__ = "equipements_serveur"
 
     id: Mapped[int] = mapped_column(Integer, ForeignKey("equipements.id"), primary_key=True)
@@ -143,6 +143,7 @@ class EquipementServeur(Equipement):
 
 class EquipementFirewall(Equipement):
     """Firewall : FortiGate, PaloAlto, pfSense, etc."""
+
     __tablename__ = "equipements_firewall"
 
     id: Mapped[int] = mapped_column(Integer, ForeignKey("equipements.id"), primary_key=True)
@@ -155,16 +156,19 @@ class EquipementFirewall(Equipement):
 
 class EquipementSwitch(EquipementReseau):
     """Switch réseau — hérite de EquipementReseau pour accéder à ports_status, vlan_config, firmware_version."""
+
     __mapper_args__ = {"polymorphic_identity": "switch"}
 
 
 class EquipementRouter(EquipementReseau):
     """Routeur — hérite de EquipementReseau pour accéder à ports_status, vlan_config, firmware_version."""
+
     __mapper_args__ = {"polymorphic_identity": "router"}
 
 
 class EquipementAccessPoint(EquipementReseau):
     """Borne WiFi — hérite de EquipementReseau pour accéder à ports_status, vlan_config, firmware_version."""
+
     __mapper_args__ = {"polymorphic_identity": "access_point"}
 
 
@@ -198,6 +202,7 @@ class EquipementCloudGateway(Equipement):
 
 class VlanDefinition(Base):
     """VLAN definition scoped to a site."""
+
     __tablename__ = "vlan_definitions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -207,9 +212,7 @@ class VlanDefinition(Base):
     subnet: Mapped[str | None] = mapped_column(String(50))
     color: Mapped[str] = mapped_column(String(7), nullable=False, default="#6b7280")
     description: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
     )
@@ -217,9 +220,7 @@ class VlanDefinition(Base):
     # Relationship
     site: Mapped["Site"] = relationship(back_populates="vlan_definitions")  # type: ignore[name-defined]
 
-    __table_args__ = (
-        UniqueConstraint("site_id", "vlan_id", name="uq_site_vlan_id"),
-    )
+    __table_args__ = (UniqueConstraint("site_id", "vlan_id", name="uq_site_vlan_id"),)
 
     def __repr__(self) -> str:
         return f"<VlanDefinition(id={self.id}, site_id={self.site_id}, vlan_id={self.vlan_id}, name='{self.name}')>"

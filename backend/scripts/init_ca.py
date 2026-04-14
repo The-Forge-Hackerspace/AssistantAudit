@@ -5,6 +5,7 @@ A executer UNE SEULE FOIS a l'installation du serveur.
 Usage :
     python scripts/init_ca.py
 """
+
 import sys
 from pathlib import Path
 

@@ -2,6 +2,7 @@
 Service de dispatch de taches vers les agents.
 Implemente la double verification d'ownership pour l'isolation inter-techniciens.
 """
+
 import logging
 
 from fastapi import HTTPException
@@ -32,19 +33,27 @@ def dispatch_task(
     """
     # Verif 1 : l'audit appartient au bon tech
     if audit_id is not None:
-        audit = db.query(Audit).filter(
-            Audit.id == audit_id,
-            Audit.owner_id == current_user_id,
-        ).first()
+        audit = (
+            db.query(Audit)
+            .filter(
+                Audit.id == audit_id,
+                Audit.owner_id == current_user_id,
+            )
+            .first()
+        )
         if audit is None:
             raise HTTPException(status_code=404, detail="Audit introuvable")
 
     # Verif 2 : l'agent appartient au bon tech et est actif
-    agent = db.query(Agent).filter(
-        Agent.agent_uuid == agent_uuid,
-        Agent.user_id == current_user_id,
-        Agent.status == "active",
-    ).first()
+    agent = (
+        db.query(Agent)
+        .filter(
+            Agent.agent_uuid == agent_uuid,
+            Agent.user_id == current_user_id,
+            Agent.status == "active",
+        )
+        .first()
+    )
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent introuvable ou inactif")
 
@@ -57,9 +66,13 @@ def dispatch_task(
 
     # Injection du XML config pour les taches ORADAD
     if tool in ("oradad", "config-oradad") and parameters.get("config_id"):
-        config = db.query(OradadConfig).filter(
-            OradadConfig.id == parameters["config_id"],
-        ).first()
+        config = (
+            db.query(OradadConfig)
+            .filter(
+                OradadConfig.id == parameters["config_id"],
+            )
+            .first()
+        )
         if config is None:
             raise HTTPException(status_code=404, detail="Profil de configuration introuvable")
         parameters = {**parameters, "config_xml": config.to_xml()}
@@ -77,8 +90,5 @@ def dispatch_task(
     db.flush()
     db.refresh(task)
 
-    logger.info(
-        f"Task dispatched: task_uuid={task.task_uuid}, "
-        f"agent={agent_uuid}, tool={tool}, user={current_user_id}"
-    )
+    logger.info(f"Task dispatched: task_uuid={task.task_uuid}, agent={agent_uuid}, tool={tool}, user={current_user_id}")
     return task

@@ -10,6 +10,7 @@ class TestAuditReport:
 
     def test_create_report(self, db_session, auditeur_user):
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="rapport-test", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()
@@ -26,6 +27,7 @@ class TestAuditReport:
 
     def test_report_with_sections(self, db_session, auditeur_user):
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="rapport-sections", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()
@@ -82,6 +84,7 @@ class TestAuditReport:
     def test_cascade_delete_report(self, db_session, auditeur_user):
         """Supprimer un rapport supprime ses sections."""
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="cascade-rpt", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()
@@ -101,6 +104,7 @@ class TestAuditReport:
     def test_section_included_default_true(self, db_session, auditeur_user):
         """Par défaut, toutes les sections sont incluses."""
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="incl-test", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()
@@ -117,6 +121,7 @@ class TestAuditReport:
     def test_section_custom_content(self, db_session, auditeur_user):
         """Une section peut avoir du contenu personnalisé."""
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="custom-content", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()
@@ -126,9 +131,11 @@ class TestAuditReport:
         db_session.flush()
 
         section = ReportSection(
-            report_id=report.id, section_key="introduction",
-            title="Introduction", order=1,
-            custom_content="Merci de nous avoir fait confiance."
+            report_id=report.id,
+            section_key="introduction",
+            title="Introduction",
+            order=1,
+            custom_content="Merci de nous avoir fait confiance.",
         )
         db_session.add(section)
         db_session.flush()

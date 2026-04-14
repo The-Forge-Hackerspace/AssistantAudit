@@ -1,6 +1,7 @@
 """
 Securite : hashing de mots de passe, gestion JWT (user + agent), enrollment.
 """
+
 import hashlib
 import hmac
 import logging
@@ -42,10 +43,7 @@ def create_access_token(
 ) -> str:
     """Crée un access token JWT"""
     now = datetime.now(timezone.utc)
-    expire = now + (
-        expires_delta
-        or timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+    expire = now + (expires_delta or timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode = {
         "sub": str(subject),
         "exp": expire,
@@ -74,9 +72,7 @@ def create_refresh_token(subject: str | int) -> str:
 def decode_token(token: str) -> Optional[dict]:
     """Decode et valide un token JWT"""
     try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         return payload
     except JWTError:
         return None
@@ -94,6 +90,7 @@ def validate_refresh_token(token: str) -> dict:
 
 
 # --- Tokens agent (daemon Windows) ---
+
 
 def create_agent_token(agent_uuid: str, owner_id: int) -> str:
     """
@@ -124,6 +121,7 @@ def verify_agent_token(token: str) -> dict:
 
 # --- Tokens d'enrollment (usage unique, ephemere) ---
 
+
 def create_enrollment_token() -> tuple[str, str, datetime]:
     """
     Genere un code d'enrollment pour un nouvel agent.
@@ -147,6 +145,4 @@ def verify_enrollment_token(code: str, stored_hash: str, expiration: datetime) -
     exp = expiration if expiration.tzinfo else expiration.replace(tzinfo=timezone.utc)
     if now > exp:
         return False
-    return hmac.compare_digest(
-        hashlib.sha256(code.encode()).hexdigest(), stored_hash
-    )
+    return hmac.compare_digest(hashlib.sha256(code.encode()).hexdigest(), stored_hash)

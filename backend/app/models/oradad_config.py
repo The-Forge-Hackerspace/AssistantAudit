@@ -3,6 +3,7 @@ Modele OradadConfig — Profil de configuration pour ORADAD (ANSSI).
 Stocke les parametres du fichier config-oradad.xml.
 Les domaines explicites (avec credentials) sont chiffres via EncryptedText.
 """
+
 import json
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape as xml_escape
@@ -34,9 +35,7 @@ class OradadConfig(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
 
-    owner_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False, index=True
-    )
+    owner_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # Parametres de collecte — auto-detect OFF par defaut (technicien hors domaine)
     auto_get_domain: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -60,12 +59,8 @@ class OradadConfig(Base):
     explicit_domains: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, nullable=False
-    )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), onupdate=_utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=_utcnow)
 
     # Relations
     owner: Mapped["User"] = relationship()  # type: ignore[name-defined]

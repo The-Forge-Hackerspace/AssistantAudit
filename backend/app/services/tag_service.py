@@ -9,12 +9,15 @@ from ..schemas.tag import TagCreate, TagUpdate
 
 
 class TagService:
-
     @staticmethod
     def list_tags(
-        db: Session, user_id: int, is_admin: bool,
-        audit_id: int | None = None, scope: str | None = None,
-        offset: int = 0, limit: int = 50
+        db: Session,
+        user_id: int,
+        is_admin: bool,
+        audit_id: int | None = None,
+        scope: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
     ) -> tuple[list[Tag], int]:
         """Liste les tags visibles par l'utilisateur."""
         query = db.query(Tag)
@@ -25,20 +28,14 @@ class TagService:
         if audit_id:
             # Tags globaux + tags de cet audit (si l'utilisateur y a accès)
             if not is_admin:
-                audit = db.query(Audit).filter(
-                    Audit.id == audit_id, Audit.owner_id == user_id
-                ).first()
+                audit = db.query(Audit).filter(Audit.id == audit_id, Audit.owner_id == user_id).first()
                 if not audit:
                     raise HTTPException(status_code=404, detail="Audit non trouvé")
-            query = query.filter(
-                (Tag.scope == "global") | (Tag.audit_id == audit_id)
-            )
+            query = query.filter((Tag.scope == "global") | (Tag.audit_id == audit_id))
         elif not is_admin:
             # Sans audit_id : tags globaux + tags des audits de l'utilisateur
             user_audit_ids = db.query(Audit.id).filter(Audit.owner_id == user_id).scalar_subquery()
-            query = query.filter(
-                (Tag.scope == "global") | (Tag.audit_id.in_(user_audit_ids))
-            )
+            query = query.filter((Tag.scope == "global") | (Tag.audit_id.in_(user_audit_ids)))
 
         total = query.count()
         tags = query.order_by(Tag.name).offset(offset).limit(limit).all()
@@ -52,9 +49,7 @@ class TagService:
             raise HTTPException(status_code=404, detail="Tag non trouvé")
         # Vérifier l'accès pour les tags d'audit
         if tag.scope == "audit" and not is_admin:
-            audit = db.query(Audit).filter(
-                Audit.id == tag.audit_id, Audit.owner_id == user_id
-            ).first()
+            audit = db.query(Audit).filter(Audit.id == tag.audit_id, Audit.owner_id == user_id).first()
             if not audit:
                 raise HTTPException(status_code=404, detail="Tag non trouvé")
         return tag
@@ -64,18 +59,20 @@ class TagService:
         """Crée un tag. Vérifie l'accès à l'audit si scope='audit'."""
         # RBAC : vérifier que l'utilisateur a accès à l'audit référencé
         if data.scope == "audit" and data.audit_id is not None and not is_admin:
-            audit = db.query(Audit).filter(
-                Audit.id == data.audit_id, Audit.owner_id == user_id
-            ).first()
+            audit = db.query(Audit).filter(Audit.id == data.audit_id, Audit.owner_id == user_id).first()
             if not audit:
                 raise HTTPException(status_code=404, detail="Audit non trouvé")
 
         # Vérifier unicité
-        existing = db.query(Tag).filter(
-            Tag.name == data.name,
-            Tag.scope == data.scope,
-            Tag.audit_id == data.audit_id,
-        ).first()
+        existing = (
+            db.query(Tag)
+            .filter(
+                Tag.name == data.name,
+                Tag.scope == data.scope,
+                Tag.audit_id == data.audit_id,
+            )
+            .first()
+        )
         if existing:
             raise HTTPException(status_code=409, detail="Tag déjà existant")
 
@@ -113,19 +110,22 @@ class TagService:
 
     @staticmethod
     def associate_tag(
-        db: Session, tag_id: int, taggable_type: str, taggable_id: int,
-        user_id: int, is_admin: bool
+        db: Session, tag_id: int, taggable_type: str, taggable_id: int, user_id: int, is_admin: bool
     ) -> TagAssociation:
         """Associe un tag à une entité."""
         # Vérifier que le tag existe et est accessible
         TagService.get_tag(db, tag_id, user_id, is_admin)
 
         # Vérifier qu'il n'y a pas déjà cette association
-        existing = db.query(TagAssociation).filter(
-            TagAssociation.tag_id == tag_id,
-            TagAssociation.taggable_type == taggable_type,
-            TagAssociation.taggable_id == taggable_id,
-        ).first()
+        existing = (
+            db.query(TagAssociation)
+            .filter(
+                TagAssociation.tag_id == tag_id,
+                TagAssociation.taggable_type == taggable_type,
+                TagAssociation.taggable_id == taggable_id,
+            )
+            .first()
+        )
         if existing:
             return existing  # Idempotent
 
@@ -141,16 +141,19 @@ class TagService:
 
     @staticmethod
     def dissociate_tag(
-        db: Session, tag_id: int, taggable_type: str, taggable_id: int,
-        user_id: int, is_admin: bool
+        db: Session, tag_id: int, taggable_type: str, taggable_id: int, user_id: int, is_admin: bool
     ) -> bool:
         """Retire un tag d'une entité."""
         TagService.get_tag(db, tag_id, user_id, is_admin)
-        assoc = db.query(TagAssociation).filter(
-            TagAssociation.tag_id == tag_id,
-            TagAssociation.taggable_type == taggable_type,
-            TagAssociation.taggable_id == taggable_id,
-        ).first()
+        assoc = (
+            db.query(TagAssociation)
+            .filter(
+                TagAssociation.tag_id == tag_id,
+                TagAssociation.taggable_type == taggable_type,
+                TagAssociation.taggable_id == taggable_id,
+            )
+            .first()
+        )
         if assoc:
             db.delete(assoc)
             db.flush()
@@ -158,9 +161,7 @@ class TagService:
         return False
 
     @staticmethod
-    def get_tags_for_entity(
-        db: Session, taggable_type: str, taggable_id: int
-    ) -> list[Tag]:
+    def get_tags_for_entity(db: Session, taggable_type: str, taggable_id: int) -> list[Tag]:
         """Récupère tous les tags d'une entité."""
         return (
             db.query(Tag)

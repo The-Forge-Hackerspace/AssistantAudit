@@ -3,6 +3,7 @@ Configuration de la base de donnees SQLAlchemy.
 Supporte PostgreSQL (psycopg2) et SQLite (dev/tests).
 Fournit le moteur, la session factory et le modele de base.
 """
+
 from pathlib import Path
 
 from sqlalchemy import create_engine, event
@@ -13,6 +14,7 @@ from .config import get_settings
 
 class Base(DeclarativeBase):
     """Classe de base pour tous les modeles SQLAlchemy"""
+
     pass
 
 
@@ -51,6 +53,7 @@ def _get_engine():
 
     # Activer les cles etrangeres pour SQLite
     if is_sqlite:
+
         @event.listens_for(engine, "connect")
         def _set_sqlite_pragma(dbapi_conn, connection_record):
             cursor = dbapi_conn.cursor()

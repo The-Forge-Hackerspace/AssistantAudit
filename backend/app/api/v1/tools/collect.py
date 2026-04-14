@@ -82,7 +82,8 @@ def list_collects(
         equipement_id=equipement_id,
         skip=(page - 1) * page_size,
         limit=page_size,
-        user_id=uid, is_admin=adm,
+        user_id=uid,
+        is_admin=adm,
     )
 
 

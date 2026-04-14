@@ -1,6 +1,7 @@
 """
 Routes API pour ORADAD — configuration, analyse et rapports ANSSI.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional
@@ -113,7 +114,9 @@ def list_configs(
 ) -> list[OradadConfigResponse]:
     """Liste les profils de configuration ORADAD du user."""
     configs = OradadConfigService.list_configs(
-        db, owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return [_config_to_response(c) for c in configs]
 
@@ -138,8 +141,11 @@ def update_config(
 ) -> OradadConfigResponse:
     """Met a jour un profil de configuration ORADAD."""
     config = OradadConfigService.update_config(
-        db, config_id, body,
-        owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        config_id,
+        body,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return _config_to_response(config)
 
@@ -152,7 +158,10 @@ def delete_config(
 ):
     """Supprime un profil de configuration ORADAD."""
     OradadConfigService.delete_config(
-        db, config_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        config_id,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return {"detail": "Profil supprime"}
 
@@ -165,7 +174,10 @@ def generate_config_xml(
 ):
     """Genere le XML config-oradad.xml depuis un profil."""
     config = OradadConfigService.get_config(
-        db, config_id, owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        config_id,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return {"xml": config.to_xml()}
 
@@ -184,7 +196,10 @@ def analyze_oradad(
     Retourne le rapport ANSSI (findings + score).
     """
     task = OradadConfigService.get_task(
-        db, task_uuid, owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        task_uuid,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
     return OradadConfigService.analyze(db, task)
 
@@ -197,7 +212,10 @@ def get_oradad_report(
 ):
     """Retourne le rapport ANSSI d'une tache ORADAD deja analysee."""
     task = OradadConfigService.get_task(
-        db, task_uuid, owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        task_uuid,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
 
     if not task.result_summary or "anssi_report" not in task.result_summary:
@@ -216,7 +234,9 @@ def list_oradad_tasks(
 ):
     """Liste les taches ORADAD."""
     tasks = OradadConfigService.list_tasks(
-        db, owner_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        owner_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
 
     return [
@@ -228,9 +248,7 @@ def list_oradad_tasks(
             "progress": t.progress,
             "created_at": t.created_at.isoformat() if t.created_at else None,
             "completed_at": t.completed_at.isoformat() if t.completed_at else None,
-            "has_report": bool(
-                t.result_summary and "anssi_report" in t.result_summary
-            ),
+            "has_report": bool(t.result_summary and "anssi_report" in t.result_summary),
         }
         for t in tasks
     ]

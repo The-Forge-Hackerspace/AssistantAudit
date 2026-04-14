@@ -11,6 +11,7 @@ class TestReportService:
 
     def test_create_report_with_25_sections(self, db_session, auditeur_user):
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="template-test", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()
@@ -27,6 +28,7 @@ class TestReportService:
 
     def test_render_html_contains_cover(self, db_session, auditeur_user):
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="rendu-html-test", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()
@@ -43,6 +45,7 @@ class TestReportService:
 
     def test_render_html_contains_sections(self, db_session, auditeur_user):
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="sections-html", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()
@@ -59,6 +62,7 @@ class TestReportService:
 
     def test_other_user_cannot_create_report(self, db_session, auditeur_user, second_auditeur_user):
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="isolation-rpt", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()
@@ -75,6 +79,7 @@ class TestReportService:
     def test_excluded_section_not_in_html(self, db_session, auditeur_user):
         """Une section exclue n'apparaît pas dans le HTML."""
         from app.models.audit import Audit
+
         audit = Audit(nom_projet="exclude-test", entreprise_id=1, owner_id=auditeur_user.id)
         db_session.add(audit)
         db_session.flush()

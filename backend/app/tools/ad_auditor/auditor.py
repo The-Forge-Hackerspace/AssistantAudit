@@ -5,6 +5,7 @@ Se connecte à un contrôleur de domaine, collecte les informations
 critiques (comptes, groupes, GPO, réplication, politique de MdP…)
 et évalue la conformité par rapport au référentiel AD.
 """
+
 import logging
 import re
 from dataclasses import dataclass, field
@@ -41,6 +42,7 @@ def _filetime_to_datetime(ft: int) -> Optional[datetime]:
 @dataclass
 class ADAuditFinding:
     """Un constat d'audit AD individuel."""
+
     control_ref: str
     title: str
     description: str
@@ -55,6 +57,7 @@ class ADAuditFinding:
 @dataclass
 class ADAuditResult:
     """Résultat complet d'un audit AD."""
+
     success: bool = False
     error: Optional[str] = None
 
@@ -232,15 +235,20 @@ class ADAuditor:
             return
         info = self._conn.server.info
         if info.other:
-            result.domain_dn = (info.other.get("defaultNamingContext", [""])[0])
-            result.forest_name = (info.other.get("rootDomainNamingContext", [""])[0])
+            result.domain_dn = info.other.get("defaultNamingContext", [""])[0]
+            result.forest_name = info.other.get("rootDomainNamingContext", [""])[0]
             fl = info.other.get("domainFunctionality", [""])[0]
             ffl = info.other.get("forestFunctionality", [""])[0]
 
             level_map = {
-                "0": "2000", "1": "2003 Interim", "2": "2003",
-                "3": "2008", "4": "2008 R2", "5": "2012",
-                "6": "2012 R2", "7": "2016",
+                "0": "2000",
+                "1": "2003 Interim",
+                "2": "2003",
+                "3": "2008",
+                "4": "2008 R2",
+                "5": "2012",
+                "6": "2012 R2",
+                "7": "2016",
             }
             result.domain_functional_level = level_map.get(fl, fl)
             result.forest_functional_level = level_map.get(ffl, ffl)
@@ -250,17 +258,27 @@ class ADAuditor:
     def _collect_domain_controllers(self, result: ADAuditResult) -> None:
         """Liste les contrôleurs de domaine."""
         ou_dc = f"OU=Domain Controllers,{self._base_dn}"
-        entries = self._search(ou_dc, "(objectClass=computer)", [
-            "cn", "dNSHostName", "operatingSystem", "operatingSystemVersion",
-            "whenCreated", "whenChanged",
-        ])
+        entries = self._search(
+            ou_dc,
+            "(objectClass=computer)",
+            [
+                "cn",
+                "dNSHostName",
+                "operatingSystem",
+                "operatingSystemVersion",
+                "whenCreated",
+                "whenChanged",
+            ],
+        )
         for e in entries:
-            result.dc_list.append({
-                "name": e.get("cn", ""),
-                "dns_hostname": e.get("dNSHostName", ""),
-                "os": e.get("operatingSystem", ""),
-                "os_version": e.get("operatingSystemVersion", ""),
-            })
+            result.dc_list.append(
+                {
+                    "name": e.get("cn", ""),
+                    "dns_hostname": e.get("dNSHostName", ""),
+                    "os": e.get("operatingSystem", ""),
+                    "os_version": e.get("operatingSystemVersion", ""),
+                }
+            )
 
     def _collect_users(self, result: ADAuditResult) -> None:
         """Collecte les informations sur les comptes utilisateurs."""
@@ -268,11 +286,20 @@ class ADAuditor:
         ninety_days_ago = now - timedelta(days=90)
 
         # Tous les utilisateurs
-        entries = self._search(self._base_dn, "(&(objectClass=user)(objectCategory=person))", [
-            "sAMAccountName", "displayName", "userAccountControl",
-            "lastLogonTimestamp", "pwdLastSet", "whenCreated",
-            "memberOf", "adminCount",
-        ])
+        entries = self._search(
+            self._base_dn,
+            "(&(objectClass=user)(objectCategory=person))",
+            [
+                "sAMAccountName",
+                "displayName",
+                "userAccountControl",
+                "lastLogonTimestamp",
+                "pwdLastSet",
+                "whenCreated",
+                "memberOf",
+                "adminCount",
+            ],
+        )
 
         for e in entries:
             uac = int(e.get("userAccountControl", "0") or "0")
@@ -288,10 +315,12 @@ class ADAuditor:
 
             # Mots de passe qui n'expirent jamais
             if pwd_never_expires and not is_disabled:
-                result.never_expire_password.append({
-                    "username": sam,
-                    "display_name": e.get("displayName", ""),
-                })
+                result.never_expire_password.append(
+                    {
+                        "username": sam,
+                        "display_name": e.get("displayName", ""),
+                    }
+                )
 
             # Utilisateurs jamais connectés
             last_logon_raw = e.get("lastLogonTimestamp")
@@ -301,25 +330,36 @@ class ADAuditor:
                 last_logon = None
 
             if not last_logon and not is_disabled:
-                result.never_logged_in.append({
-                    "username": sam,
-                    "display_name": e.get("displayName", ""),
-                    "created": e.get("whenCreated", ""),
-                })
+                result.never_logged_in.append(
+                    {
+                        "username": sam,
+                        "display_name": e.get("displayName", ""),
+                        "created": e.get("whenCreated", ""),
+                    }
+                )
 
             # Utilisateurs inactifs (> 90 jours)
             if last_logon and last_logon < ninety_days_ago and not is_disabled:
-                result.inactive_users.append({
-                    "username": sam,
-                    "display_name": e.get("displayName", ""),
-                    "last_logon": last_logon.isoformat(),
-                    "days_inactive": (now - last_logon).days,
-                })
+                result.inactive_users.append(
+                    {
+                        "username": sam,
+                        "display_name": e.get("displayName", ""),
+                        "last_logon": last_logon.isoformat(),
+                        "days_inactive": (now - last_logon).days,
+                    }
+                )
 
         # Compte Administrator intégré (RID 500)
-        admin_entries = self._search(self._base_dn, "(&(objectClass=user)(objectSid=*-500))", [
-            "sAMAccountName", "userAccountControl", "pwdLastSet", "lastLogonTimestamp",
-        ])
+        admin_entries = self._search(
+            self._base_dn,
+            "(&(objectClass=user)(objectSid=*-500))",
+            [
+                "sAMAccountName",
+                "userAccountControl",
+                "pwdLastSet",
+                "lastLogonTimestamp",
+            ],
+        )
         if admin_entries:
             adm = admin_entries[0]
             uac = int(adm.get("userAccountControl", "0") or "0")
@@ -337,9 +377,13 @@ class ADAuditor:
             "Schema Admins": result.schema_admins,
         }
         for group_name, target_list in groups.items():
-            entries = self._search(self._base_dn, f"(&(objectClass=group)(cn={group_name}))", [
-                "member",
-            ])
+            entries = self._search(
+                self._base_dn,
+                f"(&(objectClass=group)(cn={group_name}))",
+                [
+                    "member",
+                ],
+            )
             if entries and entries[0].get("member"):
                 members = entries[0]["member"]
                 if isinstance(members, str):
@@ -357,22 +401,34 @@ class ADAuditor:
                     )
                     sam = member_info[0].get("sAMAccountName", cn) if member_info else cn
                     uac = int(member_info[0].get("userAccountControl", "0") or "0") if member_info else 0
-                    target_list.append({
-                        "name": cn,
-                        "username": sam,
-                        "is_enabled": not bool(uac & 0x2),
-                    })
+                    target_list.append(
+                        {
+                            "name": cn,
+                            "username": sam,
+                            "is_enabled": not bool(uac & 0x2),
+                        }
+                    )
 
     def _collect_password_policy(self, result: ADAuditResult) -> None:
         """Collecte la politique de mot de passe du domaine."""
-        entries = self._search(self._base_dn, "(objectClass=domainDNS)", [
-            "minPwdLength", "minPwdAge", "maxPwdAge",
-            "pwdHistoryLength", "lockoutThreshold",
-            "lockoutDuration", "lockoutObservationWindow",
-            "pwdProperties",
-        ], size_limit=1)
+        entries = self._search(
+            self._base_dn,
+            "(objectClass=domainDNS)",
+            [
+                "minPwdLength",
+                "minPwdAge",
+                "maxPwdAge",
+                "pwdHistoryLength",
+                "lockoutThreshold",
+                "lockoutDuration",
+                "lockoutObservationWindow",
+                "pwdProperties",
+            ],
+            size_limit=1,
+        )
         if entries:
             pol = entries[0]
+
             # Convertir les durées (valeurs négatives en 100ns ticks)
             def ticks_to_days(val: str) -> float:
                 try:
@@ -402,39 +458,59 @@ class ADAuditor:
 
         # Fine-Grained Password Policies (PSO)
         pso_base = f"CN=Password Settings Container,CN=System,{self._base_dn}"
-        pso_entries = self._search(pso_base, "(objectClass=msDS-PasswordSettings)", [
-            "cn", "msDS-MinimumPasswordLength", "msDS-MaximumPasswordAge",
-            "msDS-PasswordComplexityEnabled", "msDS-LockoutThreshold",
-            "msDS-PSOAppliesTo", "msDS-PasswordSettingsPrecedence",
-        ])
+        pso_entries = self._search(
+            pso_base,
+            "(objectClass=msDS-PasswordSettings)",
+            [
+                "cn",
+                "msDS-MinimumPasswordLength",
+                "msDS-MaximumPasswordAge",
+                "msDS-PasswordComplexityEnabled",
+                "msDS-LockoutThreshold",
+                "msDS-PSOAppliesTo",
+                "msDS-PasswordSettingsPrecedence",
+            ],
+        )
         for pso in pso_entries:
-            result.fine_grained_policies.append({
-                "name": pso.get("cn", ""),
-                "min_length": pso.get("msDS-MinimumPasswordLength", ""),
-                "complexity": pso.get("msDS-PasswordComplexityEnabled", ""),
-                "lockout_threshold": pso.get("msDS-LockoutThreshold", ""),
-                "precedence": pso.get("msDS-PasswordSettingsPrecedence", ""),
-                "applies_to_count": len(pso.get("msDS-PSOAppliesTo", []) or []),
-            })
+            result.fine_grained_policies.append(
+                {
+                    "name": pso.get("cn", ""),
+                    "min_length": pso.get("msDS-MinimumPasswordLength", ""),
+                    "complexity": pso.get("msDS-PasswordComplexityEnabled", ""),
+                    "lockout_threshold": pso.get("msDS-LockoutThreshold", ""),
+                    "precedence": pso.get("msDS-PasswordSettingsPrecedence", ""),
+                    "applies_to_count": len(pso.get("msDS-PSOAppliesTo", []) or []),
+                }
+            )
 
     def _collect_gpo(self, result: ADAuditResult) -> None:
         """Liste les GPO du domaine."""
         gpo_base = f"CN=Policies,CN=System,{self._base_dn}"
-        entries = self._search(gpo_base, "(objectClass=groupPolicyContainer)", [
-            "displayName", "cn", "gPCFileSysPath", "whenCreated", "whenChanged",
-            "flags",
-        ])
+        entries = self._search(
+            gpo_base,
+            "(objectClass=groupPolicyContainer)",
+            [
+                "displayName",
+                "cn",
+                "gPCFileSysPath",
+                "whenCreated",
+                "whenChanged",
+                "flags",
+            ],
+        )
         for e in entries:
             flags = int(e.get("flags", "0") or "0")
-            result.gpo_list.append({
-                "name": e.get("displayName", ""),
-                "guid": e.get("cn", ""),
-                "path": e.get("gPCFileSysPath", ""),
-                "created": e.get("whenCreated", ""),
-                "modified": e.get("whenChanged", ""),
-                "user_disabled": bool(flags & 1),
-                "computer_disabled": bool(flags & 2),
-            })
+            result.gpo_list.append(
+                {
+                    "name": e.get("displayName", ""),
+                    "guid": e.get("cn", ""),
+                    "path": e.get("gPCFileSysPath", ""),
+                    "created": e.get("whenCreated", ""),
+                    "modified": e.get("whenChanged", ""),
+                    "user_disabled": bool(flags & 1),
+                    "computer_disabled": bool(flags & 2),
+                }
+            )
 
     def _collect_laps(self, result: ADAuditResult) -> None:
         """Vérifie si LAPS est déployé (attribut ms-Mcs-AdmPwd dans le schéma)."""
@@ -474,60 +550,84 @@ class ADAuditor:
         # AD-001 : Niveau fonctionnel
         fl = result.domain_functional_level
         if fl in ("2016", "2019", "2022"):
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-001", title="Niveau fonctionnel forêt/domaine",
-                category="Architecture & Design", severity="medium",
-                status="compliant",
-                evidence=f"Niveau fonctionnel domaine : {fl}",
-                remediation="",
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-001",
+                    title="Niveau fonctionnel forêt/domaine",
+                    category="Architecture & Design",
+                    severity="medium",
+                    status="compliant",
+                    evidence=f"Niveau fonctionnel domaine : {fl}",
+                    remediation="",
+                )
+            )
         else:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-001", title="Niveau fonctionnel forêt/domaine",
-                category="Architecture & Design", severity="medium",
-                status="non_compliant",
-                evidence=f"Niveau fonctionnel domaine : {fl} (obsolète)",
-                remediation="Élever le niveau fonctionnel après vérification de compatibilité.",
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-001",
+                    title="Niveau fonctionnel forêt/domaine",
+                    category="Architecture & Design",
+                    severity="medium",
+                    status="non_compliant",
+                    evidence=f"Niveau fonctionnel domaine : {fl} (obsolète)",
+                    remediation="Élever le niveau fonctionnel après vérification de compatibilité.",
+                )
+            )
 
         # AD-002 : Nombre de DC
         dc_count = len(result.dc_list)
         if dc_count >= 2:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-002", title="Nombre de contrôleurs de domaine",
-                category="Architecture & Design", severity="high",
-                status="compliant",
-                evidence=f"{dc_count} DC détectés.",
-                details={"dc_list": [dc["name"] for dc in result.dc_list]},
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-002",
+                    title="Nombre de contrôleurs de domaine",
+                    category="Architecture & Design",
+                    severity="high",
+                    status="compliant",
+                    evidence=f"{dc_count} DC détectés.",
+                    details={"dc_list": [dc["name"] for dc in result.dc_list]},
+                )
+            )
         else:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-002", title="Nombre de contrôleurs de domaine",
-                category="Architecture & Design", severity="high",
-                status="non_compliant",
-                evidence=f"Seulement {dc_count} DC détecté(s). Redondance insuffisante.",
-                remediation="Déployer un second DC pour la haute disponibilité.",
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-002",
+                    title="Nombre de contrôleurs de domaine",
+                    category="Architecture & Design",
+                    severity="high",
+                    status="non_compliant",
+                    evidence=f"Seulement {dc_count} DC détecté(s). Redondance insuffisante.",
+                    remediation="Déployer un second DC pour la haute disponibilité.",
+                )
+            )
 
         # AD-010 : Nombre de Domain Admins (≤ 5)
         da_count = len(result.domain_admins)
         if da_count <= 5:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-010", title="Nombre de Domain Admins",
-                category="Comptes Privilégiés", severity="critical",
-                status="compliant",
-                evidence=f"{da_count} membre(s) dans Domain Admins.",
-                details={"members": [m["username"] for m in result.domain_admins]},
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-010",
+                    title="Nombre de Domain Admins",
+                    category="Comptes Privilégiés",
+                    severity="critical",
+                    status="compliant",
+                    evidence=f"{da_count} membre(s) dans Domain Admins.",
+                    details={"members": [m["username"] for m in result.domain_admins]},
+                )
+            )
         else:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-010", title="Nombre de Domain Admins",
-                category="Comptes Privilégiés", severity="critical",
-                status="non_compliant",
-                evidence=f"{da_count} membres dans Domain Admins (> 5). Risque élevé.",
-                remediation="Réduire les Domain Admins au strict nécessaire.",
-                details={"members": [m["username"] for m in result.domain_admins]},
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-010",
+                    title="Nombre de Domain Admins",
+                    category="Comptes Privilégiés",
+                    severity="critical",
+                    status="non_compliant",
+                    evidence=f"{da_count} membres dans Domain Admins (> 5). Risque élevé.",
+                    remediation="Réduire les Domain Admins au strict nécessaire.",
+                    details={"members": [m["username"] for m in result.domain_admins]},
+                )
+            )
 
         # AD-012 : Compte Administrator intégré protégé
         admin = result.admin_account_status
@@ -539,37 +639,54 @@ class ADAuditor:
             else:
                 status = "non_compliant"
                 ev = "Le compte Administrator intégré est actif et non renommé."
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-012", title="Compte Administrateur intégré protégé",
-                category="Comptes Privilégiés", severity="critical",
-                status=status, evidence=ev,
-                remediation="Désactiver ou renommer le compte Administrator intégré.",
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-012",
+                    title="Compte Administrateur intégré protégé",
+                    category="Comptes Privilégiés",
+                    severity="critical",
+                    status=status,
+                    evidence=ev,
+                    remediation="Désactiver ou renommer le compte Administrator intégré.",
+                )
+            )
 
         # AD-013 : LAPS déployé
         if result.laps_deployed:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-013", title="LAPS déployé",
-                category="Comptes Privilégiés", severity="high",
-                status="compliant",
-                evidence="LAPS est déployé et actif sur au moins une machine.",
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-013",
+                    title="LAPS déployé",
+                    category="Comptes Privilégiés",
+                    severity="high",
+                    status="compliant",
+                    evidence="LAPS est déployé et actif sur au moins une machine.",
+                )
+            )
         elif result.laps_schema_present:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-013", title="LAPS déployé",
-                category="Comptes Privilégiés", severity="high",
-                status="partial",
-                evidence="Le schéma LAPS est présent mais aucune machine n'a de mot de passe LAPS.",
-                remediation="Déployer LAPS via GPO sur les postes et serveurs.",
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-013",
+                    title="LAPS déployé",
+                    category="Comptes Privilégiés",
+                    severity="high",
+                    status="partial",
+                    evidence="Le schéma LAPS est présent mais aucune machine n'a de mot de passe LAPS.",
+                    remediation="Déployer LAPS via GPO sur les postes et serveurs.",
+                )
+            )
         else:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-013", title="LAPS déployé",
-                category="Comptes Privilégiés", severity="high",
-                status="non_compliant",
-                evidence="LAPS n'est pas déployé (schéma absent).",
-                remediation="Installer et configurer LAPS pour la gestion des mots de passe locaux.",
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-013",
+                    title="LAPS déployé",
+                    category="Comptes Privilégiés",
+                    severity="high",
+                    status="non_compliant",
+                    evidence="LAPS n'est pas déployé (schéma absent).",
+                    remediation="Installer et configurer LAPS pour la gestion des mots de passe locaux.",
+                )
+            )
 
         # AD-020 : Politique de mot de passe
         pol = result.password_policy
@@ -585,78 +702,111 @@ class ADAuditor:
             else:
                 status = "non_compliant"
                 ev = f"Politique insuffisante : {min_len} caractères, complexité={'oui' if complexity else 'non'}."
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-020", title="Politique de mot de passe domaine",
-                category="Politique de Mots de Passe", severity="high",
-                status=status, evidence=ev,
-                remediation="Configurer la politique pour imposer au moins 12 caractères avec complexité.",
-                details=pol,
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-020",
+                    title="Politique de mot de passe domaine",
+                    category="Politique de Mots de Passe",
+                    severity="high",
+                    status=status,
+                    evidence=ev,
+                    remediation="Configurer la politique pour imposer au moins 12 caractères avec complexité.",
+                    details=pol,
+                )
+            )
 
         # AD-021 : Fine-Grained Password Policies
         if result.fine_grained_policies:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-021", title="Fine-Grained Password Policies",
-                category="Politique de Mots de Passe", severity="medium",
-                status="compliant",
-                evidence=f"{len(result.fine_grained_policies)} PSO configurée(s).",
-                details={"policies": [p["name"] for p in result.fine_grained_policies]},
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-021",
+                    title="Fine-Grained Password Policies",
+                    category="Politique de Mots de Passe",
+                    severity="medium",
+                    status="compliant",
+                    evidence=f"{len(result.fine_grained_policies)} PSO configurée(s).",
+                    details={"policies": [p["name"] for p in result.fine_grained_policies]},
+                )
+            )
         else:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-021", title="Fine-Grained Password Policies",
-                category="Politique de Mots de Passe", severity="medium",
-                status="non_compliant",
-                evidence="Aucune PSO (Fine-Grained Password Policy) configurée.",
-                remediation="Créer des PSO renforcées pour les comptes privilégiés.",
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-021",
+                    title="Fine-Grained Password Policies",
+                    category="Politique de Mots de Passe",
+                    severity="medium",
+                    status="non_compliant",
+                    evidence="Aucune PSO (Fine-Grained Password Policy) configurée.",
+                    remediation="Créer des PSO renforcées pour les comptes privilégiés.",
+                )
+            )
 
         # AD-022 : Mots de passe qui n'expirent jamais
         nep_count = len(result.never_expire_password)
         if nep_count == 0:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-022", title="Mots de passe qui n'expirent jamais",
-                category="Politique de Mots de Passe", severity="high",
-                status="compliant",
-                evidence="Aucun compte actif n'a le flag 'password never expires'.",
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-022",
+                    title="Mots de passe qui n'expirent jamais",
+                    category="Politique de Mots de Passe",
+                    severity="high",
+                    status="compliant",
+                    evidence="Aucun compte actif n'a le flag 'password never expires'.",
+                )
+            )
         else:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-022", title="Mots de passe qui n'expirent jamais",
-                category="Politique de Mots de Passe", severity="high",
-                status="non_compliant",
-                evidence=f"{nep_count} compte(s) actif(s) avec mot de passe qui n'expire jamais.",
-                remediation="Corriger ces comptes sauf justification documentée.",
-                details={"accounts": [u["username"] for u in result.never_expire_password[:20]]},
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-022",
+                    title="Mots de passe qui n'expirent jamais",
+                    category="Politique de Mots de Passe",
+                    severity="high",
+                    status="non_compliant",
+                    evidence=f"{nep_count} compte(s) actif(s) avec mot de passe qui n'expire jamais.",
+                    remediation="Corriger ces comptes sauf justification documentée.",
+                    details={"accounts": [u["username"] for u in result.never_expire_password[:20]]},
+                )
+            )
 
         # AD-040 : Réplication (basée sur le nombre de DC)
         if dc_count >= 2:
-            result.findings.append(ADAuditFinding(
-                control_ref="AD-040", title="Réplication fonctionnelle",
-                category="Réplication & Santé", severity="critical",
-                status="info",
-                evidence=f"{dc_count} DC détectés. Vérifier manuellement la réplication (repadmin /showrepl).",
-                remediation="Exécuter 'repadmin /showrepl' pour vérifier la réplication.",
-            ))
+            result.findings.append(
+                ADAuditFinding(
+                    control_ref="AD-040",
+                    title="Réplication fonctionnelle",
+                    category="Réplication & Santé",
+                    severity="critical",
+                    status="info",
+                    evidence=f"{dc_count} DC détectés. Vérifier manuellement la réplication (repadmin /showrepl).",
+                    remediation="Exécuter 'repadmin /showrepl' pour vérifier la réplication.",
+                )
+            )
 
         # AD-041 : DNS intégré
-        result.findings.append(ADAuditFinding(
-            control_ref="AD-041", title="DNS intégré fonctionnel",
-            category="Réplication & Santé", severity="critical",
-            status="info",
-            evidence="La vérification DNS nécessite un test réseau dédié.",
-            remediation="Vérifier la résolution DNS sur tous les DC.",
-        ))
+        result.findings.append(
+            ADAuditFinding(
+                control_ref="AD-041",
+                title="DNS intégré fonctionnel",
+                category="Réplication & Santé",
+                severity="critical",
+                status="info",
+                evidence="La vérification DNS nécessite un test réseau dédié.",
+                remediation="Vérifier la résolution DNS sur tous les DC.",
+            )
+        )
 
         # AD-050 : Audit des événements (info — nécessite GPO review)
-        result.findings.append(ADAuditFinding(
-            control_ref="AD-050", title="Audit des événements AD",
-            category="Audit & Journalisation", severity="high",
-            status="info",
-            evidence="L'audit avancé doit être vérifié via les GPO sur les DC.",
-            remediation="Configurer la stratégie d'audit avancée via GPO.",
-        ))
+        result.findings.append(
+            ADAuditFinding(
+                control_ref="AD-050",
+                title="Audit des événements AD",
+                category="Audit & Journalisation",
+                severity="high",
+                status="info",
+                evidence="L'audit avancé doit être vérifié via les GPO sur les DC.",
+                remediation="Configurer la stratégie d'audit avancée via GPO.",
+            )
+        )
 
         # Résumé
         compliant = sum(1 for f in result.findings if f.status == "compliant")

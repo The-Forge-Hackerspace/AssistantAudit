@@ -5,6 +5,7 @@ Usage:
     python reset_admin_password.py
     python reset_admin_password.py --username admin --password "NewStrongPass@2026"
 """
+
 import argparse
 import io
 import sys

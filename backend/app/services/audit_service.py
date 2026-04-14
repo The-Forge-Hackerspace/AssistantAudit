@@ -1,6 +1,7 @@
 """
 Service Audit : CRUD pour les projets d'audit.
 """
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -12,7 +13,6 @@ from ..schemas.audit import AuditCreate, AuditUpdate
 
 
 class AuditService:
-
     @staticmethod
     def list_audits(
         db: Session,
@@ -72,7 +72,10 @@ class AuditService:
 
     @staticmethod
     def update_audit(
-        db: Session, audit_id: int, data: AuditUpdate, owner_id: int | None = None,
+        db: Session,
+        audit_id: int,
+        data: AuditUpdate,
+        owner_id: int | None = None,
     ) -> Audit:
         """Met a jour un audit existant."""
         audit = get_or_404(db, Audit, audit_id)

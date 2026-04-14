@@ -266,23 +266,25 @@ export default function AgentsPage() {
   // ── WebSocket for real-time status ──
   useEffect(() => {
     if (!hasAccess) return;
-    const token = getAccessToken();
-    if (!token) return;
 
     const connect = () => {
+      const token = getAccessToken();
+      if (!token) return;
       const ws = new WebSocket(`${WS_BASE}/api/v1/ws/user?token=${token}`);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === "agent_status") {
+          if (msg.type === "agent_status" && msg.data) {
             const { agent_uuid, status } = msg.data;
-            setAgents((prev) =>
-              prev.map((a) =>
-                a.agent_uuid === agent_uuid ? { ...a, status } : a
-              )
-            );
+            if (agent_uuid && status) {
+              setAgents((prev) =>
+                prev.map((a) =>
+                  a.agent_uuid === agent_uuid ? { ...a, status } : a
+                )
+              );
+            }
           }
         } catch {
           // ignore non-JSON messages
@@ -379,14 +381,17 @@ export default function AgentsPage() {
   };
 
   // ── Revoke agent ──
-  const handleRevoke = async () => {
+  const handleRevoke = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
     if (!revokeTarget) return;
+    const targetUuid = revokeTarget.agent_uuid;
     setRevoking(true);
     try {
-      await agentsApi.revoke(revokeTarget.agent_uuid);
+      await agentsApi.revoke(targetUuid);
       await fetchAgents();
       toast.success("Agent révoqué");
-    } catch {
+    } catch (err) {
+      console.error("Revoke failed:", err);
       toast.error("Erreur lors de la révocation");
     } finally {
       setRevoking(false);
@@ -881,9 +886,12 @@ export default function AgentsPage() {
               onClick={handleRevoke}
               disabled={revoking}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              asChild
             >
-              {revoking && <Loader2 data-icon="inline-start" className="animate-spin" />}
-              Révoquer
+              <button type="button">
+                {revoking && <Loader2 data-icon="inline-start" className="animate-spin" />}
+                Révoquer
+              </button>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

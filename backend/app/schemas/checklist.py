@@ -37,6 +37,7 @@ class ChecklistTemplateRead(BaseModel):
 
 class ChecklistTemplateList(BaseModel):
     """Version allégée sans sections/items pour les listes."""
+
     id: int
     name: str
     description: Optional[str] = None
@@ -84,5 +85,6 @@ class ChecklistResponseRead(BaseModel):
 
 class ChecklistInstanceDetail(ChecklistInstanceRead):
     """Instance avec toutes les réponses."""
+
     responses: list[ChecklistResponseRead] = []
     template_name: str = ""

@@ -6,6 +6,7 @@ Utilise les fixtures de conftest.py (DB in-memory, isolation par test).
 
 # --- Health ---
 
+
 def test_health(client):
     response = client.get("/api/v1/health")
     assert response.status_code == 200
@@ -13,6 +14,7 @@ def test_health(client):
 
 
 # --- Auth ---
+
 
 def test_login_success(client, admin_user):
     response = client.post(
@@ -54,6 +56,7 @@ def test_get_me(client, admin_headers, admin_user):
 
 # --- Entreprises ---
 
+
 def test_create_entreprise(client, admin_headers):
     response = client.post(
         "/api/v1/entreprises",
@@ -61,9 +64,7 @@ def test_create_entreprise(client, admin_headers):
             "nom": "Entreprise Test",
             "adresse": "1 rue du Test",
             "secteur_activite": "IT",
-            "contacts": [
-                {"nom": "Jean Dupont", "email": "jean@test.com", "is_main_contact": True}
-            ],
+            "contacts": [{"nom": "Jean Dupont", "email": "jean@test.com", "is_main_contact": True}],
         },
         headers=admin_headers,
     )
@@ -87,6 +88,7 @@ def test_list_entreprises(client, admin_headers):
 
 
 # --- Frameworks ---
+
 
 def test_list_frameworks(client, admin_headers):
     response = client.get("/api/v1/frameworks", headers=admin_headers)

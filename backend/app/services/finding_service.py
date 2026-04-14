@@ -1,4 +1,5 @@
 """Service Finding — logique métier pour les non-conformités."""
+
 from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -17,9 +18,7 @@ class FindingService:
     """Opérations CRUD et métier sur les findings."""
 
     @staticmethod
-    def generate_from_assessment(
-        db: Session, assessment_id: int, user_id: int | None = None
-    ) -> tuple[int, int]:
+    def generate_from_assessment(db: Session, assessment_id: int, user_id: int | None = None) -> tuple[int, int]:
         """
         Génère des findings pour chaque ControlResult NON_COMPLIANT
         ou PARTIALLY_COMPLIANT d'un assessment donné.
@@ -27,15 +26,21 @@ class FindingService:
         Retourne (generated, skipped).
         """
         # Récupérer les ControlResult non-conformes
-        results = db.execute(
-            select(ControlResult).where(
-                ControlResult.assessment_id == assessment_id,
-                ControlResult.status.in_([
-                    ComplianceStatus.NON_COMPLIANT,
-                    ComplianceStatus.PARTIALLY_COMPLIANT,
-                ]),
+        results = (
+            db.execute(
+                select(ControlResult).where(
+                    ControlResult.assessment_id == assessment_id,
+                    ControlResult.status.in_(
+                        [
+                            ComplianceStatus.NON_COMPLIANT,
+                            ComplianceStatus.PARTIALLY_COMPLIANT,
+                        ]
+                    ),
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         generated = 0
         skipped = 0
@@ -135,11 +140,7 @@ class FindingService:
 
         total = db.execute(count_query).scalar() or 0
 
-        findings = db.execute(
-            query.order_by(Finding.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-        ).scalars().all()
+        findings = db.execute(query.order_by(Finding.created_at.desc()).offset(offset).limit(limit)).scalars().all()
 
         return list(findings), total
 

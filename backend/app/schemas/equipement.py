@@ -3,6 +3,7 @@ Schémas Equipement — Assets d'infrastructure.
 
 Supporte le polymorphisme STI avec des champs optionnels par type.
 """
+
 from datetime import datetime
 from typing import Optional
 
@@ -93,6 +94,7 @@ class EquipementRead(EquipementBase):
 
 class EquipementSummary(BaseModel):
     """Version allégée pour les listes"""
+
     id: int
     site_id: int
     type_equipement: str

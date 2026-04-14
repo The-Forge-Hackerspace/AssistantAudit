@@ -17,7 +17,6 @@ from ..schemas.checklist import ChecklistInstanceCreate, ChecklistResponseUpdate
 
 
 class ChecklistService:
-
     @staticmethod
     def _check_audit_access(db: Session, audit_id: int, user_id: int, is_admin: bool) -> Audit:
         """Vérifie que l'utilisateur a accès à l'audit. 404 si non trouvé."""
@@ -42,10 +41,7 @@ class ChecklistService:
         """Récupère un template avec ses sections et items."""
         tpl = (
             db.query(ChecklistTemplate)
-            .options(
-                joinedload(ChecklistTemplate.sections)
-                .joinedload(ChecklistSection.items)
-            )
+            .options(joinedload(ChecklistTemplate.sections).joinedload(ChecklistSection.items))
             .filter(ChecklistTemplate.id == template_id)
             .first()
         )
@@ -54,31 +50,28 @@ class ChecklistService:
         return tpl
 
     @staticmethod
-    def create_instance(
-        db: Session, data: ChecklistInstanceCreate, user_id: int, is_admin: bool
-    ) -> ChecklistInstance:
+    def create_instance(db: Session, data: ChecklistInstanceCreate, user_id: int, is_admin: bool) -> ChecklistInstance:
         """Instancie une checklist pour un audit."""
         # Vérifier accès audit
         ChecklistService._check_audit_access(db, data.audit_id, user_id, is_admin)
 
         # Vérifier que le template existe
-        tpl = db.query(ChecklistTemplate).filter(
-            ChecklistTemplate.id == data.template_id
-        ).first()
+        tpl = db.query(ChecklistTemplate).filter(ChecklistTemplate.id == data.template_id).first()
         if not tpl:
             raise HTTPException(status_code=404, detail="Template non trouvé")
 
         # Vérifier unicité
-        existing = db.query(ChecklistInstance).filter(
-            ChecklistInstance.template_id == data.template_id,
-            ChecklistInstance.audit_id == data.audit_id,
-            ChecklistInstance.site_id == data.site_id,
-        ).first()
-        if existing:
-            raise HTTPException(
-                status_code=409,
-                detail="Cette checklist existe déjà pour cet audit"
+        existing = (
+            db.query(ChecklistInstance)
+            .filter(
+                ChecklistInstance.template_id == data.template_id,
+                ChecklistInstance.audit_id == data.audit_id,
+                ChecklistInstance.site_id == data.site_id,
             )
+            .first()
+        )
+        if existing:
+            raise HTTPException(status_code=409, detail="Cette checklist existe déjà pour cet audit")
 
         instance = ChecklistInstance(
             template_id=data.template_id,
@@ -93,9 +86,7 @@ class ChecklistService:
         return instance
 
     @staticmethod
-    def get_instance(
-        db: Session, instance_id: int, user_id: int, is_admin: bool
-    ) -> ChecklistInstance:
+    def get_instance(db: Session, instance_id: int, user_id: int, is_admin: bool) -> ChecklistInstance:
         """Récupère une instance avec ses réponses."""
         instance = (
             db.query(ChecklistInstance)
@@ -110,22 +101,14 @@ class ChecklistService:
         return instance
 
     @staticmethod
-    def list_instances(
-        db: Session, audit_id: int, user_id: int, is_admin: bool
-    ) -> list[ChecklistInstance]:
+    def list_instances(db: Session, audit_id: int, user_id: int, is_admin: bool) -> list[ChecklistInstance]:
         """Liste les instances de checklist pour un audit."""
         ChecklistService._check_audit_access(db, audit_id, user_id, is_admin)
-        return (
-            db.query(ChecklistInstance)
-            .filter(ChecklistInstance.audit_id == audit_id)
-            .all()
-        )
+        return db.query(ChecklistInstance).filter(ChecklistInstance.audit_id == audit_id).all()
 
     @staticmethod
     def respond_to_item(
-        db: Session, instance_id: int, item_id: int,
-        data: ChecklistResponseUpdate,
-        user_id: int, is_admin: bool
+        db: Session, instance_id: int, item_id: int, data: ChecklistResponseUpdate, user_id: int, is_admin: bool
     ) -> ChecklistResponse:
         """Répond à un item (upsert : crée ou met à jour)."""
         instance = ChecklistService.get_instance(db, instance_id, user_id, is_admin)
@@ -144,10 +127,14 @@ class ChecklistService:
             raise HTTPException(status_code=404, detail="Item non trouvé dans ce template")
 
         # Upsert
-        response = db.query(ChecklistResponse).filter(
-            ChecklistResponse.instance_id == instance_id,
-            ChecklistResponse.item_id == item_id,
-        ).first()
+        response = (
+            db.query(ChecklistResponse)
+            .filter(
+                ChecklistResponse.instance_id == instance_id,
+                ChecklistResponse.item_id == item_id,
+            )
+            .first()
+        )
 
         now = datetime.now(timezone.utc)
         if response:
@@ -178,9 +165,7 @@ class ChecklistService:
     @staticmethod
     def get_progress(db: Session, instance_id: int) -> dict:
         """Calcule la progression d'une instance."""
-        instance = db.query(ChecklistInstance).filter(
-            ChecklistInstance.id == instance_id
-        ).first()
+        instance = db.query(ChecklistInstance).filter(ChecklistInstance.id == instance_id).first()
         if not instance:
             raise HTTPException(status_code=404, detail="Instance non trouvée")
 
@@ -193,9 +178,7 @@ class ChecklistService:
         )
 
         # Compter les réponses
-        responses = db.query(ChecklistResponse).filter(
-            ChecklistResponse.instance_id == instance_id
-        ).all()
+        responses = db.query(ChecklistResponse).filter(ChecklistResponse.instance_id == instance_id).all()
 
         answered = len([r for r in responses if r.status != "UNCHECKED"])
         ok_count = len([r for r in responses if r.status == "OK"])
@@ -213,9 +196,7 @@ class ChecklistService:
         }
 
     @staticmethod
-    def complete_instance(
-        db: Session, instance_id: int, user_id: int, is_admin: bool
-    ) -> ChecklistInstance:
+    def complete_instance(db: Session, instance_id: int, user_id: int, is_admin: bool) -> ChecklistInstance:
         """Marque une instance comme complétée."""
         instance = ChecklistService.get_instance(db, instance_id, user_id, is_admin)
         instance.status = "completed"
@@ -225,9 +206,7 @@ class ChecklistService:
         return instance
 
     @staticmethod
-    def delete_instance(
-        db: Session, instance_id: int, user_id: int, is_admin: bool
-    ) -> str:
+    def delete_instance(db: Session, instance_id: int, user_id: int, is_admin: bool) -> str:
         """Supprime une instance et ses réponses."""
         instance = ChecklistService.get_instance(db, instance_id, user_id, is_admin)
         db.delete(instance)

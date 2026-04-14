@@ -1,6 +1,7 @@
 """
 Routes Entreprises : CRUD.
 """
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -59,8 +60,10 @@ def get_entreprise(
 ):
     """Détail d'une entreprise"""
     return EntrepriseService.get_entreprise(
-        db, entreprise_id,
-        user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        entreprise_id,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
 
 
@@ -73,8 +76,11 @@ def update_entreprise(
 ):
     """Met à jour une entreprise"""
     return EntrepriseService.update_entreprise(
-        db, entreprise_id, body,
-        user_id=current_user.id, is_admin=current_user.role == "admin",
+        db,
+        entreprise_id,
+        body,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
     )
 
 

@@ -1,6 +1,7 @@
 """
 Schemas Agent : gestion des agents et taches.
 """
+
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -11,9 +12,7 @@ from pydantic import BaseModel, Field, field_serializer
 
 class AgentCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    allowed_tools: list[str] = Field(
-        default=["nmap", "oradad", "config-oradad", "ad_collector"]
-    )
+    allowed_tools: list[str] = Field(default=["nmap", "oradad", "config-oradad", "ad_collector"])
     target_user_id: Optional[int] = None
 
 
@@ -78,9 +77,10 @@ class AgentResponse(BaseModel):
     agent_version: Optional[str] = None
     owner_name: Optional[str] = None
     revoked_at: Optional[datetime] = None
+    cert_expires_at: Optional[datetime] = None
     created_at: datetime
 
-    @field_serializer("last_seen", "revoked_at", "created_at")
+    @field_serializer("last_seen", "revoked_at", "cert_expires_at", "created_at")
     @classmethod
     def serialize_utc(cls, v: datetime | None) -> str | None:
         """Force le suffixe Z sur les datetimes — SQLite retourne des naive datetimes."""

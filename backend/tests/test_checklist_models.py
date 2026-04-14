@@ -64,6 +64,7 @@ class TestChecklistInstance:
 
     def test_create_instance(self, db_session, auditeur_user):
         from app.models.audit import Audit
+
         # Prérequis : template + audit
         tpl = ChecklistTemplate(name="Instance Test", category="lan")
         db_session.add(tpl)
@@ -73,9 +74,7 @@ class TestChecklistInstance:
         db_session.add(audit)
         db_session.flush()
 
-        instance = ChecklistInstance(
-            template_id=tpl.id, audit_id=audit.id, filled_by=auditeur_user.id
-        )
+        instance = ChecklistInstance(template_id=tpl.id, audit_id=audit.id, filled_by=auditeur_user.id)
         db_session.add(instance)
         db_session.flush()
         assert instance.id is not None
@@ -129,10 +128,7 @@ class TestChecklistResponse:
         db_session.add(instance)
         db_session.flush()
 
-        response = ChecklistResponse(
-            instance_id=instance.id, item_id=item.id,
-            status="OK", note="Vérifié sur site"
-        )
+        response = ChecklistResponse(instance_id=instance.id, item_id=item.id, status="OK", note="Vérifié sur site")
         db_session.add(response)
         db_session.flush()
         assert response.status == "OK"
@@ -144,6 +140,7 @@ class TestChecklistResponse:
         from pydantic import ValidationError
 
         from app.schemas.checklist import ChecklistResponseUpdate
+
         with pytest.raises(ValidationError):
             ChecklistResponseUpdate(status="INVALID")
 

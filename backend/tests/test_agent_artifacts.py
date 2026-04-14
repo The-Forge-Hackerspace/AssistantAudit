@@ -1,6 +1,7 @@
 """
 Tests pour l'upload d'artifacts agent et la reponse d'enrollment enrichie.
 """
+
 import io
 from unittest.mock import patch
 
@@ -153,7 +154,6 @@ def _make_file(content: bytes = b"test content", filename: str = "result.xml"):
 
 
 class TestArtifactUpload:
-
     def test_upload_artifact_success(self, client, agent_headers, completed_task, tmp_path):
         """Agent uploade un artifact sur une tache completed → 201."""
         with patch("app.services.agent_service.settings") as mock_settings:
@@ -230,7 +230,6 @@ class TestArtifactUpload:
 
 
 class TestArtifactList:
-
     def test_list_artifacts_owner(self, client, agent_headers, owner_headers, completed_task, tmp_path):
         """Owner peut lister les artifacts de sa tache."""
         # Upload d'abord
@@ -268,9 +267,9 @@ class TestArtifactList:
 
 
 class TestEnrichedEnrollment:
-
     def _create_pending_agent(self, db_session, owner):
         from app.core.security import create_enrollment_token
+
         code, code_hash, expiration = create_enrollment_token()
         a = Agent(
             name="Enrolling Agent",
