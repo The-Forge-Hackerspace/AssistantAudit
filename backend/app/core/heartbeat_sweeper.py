@@ -66,11 +66,10 @@ async def _sweep_once() -> None:
                 )
                 if owner_id is not None:
                     notifications.append((owner_id, ev))
-            if stale:
-                logger.info(
-                    "Sweep: agent marked offline (last_seen=%s)",
-                    agent.last_seen.isoformat() if agent.last_seen else "none",
-                )
+            logger.info(
+                "Sweep: agent marked offline (last_seen=%s)",
+                agent.last_seen.isoformat() if agent.last_seen else "none",
+            )
 
         db.commit()
     except Exception:

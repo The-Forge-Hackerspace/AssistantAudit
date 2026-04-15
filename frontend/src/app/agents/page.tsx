@@ -248,15 +248,12 @@ export default function AgentsPage() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const data = await agentsApi.list();
-      setAgents(data);
+      await fetchAgents();
       toast.success("Liste actualisée");
-    } catch {
-      toast.error("Erreur lors de l'actualisation");
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [fetchAgents]);
 
   useEffect(() => {
     if (hasAccess) fetchAgents();

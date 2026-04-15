@@ -11,44 +11,21 @@ from unittest.mock import patch
 import pytest
 
 from app.core.security import create_agent_token
-from app.core.websocket_manager import ws_manager
 from app.models.agent import Agent
 
-
-class _NoCloseSession:
-    def __init__(self, session):
-        self._session = session
-
-    def __getattr__(self, name):
-        if name == "close":
-            return lambda: None
-        return getattr(self._session, name)
-
-
-class _FakeSessionLocal:
-    def __init__(self, session):
-        self._proxy = _NoCloseSession(session)
-
-    def __call__(self):
-        return self._proxy
+from tests.ws_helpers import FakeSessionLocal, reset_ws_state
 
 
 @pytest.fixture(autouse=True)
 def _clear_ws_state():
-    ws_manager.user_connections.clear()
-    ws_manager.agent_connections.clear()
-    ws_manager.agent_owners.clear()
-    ws_manager.user_event_buffer.clear()
+    reset_ws_state()
     yield
-    ws_manager.user_connections.clear()
-    ws_manager.agent_connections.clear()
-    ws_manager.agent_owners.clear()
-    ws_manager.user_event_buffer.clear()
+    reset_ws_state()
 
 
 @pytest.fixture
 def patch_session_local(db_session):
-    fake = _FakeSessionLocal(db_session)
+    fake = FakeSessionLocal(db_session)
     with patch("app.core.database.SessionLocal", fake):
         yield
 

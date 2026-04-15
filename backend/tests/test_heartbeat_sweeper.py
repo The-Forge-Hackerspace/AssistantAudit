@@ -20,41 +20,19 @@ from app.core.websocket_manager import ws_manager
 from app.models.agent import Agent
 from app.models.agent_task import AgentTask
 
-
-class _NoCloseSession:
-    def __init__(self, session):
-        self._session = session
-
-    def __getattr__(self, name):
-        if name == "close":
-            return lambda: None
-        return getattr(self._session, name)
-
-
-class _FakeSessionLocal:
-    def __init__(self, session):
-        self._proxy = _NoCloseSession(session)
-
-    def __call__(self):
-        return self._proxy
+from tests.ws_helpers import FakeSessionLocal, reset_ws_state
 
 
 @pytest.fixture(autouse=True)
 def _clear_ws_state():
-    ws_manager.user_connections.clear()
-    ws_manager.agent_connections.clear()
-    ws_manager.agent_owners.clear()
-    ws_manager.user_event_buffer.clear()
+    reset_ws_state()
     yield
-    ws_manager.user_connections.clear()
-    ws_manager.agent_connections.clear()
-    ws_manager.agent_owners.clear()
-    ws_manager.user_event_buffer.clear()
+    reset_ws_state()
 
 
 @pytest.fixture
 def patch_sweeper_session(db_session):
-    fake = _FakeSessionLocal(db_session)
+    fake = FakeSessionLocal(db_session)
     with patch("app.core.heartbeat_sweeper.SessionLocal", fake):
         yield
 
@@ -144,6 +122,40 @@ class TestHeartbeatSweeper:
 
         db_session.expire_all()
         assert db_session.get(Agent, agent.id).status == "offline"
+
+    def test_owner_notification_online(
+        self, db_session, auditeur_user, patch_sweeper_session, monkeypatch
+    ):
+        """Owner en ligne : le sweeper envoie directement via send_to_user."""
+        agent = _make_agent(
+            db_session, auditeur_user, uuid="notify-agent-online", last_seen_offset_seconds=300
+        )
+        running = _add_task(db_session, agent, auditeur_user, status="running")
+        db_session.commit()
+
+        # Espionner send_to_user et simuler un owner en ligne. ws_manager.send_to_user
+        # gere deja le routage online/buffered — on remplace l'implementation pour
+        # capturer les appels et verifier le contrat attendu par le sweeper.
+        sent: list[tuple[int, str, dict]] = []
+
+        async def fake_send_to_user(user_id, event_type, data):
+            sent.append((user_id, event_type, data))
+
+        monkeypatch.setattr(ws_manager, "send_to_user", fake_send_to_user)
+
+        asyncio.run(heartbeat_sweeper._sweep_once())
+
+        task_status_events = [
+            (uid, evt, data) for uid, evt, data in sent if evt == "task_status"
+        ]
+        assert task_status_events, "send_to_user n'a pas ete appele pour task_status"
+        owner_ids = {uid for uid, _, _ in task_status_events}
+        assert auditeur_user.id in owner_ids
+        task_uuids = {data["task_uuid"] for _, _, data in task_status_events}
+        assert running.task_uuid in task_uuids
+        for _, _, data in task_status_events:
+            assert data["status"] == "failed"
+            assert data["error_message"] == "Agent timeout"
 
     def test_owner_notification_buffered(self, db_session, auditeur_user, patch_sweeper_session):
         """Le owner recoit task_status pour chaque tache orpheline (bufferise si hors ligne)."""

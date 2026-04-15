@@ -106,6 +106,10 @@ class ConnectionManager:
 
         await websocket.accept()
         self.agent_connections[agent_uuid] = websocket
+        # Reinitialiser le mapping owner : si le nouveau JWT n'a pas d'owner_id,
+        # on evite de conserver l'ancien propriétaire (attributions erronées de
+        # tâches/notifications). Le mapping est restauré juste après si fourni.
+        self.agent_owners.pop(agent_uuid, None)
         if owner_id is not None:
             self.agent_owners[agent_uuid] = int(owner_id)
         logger.info(f"WebSocket agent connected: owner={owner_id}")

@@ -88,8 +88,11 @@ async def lifespan(app: FastAPI):
         sweeper_task.cancel()
         try:
             await sweeper_task
-        except (asyncio.CancelledError, Exception):
+        except asyncio.CancelledError:
+            # Annulation attendue lors du shutdown — rien à logger.
             pass
+        except Exception:
+            logger.exception("Heartbeat sweeper a levé une exception pendant le shutdown")
         logger.info(f"🛑 {settings.APP_NAME} arrêté")
 
 
