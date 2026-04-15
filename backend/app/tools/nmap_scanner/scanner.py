@@ -261,12 +261,12 @@ class NmapScanner:
         - `subprocess.run(..., shell=False)` : aucun parsing shell
         """
         # Valider le target AVANT toute construction d'argv (no '-', no space, whitelist stricte).
-        if not target or target.startswith("-"):
+        # re.fullmatch applique une allowlist complete — reconnu par CodeQL comme
+        # sanitizer pour py/command-line-injection.
+        if not target or target.startswith("-") or len(target) > 255:
             raise ValueError("Target Nmap invalide")
-        if not re.match(r"^[a-zA-Z0-9._:/\-]+$", target):
+        if not re.fullmatch(r"[a-zA-Z0-9._:/\-]+", target):
             raise ValueError("Target Nmap invalide")
-        if len(target) > 255:
-            raise ValueError("Target Nmap trop long")
 
         base = ["nmap", "-oX", "-"]  # sortie XML sur stdout
 
