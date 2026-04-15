@@ -13,6 +13,7 @@ import {
   WifiOff,
   Trash2,
   RotateCcw,
+  RefreshCw,
   X,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -138,6 +139,7 @@ export default function AgentsPage() {
   const { user } = useAuth();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
 
   // View mode: main list vs trash
@@ -240,6 +242,19 @@ export default function AgentsPage() {
       toast.error("Erreur lors du chargement des agents");
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const data = await agentsApi.list();
+      setAgents(data);
+      toast.success("Liste actualisée");
+    } catch {
+      toast.error("Erreur lors de l'actualisation");
+    } finally {
+      setRefreshing(false);
     }
   }, []);
 
@@ -461,6 +476,19 @@ export default function AgentsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            title="Actualiser la liste"
+          >
+            <RefreshCw
+              data-icon="inline-start"
+              className={refreshing ? "animate-spin" : ""}
+            />
+            Actualiser
+          </Button>
           <Button
             variant={showTrash ? "default" : "outline"}
             size="sm"
