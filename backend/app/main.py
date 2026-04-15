@@ -2,6 +2,7 @@
 Point d'entrée de l'application FastAPI — AssistantAudit v2.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -75,9 +76,21 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
+    # Demarrage du sweeper heartbeat agents (TOS-12)
+    from .core.heartbeat_sweeper import run_heartbeat_sweeper
+
+    sweeper_task = asyncio.create_task(run_heartbeat_sweeper())
+
     logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} démarré ({settings.ENV})")
-    yield
-    logger.info(f"🛑 {settings.APP_NAME} arrêté")
+    try:
+        yield
+    finally:
+        sweeper_task.cancel()
+        try:
+            await sweeper_task
+        except (asyncio.CancelledError, Exception):
+            pass
+        logger.info(f"🛑 {settings.APP_NAME} arrêté")
 
 
 def create_app() -> FastAPI:

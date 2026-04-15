@@ -94,17 +94,27 @@ class ConnectionManager:
 
         agent_uuid = payload["sub"]
         owner_id = payload.get("owner_id")
+
+        # Si une connexion precedente existe pour ce meme agent, la fermer proprement
+        # avant d'en accepter une nouvelle (evite les WS zombie apres reseau instable).
+        old_ws = self.agent_connections.get(agent_uuid)
+        if old_ws is not None:
+            try:
+                await old_ws.close(code=1000, reason="Superseded by new connection")
+            except Exception:
+                logger.debug("Failed to close superseded agent WS", exc_info=True)
+
         await websocket.accept()
         self.agent_connections[agent_uuid] = websocket
         if owner_id is not None:
             self.agent_owners[agent_uuid] = int(owner_id)
-        logger.info(f"WebSocket agent connected: uuid={agent_uuid}, owner={owner_id}")
+        logger.info(f"WebSocket agent connected: owner={owner_id}")
         return agent_uuid
 
     def disconnect_agent(self, agent_uuid: str) -> None:
         self.agent_connections.pop(agent_uuid, None)
         self.agent_owners.pop(agent_uuid, None)
-        logger.info(f"WebSocket agent disconnected: uuid={agent_uuid}")
+        logger.info("WebSocket agent disconnected")
 
     def get_agent_owner(self, agent_uuid: str) -> int | None:
         """Retourne l'owner_id de confiance (JWT) pour un agent connecte."""

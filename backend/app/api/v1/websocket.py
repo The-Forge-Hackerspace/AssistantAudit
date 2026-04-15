@@ -93,13 +93,20 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
     from ...models.agent import Agent
     from ...models.agent_task import AgentTask
 
-    # Resoudre agent.id depuis agent_uuid pour les checks d'ownership sur les taches
+    # Resoudre agent.id depuis agent_uuid pour les checks d'ownership sur les taches.
+    # Restaurer le status "active" si l'agent avait ete marque "offline" par le sweeper
+    # (cas d'une reconnexion apres un timeout reseau).
     trusted_agent_id: int | None = None
     try:
         db = SessionLocal()
         _agent = db.query(Agent).filter(Agent.agent_uuid == agent_uuid).first()
         if _agent:
             trusted_agent_id = _agent.id
+            if _agent.status == "offline":
+                _agent.status = "active"
+                _agent.last_seen = datetime.now(timezone.utc)
+                db.commit()
+                logger.info("Agent %s reconnected — session restored (offline → active)", agent_log_id)
     except Exception:
         logger.exception("Failed to resolve agent_id for %s", agent_log_id)
     finally:
@@ -227,50 +234,32 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
 async def _handle_agent_disconnect(agent_uuid: str, owner_id: int | None) -> None:
     """Nettoie a la deconnexion : marque les taches running comme failed."""
     agent_log_id = hashlib.sha256(agent_uuid.encode("utf-8")).hexdigest()[:12]
-    from datetime import datetime, timezone
 
     from ...core.database import SessionLocal
     from ...models.agent import Agent
-    from ...models.agent_task import AgentTask
+    from ...services.agent_service import AgentService
 
     ws_manager.disconnect_agent(agent_uuid)
 
+    reason = "Agent deconnecte pendant l'execution"
+    events: list[dict] = []
     try:
         db = SessionLocal()
         agent = db.query(Agent).filter(Agent.agent_uuid == agent_uuid).first()
         if not agent:
             return
 
-        orphans = (
-            db.query(AgentTask)
-            .filter(
-                AgentTask.agent_id == agent.id,
-                AgentTask.status.in_(["running", "dispatched", "pending"]),
-            )
-            .all()
-        )
-
-        now = datetime.now(timezone.utc)
-        for task in orphans:
-            task.status = "failed"
-            task.error_message = "Agent deconnecte pendant l'execution"
-            task.completed_at = now
-            logger.warning("Orphan task marked failed: %s (agent %s)", task.task_uuid, agent_log_id)
-
-            # Notifier le frontend
-            if owner_id is not None:
-                await ws_manager.send_to_user(
-                    owner_id,
-                    "task_status",
-                    {
-                        "task_uuid": task.task_uuid,
-                        "status": "failed",
-                        "error_message": "Agent deconnecte pendant l'execution",
-                    },
-                )
-
+        events = AgentService.mark_agent_offline_and_fail_tasks(db, agent, reason)
         db.commit()
+
+        for ev in events:
+            logger.warning("Orphan task marked failed: %s (agent %s)", ev["task_uuid"], agent_log_id)
     except Exception:
         logger.exception("Failed to handle orphan tasks for agent %s", agent_log_id)
     finally:
         db.close()
+
+    # Notifier le frontend hors du bloc DB
+    if owner_id is not None:
+        for ev in events:
+            await ws_manager.send_to_user(owner_id, "task_status", ev)
