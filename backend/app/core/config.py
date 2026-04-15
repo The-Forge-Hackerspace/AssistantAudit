@@ -168,6 +168,13 @@ class Settings(BaseSettings):
     # --- Frameworks / Référentiels ---
     FRAMEWORKS_DIR: str = str(BASE_DIR.parent / "frameworks")
 
+    # --- WebSocket agents (fiabilisation TOS-12) ---
+    # Delai sans heartbeat avant de considerer un agent offline et de marquer
+    # ses taches running/dispatched/pending comme failed.
+    AGENT_HEARTBEAT_TIMEOUT_SECONDS: int = 90
+    # Frequence du sweeper qui detecte les agents timeout.
+    AGENT_HEARTBEAT_SWEEP_INTERVAL_SECONDS: int = 15
+
     # --- Outils intégrés ---
     NMAP_TIMEOUT: int = 600  # secondes
     MONKEY365_PATH: str = ""  # chemin vers Invoke-Monkey365.ps1

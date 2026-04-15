@@ -156,6 +156,55 @@ class AgentService:
         db.flush()
 
     @staticmethod
+    def mark_agent_offline_and_fail_tasks(
+        db: Session,
+        agent: Agent,
+        reason: str,
+        mark_offline: bool = True,
+    ) -> list[dict]:
+        """Marque un agent offline et ses taches non-terminales en failed.
+
+        Retourne la liste des evenements task_status a emettre vers le owner
+        (task_uuid + message d'erreur). La session n'est pas commitee :
+        la responsabilite du commit reste a l'appelant.
+
+        Args:
+            db: session SQLAlchemy
+            agent: l'agent cible
+            reason: motif stocke dans task.error_message
+            mark_offline: si True, positionne agent.status = 'offline'
+        """
+        now = datetime.now(timezone.utc)
+
+        if mark_offline and agent.status == "active":
+            agent.status = "offline"
+
+        orphans = (
+            db.query(AgentTask)
+            .filter(
+                AgentTask.agent_id == agent.id,
+                AgentTask.status.in_(["running", "dispatched", "pending"]),
+            )
+            .all()
+        )
+
+        events: list[dict] = []
+        for task in orphans:
+            task.status = "failed"
+            task.error_message = reason
+            task.completed_at = now
+            events.append(
+                {
+                    "task_uuid": task.task_uuid,
+                    "status": "failed",
+                    "error_message": reason,
+                }
+            )
+
+        db.flush()
+        return events
+
+    @staticmethod
     def enroll_agent(db: Session, enrollment_code: str, request: Request) -> dict:
         """
         Enrolle un agent avec un code d'enrollment.
