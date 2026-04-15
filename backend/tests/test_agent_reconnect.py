@@ -12,7 +12,6 @@ import pytest
 
 from app.core.security import create_agent_token
 from app.models.agent import Agent
-
 from tests.ws_helpers import FakeSessionLocal, reset_ws_state
 
 

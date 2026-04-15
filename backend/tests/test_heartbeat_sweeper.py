@@ -19,7 +19,6 @@ from app.core import heartbeat_sweeper
 from app.core.websocket_manager import ws_manager
 from app.models.agent import Agent
 from app.models.agent_task import AgentTask
-
 from tests.ws_helpers import FakeSessionLocal, reset_ws_state
 
 
