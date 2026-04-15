@@ -23,6 +23,7 @@ from .checklist import (
     ChecklistSection,
     ChecklistTemplate,
 )
+from .collect_pipeline import CollectPipeline, PipelineStatus, PipelineStepStatus
 from .collect_result import CollectMethod, CollectResult, CollectStatus
 from .config_analysis import ConfigAnalysis
 from .entreprise import Contact, Entreprise
@@ -107,6 +108,9 @@ __all__ = [
     "CollectResult",
     "CollectMethod",
     "CollectStatus",
+    "CollectPipeline",
+    "PipelineStatus",
+    "PipelineStepStatus",
     "ADAuditResultModel",
     "ADAuditStatus",
     "Monkey365ScanResult",
