@@ -8,8 +8,13 @@ Un nouveau fichier YAML est détecté et importé sans modification de code.
 
 import hashlib
 import logging
+import re
 from pathlib import Path
 from typing import Optional
+
+# Allowlist stricte pour les noms de fichiers YAML acceptes via l'API.
+# Reconnue par CodeQL comme sanitizer pour py/path-injection.
+_SAFE_YAML_FILENAME = re.compile(r"^[A-Za-z0-9_.\-]+\.(?:yml|yaml)$")
 
 import yaml
 from sqlalchemy.orm import Session
@@ -57,23 +62,34 @@ class FrameworkService:
         return hashlib.sha256(path.read_bytes()).hexdigest()
 
     @staticmethod
-    def _validate_yaml_path(yaml_path: Path) -> Path:
-        """Valide qu'un chemin YAML pointe bien à l'intérieur du dossier frameworks autorisé."""
+    def _safe_yaml_path(filename: str) -> Path:
+        """
+        Construit un chemin YAML sûr à partir d'un basename utilisateur.
+
+        Applique une allowlist regex stricte (caractères alphanumériques, '_', '.', '-')
+        et reconstruit le chemin depuis FRAMEWORKS_DIR (base trusted). Ce pattern
+        est reconnu par CodeQL comme sanitizer pour py/path-injection : aucun
+        séparateur, aucun '..', aucune traversée possible.
+        """
+        if not isinstance(filename, str) or not _SAFE_YAML_FILENAME.fullmatch(filename):
+            raise ValueError("Nom de fichier YAML invalide")
         frameworks_dir = Path(get_settings().FRAMEWORKS_DIR).resolve()
-        resolved = yaml_path.resolve()
-        if not resolved.is_relative_to(frameworks_dir):
-            raise ValueError("Chemin YAML hors du dossier frameworks autorisé")
-        if resolved.suffix.lower() not in (".yml", ".yaml"):
-            raise ValueError("Extension de fichier YAML invalide")
-        return resolved
+        # filename ne contient que [A-Za-z0-9_.-] — aucun risque de traversée.
+        return frameworks_dir / filename
 
     @staticmethod
-    def import_from_yaml(db: Session, yaml_path: str | Path) -> Framework:
+    def import_from_yaml_name(db: Session, filename: str) -> Framework:
         """
-        Importe un référentiel depuis un fichier YAML.
-        Crée ou met à jour le framework en base de données.
+        Importe un référentiel depuis son basename (validé via allowlist regex).
+        Utilisé par l'API pour garantir que l'entrée utilisateur ne peut jamais
+        s'échapper du dossier frameworks autorisé.
         """
-        yaml_path = FrameworkService._validate_yaml_path(Path(yaml_path))
+        yaml_path = FrameworkService._safe_yaml_path(filename)
+        return FrameworkService._load_and_import(db, yaml_path)
+
+    @staticmethod
+    def _load_and_import(db: Session, yaml_path: Path) -> Framework:
+        """Charge un YAML depuis un chemin déjà validé et importe son contenu."""
         if not yaml_path.exists():
             raise FileNotFoundError("Fichier YAML introuvable")
 
@@ -181,8 +197,9 @@ class FrameworkService:
 
         frameworks = []
         for yaml_file in sorted(directory.glob("*.yaml")):
+            # yaml_file provient d'un iterdir/glob sur un dossier trusted — pas tainted.
             try:
-                fw = FrameworkService.import_from_yaml(db, yaml_file)
+                fw = FrameworkService._load_and_import(db, yaml_file)
                 frameworks.append(fw)
             except Exception as e:
                 logger.error(f"Erreur import de {yaml_file.name}: {e}")
