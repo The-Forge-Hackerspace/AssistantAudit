@@ -137,9 +137,8 @@ function ScannerContent() {
     return () => clearInterval(id);
   }, [hasRunningTasks, fetchAgentTasks]);
 
-  // WebSocket: live progress for the currently-watched agent task
+  // WebSocket: live status/progress pour toutes les taches visibles
   useEffect(() => {
-    if (!agentTaskUuid) return;
     const token = document.cookie.match(/aa_access_token=([^;]+)/)?.[1];
     if (!token) return;
 
@@ -149,7 +148,24 @@ function ScannerContent() {
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        if (msg.type === "task_status" && msg.data?.task_uuid === agentTaskUuid) {
+        const taskUuid = msg.data?.task_uuid as string | undefined;
+        if (!taskUuid) return;
+
+        if (msg.type === "task_progress") {
+          const raw = msg.data.progress ?? msg.data.percent;
+          const pct = typeof raw === "number" ? Math.max(0, Math.min(100, Math.round(raw))) : null;
+          if (pct !== null) {
+            setAgentTasks((prev) =>
+              prev.map((t) => (t.task_uuid === taskUuid ? { ...t, progress: pct } : t))
+            );
+          }
+          if (taskUuid === agentTaskUuid) {
+            const lines = msg.data.output_lines as string[] | undefined;
+            if (lines?.length) setAgentLogs((prev) => [...prev, ...lines]);
+          }
+        }
+
+        if (msg.type === "task_status" && taskUuid === agentTaskUuid) {
           const status = msg.data.status as string;
           setAgentLogs((prev) => [...prev, `[STATUS] ${status}`]);
           if (status === "completed" || status === "failed") {
@@ -161,19 +177,25 @@ function ScannerContent() {
             ]);
             fetchAgentTasks();
           }
+        } else if (msg.type === "task_status") {
+          const status = msg.data.status as string | undefined;
+          if (status === "completed" || status === "failed" || status === "cancelled") {
+            fetchAgentTasks();
+          }
         }
-        if (msg.type === "task_progress" && msg.data?.task_uuid === agentTaskUuid) {
-          const lines = msg.data.output_lines as string[] | undefined;
-          if (lines?.length) setAgentLogs((prev) => [...prev, ...lines]);
-        }
-        if (msg.type === "task_result" && msg.data?.task_uuid === agentTaskUuid) {
+
+        if (msg.type === "task_result" && taskUuid === agentTaskUuid) {
           setAgentLogs((prev) => [...prev, "[RESULT] Resultats recus"]);
           fetchAgentTasks();
         }
       } catch { /* ignore parse errors */ }
     };
 
-    ws.onerror = () => setAgentLogs((prev) => [...prev, "[WS] Erreur de connexion WebSocket"]);
+    ws.onerror = () => {
+      if (agentTaskUuid) {
+        setAgentLogs((prev) => [...prev, "[WS] Erreur de connexion WebSocket"]);
+      }
+    };
 
     return () => ws.close();
   }, [agentTaskUuid, fetchAgentTasks]);

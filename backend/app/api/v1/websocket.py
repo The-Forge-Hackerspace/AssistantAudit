@@ -148,8 +148,8 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
 
             elif msg_type in ("task_status", "task_progress"):
                 ws_data = data.get("data", {})
-                # Persister le changement de status en base
-                if msg_type == "task_status" and ws_data.get("task_uuid"):
+                # Persister le changement de status ou la progression en base
+                if ws_data.get("task_uuid"):
                     try:
                         db = SessionLocal()
                         task = (
@@ -162,25 +162,33 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                         )
                         if not task:
                             logger.warning(
-                                "Agent %s attempted task_status on task %s — not owned or not found",
+                                "Agent %s attempted %s on task %s — not owned or not found",
                                 agent_log_id,
+                                msg_type,
                                 ws_data["task_uuid"],
                             )
                         if task:
-                            new_status = ws_data.get("status")
-                            if new_status:
-                                task.status = new_status
-                            if new_status == "running" and task.started_at is None:
-                                task.started_at = datetime.now(timezone.utc)
-                            if new_status in ("completed", "failed", "cancelled"):
-                                task.completed_at = datetime.now(timezone.utc)
-                                if new_status == "completed":
-                                    task.progress = 100
-                            if ws_data.get("error_message"):
-                                task.error_message = ws_data["error_message"]
+                            if msg_type == "task_status":
+                                new_status = ws_data.get("status")
+                                if new_status:
+                                    task.status = new_status
+                                if new_status == "running" and task.started_at is None:
+                                    task.started_at = datetime.now(timezone.utc)
+                                if new_status in ("completed", "failed", "cancelled"):
+                                    task.completed_at = datetime.now(timezone.utc)
+                                    if new_status == "completed":
+                                        task.progress = 100
+                                if ws_data.get("error_message"):
+                                    task.error_message = ws_data["error_message"]
+                            else:  # task_progress
+                                pct = ws_data.get("progress")
+                                if pct is None:
+                                    pct = ws_data.get("percent")
+                                if isinstance(pct, (int, float)):
+                                    task.progress = max(0, min(100, int(pct)))
                             db.commit()
                     except Exception:
-                        logger.exception("Failed to persist task_status for %s", ws_data.get("task_uuid"))
+                        logger.exception("Failed to persist %s for %s", msg_type, ws_data.get("task_uuid"))
                     finally:
                         db.close()
                 # Forward vers le owner
