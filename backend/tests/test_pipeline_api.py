@@ -14,11 +14,12 @@ from unittest.mock import patch
 import pytest
 from sqlalchemy.orm import Session
 
+from app.models.agent import Agent
 from app.models.collect_pipeline import CollectPipeline, PipelineStatus, PipelineStepStatus
 from app.models.entreprise import Entreprise
 from app.models.site import Site
 
-# ── Fixtures ──────────────────────────────────────────────────────
+# ── Fixtures ───────────────────────────────────────────────────────────────
 
 
 @pytest.fixture()
@@ -45,10 +46,26 @@ def _site(db_session: Session, auditeur_user):
 
 
 @pytest.fixture()
-def _pipeline(db_session: Session, _site, auditeur_user):
+def _agent(db_session: Session, auditeur_user):
+    """Agent actif du auditeur_user autorisé à exécuter nmap."""
+    agent = Agent(
+        name="Agent Pipeline Test",
+        user_id=auditeur_user.id,
+        status="active",
+        allowed_tools=["nmap"],
+    )
+    db_session.add(agent)
+    db_session.commit()
+    db_session.refresh(agent)
+    return agent
+
+
+@pytest.fixture()
+def _pipeline(db_session: Session, _site, _agent, auditeur_user):
     """Pipeline pre-existant en statut completed pour les tests GET."""
     p = CollectPipeline(
         site_id=_site.id,
+        agent_id=_agent.id,
         target="10.0.0.0/24",
         created_by=auditeur_user.id,
         status=PipelineStatus.COMPLETED,
@@ -68,7 +85,7 @@ def _pipeline(db_session: Session, _site, auditeur_user):
     return p
 
 
-# ── POST /pipelines ──────────────────────────────────────────────
+# ── POST /pipelines ─────────────────────────────────────────────────────────
 
 
 class TestCreatePipeline:
@@ -76,12 +93,13 @@ class TestCreatePipeline:
 
     @patch("app.services.pipeline_service.execute_pipeline_background")
     def test_create_pipeline_returns_202(
-        self, mock_exec, client, auditeur_headers, _site
+        self, mock_exec, client, auditeur_headers, _site, _agent
     ):
         resp = client.post(
             "/api/v1/pipelines",
             json={
                 "site_id": _site.id,
+                "agent_id": _agent.id,
                 "target": "192.168.1.0/24",
                 "username": "root",
                 "password": "secret",
@@ -93,6 +111,7 @@ class TestCreatePipeline:
         assert data["status"] == "pending"
         assert data["target"] == "192.168.1.0/24"
         assert data["site_id"] == _site.id
+        assert data["agent_id"] == _agent.id
         # L'orchestrateur est lance via SyncTaskRunner (conftest)
         mock_exec.assert_called_once()
         call_kwargs = mock_exec.call_args
@@ -101,12 +120,13 @@ class TestCreatePipeline:
 
     @patch("app.services.pipeline_service.execute_pipeline_background")
     def test_create_pipeline_with_private_key(
-        self, mock_exec, client, auditeur_headers, _site
+        self, mock_exec, client, auditeur_headers, _site, _agent
     ):
         resp = client.post(
             "/api/v1/pipelines",
             json={
                 "site_id": _site.id,
+                "agent_id": _agent.id,
                 "target": "10.0.0.1",
                 "username": "deploy",
                 "private_key": "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----",
@@ -117,12 +137,13 @@ class TestCreatePipeline:
         assert mock_exec.call_args.kwargs["private_key"] is not None
 
     def test_create_pipeline_missing_credentials_returns_422(
-        self, client, auditeur_headers, _site
+        self, client, auditeur_headers, _site, _agent
     ):
         resp = client.post(
             "/api/v1/pipelines",
             json={
                 "site_id": _site.id,
+                "agent_id": _agent.id,
                 "target": "10.0.0.0/24",
                 "username": "root",
                 # ni password ni private_key
@@ -132,12 +153,80 @@ class TestCreatePipeline:
         assert resp.status_code == 422
 
     def test_create_pipeline_unknown_site_returns_404(
-        self, client, auditeur_headers
+        self, client, auditeur_headers, _agent
     ):
         resp = client.post(
             "/api/v1/pipelines",
             json={
                 "site_id": 999999,
+                "agent_id": _agent.id,
+                "target": "10.0.0.0/24",
+                "username": "root",
+                "password": "pass",
+            },
+            headers=auditeur_headers,
+        )
+        assert resp.status_code == 404
+
+    def test_create_pipeline_unknown_agent_returns_404(
+        self, client, auditeur_headers, _site
+    ):
+        resp = client.post(
+            "/api/v1/pipelines",
+            json={
+                "site_id": _site.id,
+                "agent_id": 999999,
+                "target": "10.0.0.0/24",
+                "username": "root",
+                "password": "pass",
+            },
+            headers=auditeur_headers,
+        )
+        assert resp.status_code == 404
+
+    def test_create_pipeline_inactive_agent_returns_404(
+        self, client, auditeur_headers, _site, db_session, auditeur_user
+    ):
+        agent = Agent(
+            name="Agent inactif",
+            user_id=auditeur_user.id,
+            status="pending",
+            allowed_tools=["nmap"],
+        )
+        db_session.add(agent)
+        db_session.commit()
+        db_session.refresh(agent)
+        resp = client.post(
+            "/api/v1/pipelines",
+            json={
+                "site_id": _site.id,
+                "agent_id": agent.id,
+                "target": "10.0.0.0/24",
+                "username": "root",
+                "password": "pass",
+            },
+            headers=auditeur_headers,
+        )
+        assert resp.status_code == 404
+        assert "inactif" in resp.json()["detail"].lower()
+
+    def test_create_pipeline_agent_without_nmap_returns_404(
+        self, client, auditeur_headers, _site, db_session, auditeur_user
+    ):
+        agent = Agent(
+            name="Agent sans nmap",
+            user_id=auditeur_user.id,
+            status="active",
+            allowed_tools=["oradad"],
+        )
+        db_session.add(agent)
+        db_session.commit()
+        db_session.refresh(agent)
+        resp = client.post(
+            "/api/v1/pipelines",
+            json={
+                "site_id": _site.id,
+                "agent_id": agent.id,
                 "target": "10.0.0.0/24",
                 "username": "root",
                 "password": "pass",
@@ -147,12 +236,13 @@ class TestCreatePipeline:
         assert resp.status_code == 404
 
     def test_create_pipeline_lecteur_forbidden(
-        self, client, lecteur_headers, _site
+        self, client, lecteur_headers, _site, _agent
     ):
         resp = client.post(
             "/api/v1/pipelines",
             json={
                 "site_id": _site.id,
+                "agent_id": _agent.id,
                 "target": "10.0.0.0/24",
                 "username": "root",
                 "password": "pass",
@@ -161,11 +251,12 @@ class TestCreatePipeline:
         )
         assert resp.status_code == 403
 
-    def test_create_pipeline_unauthenticated_returns_401(self, client, _site):
+    def test_create_pipeline_unauthenticated_returns_401(self, client, _site, _agent):
         resp = client.post(
             "/api/v1/pipelines",
             json={
                 "site_id": _site.id,
+                "agent_id": _agent.id,
                 "target": "10.0.0.0/24",
                 "username": "root",
                 "password": "pass",
@@ -174,7 +265,7 @@ class TestCreatePipeline:
         assert resp.status_code == 401
 
 
-# ── GET /pipelines/{id} ──────────────────────────────────────────
+# ── GET /pipelines/{id} ─────────────────────────────────────────────────────
 
 
 class TestGetPipeline:
@@ -215,7 +306,7 @@ class TestGetPipeline:
         assert resp.status_code == 404
 
 
-# ── GET /pipelines ───────────────────────────────────────────────
+# ── GET /pipelines ──────────────────────────────────────────────────────────────
 
 
 class TestListPipelines:
@@ -254,7 +345,7 @@ class TestListPipelines:
         assert resp.json()["total"] >= 1
 
 
-# ── Service helpers unitaires ────────────────────────────────────
+# ── Service helpers unitaires ─────────────────────────────────────────────────
 
 
 class TestPipelineServiceHelpers:
@@ -286,7 +377,7 @@ class TestPipelineServiceHelpers:
         assert all(p.created_by == auditeur_user.id for p in items_owner)
 
     def test_create_pipeline_unknown_site_raises(
-        self, db_session, auditeur_user
+        self, db_session, auditeur_user, _agent
     ):
         from app.services.pipeline_service import create_pending_pipeline
 
@@ -294,12 +385,13 @@ class TestPipelineServiceHelpers:
             create_pending_pipeline(
                 db_session,
                 site_id=999999,
+                agent_id=_agent.id,
                 target="10.0.0.0/24",
                 created_by=auditeur_user.id,
             )
 
     def test_create_pipeline_wrong_owner_raises(
-        self, db_session, _site, second_auditeur_user
+        self, db_session, _site, _agent, second_auditeur_user
     ):
         from app.services.pipeline_service import create_pending_pipeline
 
@@ -307,6 +399,69 @@ class TestPipelineServiceHelpers:
             create_pending_pipeline(
                 db_session,
                 site_id=_site.id,
+                agent_id=_agent.id,
                 target="10.0.0.0/24",
                 created_by=second_auditeur_user.id,
+            )
+
+    def test_create_pipeline_unknown_agent_raises(
+        self, db_session, _site, auditeur_user
+    ):
+        from app.services.pipeline_service import create_pending_pipeline
+
+        with pytest.raises(ValueError, match="Agent.*introuvable"):
+            create_pending_pipeline(
+                db_session,
+                site_id=_site.id,
+                agent_id=999999,
+                target="10.0.0.0/24",
+                created_by=auditeur_user.id,
+            )
+
+    def test_create_pipeline_inactive_agent_raises(
+        self, db_session, _site, auditeur_user
+    ):
+        from app.services.pipeline_service import create_pending_pipeline
+
+        agent = Agent(
+            name="Agent pending",
+            user_id=auditeur_user.id,
+            status="pending",
+            allowed_tools=["nmap"],
+        )
+        db_session.add(agent)
+        db_session.commit()
+        db_session.refresh(agent)
+
+        with pytest.raises(ValueError, match="inactif"):
+            create_pending_pipeline(
+                db_session,
+                site_id=_site.id,
+                agent_id=agent.id,
+                target="10.0.0.0/24",
+                created_by=auditeur_user.id,
+            )
+
+    def test_create_pipeline_agent_without_nmap_raises(
+        self, db_session, _site, auditeur_user
+    ):
+        from app.services.pipeline_service import create_pending_pipeline
+
+        agent = Agent(
+            name="Agent sans nmap",
+            user_id=auditeur_user.id,
+            status="active",
+            allowed_tools=["oradad"],
+        )
+        db_session.add(agent)
+        db_session.commit()
+        db_session.refresh(agent)
+
+        with pytest.raises(ValueError, match="non autoris"):
+            create_pending_pipeline(
+                db_session,
+                site_id=_site.id,
+                agent_id=agent.id,
+                target="10.0.0.0/24",
+                created_by=auditeur_user.id,
             )

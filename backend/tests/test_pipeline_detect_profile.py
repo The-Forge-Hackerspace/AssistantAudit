@@ -1,13 +1,13 @@
 """Tests unitaires du helper `detect_collect_profile` (TOS-13 / T003).
 
-Le helper est pur (ni DB ni I/O) : on construit des `ScanHost` / `ScanPort`
-in-memory sans les persister, ce qui garde ces tests rapides et isoles.
+Le helper est pur (ni DB ni I/O) : on construit des dicts NmapHost in-memory
+pour simuler la sortie JSON d'un agent Nmap, ce qui garde ces tests rapides
+et isoles.
 """
 
 from __future__ import annotations
 
-from app.models.scan import ScanHost, ScanPort
-from app.services.pipeline_service import detect_collect_profile
+from app.services.pipeline_service import NmapHost, detect_collect_profile
 
 
 def _make_host(
@@ -15,21 +15,27 @@ def _make_host(
     os_guess: str | None = None,
     ports: list[tuple[int, str]] | None = None,
     banners: dict[int, str] | None = None,
-) -> ScanHost:
-    """Construit un ScanHost detache avec des ports ouverts."""
-    host = ScanHost(ip_address="10.0.0.1", os_guess=os_guess)
-    host.ports = []
+) -> NmapHost:
+    """Construit un NmapHost (dict) avec des ports ouverts."""
+    port_list = []
     for port_num, state in ports or []:
-        banner = (banners or {}).get(port_num)
-        host.ports.append(
-            ScanPort(
-                port_number=port_num,
-                protocol="tcp",
-                state=state,
-                product=banner,
-            )
+        banner = (banners or {}).get(port_num) or ""
+        port_list.append(
+            {
+                "port": port_num,
+                "protocol": "tcp",
+                "state": state,
+                "service": banner,
+            }
         )
-    return host
+    return {
+        "ip": "10.0.0.1",
+        "hostname": "",
+        "mac": "",
+        "vendor": "",
+        "os": os_guess or "",
+        "ports": port_list,
+    }
 
 
 class TestDetectCollectProfile:

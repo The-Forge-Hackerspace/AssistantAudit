@@ -1,27 +1,29 @@
 """
 PipelineService — Orchestration du pipeline multi-étapes (TOS-13 / US009).
 
-Enchaîne scan Nmap → création d'équipements → collectes SSH/WinRM pour un
-sous-réseau. Ce module contient aussi les helpers purs (détection de profil)
-pour rester facilement testables.
+Enchaîne scan Nmap (délégué à un agent) → création d'équipements → collectes
+SSH/WinRM pour un sous-réseau. Ce module contient aussi les helpers purs
+(détection de profil) pour rester facilement testables.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Any, Literal, Optional, TypedDict
 
 from sqlalchemy.orm import Session
 
 from ..core.audit_logger import log_access_denied
 from ..core.database import SessionLocal
 from ..core.helpers import user_has_access_to_entreprise
+from ..models.agent import Agent
+from ..models.agent_task import AgentTask
 from ..models.collect_pipeline import CollectPipeline, PipelineStatus, PipelineStepStatus
 from ..models.collect_result import CollectResult, CollectStatus
 from ..models.equipement import Equipement
-from ..models.scan import ScanHost, ScanReseau
 from ..models.site import Site
 
 logger = logging.getLogger(__name__)
@@ -38,13 +40,65 @@ _SSH_PORT = 22
 _WINRM_HTTP_PORT = 5985
 _WINRM_HTTPS_PORT = 5986
 
+# Polling du scan agent
+_SCAN_POLL_INTERVAL_SEC = 5
+_SCAN_TIMEOUT_SEC = 30 * 60  # 30 minutes
 
-def _open_port_numbers(host: ScanHost) -> set[int]:
+
+class NmapPort(TypedDict, total=False):
+    port: int
+    protocol: str
+    state: str
+    service: str
+
+
+class NmapHost(TypedDict, total=False):
+    """Hôte Nmap normalisé à partir du JSON renvoyé par l'agent.
+
+    Les agents renvoient soit des clés courtes (ip/mac/os/port) soit les
+    clés longues historiques (ip_address/mac_address/os_guess/port_number).
+    `_normalize_host` unifie les deux formats.
+    """
+
+    ip: str
+    hostname: str
+    mac: str
+    vendor: str
+    os: str
+    ports: list[NmapPort]
+
+
+def _normalize_host(raw: dict[str, Any]) -> NmapHost:
+    """Transforme un host brut agent en NmapHost normalisé."""
+    raw_ports = raw.get("ports") or []
+    ports: list[NmapPort] = []
+    for p in raw_ports:
+        if not isinstance(p, dict):
+            continue
+        ports.append(
+            {
+                "port": int(p.get("port") or p.get("port_number") or 0),
+                "protocol": str(p.get("proto") or p.get("protocol") or "tcp"),
+                "state": str(p.get("state") or ""),
+                "service": str(p.get("service") or p.get("service_name") or ""),
+            }
+        )
+    return {
+        "ip": str(raw.get("ip") or raw.get("ip_address") or ""),
+        "hostname": str(raw.get("hostname") or ""),
+        "mac": str(raw.get("mac") or raw.get("mac_address") or ""),
+        "vendor": str(raw.get("vendor") or ""),
+        "os": str(raw.get("os") or raw.get("os_guess") or ""),
+        "ports": ports,
+    }
+
+
+def _open_port_numbers(host: NmapHost) -> set[int]:
     """Retourne l'ensemble des numéros de ports dans l'état `open` pour un hôte."""
     ports: set[int] = set()
-    for p in host.ports or []:
-        if p.state == "open" and p.port_number is not None:
-            ports.add(int(p.port_number))
+    for p in host.get("ports") or []:
+        if p.get("state") == "open" and p.get("port"):
+            ports.add(int(p["port"]))
     return ports
 
 
@@ -56,22 +110,23 @@ def _matches(value: Optional[str], *needles: str) -> bool:
     return any(n in haystack for n in needles)
 
 
-def _host_signals(host: ScanHost) -> dict:
+def _host_signals(host: NmapHost) -> dict:
     """Agrège les signaux textuels utiles à la détection (OS + banners services)."""
-    os_guess = host.os_guess or ""
-    # Concatène les `product`/`version`/`extra_info` des ports pour détecter
-    # OPNsense/FreeBSD via les banners SSH ou HTTP.
+    os_guess = host.get("os") or ""
+    # Concatène les services des ports pour détecter OPNsense/FreeBSD via les
+    # banners SSH ou HTTP. L'agent fusionne déjà product/version/extra_info
+    # dans le champ `service`.
     banners: list[str] = []
-    for p in host.ports or []:
-        if p.state != "open":
+    for p in host.get("ports") or []:
+        if p.get("state") != "open":
             continue
-        for field in (p.product, p.version, p.extra_info, p.service_name):
-            if field:
-                banners.append(field)
+        svc = p.get("service")
+        if svc:
+            banners.append(svc)
     return {"os_guess": os_guess, "banners": " ".join(banners)}
 
 
-def detect_collect_profile(host: ScanHost) -> AutoCollectProfile | None:
+def detect_collect_profile(host: NmapHost) -> AutoCollectProfile | None:
     """
     Détermine le profil de collecte approprié pour un hôte découvert.
 
@@ -145,6 +200,7 @@ def _utcnow() -> datetime:
 def create_pending_pipeline(
     db: Session,
     site_id: int,
+    agent_id: int,
     target: str,
     created_by: int,
     *,
@@ -152,8 +208,9 @@ def create_pending_pipeline(
 ) -> CollectPipeline:
     """Cree un pipeline en statut 'pending' et le persiste immediatement.
 
-    Verifie l'ownership du site (via Site -> Entreprise -> Audit) sauf admin.
-    Leve ``ValueError`` si le site est introuvable ou inaccessible.
+    Verifie l'ownership du site (via Site -> Entreprise -> Audit) et de
+    l'agent (sauf admin). Leve ``ValueError`` si une entite est introuvable
+    ou inaccessible.
     """
     site = db.get(Site, site_id)
     if not site:
@@ -162,8 +219,20 @@ def create_pending_pipeline(
         log_access_denied(created_by, "Site", site_id, action="launch_pipeline")
         raise ValueError(f"Site {site_id} introuvable")
 
+    agent = db.get(Agent, agent_id)
+    if agent is None:
+        raise ValueError(f"Agent {agent_id} introuvable")
+    if not is_admin and agent.user_id != created_by:
+        log_access_denied(created_by, "Agent", agent_id, action="launch_pipeline")
+        raise ValueError(f"Agent {agent_id} introuvable")
+    if agent.status != "active":
+        raise ValueError(f"Agent {agent_id} inactif")
+    if "nmap" not in (agent.allowed_tools or []):
+        raise ValueError(f"Agent {agent_id} non autorisé à exécuter nmap")
+
     pipeline = CollectPipeline(
         site_id=site_id,
+        agent_id=agent_id,
         target=target,
         created_by=created_by,
         status=PipelineStatus.PENDING,
@@ -251,50 +320,78 @@ def _pipeline_event(pipeline: CollectPipeline) -> dict:
     }
 
 
-def _run_scan_phase(db: Session, pipeline: CollectPipeline) -> ScanReseau | None:
-    """Phase 1 : scan Nmap. Retourne le ScanReseau (completed) ou None si echec."""
-    from . import scan_service
+def _run_scan_phase(
+    db: Session,
+    pipeline: CollectPipeline,
+    current_user_id: int,
+) -> list[NmapHost] | None:
+    """Phase 1 : dispatch du scan Nmap vers l'agent, polling jusqu'au résultat.
 
-    scan = scan_service.create_pending_scan(
-        db=db,
-        site_id=pipeline.site_id,
-        target=pipeline.target,
-        scan_type="port_scan",  # besoin des ports pour detecter le profil
-        nom=f"Pipeline #{pipeline.id}",
-        owner_id=pipeline.created_by,
-        is_admin=True,  # le check d'ownership a deja ete fait a la creation
-    )
-    pipeline.scan_id = scan.id
+    Retourne la liste des hôtes normalisés (ou None si échec/timeout).
+    """
+    from . import task_service
+
+    agent = db.get(Agent, pipeline.agent_id) if pipeline.agent_id else None
+    if agent is None:
+        pipeline.scan_status = PipelineStepStatus.FAILED
+        pipeline.error_message = "Agent introuvable"
+        return None
+
+    try:
+        task = task_service.dispatch_task(
+            db=db,
+            agent_uuid=agent.agent_uuid,
+            tool="nmap",
+            parameters={
+                "target": pipeline.target,
+                "scan_type": "port_scan",
+            },
+            current_user_id=current_user_id,
+        )
+    except Exception as exc:
+        logger.exception("Pipeline #%s : dispatch nmap échoué", pipeline.id)
+        pipeline.scan_status = PipelineStepStatus.FAILED
+        pipeline.error_message = f"Dispatch nmap échoué : {exc}"
+        return None
+
+    pipeline.scan_task_uuid = task.task_uuid
     pipeline.scan_status = PipelineStepStatus.RUNNING
     db.commit()
 
-    # execute_scan_background ouvre sa propre session, ce qui nous convient.
-    scan_service.execute_scan_background(
-        scan_id=scan.id,
-        site_id=pipeline.site_id,
-        target=pipeline.target,
-        scan_type="port_scan",
-    )
-
-    # Recharger le scan mis a jour par le worker
-    db.refresh(pipeline)
-    scan_reloaded = db.get(ScanReseau, scan.id)
-    if scan_reloaded is None or scan_reloaded.statut != "completed":
+    # Polling jusqu'à completed/failed/timeout
+    deadline = time.monotonic() + _SCAN_TIMEOUT_SEC
+    while time.monotonic() < deadline:
+        time.sleep(_SCAN_POLL_INTERVAL_SEC)
+        db.expire_all()
+        task_reloaded = db.get(AgentTask, task.id)
+        if task_reloaded is None:
+            pipeline.scan_status = PipelineStepStatus.FAILED
+            pipeline.error_message = "Tâche agent introuvable"
+            return None
+        if task_reloaded.status in ("completed", "failed", "cancelled"):
+            task = task_reloaded
+            break
+    else:
         pipeline.scan_status = PipelineStepStatus.FAILED
-        pipeline.error_message = (
-            scan_reloaded.error_message if scan_reloaded else "Scan introuvable"
-        )
+        pipeline.error_message = "Timeout du scan agent"
         return None
 
-    pipeline.hosts_discovered = scan_reloaded.nombre_hosts_trouves
+    if task.status != "completed":
+        pipeline.scan_status = PipelineStepStatus.FAILED
+        pipeline.error_message = task.error_message or f"Scan {task.status}"
+        return None
+
+    raw_hosts = (task.result_summary or {}).get("hosts") or []
+    hosts: list[NmapHost] = [_normalize_host(h) for h in raw_hosts if isinstance(h, dict)]
+    pipeline.hosts_discovered = len(hosts)
     pipeline.scan_status = PipelineStepStatus.COMPLETED
-    return scan_reloaded
+    return hosts
 
 
 def _run_equipments_phase(
     db: Session,
     pipeline: CollectPipeline,
-    scan: ScanReseau,
+    hosts: list[NmapHost],
 ) -> list[tuple[Equipement, AutoCollectProfile]]:
     """Phase 2 : pour chaque host, detecter le profil et creer/dedupliquer l'equipement.
 
@@ -304,11 +401,11 @@ def _run_equipments_phase(
     db.commit()
 
     to_collect: list[tuple[Equipement, AutoCollectProfile]] = []
-    hosts = db.query(ScanHost).filter(ScanHost.scan_id == scan.id).all()
 
     for host in hosts:
         profile = detect_collect_profile(host)
-        if profile is None:
+        ip = host.get("ip") or ""
+        if profile is None or not ip:
             pipeline.hosts_skipped += 1
             continue
 
@@ -317,7 +414,7 @@ def _run_equipments_phase(
             db.query(Equipement)
             .filter(
                 Equipement.site_id == pipeline.site_id,
-                Equipement.ip_address == host.ip_address,
+                Equipement.ip_address == ip,
             )
             .first()
         )
@@ -327,19 +424,16 @@ def _run_equipments_phase(
             equip = Equipement(
                 site_id=pipeline.site_id,
                 type_equipement=equip_type,
-                ip_address=host.ip_address,
-                hostname=host.hostname,
-                mac_address=host.mac_address,
-                fabricant=host.vendor,
-                os_detected=host.os_guess,
+                ip_address=ip,
+                hostname=host.get("hostname") or None,
+                mac_address=host.get("mac") or None,
+                fabricant=host.get("vendor") or None,
+                os_detected=host.get("os") or None,
             )
             db.add(equip)
             db.flush()
             pipeline.equipments_created += 1
 
-        host.equipement_id = equip.id
-        host.decision = "kept"
-        host.chosen_type = equip_type
         to_collect.append((equip, profile))
 
     pipeline.equipments_status = PipelineStepStatus.COMPLETED
@@ -428,6 +522,8 @@ def _run_collects_phase(
 def execute_pipeline_background(
     pipeline_id: int,
     *,
+    agent_uuid: Optional[str] = None,  # conservé pour compat, non utilisé
+    current_user_id: int,
     username: str,
     password: Optional[str] = None,
     private_key: Optional[str] = None,
@@ -435,11 +531,12 @@ def execute_pipeline_background(
     use_ssl: bool = False,
     transport: str = "ntlm",
 ) -> None:
-    """Orchestre scan → equipements → collectes pour un pipeline.
+    """Orchestre scan agent → equipements → collectes pour un pipeline.
 
     Execute de maniere synchrone dans un thread dedie (LocalTaskRunner). Chaque
     etape est isolee : un echec de collecte individuelle n'arrete pas la boucle.
     """
+    del agent_uuid  # l'agent est lu depuis pipeline.agent_id
     db = SessionLocal()
     try:
         pipeline = db.get(CollectPipeline, pipeline_id)
@@ -452,11 +549,11 @@ def execute_pipeline_background(
         db.commit()
         _notify(pipeline.created_by, "pipeline_started", _pipeline_event(pipeline))
 
-        # Phase 1 — Scan
-        scan = _run_scan_phase(db, pipeline)
+        # Phase 1 — Scan agent
+        hosts = _run_scan_phase(db, pipeline, current_user_id)
         db.commit()
         _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
-        if scan is None:
+        if hosts is None:
             pipeline.status = PipelineStatus.FAILED
             pipeline.completed_at = _utcnow()
             db.commit()
@@ -464,7 +561,7 @@ def execute_pipeline_background(
             return
 
         # Phase 2 — Equipements
-        targets = _run_equipments_phase(db, pipeline, scan)
+        targets = _run_equipments_phase(db, pipeline, hosts)
         _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
 
         # Phase 3 — Collectes

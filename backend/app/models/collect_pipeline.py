@@ -56,8 +56,9 @@ class CollectPipeline(Base):
     )
     error_message: Mapped[str | None] = mapped_column(Text)
 
-    # Étape 1 — Scan Nmap
-    scan_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("scans_reseau.id"), index=True)
+    # Étape 1 — Scan Nmap (délégué à un agent)
+    agent_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("agents.id"), index=True)
+    scan_task_uuid: Mapped[str | None] = mapped_column(String(36), ForeignKey("agent_tasks.task_uuid"), index=True)
     scan_status: Mapped[PipelineStepStatus] = mapped_column(
         Enum(PipelineStepStatus), default=PipelineStepStatus.PENDING, nullable=False
     )
@@ -84,7 +85,8 @@ class CollectPipeline(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Relations
-    scan: Mapped["ScanReseau | None"] = relationship()  # type: ignore[name-defined]
+    agent: Mapped["Agent | None"] = relationship()  # type: ignore[name-defined]
+    scan_task: Mapped["AgentTask | None"] = relationship()  # type: ignore[name-defined]
 
     def __repr__(self) -> str:
         return (

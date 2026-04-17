@@ -12,6 +12,7 @@ class PipelineCreate(BaseModel):
     """Paramètres pour lancer un pipeline multi-étapes scan → equipements → collectes."""
 
     site_id: int = Field(..., description="Site sur lequel rattacher les équipements")
+    agent_id: int = Field(..., description="Agent qui exécutera le scan Nmap")
     target: str = Field(
         ...,
         description="IP, CIDR ou hostname à scanner",
@@ -49,7 +50,8 @@ class PipelineRead(BaseModel):
     status: str
     error_message: Optional[str] = None
 
-    scan_id: Optional[int] = None
+    agent_id: Optional[int] = None
+    scan_task_uuid: Optional[str] = None
     scan_status: str
     hosts_discovered: int
 

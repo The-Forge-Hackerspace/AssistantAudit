@@ -45,6 +45,7 @@ def launch_pipeline(
         pipeline = pipeline_service.create_pending_pipeline(
             db=db,
             site_id=payload.site_id,
+            agent_id=payload.agent_id,
             target=payload.target,
             created_by=current_user.id,
             is_admin=current_user.role == "admin",
@@ -58,6 +59,8 @@ def launch_pipeline(
     task_runner.submit(
         pipeline_service.execute_pipeline_background,
         pipeline_id=pipeline.id,
+        agent_uuid=None,  # résolu depuis pipeline.agent
+        current_user_id=current_user.id,
         username=payload.username,
         password=payload.password,
         private_key=payload.private_key,
