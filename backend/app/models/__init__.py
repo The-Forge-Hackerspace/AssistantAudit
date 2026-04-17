@@ -58,7 +58,6 @@ from .monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
 from .network_map import NetworkLink, NetworkMapLayout, SiteConnection
 from .oradad_config import OradadConfig
 from .report import AuditReport, ReportSection
-from .scan import ScanHost, ScanPort, ScanReseau
 from .site import Site
 from .tag import Tag, TagAssociation
 from .task_artifact import TaskArtifact
@@ -88,9 +87,6 @@ __all__ = [
     "EquipementAuditStatus",
     "EQUIPEMENT_TYPE_VALUES",
     "EQUIPEMENT_TYPE_CLASS_MAP",
-    "ScanReseau",
-    "ScanHost",
-    "ScanPort",
     "NetworkLink",
     "NetworkMapLayout",
     "SiteConnection",

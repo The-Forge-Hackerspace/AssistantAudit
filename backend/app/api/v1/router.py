@@ -20,7 +20,6 @@ from .network_map import router as network_map_router
 from .oradad import router as oradad_router
 from .pipelines import router as pipelines_router
 from .reports import router as reports_router
-from .scans import router as scans_router
 from .sites import router as sites_router
 from .tags import router as tags_router
 from .tools import router as tools_router
@@ -37,7 +36,6 @@ api_router.include_router(equipements_router, prefix="/equipements", tags=["Équ
 api_router.include_router(frameworks_router, prefix="/frameworks", tags=["Référentiels"])
 api_router.include_router(assessments_router, prefix="/assessments", tags=["Évaluations"])
 api_router.include_router(attachments_router, prefix="/attachments", tags=["Pièces jointes"])
-api_router.include_router(scans_router, prefix="/scans", tags=["Scanner réseau"])
 api_router.include_router(pipelines_router, prefix="/pipelines", tags=["Pipelines de collecte"])
 api_router.include_router(network_map_router, prefix="/network-map", tags=["Cartographie réseau"])
 api_router.include_router(tools_router)
