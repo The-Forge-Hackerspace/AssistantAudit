@@ -65,7 +65,7 @@ RUN pwsh -NoProfile -Command "\
     && find /usr/local/share/powershell -name '*.nupkg' -delete 2>/dev/null; true
 
 # Répertoires
-RUN mkdir -p /app/data /app/certs /app/instance /app/tools/monkey365
+RUN mkdir -p /app/data/blobs /app/certs /app/instance /app/tools/monkey365
 
 # Utilisateur non-root
 RUN useradd -r -s /bin/false appuser && chown -R appuser:appuser /app
