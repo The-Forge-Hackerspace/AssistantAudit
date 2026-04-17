@@ -1,13 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Play, Server, Monitor, Terminal } from "lucide-react";
+import { Play, Monitor, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { entreprisesApi, sitesApi, agentsApi, scansApi } from "@/services/api";
+import { entreprisesApi, sitesApi, agentsApi } from "@/services/api";
 import type { Agent, Entreprise, Site } from "@/types";
 import { toast } from "sonner";
 
@@ -39,15 +37,10 @@ const SCAN_TYPES = [
 interface LaunchScanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onLaunched: () => void;
   onAgentDispatched: (taskUuid: string) => void;
 }
 
-export function LaunchScanDialog({ open, onOpenChange, onLaunched, onAgentDispatched }: LaunchScanDialogProps) {
-  // Mode
-  const [scanMode, setScanMode] = useState<"local" | "agent">("local");
-
-  // Selects
+export function LaunchScanDialog({ open, onOpenChange, onAgentDispatched }: LaunchScanDialogProps) {
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -55,7 +48,6 @@ export function LaunchScanDialog({ open, onOpenChange, onLaunched, onAgentDispat
   const [siteId, setSiteId] = useState<number>(0);
   const [selectedAgentUuid, setSelectedAgentUuid] = useState("");
 
-  // Form
   const [nom, setNom] = useState("");
   const [target, setTarget] = useState("");
   const [scanType, setScanType] = useState<string>("discovery");
@@ -63,18 +55,16 @@ export function LaunchScanDialog({ open, onOpenChange, onLaunched, onAgentDispat
   const [notes, setNotes] = useState("");
   const [launching, setLaunching] = useState(false);
 
-  // Fetch entreprises + agents on open
   useEffect(() => {
     if (!open) return;
     entreprisesApi.list(1, 100).then((r) => setEntreprises(r.items)).catch(() => {});
     agentsApi.list().then(setAgents).catch(() => {});
   }, [open]);
 
-  // Fetch sites when entreprise changes
   useEffect(() => {
     if (!entrepriseId) { setSites([]); return; }
     sitesApi.list(1, 100, entrepriseId).then((r) => setSites(r.items)).catch(() => {});
-    setSiteId(0); // reset site selection
+    setSiteId(0);
   }, [entrepriseId]);
 
   const nmapAgents = useMemo(
@@ -96,11 +86,15 @@ export function LaunchScanDialog({ open, onOpenChange, onLaunched, onAgentDispat
 
   const reset = useCallback(() => {
     setNom(""); setTarget(""); setCustomArgs(""); setNotes("");
-    setScanType("discovery"); setScanMode("local");
+    setScanType("discovery");
     setEntrepriseId(0); setSiteId(0); setSelectedAgentUuid("");
   }, []);
 
   const handleLaunch = async () => {
+    if (!selectedAgentUuid) {
+      toast.error("Veuillez selectionner un agent");
+      return;
+    }
     if (!siteId || !target) {
       toast.error("Veuillez selectionner un site et saisir une cible");
       return;
@@ -112,40 +106,27 @@ export function LaunchScanDialog({ open, onOpenChange, onLaunched, onAgentDispat
 
     setLaunching(true);
     try {
-      if (scanMode === "agent") {
-        if (!selectedAgentUuid) { toast.error("Veuillez selectionner un agent"); return; }
-        const res = await agentsApi.dispatch({
-          agent_uuid: selectedAgentUuid,
-          tool: "nmap",
-          parameters: {
-            target,
-            scan_type: scanType,
-            custom_args: scanType === "custom" ? customArgs.trim() : undefined,
-            site_id: siteId,
-            entreprise_id: entrepriseId,
-            nom: nom.trim() || undefined,
-          },
-        });
-        const taskUuid = (res as { task_uuid?: string }).task_uuid;
-        if (taskUuid) onAgentDispatched(taskUuid);
-        toast.success("Scan dispatche vers l'agent distant");
-      } else {
-        await scansApi.launch({
-          nom: nom.trim() || undefined,
-          site_id: siteId,
+      const res = await agentsApi.dispatch({
+        agent_uuid: selectedAgentUuid,
+        tool: "nmap",
+        parameters: {
           target,
-          scan_type: scanType as "discovery" | "port_scan" | "full" | "custom",
+          scan_type: scanType,
           custom_args: scanType === "custom" ? customArgs.trim() : undefined,
+          site_id: siteId,
+          entreprise_id: entrepriseId,
+          nom: nom.trim() || undefined,
           notes: notes || undefined,
-        });
-        toast.success("Scan lance en arriere-plan");
-        onLaunched();
-      }
+        },
+      });
+      const taskUuid = (res as { task_uuid?: string }).task_uuid;
+      if (taskUuid) onAgentDispatched(taskUuid);
+      toast.success("Scan dispatche vers l'agent distant");
       onOpenChange(false);
       reset();
     } catch (err: unknown) {
       const axErr = err as { response?: { data?: { detail?: string } } };
-      toast.error(axErr?.response?.data?.detail || "Erreur lors du lancement");
+      toast.error(axErr?.response?.data?.detail || "Erreur lors du dispatch");
     } finally {
       setLaunching(false);
     }
@@ -155,28 +136,33 @@ export function LaunchScanDialog({ open, onOpenChange, onLaunched, onAgentDispat
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Lancer un scan reseau</DialogTitle>
-          <DialogDescription>Configurez les parametres du scan Nmap</DialogDescription>
+          <DialogTitle>Lancer un scan reseau (agent distant)</DialogTitle>
+          <DialogDescription>Dispatchez un scan Nmap vers un agent enregistre.</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4">
-          {/* Mode Local / Agent */}
+          {/* Agent */}
           <div>
-            <Label className="mb-1.5 block">Execution</Label>
-            <Tabs value={scanMode} onValueChange={(v) => setScanMode(v as "local" | "agent")}>
-              <TabsList className="w-full">
-                <TabsTrigger value="local" className="flex-1 gap-1.5">
-                  <Server className="size-3.5" />
-                  Local (serveur)
-                </TabsTrigger>
-                <TabsTrigger value="agent" className="flex-1 gap-1.5" disabled={nmapAgents.length === 0}>
-                  <Monitor className="size-3.5" />
-                  Agent distant
-                  {nmapAgents.length > 0 && (
-                    <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">{nmapAgents.length}</Badge>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <Label>Agent *</Label>
+            <Select value={selectedAgentUuid} onValueChange={setSelectedAgentUuid}>
+              <SelectTrigger>
+                <SelectValue placeholder={nmapAgents.length === 0 ? "Aucun agent Nmap disponible" : "Selectionner un agent"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {nmapAgents.map((a) => (
+                    <SelectItem key={a.agent_uuid} value={a.agent_uuid}>
+                      <Monitor className="size-3.5 inline mr-1" />
+                      {a.name} {a.last_ip ? `(${a.last_ip})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            {nmapAgents.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Aucun agent actif avec l&apos;outil <code>nmap</code>. Enregistrez un agent dans la section Agents.
+              </p>
+            )}
           </div>
 
           {/* Entreprise */}
@@ -194,7 +180,7 @@ export function LaunchScanDialog({ open, onOpenChange, onLaunched, onAgentDispat
             </Select>
           </div>
 
-          {/* Site (filtered by entreprise) */}
+          {/* Site */}
           <div>
             <Label>Site *</Label>
             <Select
@@ -212,25 +198,6 @@ export function LaunchScanDialog({ open, onOpenChange, onLaunched, onAgentDispat
               </SelectContent>
             </Select>
           </div>
-
-          {/* Agent (only in agent mode) */}
-          {scanMode === "agent" && nmapAgents.length > 0 && (
-            <div>
-              <Label>Agent *</Label>
-              <Select value={selectedAgentUuid} onValueChange={setSelectedAgentUuid}>
-                <SelectTrigger><SelectValue placeholder="Selectionner un agent" /></SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {nmapAgents.map((a) => (
-                      <SelectItem key={a.agent_uuid} value={a.agent_uuid}>
-                        {a.name} {a.last_ip ? `(${a.last_ip})` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           {/* Nom */}
           <div>
@@ -289,9 +256,9 @@ export function LaunchScanDialog({ open, onOpenChange, onLaunched, onAgentDispat
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button onClick={handleLaunch} disabled={launching}>
+          <Button onClick={handleLaunch} disabled={launching || nmapAgents.length === 0}>
             <Play data-icon="inline-start" />
-            {launching ? "Lancement..." : "Lancer"}
+            {launching ? "Dispatch..." : "Dispatcher"}
           </Button>
         </DialogFooter>
       </DialogContent>
