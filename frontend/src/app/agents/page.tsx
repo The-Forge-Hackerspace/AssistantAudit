@@ -282,7 +282,7 @@ export default function AgentsPage() {
     const connect = () => {
       const token = getAccessToken();
       if (!token) return;
-      const ws = new WebSocket(`${WS_BASE}/api/v1/ws/user?token=${token}`);
+      const ws = new WebSocket(`${WS_BASE}/ws/user?token=${token}`);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {
