@@ -55,7 +55,7 @@ import { cn } from "@/lib/utils";
 import { useRef } from "react";
 import { toast } from "sonner";
 import { agentsApi, entreprisesApi, sitesApi } from "@/services/api";
-import type { Agent, AgentTask, Entreprise, Site } from "@/types";
+import type { Agent, AgentTask, AgentTaskStatus, Entreprise, Site } from "@/types";
 import { LaunchScanDialog } from "./components/launch-scan-dialog";
 import { AgentTaskDetail } from "./components/agent-task-detail";
 
@@ -151,12 +151,22 @@ function ScannerContent() {
         const taskUuid = msg.data?.task_uuid as string | undefined;
         if (!taskUuid) return;
 
+        const ALLOWED_STATUSES: AgentTaskStatus[] = ["pending", "dispatched", "running", "completed", "failed", "cancelled"];
+        const isStatus = (v: unknown): v is AgentTaskStatus =>
+          typeof v === "string" && (ALLOWED_STATUSES as string[]).includes(v);
+        const isTerminal = (s: AgentTaskStatus | undefined) =>
+          s === "completed" || s === "failed" || s === "cancelled";
+
         if (msg.type === "task_progress") {
           const raw = msg.data.progress ?? msg.data.percent;
           const pct = typeof raw === "number" ? Math.max(0, Math.min(100, Math.round(raw))) : null;
           if (pct !== null) {
             setAgentTasks((prev) =>
-              prev.map((t) => (t.task_uuid === taskUuid ? { ...t, progress: pct } : t))
+              prev.map((t) =>
+                t.task_uuid === taskUuid
+                  ? { ...t, progress: pct, status: isTerminal(t.status) ? t.status : "running" }
+                  : t
+              )
             );
           }
           if (taskUuid === agentTaskUuid) {
@@ -165,21 +175,26 @@ function ScannerContent() {
           }
         }
 
-        if (msg.type === "task_status" && taskUuid === agentTaskUuid) {
-          const status = msg.data.status as string;
-          setAgentLogs((prev) => [...prev, `[STATUS] ${status}`]);
-          if (status === "completed" || status === "failed") {
-            setAgentLogs((prev) => [
-              ...prev,
-              status === "completed"
-                ? "[DONE] Scan termine avec succes"
-                : `[ERREUR] ${msg.data.error_message || "Echec du scan"}`,
-            ]);
-            fetchAgentTasks();
+        if (msg.type === "task_status") {
+          const rawStatus = msg.data.status;
+          const status = isStatus(rawStatus) ? rawStatus : undefined;
+          if (status) {
+            setAgentTasks((prev) =>
+              prev.map((t) => (t.task_uuid === taskUuid ? { ...t, status } : t))
+            );
           }
-        } else if (msg.type === "task_status") {
-          const status = msg.data.status as string | undefined;
-          if (status === "completed" || status === "failed" || status === "cancelled") {
+          if (taskUuid === agentTaskUuid) {
+            setAgentLogs((prev) => [...prev, `[STATUS] ${status ?? rawStatus}`]);
+            if (status === "completed" || status === "failed") {
+              setAgentLogs((prev) => [
+                ...prev,
+                status === "completed"
+                  ? "[DONE] Scan termine avec succes"
+                  : `[ERREUR] ${msg.data.error_message || "Echec du scan"}`,
+              ]);
+              fetchAgentTasks();
+            }
+          } else if (status === "completed" || status === "failed" || status === "cancelled") {
             fetchAgentTasks();
           }
         }
