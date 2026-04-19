@@ -25,14 +25,18 @@ export default function LoginPage() {
       // La redirection vers "/" est gérée par AuthGuard
       // une fois que le state `user` est mis à jour.
     } catch (err: unknown) {
-      if (err && typeof err === "object" && "response" in err) {
-        const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } };
-        const detail = axiosErr.response?.data?.detail;
-        setError(detail || `Erreur ${axiosErr.response?.status || "inconnue"}`);
-      } else if (err instanceof Error) {
-        setError(err.message || "Erreur de connexion");
+      const status =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
+      if (status === 401) {
+        setError("Identifiant ou mot de passe invalide");
+      } else if (status === 429) {
+        setError("Trop de tentatives, réessayez plus tard");
+      } else if (status !== undefined) {
+        setError(`Erreur ${status} — réessayez`);
       } else {
-        setError("Identifiants incorrects");
+        setError("Impossible de joindre le serveur");
       }
     } finally {
       setLoading(false);

@@ -12,7 +12,6 @@ from app.models.assessment import AssessmentCampaign
 from app.models.audit import Audit
 from app.models.entreprise import Entreprise
 from app.models.equipement import Equipement
-from app.models.scan import ScanReseau
 from app.models.site import Site
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -475,73 +474,6 @@ class TestEquipementIsolation:
             },
             headers=second_auditeur_headers,
         )
-        assert r.status_code == 404
-
-
-# ══════════════════════════════════════════════════════════════════════
-# E) SCAN ISOLATION (owner_id direct)
-# ══════════════════════════════════════════════════════════════════════
-
-
-class TestScanIsolation:
-    def test_scan_not_visible_to_other_user(
-        self,
-        client,
-        db_session,
-        auditeur_user,
-        auditeur_headers,
-        second_auditeur_user,
-        second_auditeur_headers,
-    ):
-        """User B ne voit pas les scans de User A."""
-        _, _, site, _ = _create_chain(
-            db_session,
-            auditeur_user,
-            ent_name="Ent ScanVis",
-        )
-        scan = ScanReseau(
-            site_id=site.id,
-            owner_id=auditeur_user.id,
-            type_scan="discovery",
-            statut="completed",
-        )
-        db_session.add(scan)
-        db_session.commit()
-        db_session.refresh(scan)
-
-        # User B liste → vide
-        r = client.get("/api/v1/scans", headers=second_auditeur_headers)
-        assert r.status_code == 200
-        assert r.json()["total"] == 0
-
-        # User B detail → 404
-        r = client.get(f"/api/v1/scans/{scan.id}", headers=second_auditeur_headers)
-        assert r.status_code == 404
-
-    def test_scan_delete_by_other_user_returns_404(
-        self,
-        client,
-        db_session,
-        auditeur_user,
-        second_auditeur_headers,
-    ):
-        """User B ne peut pas supprimer le scan de User A."""
-        _, _, site, _ = _create_chain(
-            db_session,
-            auditeur_user,
-            ent_name="Ent ScanDel",
-        )
-        scan = ScanReseau(
-            site_id=site.id,
-            owner_id=auditeur_user.id,
-            type_scan="discovery",
-            statut="completed",
-        )
-        db_session.add(scan)
-        db_session.commit()
-        db_session.refresh(scan)
-
-        r = client.delete(f"/api/v1/scans/{scan.id}", headers=second_auditeur_headers)
         assert r.status_code == 404
 
 

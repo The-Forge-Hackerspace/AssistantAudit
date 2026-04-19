@@ -48,6 +48,10 @@ api.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // /auth/login : le 401 est attendu (mauvais identifiants), laisser l'UI le gérer
+      if (originalRequest.url?.includes("/auth/login")) {
+        return Promise.reject(error);
+      }
       // Si c'est la route /auth/refresh qui a échoué → logout direct
       if (originalRequest.url?.includes("/auth/refresh")) {
         clearTokens();

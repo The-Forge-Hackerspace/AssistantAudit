@@ -43,7 +43,6 @@ from app.models.attachment import Attachment  # noqa: E402
 from app.models.collect_result import CollectResult  # noqa: E402
 from app.models.finding import Finding  # noqa: E402
 from app.models.oradad_config import OradadConfig  # noqa: E402
-from app.models.scan import ScanReseau  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Logging structuré
@@ -59,7 +58,6 @@ logger = logging.getLogger("rotate_keys")
 # Registre des colonnes chiffrées (modèle, nom_colonne, type_decorator)
 # ---------------------------------------------------------------------------
 ENCRYPTED_COLUMNS: list[tuple[type, str, type]] = [
-    (ScanReseau, "raw_xml_output", EncryptedText),
     (OradadConfig, "explicit_domains", EncryptedText),
     (CollectResult, "username", EncryptedText),
     (Finding, "remediation_note", EncryptedText),

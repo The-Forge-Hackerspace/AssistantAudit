@@ -196,6 +196,11 @@ def create_app() -> FastAPI:
             if request.scope.get("type") == "websocket":
                 return await call_next(request)
 
+            # Préflights CORS : pas de rate limiting (pas de logique métier,
+            # consomme inutilement le budget quand le front poll à 3s)
+            if request.method == "OPTIONS":
+                return await call_next(request)
+
             path = request.url.path
 
             try:

@@ -92,6 +92,33 @@ def main() -> None:
     # Créer l'admin si absent (premier démarrage ou base réinitialisée)
     _ensure_admin()
 
+    # Injection des données de démo si DEMO=true (staging/demo seulement)
+    _seed_demo_if_requested()
+
+
+def _seed_demo_if_requested() -> None:
+    """Injecte les données de démonstration si DEMO=true.
+
+    Idempotent : seed_demo.py ne crée rien qui existe déjà.
+    Activé uniquement via env var explicite — ne s'exécute jamais par défaut.
+    """
+    flag = os.getenv("DEMO", "").strip().lower()
+    if flag not in ("true", "1", "yes", "on"):
+        return
+
+    seed_script = BACKEND_DIR / "scripts" / "seed_demo.py"
+    if not seed_script.exists():
+        print(f"[WARN] DEMO=true mais script introuvable : {seed_script}")
+        return
+
+    print("[INFO] DEMO=true — injection des données de démonstration")
+    result = subprocess.run([sys.executable, str(seed_script)], cwd=str(BACKEND_DIR))  # noqa: S603
+    if result.returncode != 0:
+        # Non-bloquant : un seed raté ne doit pas empêcher le backend de démarrer
+        print(f"[WARN] Seed démo a retourné code {result.returncode} — backend démarre quand même")
+    else:
+        print("[OK] Données de démonstration injectées")
+
 
 if __name__ == "__main__":
     main()

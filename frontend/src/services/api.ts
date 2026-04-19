@@ -29,10 +29,6 @@ import type {
   MessageResponse,
   RegisterRequest,
   Attachment,
-  Scan,
-  ScanCreate,
-  ScanSummary,
-  ScanHostDecision,
   ConfigUploadResponse,
   ConfigAnalysisRead,
   ConfigAnalysisSummary,
@@ -450,63 +446,7 @@ export const attachmentsApi = {
   },
 };
 
-// ── Scans (Scanner réseau) ──
-export const scansApi = {
-  async launch(data: ScanCreate): Promise<Scan> {
-    const { data: result } = await api.post("/scans", data);
-    return result;
-  },
-
-  async list(params?: {
-    site_id?: number;
-    page?: number;
-    page_size?: number;
-  }): Promise<PaginatedResponse<ScanSummary>> {
-    const { data } = await api.get("/scans", { params });
-    return data;
-  },
-
-  async get(scanId: number): Promise<Scan> {
-    const { data } = await api.get(`/scans/${scanId}`);
-    return data;
-  },
-
-  async delete(scanId: number): Promise<void> {
-    await api.delete(`/scans/${scanId}`);
-  },
-
-  async updateHostDecision(
-    hostId: number,
-    decision: ScanHostDecision
-  ): Promise<Record<string, unknown>> {
-    const { data } = await api.put(`/scans/hosts/${hostId}/decision`, decision);
-    return data;
-  },
-
-  async linkHostToEquipement(
-    hostId: number,
-    equipementId: number
-  ): Promise<Record<string, unknown>> {
-    const { data } = await api.post(
-      `/scans/hosts/${hostId}/link/${equipementId}`
-    );
-    return data;
-  },
-
-  async importAllKept(scanId: number): Promise<Record<string, unknown>> {
-    const { data } = await api.post(`/scans/${scanId}/import-all`);
-    return data;
-  },
-
-  async previewCommand(params: {
-    scan_type: string;
-    target?: string;
-    custom_args?: string;
-  }): Promise<{ command: string }> {
-    const { data } = await api.get("/scans/preview-command", { params });
-    return data;
-  },
-};
+// scansApi supprime — le scan nmap est deleguee a l'agent distant (agentsApi.dispatch).
 
 export const networkMapApi = {
   async getSiteMap(siteId: number): Promise<NetworkMap> {

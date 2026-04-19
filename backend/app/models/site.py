@@ -29,9 +29,6 @@ class Site(Base):
     def equipement_count(self) -> int:
         return len(self.equipements) if self.equipements else 0
 
-    scans: Mapped[list["ScanReseau"]] = relationship(  # type: ignore[name-defined]
-        back_populates="site", cascade="all, delete-orphan", lazy="selectin"
-    )
     network_links: Mapped[list["NetworkLink"]] = relationship(  # type: ignore[name-defined]
         back_populates="site",
         cascade="all, delete-orphan",

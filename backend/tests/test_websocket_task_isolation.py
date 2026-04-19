@@ -282,3 +282,53 @@ class TestOwnTaskStillWorks:
         assert task_for_agent_a.status == "completed"
         assert task_for_agent_a.progress == 100
         assert task_for_agent_a.result_summary == {"hosts_found": 3}
+
+    def test_own_task_progress_persists(
+        self,
+        client,
+        agent_a,
+        task_for_agent_a,
+        db_session,
+        admin_user,
+    ):
+        """Agent A envoie task_progress → AgentTask.progress est mis a jour."""
+        token = create_agent_token(agent_uuid=agent_a.agent_uuid, owner_id=admin_user.id)
+        with client.websocket_connect(f"/ws/agent?token={token}") as ws:
+            ws.send_json(
+                {
+                    "type": "task_progress",
+                    "data": {
+                        "task_uuid": task_for_agent_a.task_uuid,
+                        "progress": 42,
+                    },
+                }
+            )
+            ws.send_json({"type": "heartbeat"})
+            resp = ws.receive_json()
+            assert resp["type"] == "heartbeat_ack"
+
+        db_session.refresh(task_for_agent_a)
+        assert task_for_agent_a.progress == 42
+
+    def test_own_task_progress_clamped(
+        self,
+        client,
+        agent_a,
+        task_for_agent_a,
+        db_session,
+        admin_user,
+    ):
+        """task_progress avec valeur hors bornes est clampe a [0, 100]."""
+        token = create_agent_token(agent_uuid=agent_a.agent_uuid, owner_id=admin_user.id)
+        with client.websocket_connect(f"/ws/agent?token={token}") as ws:
+            ws.send_json(
+                {
+                    "type": "task_progress",
+                    "data": {"task_uuid": task_for_agent_a.task_uuid, "percent": 150},
+                }
+            )
+            ws.send_json({"type": "heartbeat"})
+            ws.receive_json()
+
+        db_session.refresh(task_for_agent_a)
+        assert task_for_agent_a.progress == 100
