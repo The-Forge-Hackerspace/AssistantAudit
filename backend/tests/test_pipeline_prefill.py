@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.agent import Agent
 from app.models.agent_task import AgentTask
-from app.models.assessment import ComplianceStatus, ControlResult
+from app.models.assessment import ComplianceStatus
 from app.models.collect_pipeline import CollectPipeline, PipelineStatus, PipelineStepStatus
 from app.models.entreprise import Entreprise
 from app.models.site import Site
@@ -25,7 +25,6 @@ from tests.factories import (
     FrameworkCategoryFactory,
     FrameworkFactory,
 )
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────────
 
