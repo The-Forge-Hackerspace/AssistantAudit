@@ -28,10 +28,26 @@ PHASE_WEIGHTS: list[tuple[str, int, int]] = [
 
 # Quantificateurs bornés pour éviter une complexité quadratique sur des entrées
 # malicieuses (ReDoS) — l'input vient d'un agent réseau via WebSocket.
-_INITIATING_RE = re.compile(r"Initiating ([^\r\n]{1,100}?)(?:\s{1,5}at\s{1,5}\d|\s{0,5}$)", re.IGNORECASE)
+# Le préfixe "Initiating " est extrait par str.startswith plutôt que regex pour
+# éviter l'ambiguïté du `$` en alternance signalée par CodeQL.
+_AT_TIME_RE = re.compile(r"\s{1,5}at\s{1,5}\d")
 _TIMING_RE = re.compile(r"(\d{1,3}(?:\.\d{1,3})?)% done")
 _TOTAL_HOSTS_RE = re.compile(r"Scanning (\d{1,9}) hosts?")
 _HOSTS_DONE_RE = re.compile(r"(\d{1,9}) hosts? completed")
+_INITIATING_PREFIX = "Initiating "
+_MAX_PHASE_NAME = 100
+
+
+def _extract_initiating_phase(line: str) -> Optional[str]:
+    """Extrait le nom de phase d'une ligne 'Initiating <phase> [at HH:MM]'."""
+    if not line[: len(_INITIATING_PREFIX)].lower() == _INITIATING_PREFIX.lower():
+        return None
+    rest = line[len(_INITIATING_PREFIX) : len(_INITIATING_PREFIX) + _MAX_PHASE_NAME + 20]
+    m = _AT_TIME_RE.search(rest)
+    if m:
+        rest = rest[: m.start()]
+    rest = rest.strip()
+    return rest[:_MAX_PHASE_NAME] if rest else None
 
 # Plafond défensif : on ignore les lignes anormalement longues (les vraies lignes
 # nmap font moins de 200 caractères).
@@ -85,9 +101,9 @@ def compute_progress(
             if m_done:
                 state.hosts_completed = max(state.hosts_completed, int(m_done.group(1)))
 
-            m_init = _INITIATING_RE.search(line)
-            if m_init:
-                phase = _match_phase(m_init.group(1))
+            phase_name = _extract_initiating_phase(line)
+            if phase_name:
+                phase = _match_phase(phase_name)
                 if phase:
                     state.phase_start, state.phase_end = phase
                     # Pas de reset à 0.0 : on laisse fallback_pct piloter l'intra-phase

@@ -54,8 +54,8 @@ import { TableSkeleton } from "@/components/skeletons";
 import { cn } from "@/lib/utils";
 import { useRef } from "react";
 import { toast } from "sonner";
-import { agentsApi, entreprisesApi, sitesApi } from "@/services/api";
-import type { Agent, AgentTask, AgentTaskStatus, Entreprise, Site } from "@/types";
+import { agentsApi, entreprisesApi } from "@/services/api";
+import type { Agent, AgentTask, AgentTaskStatus, Entreprise } from "@/types";
 import { LaunchScanDialog } from "./components/launch-scan-dialog";
 import { AgentTaskDetail } from "./components/agent-task-detail";
 
@@ -76,7 +76,6 @@ export default function ScannerPage() {
 
 function ScannerContent() {
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
-  const [sites, setSites] = useState<Site[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,13 +101,6 @@ function ScannerContent() {
     } catch { /* silent */ }
   }, []);
 
-  const fetchSites = useCallback(async () => {
-    try {
-      const res = await sitesApi.list(1, 100);
-      setSites(res.items);
-    } catch { /* silent */ }
-  }, []);
-
   const fetchAgents = useCallback(async () => {
     try { setAgents(await agentsApi.list()); } catch { /* silent */ }
   }, []);
@@ -125,10 +117,9 @@ function ScannerContent() {
 
   useEffect(() => {
     fetchEntreprises();
-    fetchSites();
     fetchAgents();
     fetchAgentTasks();
-  }, [fetchEntreprises, fetchSites, fetchAgents, fetchAgentTasks]);
+  }, [fetchEntreprises, fetchAgents, fetchAgentTasks]);
 
   // Poll running tasks every 3s
   useEffect(() => {
