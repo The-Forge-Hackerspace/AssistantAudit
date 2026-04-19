@@ -181,11 +181,18 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                                 if ws_data.get("error_message"):
                                     task.error_message = ws_data["error_message"]
                             else:  # task_progress
+                                from ...services.scan_progress import compute_progress
+
                                 pct = ws_data.get("progress")
                                 if pct is None:
                                     pct = ws_data.get("percent")
-                                if isinstance(pct, (int, float)):
-                                    task.progress = max(0, min(100, int(pct)))
+                                raw_pct = int(pct) if isinstance(pct, (int, float)) else None
+                                lines = ws_data.get("output_lines") or []
+                                # Recalcul hybride (phase + hôtes + monotone)
+                                new_pct = compute_progress(task.task_uuid, lines, raw_pct)
+                                task.progress = new_pct
+                                # On réinjecte le pct corrigé dans le message forwardé au front
+                                ws_data["progress"] = new_pct
                             db.commit()
                     except Exception:
                         logger.exception("Failed to persist %s for %s", msg_type, ws_data.get("task_uuid"))
@@ -225,6 +232,9 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                                 task.error_message = ws_data["error_message"]
                                 task.status = "failed"
                             db.commit()
+                            from ...services.scan_progress import reset_task
+
+                            reset_task(task.task_uuid)
                     except Exception:
                         logger.exception("Failed to persist task_result for %s", ws_data.get("task_uuid"))
                     finally:
