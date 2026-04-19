@@ -26,10 +26,16 @@ PHASE_WEIGHTS: list[tuple[str, int, int]] = [
     ("Script scan", 92, 98),
 ]
 
-_INITIATING_RE = re.compile(r"Initiating (.+?)(?:\s+at\s+\d|\s*$)", re.IGNORECASE)
-_TIMING_RE = re.compile(r"(\d+(?:\.\d+)?)% done")
-_TOTAL_HOSTS_RE = re.compile(r"Scanning (\d+) hosts?")
-_HOSTS_DONE_RE = re.compile(r"(\d+) hosts? completed")
+# Quantificateurs bornés pour éviter une complexité quadratique sur des entrées
+# malicieuses (ReDoS) — l'input vient d'un agent réseau via WebSocket.
+_INITIATING_RE = re.compile(r"Initiating ([^\r\n]{1,100}?)(?:\s{1,5}at\s{1,5}\d|\s{0,5}$)", re.IGNORECASE)
+_TIMING_RE = re.compile(r"(\d{1,3}(?:\.\d{1,3})?)% done")
+_TOTAL_HOSTS_RE = re.compile(r"Scanning (\d{1,9}) hosts?")
+_HOSTS_DONE_RE = re.compile(r"(\d{1,9}) hosts? completed")
+
+# Plafond défensif : on ignore les lignes anormalement longues (les vraies lignes
+# nmap font moins de 200 caractères).
+_MAX_LINE_LENGTH = 500
 
 
 @dataclass
@@ -69,6 +75,8 @@ def compute_progress(
         state = _states.setdefault(task_uuid, _TaskState())
 
         for line in output_lines or []:
+            if len(line) > _MAX_LINE_LENGTH:
+                continue
             m_total = _TOTAL_HOSTS_RE.search(line)
             if m_total:
                 state.total_hosts = max(state.total_hosts, int(m_total.group(1)))
