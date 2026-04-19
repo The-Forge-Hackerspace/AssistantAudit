@@ -142,7 +142,10 @@ function ScannerContent() {
     const token = document.cookie.match(/aa_access_token=([^;]+)/)?.[1];
     if (!token) return;
 
-    const wsUrl = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/user?token=${token}`;
+    const wsBase =
+      process.env.NEXT_PUBLIC_WS_URL ||
+      `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8000`;
+    const wsUrl = `${wsBase}/ws/user?token=${token}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {
