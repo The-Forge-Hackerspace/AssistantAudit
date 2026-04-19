@@ -19,6 +19,7 @@ from ...core.task_runner import get_task_runner
 from ...models.user import User
 from ...schemas.common import PaginatedResponse
 from ...schemas.pipeline import PipelineCreate, PipelineRead
+from ...schemas.scan import PrefillResult
 from ...services import pipeline_service
 
 logger = logging.getLogger(__name__)
@@ -120,3 +121,24 @@ def get_pipeline(
     if pipeline is None:
         raise HTTPException(status_code=404, detail="Pipeline introuvable")
     return pipeline
+
+
+@router.post(
+    "/{pipeline_id}/prefill/{assessment_id}",
+    response_model=PrefillResult,
+    summary="Pré-remplir un assessment depuis les résultats du pipeline (Nmap)",
+)
+def prefill_from_pipeline(
+    pipeline_id: int,
+    assessment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_auditeur),
+):
+    """Mappe les ports ouverts détectés par le scan en findings non-conformes."""
+    del current_user
+    try:
+        return pipeline_service.prefill_assessment_from_pipeline(
+            db, pipeline_id, assessment_id
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
