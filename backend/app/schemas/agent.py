@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, field_serializer
 
 class AgentCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    allowed_tools: list[str] = Field(default=["nmap", "oradad", "config-oradad", "ad_collector"])
+    allowed_tools: list[str] = Field(default=["nmap", "oradad", "config-oradad", "ad_collector", "ssh-collect", "winrm-collect"])
     target_user_id: Optional[int] = None
 
 

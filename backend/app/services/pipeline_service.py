@@ -45,6 +45,10 @@ _WINRM_HTTPS_PORT = 5986
 _SCAN_POLL_INTERVAL_SEC = 5
 _SCAN_TIMEOUT_SEC = 30 * 60  # 30 minutes
 
+# Polling des collectes SSH/WinRM agent
+_COLLECT_POLL_INTERVAL_SEC = 5
+_COLLECT_TIMEOUT_SEC = 15 * 60  # 15 minutes par collecte
+
 
 class NmapPort(TypedDict, total=False):
     port: int
@@ -581,6 +585,8 @@ def _run_collects_phase(
     pipeline: CollectPipeline,
     targets: list[tuple[Equipement, AutoCollectProfile]],
     *,
+    agent_uuid: str,
+    current_user_id: int,
     username: str,
     password: Optional[str],
     private_key: Optional[str],
@@ -588,7 +594,7 @@ def _run_collects_phase(
     use_ssl: bool,
     transport: str,
 ) -> None:
-    """Phase 3 : lancer une collecte par equipement, tolerer les echecs individuels."""
+    """Phase 3 : dispatcher une collecte par equipement vers l'agent et poller le resultat."""
     from . import collect_service
 
     if not targets:
@@ -618,16 +624,32 @@ def _run_collects_phase(
             db.commit()
             collect_id = collect.id
 
-            collect_service.execute_collect_background(
+            task = collect_service.dispatch_collect_to_agent(
+                db=db,
                 collect_id=collect_id,
+                agent_uuid=agent_uuid,
+                current_user_id=current_user_id,
                 password=password,
                 private_key=private_key,
                 passphrase=passphrase,
                 use_ssl=use_ssl,
                 transport=transport,
             )
+            db.commit()
+            task_id = task.id
 
-            # Lire le statut final dans une session propre
+            # Polling de la tache agent jusqu'a completion/echec/timeout.
+            # L'hydration du CollectResult est faite par le handler WebSocket.
+            deadline = time.monotonic() + _COLLECT_TIMEOUT_SEC
+            while time.monotonic() < deadline:
+                time.sleep(_COLLECT_POLL_INTERVAL_SEC)
+                db.expire_all()
+                task_reloaded = db.get(AgentTask, task_id)
+                if task_reloaded is None:
+                    break
+                if task_reloaded.status in ("completed", "failed", "cancelled"):
+                    break
+
             db.expire_all()
             final = db.get(CollectResult, collect_id)
             if final is not None and final.status == CollectStatus.SUCCESS:
@@ -656,7 +678,7 @@ def _run_collects_phase(
 def execute_pipeline_background(
     pipeline_id: int,
     *,
-    agent_uuid: Optional[str] = None,  # conservé pour compat, non utilisé
+    agent_uuid: Optional[str] = None,  # conserve pour compat : non utilise (agent lu depuis pipeline.agent_id)
     current_user_id: int,
     username: str,
     password: Optional[str] = None,
@@ -699,17 +721,25 @@ def execute_pipeline_background(
         _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
 
         # Phase 3 — Collectes
-        _run_collects_phase(
-            db,
-            pipeline,
-            targets,
-            username=username,
-            password=password,
-            private_key=private_key,
-            passphrase=passphrase,
-            use_ssl=use_ssl,
-            transport=transport,
-        )
+        agent = db.get(Agent, pipeline.agent_id) if pipeline.agent_id else None
+        if agent is None:
+            logger.error("Pipeline #%s : agent introuvable pour la phase collectes", pipeline_id)
+            pipeline.collects_status = PipelineStepStatus.FAILED
+            pipeline.error_message = pipeline.error_message or "Agent introuvable pour collectes"
+        else:
+            _run_collects_phase(
+                db,
+                pipeline,
+                targets,
+                agent_uuid=agent.agent_uuid,
+                current_user_id=current_user_id,
+                username=username,
+                password=password,
+                private_key=private_key,
+                passphrase=passphrase,
+                use_ssl=use_ssl,
+                transport=transport,
+            )
 
         pipeline.status = PipelineStatus.COMPLETED
         pipeline.completed_at = _utcnow()

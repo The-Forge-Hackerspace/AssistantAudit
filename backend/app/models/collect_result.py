@@ -42,6 +42,11 @@ class CollectResult(Base):
     status: Mapped[CollectStatus] = mapped_column(Enum(CollectStatus), default=CollectStatus.RUNNING, nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text)
 
+    # Lien vers la tache agent qui execute la collecte (agent on-prem, TOS-16)
+    agent_task_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("agent_tasks.id", ondelete="SET NULL"), index=True
+    )
+
     # Connexion
     target_host: Mapped[str] = mapped_column(String(255), nullable=False)
     target_port: Mapped[int] = mapped_column(Integer, nullable=False)
