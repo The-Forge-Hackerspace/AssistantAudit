@@ -5,7 +5,7 @@ SSH/WinRM a la tache agent qui l'execute (la collecte ne s'execute plus
 cote serveur, mais est deleguee a un agent on-prem).
 
 Revision ID: 9a4e7cd1a2f3
-Revises: 8cd801626d19
+Revises: drop_scan_tables
 Create Date: 2026-04-20 00:00:00.000000
 """
 from typing import Sequence, Union
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 
 revision: str = '9a4e7cd1a2f3'
-down_revision: Union[str, None] = '8cd801626d19'
+down_revision: Union[str, None] = 'drop_scan_tables'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
