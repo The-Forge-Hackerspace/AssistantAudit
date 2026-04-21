@@ -231,6 +231,22 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                             if ws_data.get("error_message"):
                                 task.error_message = ws_data["error_message"]
                                 task.status = "failed"
+                            # Hydrater le CollectResult lie a cette tache si c'est une collecte agent
+                            if task.tool in ("ssh-collect", "winrm-collect"):
+                                from ...models.collect_result import CollectResult
+                                from ...services import collect_service
+                                collect = (
+                                    db.query(CollectResult)
+                                    .filter(CollectResult.agent_task_id == task.id)
+                                    .first()
+                                )
+                                if collect is not None:
+                                    collect_service.hydrate_collect_from_agent_result(
+                                        db,
+                                        collect,
+                                        ws_data.get("result_summary"),
+                                        ws_data.get("error_message"),
+                                    )
                             db.commit()
                             from ...services.scan_progress import reset_task
 

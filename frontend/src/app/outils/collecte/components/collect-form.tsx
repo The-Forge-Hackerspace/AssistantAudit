@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import type { Equipement } from "@/types";
+import type { Agent, Equipement } from "@/types";
 
 // ── Constantes ──────────────────────────────────────────────
 const PROFILE_OPTIONS: { value: string; label: string; description: string }[] = [
@@ -45,6 +45,10 @@ export interface CollectFormProps {
   setDeviceProfile: (v: string) => void;
   selectedEquipementId: string;
   setSelectedEquipementId: (v: string) => void;
+  agents: Agent[];
+  loadingAgents: boolean;
+  selectedAgentUuid: string;
+  setSelectedAgentUuid: (v: string) => void;
   targetHost: string;
   setTargetHost: (v: string) => void;
   targetPort: string;
@@ -79,6 +83,10 @@ export function CollectForm({
   setDeviceProfile,
   selectedEquipementId,
   setSelectedEquipementId,
+  agents,
+  loadingAgents,
+  selectedAgentUuid,
+  setSelectedAgentUuid,
   targetHost,
   setTargetHost,
   targetPort,
@@ -222,6 +230,49 @@ export function CollectForm({
           </div>
         </div>
 
+        {/* Row 1.5: Agent executant */}
+        <div className="grid grid-cols-1 gap-4">
+          <div className="flex flex-col gap-2">
+            <Label>Agent executant la collecte</Label>
+            {loadingAgents ? (
+              <Skeleton className="h-10 w-full" />
+            ) : (() => {
+              const requiredTool = method === "ssh" ? "ssh-collect" : "winrm-collect";
+              const eligibleAgents = agents.filter(
+                (a) => a.status === "active" && (a.allowed_tools ?? []).includes(requiredTool),
+              );
+              if (eligibleAgents.length === 0) {
+                return (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                    Aucun agent actif disposant de l&apos;outil <code>{requiredTool}</code>. Enrôlez un agent on-prem depuis la page Agents.
+                  </div>
+                );
+              }
+              return (
+                <Select value={selectedAgentUuid} onValueChange={setSelectedAgentUuid}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un agent on-prem…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Agents disponibles</SelectLabel>
+                      {eligibleAgents.map((a) => (
+                        <SelectItem key={a.agent_uuid} value={a.agent_uuid}>
+                          <span className="flex items-center gap-2">
+                            <Shield className="size-4" />
+                            {a.name}
+                            {a.last_ip ? <span className="text-muted-foreground text-xs">— {a.last_ip}</span> : null}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              );
+            })()}
+          </div>
+        </div>
+
         {/* Row 2: Connection details */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex flex-col gap-2">
@@ -326,7 +377,7 @@ export function CollectForm({
         {/* Launch button */}
         <Button
           onClick={onLaunch}
-          disabled={launching || !selectedEquipementId || !targetHost || !username}
+          disabled={launching || !selectedEquipementId || !selectedAgentUuid || !targetHost || !username}
           className="gap-2"
         >
           {launching ? (

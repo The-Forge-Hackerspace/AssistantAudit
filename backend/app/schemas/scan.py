@@ -179,9 +179,10 @@ class PrefillResult(BaseModel):
 
 
 class CollectCreate(BaseModel):
-    """Paramètres pour lancer une collecte SSH ou WinRM."""
+    """Paramètres pour lancer une collecte SSH ou WinRM via un agent on-prem."""
 
     equipement_id: int
+    agent_uuid: str = Field(..., min_length=1, max_length=255, description="UUID de l'agent on-prem qui executera la collecte")
     method: Literal["ssh", "winrm"] = Field(..., description="Methode de collecte")
     target_host: str = Field(..., max_length=255, description="IP ou hostname du serveur")
     target_port: int = Field(22, ge=1, le=65535, description="Port SSH (22) ou WinRM (5985/5986)")

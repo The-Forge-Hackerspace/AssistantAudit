@@ -174,7 +174,7 @@ class TestAgentDefaults:
         db.commit()
         db.refresh(agent)
 
-        assert agent.allowed_tools == ["nmap", "oradad", "config-oradad", "ad_collector"]
+        assert agent.allowed_tools == ["nmap", "oradad", "config-oradad", "ad_collector", "ssh-collect", "winrm-collect"]
 
     def test_custom_allowed_tools(self, db: Session, user: User):
         agent = Agent(

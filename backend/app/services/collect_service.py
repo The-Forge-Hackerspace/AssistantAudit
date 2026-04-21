@@ -11,12 +11,11 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from ..core.database import SessionLocal
+from ..models.agent_task import AgentTask
 from ..models.assessment import Assessment, ComplianceStatus, ControlResult
 from ..models.collect_result import CollectMethod, CollectResult, CollectStatus
 from ..models.equipement import Equipement, EquipementServeur
 from ..models.site import Site
-from ..tools.collectors.ssh_collector import collect_via_ssh
-from ..tools.collectors.winrm_collector import collect_via_winrm
 
 logger = logging.getLogger(__name__)
 
@@ -1039,125 +1038,140 @@ def create_pending_collect(
     return collect
 
 
-def execute_collect_background(
+def dispatch_collect_to_agent(
+    db: Session,
     collect_id: int,
+    agent_uuid: str,
+    current_user_id: int,
+    *,
     password: Optional[str] = None,
     private_key: Optional[str] = None,
     passphrase: Optional[str] = None,
     use_ssl: bool = False,
     transport: str = "ntlm",
+    audit_id: Optional[int] = None,
+) -> AgentTask:
+    """Dispatche la collecte vers un agent on-prem via task_service.
+
+    La collecte reste en statut 'running' jusqu'a reception du task_result
+    (hydrate_collect_from_agent_result depuis le handler WebSocket).
+    """
+    from . import task_service
+
+    collect = db.get(CollectResult, collect_id)
+    if collect is None:
+        raise ValueError(f"CollectResult #{collect_id} introuvable")
+
+    if collect.method == CollectMethod.SSH:
+        tool = "ssh-collect"
+        parameters: dict = {
+            "host": collect.target_host,
+            "port": collect.target_port,
+            "username": collect.username,
+            "device_profile": collect.device_profile or "linux_server",
+        }
+        if password:
+            parameters["password"] = password
+        if private_key:
+            parameters["private_key"] = private_key
+        if passphrase:
+            parameters["passphrase"] = passphrase
+    elif collect.method == CollectMethod.WINRM:
+        tool = "winrm-collect"
+        parameters = {
+            "host": collect.target_host,
+            "port": collect.target_port,
+            "username": collect.username,
+            "password": password or "",
+            "use_ssl": use_ssl,
+            "transport": transport,
+        }
+    else:
+        raise ValueError(f"Methode de collecte non supportee : {collect.method}")
+
+    task = task_service.dispatch_task(
+        db=db,
+        agent_uuid=agent_uuid,
+        tool=tool,
+        parameters=parameters,
+        current_user_id=current_user_id,
+        audit_id=audit_id,
+    )
+    collect.agent_task_id = task.id
+    db.flush()
+    logger.info(
+        "Collecte #%s dispatchee vers agent (task_uuid=%s, tool=%s)",
+        collect_id,
+        task.task_uuid,
+        tool,
+    )
+    return task
+
+
+def hydrate_collect_from_agent_result(
+    db: Session,
+    collect: CollectResult,
+    result_summary: Optional[dict],
+    error_message: Optional[str],
 ) -> None:
+    """Applique le resultat renvoye par l'agent sur un CollectResult.
+
+    Appele par le handler WebSocket task_result. result_summary est la sortie
+    de SshCollectorTool / WinRMCollectorTool (asdict(SSHCollectResult|WinRMCollectResult)).
     """
-    Exécute la collecte en arrière-plan (appelé dans un thread).
-    Met à jour le CollectResult avec les résultats.
-    """
-    db = SessionLocal()
-    try:
-        collect = db.get(CollectResult, collect_id)
-        if not collect:
-            logger.error(f"CollectResult #{collect_id} introuvable")
-            return
+    now = datetime.now(timezone.utc)
+    start = collect.created_at
+    if start is not None:
+        start_tz = start if start.tzinfo is not None else start.replace(tzinfo=timezone.utc)
+        collect.duration_seconds = max(0, int((now - start_tz).total_seconds()))
+    collect.completed_at = now
 
-        start = time.time()
+    data = result_summary or {}
+    agent_error = data.get("error") if isinstance(data, dict) else None
 
-        if collect.method == CollectMethod.SSH:
-            raw_result = collect_via_ssh(
-                host=collect.target_host,
-                port=collect.target_port,
-                username=collect.username,
-                password=password,
-                private_key=private_key,
-                passphrase=passphrase,
-                device_profile=collect.device_profile or "linux_server",
+    if error_message or (isinstance(data, dict) and data.get("success") is False):
+        collect.status = CollectStatus.FAILED
+        collect.error_message = error_message or agent_error or "Collecte agent echouee"
+        return
+
+    collect.status = CollectStatus.SUCCESS
+    collect.hostname_collected = data.get("hostname") or None
+    collect.os_info = data.get("os_info") or {}
+    collect.network = data.get("network") or {}
+    collect.users = data.get("users") or {}
+    collect.services = data.get("services") or {}
+    collect.security = data.get("security") or {}
+    collect.storage = data.get("storage") or {}
+    collect.updates = data.get("updates") or {}
+
+    findings = _analyze_collect_findings(collect)
+    collect.findings = findings
+    collect.summary = _generate_summary(collect, findings)
+
+    eq = db.get(Equipement, collect.equipement_id)
+    if eq is None:
+        return
+    if collect.hostname_collected and not eq.hostname:
+        eq.hostname = collect.hostname_collected
+    os_info = collect.os_info or {}
+    if collect.method == CollectMethod.WINRM:
+        os_name = os_info.get("caption", "")
+    else:
+        os_name = os_info.get("distro", "")
+    if os_name and not eq.os_detected:
+        eq.os_detected = os_name
+
+    if isinstance(eq, EquipementServeur):
+        if collect.method == CollectMethod.WINRM:
+            detail = f"{os_info.get('caption', '')} Build {os_info.get('build', '')}"
+        else:
+            detail = (
+                f"{os_info.get('distro', '')} {os_info.get('version_id', '')} "
+                f"(kernel {os_info.get('kernel', '')})"
             )
+        if not eq.os_version_detail:
+            eq.os_version_detail = detail
 
-            if raw_result.success:
-                collect.status = CollectStatus.SUCCESS
-                collect.hostname_collected = raw_result.hostname
-                collect.os_info = raw_result.os_info
-                collect.network = raw_result.network
-                collect.users = raw_result.users
-                collect.services = raw_result.services
-                collect.security = raw_result.security
-                collect.storage = raw_result.storage
-                collect.updates = raw_result.updates
-            else:
-                collect.status = CollectStatus.FAILED
-                collect.error_message = raw_result.error
-
-        elif collect.method == CollectMethod.WINRM:
-            raw_result = collect_via_winrm(
-                host=collect.target_host,
-                username=collect.username,
-                password=password or "",
-                port=collect.target_port,
-                use_ssl=use_ssl,
-                transport=transport,
-            )
-
-            if raw_result.success:
-                collect.status = CollectStatus.SUCCESS
-                collect.hostname_collected = raw_result.hostname
-                collect.os_info = raw_result.os_info
-                collect.network = raw_result.network
-                collect.users = raw_result.users
-                collect.services = raw_result.services
-                collect.security = raw_result.security
-                collect.storage = raw_result.storage
-                collect.updates = raw_result.updates
-            else:
-                collect.status = CollectStatus.FAILED
-                collect.error_message = raw_result.error
-
-        # Calculer durée
-        elapsed = int(time.time() - start)
-        collect.duration_seconds = elapsed
-        collect.completed_at = datetime.now(timezone.utc)
-
-        # Si succès, analyser les findings
-        if collect.status == CollectStatus.SUCCESS:
-            findings = _analyze_collect_findings(collect)
-            collect.findings = findings
-            collect.summary = _generate_summary(collect, findings)
-
-            # Enrichir l'équipement
-            eq = db.get(Equipement, collect.equipement_id)
-            if eq:
-                if collect.hostname_collected and not eq.hostname:
-                    eq.hostname = collect.hostname_collected
-                os_info = collect.os_info or {}
-                if collect.method == CollectMethod.WINRM:
-                    os_name = os_info.get("caption", "")
-                else:
-                    os_name = os_info.get("distro", "")
-                if os_name and not eq.os_detected:
-                    eq.os_detected = os_name
-
-                # Mettre à jour les infos spécifiques serveur
-                if isinstance(eq, EquipementServeur):
-                    if collect.method == CollectMethod.WINRM:
-                        detail = f"{os_info.get('caption', '')} Build {os_info.get('build', '')}"
-                    else:
-                        detail = f"{os_info.get('distro', '')} {os_info.get('version_id', '')} (kernel {os_info.get('kernel', '')})"
-                    if not eq.os_version_detail:
-                        eq.os_version_detail = detail
-
-        db.commit()
-        logger.info(f"Collecte #{collect_id} terminée: {collect.status.value} en {elapsed}s")
-
-    except Exception as e:
-        logger.error(f"Erreur collecte #{collect_id}: {e}", exc_info=True)
-        try:
-            collect = db.get(CollectResult, collect_id)
-            if collect:
-                collect.status = CollectStatus.FAILED
-                collect.error_message = str(e)
-                collect.completed_at = datetime.now(timezone.utc)
-                db.commit()
-        except Exception:
-            pass
-    finally:
-        db.close()
 
 
 def _check_equip_access(db: Session, equipement_id: int, user_id: int | None, is_admin: bool) -> bool:
