@@ -496,6 +496,8 @@ def _run_scan_phase(
     pipeline.scan_status = PipelineStepStatus.RUNNING
     db.commit()
 
+    task_service.notify_agent_new_task(agent.agent_uuid, task)
+
     # Polling jusqu'à completed/failed/timeout
     deadline = time.monotonic() + _SCAN_TIMEOUT_SEC
     while time.monotonic() < deadline:
@@ -637,6 +639,10 @@ def _run_collects_phase(
             )
             db.commit()
             task_id = task.id
+
+            from . import task_service
+
+            task_service.notify_agent_new_task(agent_uuid, task)
 
             # Polling de la tache agent jusqu'a completion/echec/timeout.
             # L'hydration du CollectResult est faite par le handler WebSocket.

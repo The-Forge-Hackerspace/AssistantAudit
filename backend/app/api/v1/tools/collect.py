@@ -52,7 +52,7 @@ def launch_collect(
         raise HTTPException(404, str(e))
 
     try:
-        dispatch_collect_to_agent(
+        task = dispatch_collect_to_agent(
             db=db,
             collect_id=collect.id,
             agent_uuid=params.agent_uuid,
@@ -70,6 +70,10 @@ def launch_collect(
     except ValueError as e:
         db.rollback()
         raise HTTPException(400, str(e))
+
+    from ....services.task_service import notify_agent_new_task
+
+    notify_agent_new_task(params.agent_uuid, task)
 
     logger.info(f"Collecte #{collect.id} dispatchee vers agent {params.agent_uuid} ({params.method} \u2192 {params.target_host})")
     return collect
