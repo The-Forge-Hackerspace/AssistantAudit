@@ -75,9 +75,15 @@ USER appuser
 ENV ENV=production \
     DATABASE_URL=postgresql://assistantaudit:changeme@db:5432/assistantaudit \
     LOG_LEVEL=INFO \
-    PYTHONPATH=/app/backend
+    PYTHONPATH=/app/backend \
+    FORWARDED_ALLOW_IPS=*
 
 EXPOSE 8000
 
-# Initialisation DB (create_all ou alembic upgrade selon l'état) + démarrage
-CMD ["sh", "-c", "cd /app/backend && python docker_entrypoint.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Initialisation DB (create_all ou alembic upgrade selon l'etat) + demarrage.
+# --proxy-headers : uvicorn honore X-Forwarded-Proto/For poses par le reverse
+# proxy (NPMPlus en prod, Caddy en staging) -> request.url.scheme = "https"
+# pour declencher HSTS, et X-Forwarded-For utilisable pour le rate-limit IP.
+# --forwarded-allow-ips : par defaut '*' (port 8000 non publie via NPMPlus).
+# A restreindre via FORWARDED_ALLOW_IPS=10.0.0.5 si le backend devient public.
+CMD ["sh", "-c", "cd /app/backend && python docker_entrypoint.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-*}\""]

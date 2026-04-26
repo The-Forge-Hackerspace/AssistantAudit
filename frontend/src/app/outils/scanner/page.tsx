@@ -130,13 +130,12 @@ function ScannerContent() {
 
   // WebSocket: live status/progress pour toutes les taches visibles
   useEffect(() => {
-    const token = document.cookie.match(/aa_access_token=([^;]+)/)?.[1];
-    if (!token) return;
-
+    // Token JWT en cookie httpOnly : le navigateur l'envoie automatiquement
+    // avec la requete d'upgrade WebSocket (same-site).
     const wsBase =
       process.env.NEXT_PUBLIC_WS_URL ||
       `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8000`;
-    const wsUrl = `${wsBase}/ws/user?token=${token}`;
+    const wsUrl = `${wsBase}/ws/user`;
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {

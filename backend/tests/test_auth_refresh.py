@@ -121,9 +121,11 @@ class TestRefreshEndpoint:
         assert resp.status_code == 401
 
     def test_refresh_missing_body_fails(self, client):
-        """Un body vide retourne 422."""
+        """Sans cookie ni body, l'endpoint retourne 401 (token requis)."""
+        # Le refresh_token est desormais optionnel dans le body : il peut etre lu
+        # depuis le cookie httpOnly aa_refresh_token. Sans aucune source -> 401.
         resp = client.post("/api/v1/auth/refresh", json={})
-        assert resp.status_code == 422
+        assert resp.status_code == 401
 
     def test_login_returns_refresh_token(self, client, auditeur_user):
         """Les endpoints login retournent un refresh_token."""
@@ -161,3 +163,43 @@ class TestRefreshEndpoint:
         )
         assert me_resp.status_code == 200
         assert me_resp.json()["username"] == "auditeur_test"
+
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Sources du refresh_token : cookie httpOnly, body legacy, precedence
+    # ────────────────────────────────────────────────────────────────────────
+
+    def test_refresh_via_cookie_only(self, client, auditeur_user):
+        """Cookie aa_refresh_token seul (body vide) -> 200 + nouveaux cookies."""
+        token = create_refresh_token(subject=auditeur_user.id)
+        client.cookies.set("aa_refresh_token", token)
+        resp = client.post("/api/v1/auth/refresh", json={})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["access_token"]
+        assert data["refresh_token"]
+        # Les nouveaux cookies sont poses par le serveur
+        assert "aa_access_token" in resp.cookies
+        assert "aa_refresh_token" in resp.cookies
+
+    def test_refresh_via_body_only_legacy_client(self, client, auditeur_user):
+        """Body legacy sans cookie -> 200 (compat scripts/agents)."""
+        token = create_refresh_token(subject=auditeur_user.id)
+        # Pas de cookie : le test client part avec un jar vide
+        resp = client.post("/api/v1/auth/refresh", json={"refresh_token": token})
+        assert resp.status_code == 200
+        assert resp.json()["access_token"]
+
+    def test_refresh_cookie_takes_precedence_over_body(self, client, auditeur_user):
+        """Si cookie ET body sont presents, le cookie prime (auth principale)."""
+        valid_cookie_token = create_refresh_token(subject=auditeur_user.id)
+        # Si le body etait utilise en priorite, /refresh renverrait 401 sur ce token
+        invalid_body_token = "definitely.invalid.token"
+        client.cookies.set("aa_refresh_token", valid_cookie_token)
+        resp = client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": invalid_body_token},
+        )
+        assert resp.status_code == 200, (
+            "le cookie aurait du etre utilise en priorite, pas le body invalide"
+        )

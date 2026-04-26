@@ -14,6 +14,12 @@ jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    # Variables visibles par TOUS les steps : `docker compose exec` (seed admin,
+    # health checks) interpole POSTGRES_PASSWORD a chaque appel et echoue sans elle
+    # depuis qu'on a retire le defaut `:-changeme`.
+    env:
+      ENV: testing
+      POSTGRES_PASSWORD: changeme
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
@@ -28,9 +34,6 @@ jobs:
 
     - name: Start stack (Docker Compose)
       run: docker compose up -d --build db backend frontend
-      env:
-        ENV: testing
-        POSTGRES_PASSWORD: changeme
 
     - name: Wait for backend health
       run: |

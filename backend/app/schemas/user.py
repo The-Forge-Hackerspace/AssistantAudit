@@ -40,7 +40,9 @@ class TokenResponse(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    # Optionnel : le refresh token est lu depuis le cookie httpOnly aa_refresh_token.
+    # Conserve pour compat clients programmatiques (scripts, agents).
+    refresh_token: Optional[str] = None
 
 
 # --- User CRUD ---

@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Cookie, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -27,13 +27,17 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 async def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
+    aa_access_token: Optional[str] = Cookie(default=None),
     db: Session = Depends(get_db),
 ):
     """
-    Dépendance : récupère l'utilisateur authentifié depuis le token JWT
-    envoyé dans le header Authorization: Bearer <token>.
-    Lève 401 si aucun token valide n'est trouvé.
+    Dependance : recupere l'utilisateur authentifie depuis le token JWT.
+    Source des tokens (par ordre de priorite) :
+      1. Cookie httpOnly `aa_access_token` (frontend SPA, auth principale)
+      2. Header Authorization: Bearer <token> (Swagger, scripts, fallback)
+    Leve 401 si aucun token valide n'est trouve.
     """
+    token = aa_access_token or token
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

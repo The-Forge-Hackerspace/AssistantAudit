@@ -1,6 +1,5 @@
 import axios from "axios";
-import Cookies from "js-cookie";
-import api, { setTokens, clearTokens } from "@/lib/api-client";
+import api from "@/lib/api-client";
 import type {
   TokenResponse,
   User,
@@ -82,7 +81,7 @@ export const authApi = {
     const { data } = await api.post<TokenResponse>("/auth/login", form, {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
-    setTokens(data.access_token, data.refresh_token);
+    // Tokens poses en cookies httpOnly par le backend ; le body sert pour les clients programmatiques.
     return data;
   },
 
@@ -105,21 +104,23 @@ export const authApi = {
   },
 
   async refresh(): Promise<TokenResponse> {
-    const refreshToken = Cookies.get("aa_refresh_token");
-    if (!refreshToken) {
-      throw new Error("No refresh token");
-    }
-    // Appel direct avec axios (pas l'instance api) pour éviter l'intercepteur
+    // Refresh token transmis automatiquement via cookie httpOnly aa_refresh_token.
+    // withCredentials necessaire pour que le navigateur envoie le cookie cross-origin.
     const { data } = await axios.post<TokenResponse>(
       `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/auth/refresh`,
-      { refresh_token: refreshToken }
+      {},
+      { withCredentials: true }
     );
-    setTokens(data.access_token, data.refresh_token);
     return data;
   },
 
-  logout() {
-    clearTokens();
+  async logout() {
+    // Endpoint backend qui supprime les cookies httpOnly cote navigateur.
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // logout best-effort : meme en cas d'erreur, l'UI poursuit la deconnexion.
+    }
   },
 };
 

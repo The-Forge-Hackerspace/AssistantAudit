@@ -2,7 +2,6 @@
 
 import React, { createContext, use, useEffect, useState, useCallback } from "react";
 import { authApi } from "@/services/api";
-import { isAuthenticated } from "@/lib/api-client";
 import type { User } from "@/types";
 
 interface AuthContextType {
@@ -20,17 +19,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!isAuthenticated()) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
+    // Avec les cookies httpOnly, JS ne peut pas verifier l'auth localement :
+    // on appelle /auth/me et on traite 401 comme "non connecte". L'intercepteur
+    // axios tente automatiquement un refresh avant de remonter l'erreur.
     try {
       const me = await authApi.me();
       setUser(me);
     } catch {
       setUser(null);
-      authApi.logout();
     } finally {
       setLoading(false);
     }

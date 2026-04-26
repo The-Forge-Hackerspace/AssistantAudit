@@ -25,7 +25,7 @@ email-validator==2.3.0
 # --- Authentification ---
 python-jose[cryptography]==3.5.0
 bcrypt==5.0.0
-python-multipart==0.0.22
+python-multipart==0.0.26  # >=0.0.26 patch GHSA-mj87-hwqh-73pj (DoS via multipart preamble)
 
 # --- YAML (référentiels) ---
 PyYAML==6.0.3
