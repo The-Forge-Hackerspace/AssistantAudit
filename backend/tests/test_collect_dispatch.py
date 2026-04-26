@@ -250,6 +250,8 @@ class TestHydrateCollectFromAgentResult:
         assert collect.completed_at is not None
         assert collect.findings is not None
         assert collect.summary is not None
+        assert collect.duration_seconds is not None
+        assert collect.duration_seconds >= 0
 
     def test_success_propagates_hostname_to_equipement(
         self, db_session, equipement
@@ -300,6 +302,20 @@ class TestHydrateCollectFromAgentResult:
 
         assert collect.status == CollectStatus.FAILED
         assert collect.error_message == "timeout ssh"
+
+    def test_agent_error_only_marks_failed(self, db_session, equipement):
+        """Payload {"error": "..."} sans flag success doit etre traite comme echec."""
+        collect = _pending_collect(db_session, equipement.id, method="ssh")
+
+        collect_service.hydrate_collect_from_agent_result(
+            db_session,
+            collect,
+            {"error": "auth refused"},
+            None,
+        )
+
+        assert collect.status == CollectStatus.FAILED
+        assert collect.error_message == "auth refused"
 
 
 # ── POST /api/v1/tools/collect ──────────────────────────────────────────

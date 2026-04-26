@@ -647,17 +647,30 @@ def _run_collects_phase(
             # Polling de la tache agent jusqu'a completion/echec/timeout.
             # L'hydration du CollectResult est faite par le handler WebSocket.
             deadline = time.monotonic() + _COLLECT_TIMEOUT_SEC
+            timed_out = True
             while time.monotonic() < deadline:
                 time.sleep(_COLLECT_POLL_INTERVAL_SEC)
                 db.expire_all()
                 task_reloaded = db.get(AgentTask, task_id)
                 if task_reloaded is None:
+                    timed_out = False
                     break
                 if task_reloaded.status in ("completed", "failed", "cancelled"):
+                    timed_out = False
                     break
 
             db.expire_all()
             final = db.get(CollectResult, collect_id)
+            if timed_out and final is not None and final.status == CollectStatus.RUNNING:
+                final.status = CollectStatus.FAILED
+                final.error_message = "Timeout de la collecte agent"
+                final.completed_at = _utcnow()
+                logger.warning(
+                    "Pipeline #%s : collecte #%s timeout (task #%s)",
+                    pipeline.id,
+                    collect_id,
+                    task_id,
+                )
             if final is not None and final.status == CollectStatus.SUCCESS:
                 pipeline.collects_done += 1
             else:
@@ -747,7 +760,10 @@ def execute_pipeline_background(
                 transport=transport,
             )
 
-        pipeline.status = PipelineStatus.COMPLETED
+        if pipeline.collects_status == PipelineStepStatus.FAILED:
+            pipeline.status = PipelineStatus.FAILED
+        else:
+            pipeline.status = PipelineStatus.COMPLETED
         pipeline.completed_at = _utcnow()
         db.commit()
         _notify(pipeline.created_by, "pipeline_completed", _pipeline_event(pipeline))

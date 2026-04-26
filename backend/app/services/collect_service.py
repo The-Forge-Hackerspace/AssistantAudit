@@ -1127,7 +1127,11 @@ def hydrate_collect_from_agent_result(
     data = result_summary or {}
     agent_error = data.get("error") if isinstance(data, dict) else None
 
-    if error_message or (isinstance(data, dict) and data.get("success") is False):
+    is_failure = bool(error_message) or (
+        isinstance(data, dict)
+        and (data.get("success") is False or bool(agent_error))
+    )
+    if is_failure:
         collect.status = CollectStatus.FAILED
         collect.error_message = error_message or agent_error or "Collecte agent echouee"
         return
