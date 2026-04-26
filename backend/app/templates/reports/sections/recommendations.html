@@ -19,13 +19,6 @@
 <h2 class="reco-synthesis-title">Synthese des recommandations</h2>
 {% for cat_name, cat_items in recommendations.by_category.items() %}
 <div class="reco-synth-cat-block">
-    <div class="reco-synth-cat-header">
-        <span class="reco-synth-cat-label"><em>{{ cat_name }}</em></span>
-        <span class="reco-synth-col-head reco-synth-col-critique">Risque critique</span>
-        <span class="reco-synth-col-head reco-synth-col-modere">Risque modere</span>
-        <span class="reco-synth-col-head reco-synth-col-mineur">Risque mineur</span>
-        <span class="reco-synth-col-head reco-synth-col-ameliorations">Ameliorations</span>
-    </div>
     <table class="reco-synthesis">
         <colgroup>
             <col class="reco-synth-col-title" />
@@ -34,6 +27,15 @@
             <col class="reco-synth-col-mark" />
             <col class="reco-synth-col-mark" />
         </colgroup>
+        <thead>
+            <tr>
+                <th class="reco-synth-cat-header"><em>{{ cat_name }}</em></th>
+                <th class="reco-synth-col-head"><span class="reco-synth-rot reco-rot-critique">Risque critique</span></th>
+                <th class="reco-synth-col-head"><span class="reco-synth-rot reco-rot-modere">Risque modere</span></th>
+                <th class="reco-synth-col-head"><span class="reco-synth-rot reco-rot-mineur">Risque mineur</span></th>
+                <th class="reco-synth-col-head"><span class="reco-synth-rot reco-rot-ameliorations">Ameliorations</span></th>
+            </tr>
+        </thead>
         <tbody>
         {% for reco in cat_items %}
         {% set col = sev_to_col.get(reco.severity, 'ameliorations') %}

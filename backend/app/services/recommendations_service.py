@@ -88,7 +88,11 @@ class RecommendationsService:
         for item in nc_by_control.values():
             ctrl = item["control"]
             sev = ctrl.severity.value
-            cat_name = ctrl.category.name if ctrl.category else "Autres"
+            sub_cat = ctrl.category.name if ctrl.category else "Autres"
+            # Groupement de la synthese par framework (ex: AD, Firewall, M365),
+            # pas par sous-categorie : un audit cible un seul referentiel par bloc.
+            framework = ctrl.category.framework if ctrl.category else None
+            group_name = framework.ref_id if framework else "Autres"
             detail = RecommendationDetail(
                 control_ref=ctrl.ref_id,
                 title=ctrl.title,
@@ -97,10 +101,10 @@ class RecommendationsService:
                 remediation=ctrl.remediation,
                 occurrences=item["count"],
                 affected_equipements=item["equipements"],
-                category_name=cat_name,
+                category_name=sub_cat,
             )
             by_severity[sev].append(detail)
-            by_category[cat_name].append(detail)
+            by_category[group_name].append(detail)
 
         # Tri intra-severite par occurrences desc
         for sev in by_severity:
