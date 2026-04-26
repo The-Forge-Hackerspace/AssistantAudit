@@ -5,15 +5,50 @@ Schemas Agent : gestion des agents et taches.
 from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
+
+# Liste fermee des outils que l'agent peut etre autorise a executer.
+# Toute valeur hors de ce set est rejetee a la creation et a l'update.
+SUPPORTED_AGENT_TOOLS: tuple[str, ...] = (
+    "nmap",
+    "oradad",
+    "config-oradad",
+    "ad_collector",
+    "ssh-collect",
+    "winrm-collect",
+)
 
 # ── Requetes ──────────────────────────────────────────────────────────
 
 
 class AgentCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    allowed_tools: list[str] = Field(default=["nmap", "oradad", "config-oradad", "ad_collector", "ssh-collect", "winrm-collect"])
+    allowed_tools: list[str] = Field(default=list(SUPPORTED_AGENT_TOOLS))
     target_user_id: Optional[int] = None
+
+    @field_validator("allowed_tools")
+    @classmethod
+    def _validate_tools(cls, v: list[str]) -> list[str]:
+        invalid = [t for t in v if t not in SUPPORTED_AGENT_TOOLS]
+        if invalid:
+            raise ValueError(f"Outils non supportes : {invalid}")
+        return v
+
+
+class AgentUpdateRequest(BaseModel):
+    """Update partiel d'un agent — uniquement les champs administrables."""
+
+    allowed_tools: Optional[list[str]] = Field(default=None)
+
+    @field_validator("allowed_tools")
+    @classmethod
+    def _validate_tools(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+        if v is None:
+            return v
+        invalid = [t for t in v if t not in SUPPORTED_AGENT_TOOLS]
+        if invalid:
+            raise ValueError(f"Outils non supportes : {invalid}")
+        return v
 
 
 class EnrollRequest(BaseModel):

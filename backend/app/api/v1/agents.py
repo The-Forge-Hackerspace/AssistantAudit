@@ -15,6 +15,7 @@ from ...schemas.agent import (
     AgentCreateRequest,
     AgentCreateResponse,
     AgentResponse,
+    AgentUpdateRequest,
     ArtifactRead,
     ArtifactUploadResponse,
     EnrollRequest,
@@ -97,7 +98,7 @@ def revoke_agent(
     current_user=Depends(get_current_auditeur),
 ):
     """Revoque un agent. Admin peut revoquer n'importe quel agent, auditeur seulement les siens."""
-    agent = AgentService.revoke_agent(
+    agent, cancelled_tasks_count = AgentService.revoke_agent(
         db,
         agent_uuid,
         user_id=current_user.id,
@@ -113,7 +114,43 @@ def revoke_agent(
         {"agent_uuid": agent_uuid, "status": "revoked"},
     )
     # TODO: scheduled purge — delete agents where revoked_at < now() - 30 days
-    return {"detail": "Agent revoque"}
+    return {"detail": "Agent revoque", "cancelled_tasks_count": cancelled_tasks_count}
+
+
+@router.patch("/{agent_uuid}", response_model=AgentResponse)
+def update_agent(
+    agent_uuid: str,
+    body: AgentUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_auditeur),
+):
+    """Update partiel d'un agent. Pour l'instant : allowed_tools uniquement.
+
+    Admin peut modifier n'importe quel agent, auditeur uniquement les siens.
+    """
+    if body.allowed_tools is None:
+        raise HTTPException(status_code=400, detail="Aucun champ a mettre a jour")
+    agent = AgentService.update_allowed_tools(
+        db,
+        agent_uuid,
+        body.allowed_tools,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
+    )
+    return AgentResponse(
+        id=agent.id,
+        agent_uuid=agent.agent_uuid,
+        name=agent.name,
+        status=agent.status,
+        last_seen=agent.last_seen,
+        last_ip=agent.last_ip,
+        allowed_tools=agent.allowed_tools,
+        os_info=agent.os_info,
+        agent_version=agent.agent_version,
+        owner_name=agent.owner.full_name if agent.owner else None,
+        revoked_at=agent.revoked_at,
+        created_at=agent.created_at,
+    )
 
 
 # ── Routes agent (enrollment, heartbeat, refresh) ─────────────────────

@@ -60,6 +60,8 @@ import type {
   TaskArtifact,
   AgentCreateRequest,
   AgentCreateResponse,
+  AgentUpdateRequest,
+  AgentRevokeResponse,
   OradadTask,
   OradadConfig,
   OradadConfigCreate,
@@ -597,8 +599,13 @@ export const agentsApi = {
     return data;
   },
 
-  async revoke(agentUuid: string): Promise<{ detail: string }> {
-    const { data } = await api.delete<{ detail: string }>(`/agents/${agentUuid}`);
+  async revoke(agentUuid: string): Promise<AgentRevokeResponse> {
+    const { data } = await api.delete<AgentRevokeResponse>(`/agents/${agentUuid}`);
+    return data;
+  },
+
+  async update(agentUuid: string, payload: AgentUpdateRequest): Promise<Agent> {
+    const { data } = await api.patch<Agent>(`/agents/${agentUuid}`, payload);
     return data;
   },
 

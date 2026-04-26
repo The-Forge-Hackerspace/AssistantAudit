@@ -181,6 +181,8 @@ class TestRevokeAgent:
             headers=auditeur_headers,
         )
         assert resp.status_code == 200
+        body = resp.json()
+        assert body["cancelled_tasks_count"] == 0
 
     def test_revoke_other_user_agent_404(self, client, user2_headers, active_agent):
         resp = client.delete(
@@ -188,6 +190,91 @@ class TestRevokeAgent:
             headers=user2_headers,
         )
         assert resp.status_code == 404
+
+    def test_revoke_cancels_active_tasks(
+        self, client, auditeur_headers, auditeur_user, active_agent, db_session
+    ):
+        """Revoke doit annuler running/dispatched/pending et renvoyer le compte."""
+        from app.models.agent_task import AgentTask
+
+        for s in ("pending", "dispatched", "running", "completed"):
+            t = AgentTask(
+                agent_id=active_agent.id,
+                owner_id=auditeur_user.id,
+                tool="nmap",
+                parameters={"target": "10.0.0.1"},
+                status=s,
+            )
+            db_session.add(t)
+        db_session.commit()
+
+        resp = client.delete(
+            f"/api/v1/agents/{active_agent.agent_uuid}",
+            headers=auditeur_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["cancelled_tasks_count"] == 3  # pending+dispatched+running
+        cancelled = (
+            db_session.query(AgentTask)
+            .filter(AgentTask.agent_id == active_agent.id, AgentTask.status == "cancelled")
+            .count()
+        )
+        assert cancelled == 3
+
+
+# ────────────────────────────────────────────────────────────────────────
+# PATCH /agents/{uuid} — update allowed_tools
+# ────────────────────────────────────────────────────────────────────────
+
+
+class TestUpdateAgent:
+    def test_update_allowed_tools(self, client, auditeur_headers, active_agent):
+        resp = client.patch(
+            f"/api/v1/agents/{active_agent.agent_uuid}",
+            json={"allowed_tools": ["nmap", "ssh-collect"]},
+            headers=auditeur_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert set(body["allowed_tools"]) == {"nmap", "ssh-collect"}
+
+    def test_update_invalid_tool_rejected(self, client, auditeur_headers, active_agent):
+        resp = client.patch(
+            f"/api/v1/agents/{active_agent.agent_uuid}",
+            json={"allowed_tools": ["nmap", "rm-rf"]},
+            headers=auditeur_headers,
+        )
+        assert resp.status_code == 422
+
+    def test_update_other_user_agent_404(
+        self, client, user2_headers, active_agent
+    ):
+        resp = client.patch(
+            f"/api/v1/agents/{active_agent.agent_uuid}",
+            json={"allowed_tools": ["nmap"]},
+            headers=user2_headers,
+        )
+        assert resp.status_code == 404
+
+    def test_update_empty_payload_rejected(
+        self, client, auditeur_headers, active_agent
+    ):
+        resp = client.patch(
+            f"/api/v1/agents/{active_agent.agent_uuid}",
+            json={},
+            headers=auditeur_headers,
+        )
+        assert resp.status_code == 400
+
+    def test_admin_can_update_any_agent(
+        self, client, admin_headers, active_agent
+    ):
+        resp = client.patch(
+            f"/api/v1/agents/{active_agent.agent_uuid}",
+            json={"allowed_tools": ["nmap"]},
+            headers=admin_headers,
+        )
+        assert resp.status_code == 200
 
 
 # ────────────────────────────────────────────────────────────────────────

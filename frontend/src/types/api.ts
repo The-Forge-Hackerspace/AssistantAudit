@@ -879,6 +879,15 @@ export interface AgentCreateResponse {
   expires_at: string;
 }
 
+export interface AgentUpdateRequest {
+  allowed_tools?: string[];
+}
+
+export interface AgentRevokeResponse {
+  detail: string;
+  cancelled_tasks_count: number;
+}
+
 export type AgentTaskStatus = "pending" | "dispatched" | "running" | "completed" | "failed" | "cancelled";
 
 export interface AgentTask {
