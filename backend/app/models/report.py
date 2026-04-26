@@ -21,9 +21,10 @@ def _utcnow():
     return datetime.now(timezone.utc)
 
 
-# Sections du rapport (brief §7.7) + "executive_summary" ajoute apres "cover"
+# Sections du rapport (brief §7.7) + executive_summary, toc et recommendations
 REPORT_SECTIONS = [
     ("cover", "Page de garde"),
+    ("toc", "Table des matières"),
     ("executive_summary", "Synthese executive"),
     ("introduction", "Introduction"),
     ("objectives", "Objectifs de l'audit"),
@@ -49,6 +50,7 @@ REPORT_SECTIONS = [
     ("strengths", "Points forts observés"),
     ("quick_wins", "Quick wins"),
     ("synthesis", "Synthèse globale"),
+    ("recommendations", "Recommandations prioritaires"),
 ]
 
 

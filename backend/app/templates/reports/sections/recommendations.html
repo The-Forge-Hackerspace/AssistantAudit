@@ -1,0 +1,70 @@
+{# Recommandations prioritaires — liste exhaustive groupee par severite (TOS-25 section 5) #}
+{% set sev_labels = {'critical': 'Critique', 'high': 'Eleve', 'medium': 'Moyen', 'low': 'Faible', 'info': 'Info'} %}
+{% set sev_colors = {'critical': '#DC2626', 'high': '#EA580C', 'medium': '#F59E0B', 'low': '#6B7280', 'info': '#3B82F6'} %}
+
+{% if recommendations and recommendations.total > 0 %}
+
+<p class="reco-intro">
+    Cette section liste l'ensemble des <strong>{{ recommendations.total }}</strong>
+    non-conformites identifiees lors de l'audit, groupees par niveau de criticite.
+    Pour chaque recommandation, vous trouverez le controle concerne, le nombre d'equipements
+    impactes et l'action de remediation a entreprendre.
+</p>
+
+{% for severity, items in recommendations.by_severity.items() %}
+<div class="reco-severity-block">
+    <div class="reco-severity-header" style="background: {{ sev_colors.get(severity, '#6B7280') }};">
+        <span class="reco-severity-name">{{ sev_labels.get(severity, severity) | upper }}</span>
+        <span class="reco-severity-count">{{ items | length }} recommandation(s)</span>
+    </div>
+
+    {% for reco in items %}
+    <div class="reco-card" style="border-left-color: {{ sev_colors.get(severity, '#6B7280') }};">
+        <div class="reco-card-header">
+            <code class="reco-ref">{{ reco.control_ref }}</code>
+            <h3 class="reco-card-title">{{ reco.title }}</h3>
+        </div>
+
+        {% if reco.category_name %}
+        <p class="reco-meta">
+            <span class="reco-meta-label">Categorie :</span> {{ reco.category_name }}
+        </p>
+        {% endif %}
+
+        {% if reco.description %}
+        <p class="reco-description">{{ reco.description }}</p>
+        {% endif %}
+
+        <div class="reco-impact">
+            <span class="reco-impact-occur">
+                <strong>{{ reco.occurrences }}</strong> occurrence(s)
+            </span>
+            {% if reco.affected_equipements %}
+            <span class="reco-impact-equips">
+                sur {{ reco.affected_equipements | length }} equipement(s) :
+                {{ reco.affected_equipements[:5] | join(', ') }}{% if reco.affected_equipements | length > 5 %} (+ {{ reco.affected_equipements | length - 5 }}){% endif %}
+            </span>
+            {% endif %}
+        </div>
+
+        {% if reco.remediation %}
+        <div class="reco-remediation">
+            <span class="reco-remediation-label">Remediation</span>
+            <p>{{ reco.remediation }}</p>
+        </div>
+        {% else %}
+        <p class="reco-remediation-empty">Action de remediation a definir avec le client.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+
+{% else %}
+<div class="reco-empty">
+    <p><strong>Aucune recommandation</strong> — conformite totale.</p>
+    <p class="reco-empty-detail">
+        L'audit n'a identifie aucune non-conformite necessitant une action corrective.
+    </p>
+</div>
+{% endif %}

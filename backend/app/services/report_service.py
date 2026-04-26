@@ -225,6 +225,28 @@ class ReportService:
                 )
                 executive_summary = None
 
+        # Si la section recommandations est incluse, calculer la liste exhaustive
+        recommendations = None
+        reco_section = sections_by_key.get("recommendations")
+        if reco_section and reco_section.included and not reco_section.custom_content:
+            from .recommendations_service import RecommendationsService
+
+            try:
+                recommendations = RecommendationsService.generate(
+                    db,
+                    report.audit_id,
+                    user_id=report.generated_by or 0,
+                    is_admin=True,
+                )
+            except Exception:
+                logger.exception(
+                    "Echec calcul recommandations pour audit %s (rapport %s)",
+                    report.audit_id,
+                    report.id,
+                )
+                recommendations = None
+
+
         template = env.get_template("report_base.html")
         return template.render(
             css=css,
@@ -237,4 +259,5 @@ class ReportService:
             ordered_sections=ordered_sections,
             sections=sections_by_key,
             executive_summary=executive_summary,
+            recommendations=recommendations,
         )

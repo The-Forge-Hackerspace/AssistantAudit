@@ -1,0 +1,21 @@
+{# Table des matieres - le compteur match la numerotation de report_base.html (cover exclu) #}
+<div class="toc-container">
+    <ol class="toc-list">
+        {% set ns = namespace(idx=0) %}
+        {% for section in ordered_sections %}
+            {% if section.included and section.section_key != "cover" %}
+                {% set ns.idx = ns.idx + 1 %}
+                {% if section.section_key != "toc" %}
+                <li class="toc-entry" style="--toc-num: '{{ ns.idx }}'">
+                    <a href="#section-{{ section.section_key }}" class="toc-link" data-num="{{ ns.idx }}">
+                        <span class="toc-num">{{ ns.idx }}.</span>
+                        <span class="toc-title">{{ section.title }}</span>
+                        <span class="toc-leader"></span>
+                        <span class="toc-page"></span>
+                    </a>
+                </li>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+    </ol>
+</div>
