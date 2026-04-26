@@ -199,6 +199,23 @@ class ReportService:
         ordered_sections = sorted(report.sections, key=lambda s: s.order)
         sections_by_key = {s.section_key: s for s in ordered_sections}
 
+        # Si la section synthèse exécutive est incluse, calculer ses donnees
+        executive_summary = None
+        exec_section = sections_by_key.get("executive_summary")
+        if exec_section and exec_section.included and not exec_section.custom_content:
+            from .executive_summary_service import ExecutiveSummaryService
+
+            try:
+                executive_summary = ExecutiveSummaryService.generate(
+                    db,
+                    report.audit_id,
+                    user_id=report.generated_by or 0,
+                    is_admin=True,  # rendu serveur, pas de check user
+                )
+            except Exception:
+                # Ne pas casser le rendu si la synthese echoue
+                executive_summary = None
+
         template = env.get_template("report_base.html")
         return template.render(
             css=css,
@@ -210,4 +227,5 @@ class ReportService:
             client_logo=client_logo,
             ordered_sections=ordered_sections,
             sections=sections_by_key,
+            executive_summary=executive_summary,
         )

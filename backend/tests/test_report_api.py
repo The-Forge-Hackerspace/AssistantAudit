@@ -51,7 +51,7 @@ class TestReportRoutes:
         resp = client.get(f"/api/v1/reports/{report_id}", headers=auditeur_headers)
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data["sections"]) == 25
+        assert len(data["sections"]) == 26
 
     def test_update_section_exclude(self, client: TestClient, auditeur_headers, audit_for_report):
         resp = client.post(

@@ -1,0 +1,147 @@
+{# Synthese executive — page premium destinee aux decideurs #}
+{% if executive_summary and executive_summary.has_data %}
+{% set s = executive_summary %}
+{% set score = s.global_score or 0 %}
+{# Couleur du score selon le palier #}
+{% if score >= 80 %}{% set score_color = "#10B981" %}{% set score_label = "Bon niveau" %}
+{% elif score >= 60 %}{% set score_color = "#F59E0B" %}{% set score_label = "A ameliorer" %}
+{% else %}{% set score_color = "#EF4444" %}{% set score_label = "Critique" %}{% endif %}
+{# Calcul de l'arc SVG : 270deg max, score/100 * 270 #}
+{% set arc_pct = (score / 100) * 270 %}
+
+<div class="exec-summary">
+
+    <p class="exec-intro">
+        Cette synthese consolide les resultats de l'audit
+        <strong>{{ s.audit_name }}</strong>{% if s.entreprise_name %} realise pour
+        <strong>{{ s.entreprise_name }}</strong>{% endif %}. Elle agrege
+        <strong>{{ s.total_evaluations }}</strong> evaluation(s) sur
+        <strong>{{ s.total_equipements }}</strong> equipement(s),
+        soit <strong>{{ s.total_controls_assessed }}</strong> controles examines.
+    </p>
+
+    {# Score global + KPIs #}
+    <div class="exec-hero">
+        <div class="exec-gauge">
+            <svg viewBox="0 0 200 200" width="180" height="180">
+                {# Arc de fond #}
+                <circle cx="100" cy="100" r="80" fill="none" stroke="#E5E7EB" stroke-width="18"
+                        stroke-dasharray="377 502" stroke-dashoffset="0"
+                        transform="rotate(135 100 100)" stroke-linecap="round"/>
+                {# Arc score #}
+                <circle cx="100" cy="100" r="80" fill="none" stroke="{{ score_color }}" stroke-width="18"
+                        stroke-dasharray="{{ (arc_pct / 270 * 377) | round(1) }} 502"
+                        transform="rotate(135 100 100)" stroke-linecap="round"/>
+                {# Texte score #}
+                <text x="100" y="100" text-anchor="middle" font-size="48" font-weight="bold"
+                      fill="{{ score_color }}" dominant-baseline="middle">{{ score | round(0) | int }}</text>
+                <text x="100" y="135" text-anchor="middle" font-size="12" fill="#6B7280">/ 100</text>
+            </svg>
+            <p class="exec-gauge-label" style="color: {{ score_color }};">{{ score_label }}</p>
+        </div>
+
+        <div class="exec-kpis">
+            <div class="exec-kpi">
+                <span class="exec-kpi-value" style="color: #10B981;">{{ s.by_status.compliant }}</span>
+                <span class="exec-kpi-label">Conformes</span>
+            </div>
+            <div class="exec-kpi">
+                <span class="exec-kpi-value" style="color: #EF4444;">{{ s.by_status.non_compliant }}</span>
+                <span class="exec-kpi-label">Non conformes</span>
+            </div>
+            <div class="exec-kpi">
+                <span class="exec-kpi-value" style="color: #F59E0B;">{{ s.by_status.partially_compliant }}</span>
+                <span class="exec-kpi-label">Partiels</span>
+            </div>
+            <div class="exec-kpi">
+                <span class="exec-kpi-value" style="color: #6B7280;">{{ s.by_status.not_applicable }}</span>
+                <span class="exec-kpi-label">Non applicables</span>
+            </div>
+        </div>
+    </div>
+
+    {# Repartition par severite #}
+    {% set sev_order = ['critical', 'high', 'medium', 'low', 'info'] %}
+    {% set sev_labels = {'critical': 'Critique', 'high': 'Eleve', 'medium': 'Moyen', 'low': 'Faible', 'info': 'Info'} %}
+    {% set sev_colors = {'critical': '#DC2626', 'high': '#EA580C', 'medium': '#F59E0B', 'low': '#6B7280', 'info': '#3B82F6'} %}
+
+    <h2>Non-conformites par criticite</h2>
+    <div class="exec-severity-chart">
+        {% set max_nc = 1 %}
+        {% for sev in sev_order %}
+            {% if sev in s.by_severity and s.by_severity[sev].non_compliant > max_nc %}
+                {% set max_nc = s.by_severity[sev].non_compliant %}
+            {% endif %}
+        {% endfor %}
+        {% for sev in sev_order %}
+            {% set bd = s.by_severity.get(sev) %}
+            {% if bd and bd.total > 0 %}
+                {% set nc = bd.non_compliant %}
+                {% set width_pct = (nc / max_nc * 100) if nc > 0 else 0 %}
+                <div class="exec-severity-row">
+                    <span class="exec-severity-label">{{ sev_labels[sev] }}</span>
+                    <div class="exec-severity-bar-wrap">
+                        <div class="exec-severity-bar"
+                             style="width: {{ width_pct | round(1) }}%; background: {{ sev_colors[sev] }};">
+                            {% if nc > 0 %}<span class="exec-severity-bar-value">{{ nc }}</span>{% endif %}
+                        </div>
+                    </div>
+                    <span class="exec-severity-count">{{ nc }}/{{ bd.total }}</span>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    {# Top 5 non-conformites #}
+    {% if s.top_non_compliances %}
+    <h2>Top {{ s.top_non_compliances | length }} non-conformites identifiees</h2>
+    <table class="exec-top-nc">
+        <thead>
+            <tr>
+                <th style="width: 8%;">Sev.</th>
+                <th style="width: 12%;">Reference</th>
+                <th>Controle</th>
+                <th style="width: 10%;">Occur.</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nc in s.top_non_compliances %}
+            <tr>
+                <td><span class="exec-sev-badge" style="background: {{ sev_colors.get(nc.severity, '#6B7280') }};">{{ sev_labels.get(nc.severity, nc.severity) }}</span></td>
+                <td><code class="exec-ref">{{ nc.control_ref }}</code></td>
+                <td>{{ nc.title }}</td>
+                <td class="exec-occur">{{ nc.occurrences }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {# Recommandations prioritaires #}
+    {% if s.recommendations %}
+    <h2>Recommandations prioritaires</h2>
+    <div class="exec-recos">
+        {% for reco in s.recommendations %}
+        <div class="exec-reco" style="border-left-color: {{ sev_colors.get(reco.severity, '#6B7280') }};">
+            <div class="exec-reco-header">
+                <span class="exec-sev-badge" style="background: {{ sev_colors.get(reco.severity, '#6B7280') }};">{{ sev_labels.get(reco.severity, reco.severity) }}</span>
+                <span class="exec-reco-title">{{ reco.title }}</span>
+            </div>
+            {% if reco.remediation %}
+            <p class="exec-reco-remediation">{{ reco.remediation }}</p>
+            {% else %}
+            <p class="exec-reco-remediation exec-reco-empty">Action de remediation a definir avec le client.</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+
+{% else %}
+<p class="placeholder-notice">
+    Synthese indisponible : aucune evaluation n'a ete realisee dans le cadre de cet audit.
+    Completez au moins une evaluation pour voir apparaitre les KPIs.
+</p>
+{% endif %}

@@ -36,7 +36,7 @@ class TestAuditReport:
         db_session.add(report)
         db_session.flush()
 
-        # Créer les 25 sections
+        # Creer toutes les sections
         for order, (key, title) in enumerate(REPORT_SECTIONS):
             section = ReportSection(
                 report_id=report.id,
@@ -48,13 +48,13 @@ class TestAuditReport:
         db_session.flush()
 
         db_session.refresh(report)
-        assert len(report.sections) == 25
+        assert len(report.sections) == 26
         assert report.sections[0].section_key == "cover"
-        assert report.sections[24].section_key == "synthesis"
+        assert report.sections[25].section_key == "synthesis"
 
-    def test_25_sections_defined(self):
-        """Le brief §7.7 définit 25 sections."""
-        assert len(REPORT_SECTIONS) == 25
+    def test_sections_defined(self):
+        """Le brief §7.7 définit 25 sections + synthèse exécutive."""
+        assert len(REPORT_SECTIONS) == 26
 
     def test_section_keys_unique(self):
         """Chaque section a une clé unique."""

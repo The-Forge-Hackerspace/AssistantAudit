@@ -11,6 +11,7 @@ import type {
   EntrepriseCreate,
   Audit,
   AuditCreate,
+  ExecutiveSummary,
   Site,
   SiteCreate,
   Equipement,
@@ -209,6 +210,12 @@ export const auditsApi = {
     const { data } = await api.delete(`/audits/${id}`);
     return data;
   },
+
+  async getExecutiveSummary(id: number): Promise<ExecutiveSummary> {
+    const { data } = await api.get<ExecutiveSummary>(`/audits/${id}/executive-summary`);
+    return data;
+  },
+
 };
 
 // ── Sites ──

@@ -7,6 +7,7 @@ import {
   BarChart3,
   FileText,
   ArrowLeft,
+  FileBarChart,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { auditsApi } from "@/services/api";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Audit, AuditStatus } from "@/types";
 import {
@@ -43,6 +45,7 @@ export function AuditDetailView({
   onBack,
   onAuditUpdated,
 }: AuditDetailViewProps) {
+  const router = useRouter();
   const formatDate = (d: string) => {
     try {
       return new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
@@ -76,6 +79,15 @@ export function AuditDetailView({
             {entrepriseMap[audit.entreprise_id] || `Entreprise #${audit.entreprise_id}`}
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push(`/audits/${audit.id}/synthese`)}
+          title="Synthèse exécutive"
+        >
+          <FileBarChart className="size-4 mr-1" />
+          Synthèse
+        </Button>
         <Badge variant={STATUS_VARIANTS[audit.status]} className="text-sm px-3 py-1">
           <StatusIcon className="size-4 mr-1" />
           {STATUS_LABELS[audit.status]}
