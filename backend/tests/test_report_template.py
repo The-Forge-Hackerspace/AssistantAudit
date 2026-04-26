@@ -24,6 +24,9 @@ class TestReportService:
         )
         assert len(report.sections) == 26
         assert report.sections[0].section_key == "cover"
+        # Synthese executive doit etre inseree juste apres la page de garde
+        assert report.sections[1].section_key == "executive_summary"
+        assert report.sections[1].order == 1
         assert report.status == "draft"
 
     def test_render_html_contains_cover(self, db_session, auditeur_user):

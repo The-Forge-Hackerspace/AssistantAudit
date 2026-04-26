@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class StatusBreakdown(BaseModel):
@@ -64,10 +64,10 @@ class ExecutiveSummary(BaseModel):
 
     # Decompte par statut et severite
     by_status: StatusBreakdown
-    by_severity: dict[str, SeverityBreakdown] = {}
+    by_severity: dict[str, SeverityBreakdown] = Field(default_factory=dict)
 
     # Top 5 non-conformites
-    top_non_compliances: list[TopNonCompliance] = []
+    top_non_compliances: list[TopNonCompliance] = Field(default_factory=list)
 
     # 3 recommandations prioritaires
-    recommendations: list[Recommendation] = []
+    recommendations: list[Recommendation] = Field(default_factory=list)

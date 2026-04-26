@@ -1,6 +1,7 @@
 """Service de génération de rapports d'audit."""
 
 import base64
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,9 @@ from ..models.report import REPORT_SECTIONS, AuditReport, ReportSection
 from ..schemas.report import AuditReportCreate, ReportSectionUpdate
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates" / "reports"
+
+logger = logging.getLogger(__name__)
+
 
 
 class ReportService:
@@ -214,6 +218,11 @@ class ReportService:
                 )
             except Exception:
                 # Ne pas casser le rendu si la synthese echoue
+                logger.exception(
+                    "Echec calcul synthese executive pour audit %s (rapport %s)",
+                    report.audit_id,
+                    report.id,
+                )
                 executive_summary = None
 
         template = env.get_template("report_base.html")

@@ -52,6 +52,11 @@ class TestReportRoutes:
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["sections"]) == 26
+        section_keys = [s["section_key"] for s in data["sections"]]
+        assert "executive_summary" in section_keys
+        # Synthese executive : section apres la page de garde
+        exec_section = next(s for s in data["sections"] if s["section_key"] == "executive_summary")
+        assert exec_section["order"] == 1
 
     def test_update_section_exclude(self, client: TestClient, auditeur_headers, audit_for_report):
         resp = client.post(
