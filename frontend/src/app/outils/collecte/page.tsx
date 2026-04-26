@@ -328,7 +328,7 @@ export default function CollectePage() {
 
       {/* Detail Dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-[70vw] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-[min(1400px,90vw)] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Terminal className="size-5" />
