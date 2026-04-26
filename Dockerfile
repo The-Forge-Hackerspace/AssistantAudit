@@ -79,5 +79,10 @@ ENV ENV=production \
 
 EXPOSE 8000
 
-# Initialisation DB (create_all ou alembic upgrade selon l'état) + démarrage
-CMD ["sh", "-c", "cd /app/backend && python docker_entrypoint.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Initialisation DB (create_all ou alembic upgrade selon l'etat) + demarrage.
+# --proxy-headers : uvicorn honore X-Forwarded-Proto/For poses par le reverse
+# proxy (NPMPlus en prod, Caddy en staging) -> request.url.scheme = "https"
+# pour declencher HSTS, et X-Forwarded-For utilisable pour le rate-limit IP.
+# --forwarded-allow-ips='*' : seul le proxy parle au backend dans ce stack
+# (port 8000 non publie via NPMPlus). A restreindre si le port est expose.
+CMD ["sh", "-c", "cd /app/backend && python docker_entrypoint.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]
