@@ -49,6 +49,9 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://frontend:3000"]}
       MONKEY365_PATH: /app/tools/monkey365/Invoke-Monkey365.ps1
       DEMO: ${DEMO:-false}
+      # Restreindre aux IPs du reverse proxy en prod (NPMPlus). '*' par defaut
+      # car le port 8000 du backend n'est pas publie via le proxy.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
     volumes:
       - ./data:/app/data
       - app-certs:/app/certs
