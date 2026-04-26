@@ -102,8 +102,13 @@ class AgentService:
         agent_uuid: str,
         user_id: int,
         is_admin: bool = False,
-    ) -> Agent:
-        """Revoque un agent. Admin peut revoquer n'importe lequel."""
+    ) -> tuple[Agent, int]:
+        """Revoque un agent et annule ses taches en cours.
+
+        Returns (agent, cancelled_tasks_count) — utilise par l'endpoint pour
+        afficher "Agent revoque — N taches annulees" cote frontend.
+        Admin peut revoquer n'importe lequel.
+        """
         query = db.query(Agent).filter(Agent.agent_uuid == agent_uuid)
         if not is_admin:
             query = query.filter(Agent.user_id == user_id)
@@ -113,6 +118,25 @@ class AgentService:
 
         agent.status = "revoked"
         agent.revoked_at = datetime.now(timezone.utc)
+
+        # Annuler toutes les taches encore actives (running/dispatched/pending)
+        from ..models.agent_task import AgentTask
+
+        active_tasks = (
+            db.query(AgentTask)
+            .filter(
+                AgentTask.agent_id == agent.id,
+                AgentTask.status.in_(["pending", "dispatched", "running"]),
+            )
+            .all()
+        )
+        cancelled_count = 0
+        for task in active_tasks:
+            task.status = "cancelled"
+            task.completed_at = datetime.now(timezone.utc)
+            task.error_message = task.error_message or "Agent revoque"
+            cancelled_count += 1
+
         db.flush()
 
         # Regenerer la CRL avec tous les agents revoques
@@ -136,7 +160,43 @@ class AgentService:
                 mgr = CertManager(ca_cert_path, ca_key_path)
                 mgr.generate_crl(revoked_serials, Path(settings.CRL_PATH))
 
-        logger.info(f"Agent revoked: uuid={agent_uuid}, user={user_id}")
+        logger.info(
+            "Agent revoked: uuid=%s, user=%s, cancelled_tasks=%s",
+            agent_uuid, user_id, cancelled_count,
+        )
+        return agent, cancelled_count
+
+    @staticmethod
+    def update_allowed_tools(
+        db: Session,
+        agent_uuid: str,
+        allowed_tools: list[str],
+        user_id: int,
+        is_admin: bool = False,
+    ) -> Agent:
+        """Met a jour la liste des outils autorises pour un agent.
+
+        Admin peut modifier n'importe quel agent ; auditeur uniquement les
+        siens. La validation des outils (liste fermee) est faite cote schema
+        Pydantic en amont.
+        """
+        query = db.query(Agent).filter(Agent.agent_uuid == agent_uuid)
+        if not is_admin:
+            query = query.filter(Agent.user_id == user_id)
+        agent = query.first()
+        if agent is None:
+            raise HTTPException(status_code=404, detail="Agent introuvable")
+        if agent.status == "revoked":
+            raise HTTPException(
+                status_code=409,
+                detail="Impossible de modifier un agent revoque",
+            )
+        agent.allowed_tools = allowed_tools
+        db.flush()
+        logger.info(
+            "Agent allowed_tools updated: uuid=%s, user=%s, tools=%s",
+            agent_uuid, user_id, allowed_tools,
+        )
         return agent
 
     @staticmethod
@@ -295,18 +355,28 @@ class AgentService:
         user_id: int,
         is_admin: bool = False,
         tool: str | None = None,
+        agent_id: int | None = None,
+        limit: int = 100,
     ) -> list[dict]:
-        """Liste les taches agent avec resolution site/entreprise."""
+        """Liste les taches agent avec resolution site/entreprise.
+
+        agent_id : restreint au scope d'un agent (utile pour le detail).
+        limit : plafond de resultats (1-500).
+        """
         from ..models.entreprise import Entreprise
         from ..models.site import Site
         from ..schemas.agent import TaskResponse
+
+        limit = max(1, min(limit, 500))
 
         query = db.query(AgentTask)
         if not is_admin:
             query = query.filter(AgentTask.owner_id == user_id)
         if tool:
             query = query.filter(AgentTask.tool == tool)
-        tasks = query.order_by(AgentTask.created_at.desc()).limit(100).all()
+        if agent_id is not None:
+            query = query.filter(AgentTask.agent_id == agent_id)
+        tasks = query.order_by(AgentTask.created_at.desc()).limit(limit).all()
 
         # Batch-resolve site and entreprise names
         site_ids = set()

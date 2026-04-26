@@ -1,5 +1,6 @@
 "use client";
 
+import axios from "axios";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   Bot,
@@ -69,17 +70,31 @@ import { agentsApi, usersApi } from "@/services/api";
 // Le token JWT vit dans le cookie httpOnly aa_access_token : le navigateur
 // l'envoie automatiquement avec la requete d'upgrade WebSocket (same-site).
 import { cn } from "@/lib/utils";
-import type { Agent, AgentCreateResponse, AgentStatus, User } from "@/types";
+import type { Agent, AgentCreateResponse, AgentStatus, AgentTask, User } from "@/types";
 
 // ── Constants ──
-const AVAILABLE_TOOLS = ["nmap", "oradad", "ad_collector"] as const;
+// Doit rester aligne avec backend/app/schemas/agent.py:SUPPORTED_AGENT_TOOLS
+// Fallback si l'endpoint /agents/supported-tools est indisponible.
+// La liste reelle est fetchee au mount via agentsApi.getSupportedTools().
+const FALLBACK_TOOLS = [
+  "nmap",
+  "oradad",
+  "config-oradad",
+  "ad_collector",
+  "ssh-collect",
+  "winrm-collect",
+] as const;
 const TOOL_LABELS: Record<string, string> = {
   nmap: "Nmap",
   oradad: "ORADAD",
+  "config-oradad": "Config ORADAD",
   ad_collector: "AD Collector",
+  "ssh-collect": "SSH Collect",
+  "winrm-collect": "WinRM Collect",
 };
 const ACTIVE_STATUSES: AgentStatus[] = ["pending", "active", "offline"];
 const PURGE_DAYS = 30;
+const INACTIVE_DAYS_THRESHOLD = 30;
 
 const WS_BASE =
   process.env.NEXT_PUBLIC_WS_URL ||
@@ -105,6 +120,26 @@ function formatRelativeTime(dateStr: string | null): string {
   if (diffDays < 30) return `Il y a ${diffDays}j`;
   const diffMonths = Math.floor(diffDays / 30);
   return `Il y a ${diffMonths} mois`;
+}
+
+function isInactiveBeyondThreshold(agent: Agent): boolean {
+  if (agent.status === "revoked") return false;
+  if (!agent.last_seen) {
+    // Jamais vu : on regarde la date de creation
+    if (!agent.created_at) return false;
+    const norm = agent.created_at.endsWith("Z") || agent.created_at.includes("+")
+      ? agent.created_at
+      : agent.created_at + "Z";
+    const created = new Date(norm);
+    const ageDays = (Date.now() - created.getTime()) / (24 * 60 * 60 * 1000);
+    return ageDays > INACTIVE_DAYS_THRESHOLD;
+  }
+  const norm = agent.last_seen.endsWith("Z") || agent.last_seen.includes("+")
+    ? agent.last_seen
+    : agent.last_seen + "Z";
+  const seen = new Date(norm);
+  const ageDays = (Date.now() - seen.getTime()) / (24 * 60 * 60 * 1000);
+  return ageDays > INACTIVE_DAYS_THRESHOLD;
 }
 
 function daysUntilPurge(revokedAt: string | null): number {
@@ -157,7 +192,7 @@ export default function AgentsPage() {
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newAgentName, setNewAgentName] = useState("");
-  const [selectedTools, setSelectedTools] = useState<string[]>([...AVAILABLE_TOOLS]);
+  const [selectedTools, setSelectedTools] = useState<string[]>([...FALLBACK_TOOLS]);
   const [targetUserId, setTargetUserId] = useState<string>("__self__");
 
   // Enrollment dialog
@@ -169,6 +204,16 @@ export default function AgentsPage() {
   // Revoke dialog
   const [revokeTarget, setRevokeTarget] = useState<Agent | null>(null);
   const [revoking, setRevoking] = useState(false);
+
+  // Detail dialog (fiche agent)
+  const [detailTarget, setDetailTarget] = useState<Agent | null>(null);
+  const [detailTools, setDetailTools] = useState<string[]>([]);
+  const [detailTasks, setDetailTasks] = useState<AgentTask[] | null>(null);
+  const [detailSaving, setDetailSaving] = useState(false);
+
+  // Liste des outils supportes (source de verite : backend)
+  const [availableTools, setAvailableTools] = useState<string[]>([...FALLBACK_TOOLS]);
+
 
   // UUID copy
   const [copiedUuid, setCopiedUuid] = useState<string | null>(null);
@@ -260,6 +305,20 @@ export default function AgentsPage() {
     if (hasAccess) fetchAgents();
     else setLoading(false);
   }, [hasAccess, fetchAgents]);
+
+  // Fetch supported tools (source de verite backend)
+  useEffect(() => {
+    if (!hasAccess) return;
+    (async () => {
+      try {
+        const tools = await agentsApi.getSupportedTools();
+        if (tools.length > 0) setAvailableTools(tools);
+      } catch {
+        // non-blocking : on garde le fallback
+      }
+    })();
+  }, [hasAccess]);
+
 
   // Fetch assignable users (admin only)
   useEffect(() => {
@@ -398,9 +457,16 @@ export default function AgentsPage() {
     const targetUuid = revokeTarget.agent_uuid;
     setRevoking(true);
     try {
-      await agentsApi.revoke(targetUuid);
+      const resp = await agentsApi.revoke(targetUuid);
       await fetchAgents();
-      toast.success("Agent révoqué");
+      const cancelled = resp.cancelled_tasks_count ?? 0;
+      if (cancelled > 0) {
+        toast.success(
+          `Agent révoqué — ${cancelled} tâche${cancelled > 1 ? "s" : ""} annulée${cancelled > 1 ? "s" : ""}`,
+        );
+      } else {
+        toast.success("Agent révoqué");
+      }
     } catch (err) {
       console.error("Revoke failed:", err);
       toast.error("Erreur lors de la révocation");
@@ -409,6 +475,64 @@ export default function AgentsPage() {
       setRevokeTarget(null);
     }
   };
+
+  // ── Detail dialog ──
+  const openDetail = useCallback(async (agent: Agent) => {
+    setDetailTarget(agent);
+    setDetailTools(agent.allowed_tools);
+    setDetailTasks(null);
+    try {
+      const own = await agentsApi.listTasks({ agent_id: agent.id, limit: 10 });
+      setDetailTasks(own);
+    } catch (err) {
+      console.error("listTasks failed:", err);
+      setDetailTasks([]);
+    }
+  }, []);
+
+  const closeDetail = () => {
+    setDetailTarget(null);
+    setDetailTools([]);
+    setDetailTasks(null);
+  };
+
+  const toggleDetailTool = (tool: string) => {
+    setDetailTools((prev) =>
+      prev.includes(tool) ? prev.filter((t) => t !== tool) : [...prev, tool],
+    );
+  };
+
+  const saveDetailTools = async () => {
+    if (!detailTarget) return;
+    setDetailSaving(true);
+    try {
+      const updated = await agentsApi.update(detailTarget.agent_uuid, {
+        allowed_tools: detailTools,
+      });
+      // Mise a jour optimiste de la liste
+      setAgents((prev) =>
+        prev.map((a) => (a.agent_uuid === updated.agent_uuid ? updated : a)),
+      );
+      setDetailTarget(updated);
+      toast.success("Outils autorisés mis à jour");
+    } catch (err: unknown) {
+      console.error("update agent failed:", err);
+      const detail =
+        axios.isAxiosError(err) && err.response?.data?.detail
+          ? String(err.response.data.detail)
+          : "Erreur lors de la mise à jour";
+      toast.error(detail);
+    } finally {
+      setDetailSaving(false);
+    }
+  };
+
+  const detailToolsDirty = useMemo(() => {
+    if (!detailTarget) return false;
+    const a = [...detailTarget.allowed_tools].sort();
+    const b = [...detailTools].sort();
+    return a.length !== b.length || a.some((v, i) => v !== b[i]);
+  }, [detailTarget, detailTools]);
 
   // ── Toggle tool selection ──
   const toggleTool = (tool: string) => {
@@ -434,7 +558,7 @@ export default function AgentsPage() {
   // ── Reset create dialog ──
   const openCreateDialog = () => {
     setNewAgentName("");
-    setSelectedTools([...AVAILABLE_TOOLS]);
+    setSelectedTools([...availableTools]);
     setTargetUserId("__self__");
     setShowCreateDialog(true);
   };
@@ -640,9 +764,22 @@ export default function AgentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAgents.map((agent) => (
-                  <TableRow key={agent.agent_uuid}>
-                    <TableCell className="font-medium">{agent.name}</TableCell>
+                {filteredAgents.map((agent) => {
+                  const inactive = isInactiveBeyondThreshold(agent);
+                  return (
+                  <TableRow
+                    key={agent.agent_uuid}
+                    className={cn(inactive && "opacity-60")}
+                  >
+                    <TableCell className="font-medium">
+                      <button
+                        type="button"
+                        onClick={() => openDetail(agent)}
+                        className="text-left hover:underline focus:outline-none focus:underline"
+                      >
+                        {agent.name}
+                      </button>
+                    </TableCell>
                     {isAdmin && (
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
@@ -673,7 +810,19 @@ export default function AgentsPage() {
                         </Tooltip>
                       </TooltipProvider>
                     </TableCell>
-                    <TableCell>{statusBadge(agent.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {statusBadge(agent.status)}
+                        {inactive && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs text-muted-foreground"
+                          >
+                            Inactif &gt; 30j
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     {showTrash ? (
                       <>
                         <TableCell>
@@ -755,7 +904,8 @@ export default function AgentsPage() {
                       </TableCell>
                     )}
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -811,7 +961,7 @@ export default function AgentsPage() {
             <div className="flex flex-col gap-2">
               <Label>Outils autorisés</Label>
               <div className="flex flex-col gap-2">
-                {AVAILABLE_TOOLS.map((tool) => (
+                {availableTools.map((tool) => (
                   <label
                     key={tool}
                     className="flex items-center gap-2 cursor-pointer"
@@ -836,6 +986,159 @@ export default function AgentsPage() {
             <Button onClick={handleCreate} disabled={creating}>
               {creating && <Loader2 data-icon="inline-start" className="animate-spin" />}
               Créer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Detail dialog (fiche agent) ── */}
+      <Dialog
+        open={detailTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) closeDetail();
+        }}
+      >
+        <DialogContent className="w-[95vw] sm:max-w-[min(900px,90vw)] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bot className="size-5" />
+              {detailTarget?.name || "Agent"}
+            </DialogTitle>
+            <DialogDescription>
+              Détails de l&apos;agent et gestion des outils autorisés.
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailTarget && (
+            <div className="space-y-6 py-2">
+              {/* Métadonnées */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
+                <div>
+                  <Label className="text-xs text-muted-foreground">UUID</Label>
+                  <p className="font-mono text-xs break-all">{detailTarget.agent_uuid}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Statut</Label>
+                  <div className="mt-0.5">{statusBadge(detailTarget.status)}</div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Dernier heartbeat</Label>
+                  <p>{formatRelativeTime(detailTarget.last_seen)}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Dernière IP</Label>
+                  <p className="font-mono text-xs">{detailTarget.last_ip || "—"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">OS</Label>
+                  <p>{detailTarget.os_info || "—"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Version agent</Label>
+                  <p>{detailTarget.agent_version || "—"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Owner</Label>
+                  <p>{detailTarget.owner_name || "—"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Créé le</Label>
+                  <p>{formatRelativeTime(detailTarget.created_at)}</p>
+                </div>
+              </div>
+
+              {/* Outils autorisés (édition) */}
+              <div>
+                <Label className="text-sm font-semibold">Outils autorisés</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  L&apos;agent ne peut exécuter que ces outils. Décocher un outil
+                  bloquera immédiatement les futures tâches qui l&apos;utilisent.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {availableTools.map((tool) => (
+                    <label
+                      key={tool}
+                      className="flex items-center gap-2 rounded border border-border p-2 cursor-pointer hover:bg-muted/50"
+                    >
+                      <Checkbox
+                        checked={detailTools.includes(tool)}
+                        onCheckedChange={() => toggleDetailTool(tool)}
+                        disabled={detailTarget.status === "revoked"}
+                      />
+                      <span className="text-sm">{TOOL_LABELS[tool] || tool}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={saveDetailTools}
+                    disabled={
+                      !detailToolsDirty ||
+                      detailSaving ||
+                      detailTarget.status === "revoked"
+                    }
+                  >
+                    {detailSaving && (
+                      <Loader2 data-icon="inline-start" className="animate-spin" />
+                    )}
+                    Enregistrer
+                  </Button>
+                </div>
+              </div>
+
+              {/* Tâches récentes */}
+              <div>
+                <Label className="text-sm font-semibold">
+                  Tâches récentes (10 dernières)
+                </Label>
+                {detailTasks === null ? (
+                  <div className="py-3 text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="size-4 animate-spin" /> Chargement…
+                  </div>
+                ) : detailTasks.length === 0 ? (
+                  <p className="py-3 text-sm text-muted-foreground">
+                    Aucune tâche pour cet agent.
+                  </p>
+                ) : (
+                  <div className="rounded border border-border max-h-60 overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Outil</TableHead>
+                          <TableHead>Statut</TableHead>
+                          <TableHead>Créée</TableHead>
+                          <TableHead>Terminée</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detailTasks.map((t) => (
+                          <TableRow key={t.task_uuid}>
+                            <TableCell className="font-mono text-xs">{t.tool}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {t.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {formatRelativeTime(t.created_at)}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {t.completed_at ? formatRelativeTime(t.completed_at) : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDetail}>
+              Fermer
             </Button>
           </DialogFooter>
         </DialogContent>

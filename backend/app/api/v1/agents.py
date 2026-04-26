@@ -15,6 +15,7 @@ from ...schemas.agent import (
     AgentCreateRequest,
     AgentCreateResponse,
     AgentResponse,
+    AgentUpdateRequest,
     ArtifactRead,
     ArtifactUploadResponse,
     EnrollRequest,
@@ -89,6 +90,19 @@ def list_agents(
     ]
 
 
+@router.get("/supported-tools")
+def get_supported_tools(
+    current_user=Depends(get_current_auditeur),
+) -> dict[str, list[str]]:
+    """Liste les outils supportes pour allowed_tools (source de verite backend).
+
+    Permet au frontend de deriver AVAILABLE_TOOLS sans dupliquer la constante.
+    """
+    from ...schemas.agent import SUPPORTED_AGENT_TOOLS
+
+    return {"tools": list(SUPPORTED_AGENT_TOOLS)}
+
+
 @router.delete("/{agent_uuid}", status_code=200)
 def revoke_agent(
     agent_uuid: str,
@@ -97,7 +111,7 @@ def revoke_agent(
     current_user=Depends(get_current_auditeur),
 ):
     """Revoque un agent. Admin peut revoquer n'importe quel agent, auditeur seulement les siens."""
-    agent = AgentService.revoke_agent(
+    agent, cancelled_tasks_count = AgentService.revoke_agent(
         db,
         agent_uuid,
         user_id=current_user.id,
@@ -113,7 +127,43 @@ def revoke_agent(
         {"agent_uuid": agent_uuid, "status": "revoked"},
     )
     # TODO: scheduled purge — delete agents where revoked_at < now() - 30 days
-    return {"detail": "Agent revoque"}
+    return {"detail": "Agent revoque", "cancelled_tasks_count": cancelled_tasks_count}
+
+
+@router.patch("/{agent_uuid}", response_model=AgentResponse)
+def update_agent(
+    agent_uuid: str,
+    body: AgentUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_auditeur),
+):
+    """Update partiel d'un agent. Pour l'instant : allowed_tools uniquement.
+
+    Admin peut modifier n'importe quel agent, auditeur uniquement les siens.
+    """
+    if body.allowed_tools is None:
+        raise HTTPException(status_code=400, detail="Aucun champ a mettre a jour")
+    agent = AgentService.update_allowed_tools(
+        db,
+        agent_uuid,
+        body.allowed_tools,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
+    )
+    return AgentResponse(
+        id=agent.id,
+        agent_uuid=agent.agent_uuid,
+        name=agent.name,
+        status=agent.status,
+        last_seen=agent.last_seen,
+        last_ip=agent.last_ip,
+        allowed_tools=agent.allowed_tools,
+        os_info=agent.os_info,
+        agent_version=agent.agent_version,
+        owner_name=agent.owner.full_name if agent.owner else None,
+        revoked_at=agent.revoked_at,
+        created_at=agent.created_at,
+    )
 
 
 # ── Routes agent (enrollment, heartbeat, refresh) ─────────────────────
@@ -162,16 +212,23 @@ def refresh_agent_token(
 @router.get("/tasks")
 def list_tasks(
     tool: str | None = None,
+    agent_id: int | None = None,
+    limit: int = 100,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_auditeur),
 ):
-    """Liste les taches agent du user courant (admin voit tout). Filtrable par tool.
-    Enrichit chaque tache avec site_name et entreprise_name resolus depuis les parametres."""
+    """Liste les taches agent du user courant (admin voit tout).
+
+    Filtrable par tool et/ou agent_id, plafonne par limit (1-500, defaut 100).
+    Enrichit chaque tache avec site_name et entreprise_name resolus depuis les parametres.
+    """
     return AgentService.list_tasks(
         db,
         user_id=current_user.id,
         is_admin=current_user.role == "admin",
         tool=tool,
+        agent_id=agent_id,
+        limit=limit,
     )
 
 

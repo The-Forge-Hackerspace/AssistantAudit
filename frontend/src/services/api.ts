@@ -60,6 +60,8 @@ import type {
   TaskArtifact,
   AgentCreateRequest,
   AgentCreateResponse,
+  AgentUpdateRequest,
+  AgentRevokeResponse,
   OradadTask,
   OradadConfig,
   OradadConfigCreate,
@@ -597,10 +599,21 @@ export const agentsApi = {
     return data;
   },
 
-  async revoke(agentUuid: string): Promise<{ detail: string }> {
-    const { data } = await api.delete<{ detail: string }>(`/agents/${agentUuid}`);
+  async revoke(agentUuid: string): Promise<AgentRevokeResponse> {
+    const { data } = await api.delete<AgentRevokeResponse>(`/agents/${agentUuid}`);
     return data;
   },
+
+  async update(agentUuid: string, payload: AgentUpdateRequest): Promise<Agent> {
+    const { data } = await api.patch<Agent>(`/agents/${agentUuid}`, payload);
+    return data;
+  },
+
+  async getSupportedTools(): Promise<string[]> {
+    const { data } = await api.get<{ tools: string[] }>("/agents/supported-tools");
+    return data.tools;
+  },
+
 
   async dispatch(payload: {
     agent_uuid: string;
@@ -612,8 +625,11 @@ export const agentsApi = {
     return data;
   },
 
-  async listTasks(tool?: string): Promise<AgentTask[]> {
-    const params = tool ? { tool } : {};
+  async listTasks(opts?: { tool?: string; agent_id?: number; limit?: number }): Promise<AgentTask[]> {
+    const params: Record<string, string | number> = {};
+    if (opts?.tool) params.tool = opts.tool;
+    if (opts?.agent_id != null) params.agent_id = opts.agent_id;
+    if (opts?.limit != null) params.limit = opts.limit;
     const { data } = await api.get<AgentTask[]>("/agents/tasks", { params });
     return data;
   },
