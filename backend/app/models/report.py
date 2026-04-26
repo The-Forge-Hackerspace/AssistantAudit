@@ -21,9 +21,10 @@ def _utcnow():
     return datetime.now(timezone.utc)
 
 
-# Les 25 sections du brief §7.7, avec leur clé machine et leur titre FR
+# Sections du rapport (brief §7.7) + "executive_summary" ajoute apres "cover"
 REPORT_SECTIONS = [
     ("cover", "Page de garde"),
+    ("executive_summary", "Synthese executive"),
     ("introduction", "Introduction"),
     ("objectives", "Objectifs de l'audit"),
     ("scope", "Périmètre de l'audit"),

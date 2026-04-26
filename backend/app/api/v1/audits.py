@@ -10,7 +10,9 @@ from ...core.deps import PaginationParams, get_current_admin, get_current_audite
 from ...models.user import User
 from ...schemas.audit import AuditCreate, AuditDetail, AuditRead, AuditUpdate
 from ...schemas.common import MessageResponse, PaginatedResponse
+from ...schemas.executive_summary import ExecutiveSummary
 from ...services.audit_service import AuditService
+from ...services.executive_summary_service import ExecutiveSummaryService
 
 router = APIRouter()
 
@@ -107,3 +109,21 @@ def delete_audit(
 ):
     nom = AuditService.delete_audit(db, audit_id)
     return MessageResponse(message=f"Audit '{nom}' supprimé")
+
+
+@router.get("/{audit_id}/executive-summary", response_model=ExecutiveSummary)
+def get_executive_summary(
+    audit_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Synthese executive de l'audit (KPIs, top non-conformites, recommandations).
+
+    Calculee a la volee a partir de toutes les campagnes/assessments/results.
+    """
+    return ExecutiveSummaryService.generate(
+        db,
+        audit_id,
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
+    )

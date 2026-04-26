@@ -106,6 +106,56 @@ export interface Audit {
   entreprise_nom?: string | null;
 }
 
+export interface ExecutiveSummaryStatus {
+  compliant: number;
+  non_compliant: number;
+  partially_compliant: number;
+  not_applicable: number;
+  not_assessed: number;
+}
+
+export interface ExecutiveSummarySeverity {
+  total: number;
+  compliant: number;
+  non_compliant: number;
+  partially_compliant: number;
+  not_assessed: number;
+  not_applicable: number;
+}
+
+export interface ExecutiveSummaryTopNC {
+  control_ref: string;
+  title: string;
+  severity: string;
+  occurrences: number;
+  affected_equipements: string[];
+}
+
+export interface ExecutiveSummaryRecommendation {
+  control_ref: string;
+  title: string;
+  severity: string;
+  remediation: string | null;
+  occurrences: number;
+}
+
+export interface ExecutiveSummary {
+  audit_id: number;
+  audit_name: string;
+  entreprise_name: string | null;
+  generated_at: string;
+  has_data: boolean;
+  global_score: number | null;
+  total_evaluations: number;
+  total_equipements: number;
+  total_controls_assessed: number;
+  by_status: ExecutiveSummaryStatus;
+  by_severity: Record<string, ExecutiveSummarySeverity>;
+  top_non_compliances: ExecutiveSummaryTopNC[];
+  recommendations: ExecutiveSummaryRecommendation[];
+}
+
+
 export interface AuditCreate {
   nom_projet: string;
   entreprise_id: number;

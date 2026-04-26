@@ -208,3 +208,219 @@ em { font-style: italic; }
 
 /* --- Sauts de page --- */
 .page-break { page-break-after: always; }
+
+/* ============================================================
+   Synthese executive — premium look
+   ============================================================ */
+
+.exec-summary {
+    margin-top: 4mm;
+}
+
+.exec-intro {
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #374151;
+    background: #F9FAFB;
+    border-left: 3px solid #3B82F6;
+    padding: 4mm 5mm;
+    margin-bottom: 8mm;
+    border-radius: 1mm;
+}
+
+/* --- Hero : score + KPIs --- */
+.exec-hero {
+    display: flex;
+    gap: 8mm;
+    align-items: center;
+    background: linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%);
+    padding: 6mm;
+    border-radius: 2mm;
+    margin-bottom: 8mm;
+    page-break-inside: avoid;
+}
+
+.exec-gauge {
+    flex: 0 0 auto;
+    text-align: center;
+}
+
+.exec-gauge svg {
+    display: block;
+}
+
+.exec-gauge-label {
+    font-size: 11pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2mm;
+}
+
+.exec-kpis {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4mm;
+}
+
+.exec-kpi {
+    background: #FFFFFF;
+    padding: 4mm;
+    border-radius: 1.5mm;
+    border: 1px solid #E5E7EB;
+    text-align: center;
+}
+
+.exec-kpi-value {
+    display: block;
+    font-size: 22pt;
+    font-weight: bold;
+    line-height: 1;
+    margin-bottom: 1mm;
+}
+
+.exec-kpi-label {
+    display: block;
+    font-size: 9pt;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* --- Bar chart par severite --- */
+.exec-severity-chart {
+    margin: 4mm 0 8mm 0;
+}
+
+.exec-severity-row {
+    display: flex;
+    align-items: center;
+    gap: 3mm;
+    margin-bottom: 2.5mm;
+}
+
+.exec-severity-label {
+    flex: 0 0 22mm;
+    font-size: 10pt;
+    font-weight: bold;
+    color: #374151;
+}
+
+.exec-severity-bar-wrap {
+    flex: 1;
+    height: 7mm;
+    background: #F3F4F6;
+    border-radius: 1mm;
+    overflow: hidden;
+    position: relative;
+}
+
+.exec-severity-bar {
+    height: 100%;
+    border-radius: 1mm;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 2mm;
+    min-width: 4mm;
+    transition: width 0.4s ease;
+}
+
+.exec-severity-bar-value {
+    font-size: 9pt;
+    font-weight: bold;
+    color: #FFFFFF;
+}
+
+.exec-severity-count {
+    flex: 0 0 16mm;
+    font-size: 9pt;
+    color: #6B7280;
+    text-align: right;
+}
+
+/* --- Top non-conformites --- */
+.exec-top-nc {
+    margin-bottom: 8mm;
+}
+
+.exec-top-nc th {
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.exec-top-nc td {
+    font-size: 10pt;
+    vertical-align: middle;
+}
+
+.exec-sev-badge {
+    display: inline-block;
+    padding: 0.5mm 2mm;
+    border-radius: 1mm;
+    color: #FFFFFF;
+    font-size: 8pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.exec-ref {
+    font-family: "Courier New", monospace;
+    font-size: 9pt;
+    background: #F3F4F6;
+    padding: 0.5mm 1.5mm;
+    border-radius: 1mm;
+    color: #1D4ED8;
+}
+
+.exec-occur {
+    text-align: center;
+    font-weight: bold;
+    color: #1F2937;
+}
+
+/* --- Recommandations --- */
+.exec-recos {
+    display: flex;
+    flex-direction: column;
+    gap: 4mm;
+}
+
+.exec-reco {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-left: 4px solid #6B7280;
+    border-radius: 1.5mm;
+    padding: 4mm 5mm;
+    page-break-inside: avoid;
+}
+
+.exec-reco-header {
+    display: flex;
+    align-items: center;
+    gap: 3mm;
+    margin-bottom: 2mm;
+}
+
+.exec-reco-title {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #111827;
+}
+
+.exec-reco-remediation {
+    font-size: 10pt;
+    color: #374151;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.exec-reco-empty {
+    color: #9CA3AF;
+    font-style: italic;
+}
+
