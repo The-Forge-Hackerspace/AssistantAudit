@@ -107,7 +107,7 @@ function ScannerContent() {
 
   const fetchAgentTasks = useCallback(async () => {
     try {
-      setAgentTasks(await agentsApi.listTasks("nmap"));
+      setAgentTasks(await agentsApi.listTasks({ tool: "nmap" }));
     } catch {
       toast.error("Erreur lors du chargement des taches agent");
     } finally {

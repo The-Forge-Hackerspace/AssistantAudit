@@ -74,7 +74,9 @@ import type { Agent, AgentCreateResponse, AgentStatus, AgentTask, User } from "@
 
 // ── Constants ──
 // Doit rester aligne avec backend/app/schemas/agent.py:SUPPORTED_AGENT_TOOLS
-const AVAILABLE_TOOLS = [
+// Fallback si l'endpoint /agents/supported-tools est indisponible.
+// La liste reelle est fetchee au mount via agentsApi.getSupportedTools().
+const FALLBACK_TOOLS = [
   "nmap",
   "oradad",
   "config-oradad",
@@ -190,7 +192,7 @@ export default function AgentsPage() {
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newAgentName, setNewAgentName] = useState("");
-  const [selectedTools, setSelectedTools] = useState<string[]>([...AVAILABLE_TOOLS]);
+  const [selectedTools, setSelectedTools] = useState<string[]>([...FALLBACK_TOOLS]);
   const [targetUserId, setTargetUserId] = useState<string>("__self__");
 
   // Enrollment dialog
@@ -208,6 +210,10 @@ export default function AgentsPage() {
   const [detailTools, setDetailTools] = useState<string[]>([]);
   const [detailTasks, setDetailTasks] = useState<AgentTask[] | null>(null);
   const [detailSaving, setDetailSaving] = useState(false);
+
+  // Liste des outils supportes (source de verite : backend)
+  const [availableTools, setAvailableTools] = useState<string[]>([...FALLBACK_TOOLS]);
+
 
   // UUID copy
   const [copiedUuid, setCopiedUuid] = useState<string | null>(null);
@@ -299,6 +305,20 @@ export default function AgentsPage() {
     if (hasAccess) fetchAgents();
     else setLoading(false);
   }, [hasAccess, fetchAgents]);
+
+  // Fetch supported tools (source de verite backend)
+  useEffect(() => {
+    if (!hasAccess) return;
+    (async () => {
+      try {
+        const tools = await agentsApi.getSupportedTools();
+        if (tools.length > 0) setAvailableTools(tools);
+      } catch {
+        // non-blocking : on garde le fallback
+      }
+    })();
+  }, [hasAccess]);
+
 
   // Fetch assignable users (admin only)
   useEffect(() => {
@@ -462,11 +482,7 @@ export default function AgentsPage() {
     setDetailTools(agent.allowed_tools);
     setDetailTasks(null);
     try {
-      const all = await agentsApi.listTasks();
-      const own = all
-        .filter((t) => t.agent_id === agent.id)
-        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-        .slice(0, 10);
+      const own = await agentsApi.listTasks({ agent_id: agent.id, limit: 10 });
       setDetailTasks(own);
     } catch (err) {
       console.error("listTasks failed:", err);
@@ -542,7 +558,7 @@ export default function AgentsPage() {
   // ── Reset create dialog ──
   const openCreateDialog = () => {
     setNewAgentName("");
-    setSelectedTools([...AVAILABLE_TOOLS]);
+    setSelectedTools([...availableTools]);
     setTargetUserId("__self__");
     setShowCreateDialog(true);
   };
@@ -945,7 +961,7 @@ export default function AgentsPage() {
             <div className="flex flex-col gap-2">
               <Label>Outils autorisés</Label>
               <div className="flex flex-col gap-2">
-                {AVAILABLE_TOOLS.map((tool) => (
+                {availableTools.map((tool) => (
                   <label
                     key={tool}
                     className="flex items-center gap-2 cursor-pointer"
@@ -1039,7 +1055,7 @@ export default function AgentsPage() {
                   bloquera immédiatement les futures tâches qui l&apos;utilisent.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
-                  {AVAILABLE_TOOLS.map((tool) => (
+                  {availableTools.map((tool) => (
                     <label
                       key={tool}
                       className="flex items-center gap-2 rounded border border-border p-2 cursor-pointer hover:bg-muted/50"

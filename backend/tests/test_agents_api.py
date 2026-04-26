@@ -276,6 +276,28 @@ class TestUpdateAgent:
         )
         assert resp.status_code == 200
 
+    def test_update_revoked_agent_returns_409(
+        self, client, auditeur_headers, active_agent, db_session
+    ):
+        # Revoque l'agent au prealable
+        active_agent.status = "revoked"
+        db_session.commit()
+        resp = client.patch(
+            f"/api/v1/agents/{active_agent.agent_uuid}",
+            json={"allowed_tools": ["nmap"]},
+            headers=auditeur_headers,
+        )
+        assert resp.status_code == 409
+
+    def test_supported_tools_endpoint(self, client, auditeur_headers):
+        resp = client.get("/api/v1/agents/supported-tools", headers=auditeur_headers)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert isinstance(body["tools"], list)
+        assert "nmap" in body["tools"]
+        assert "ssh-collect" in body["tools"]
+
+
 
 # ────────────────────────────────────────────────────────────────────────
 # POST /agents/enroll

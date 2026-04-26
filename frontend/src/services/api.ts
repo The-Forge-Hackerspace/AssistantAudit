@@ -609,6 +609,12 @@ export const agentsApi = {
     return data;
   },
 
+  async getSupportedTools(): Promise<string[]> {
+    const { data } = await api.get<{ tools: string[] }>("/agents/supported-tools");
+    return data.tools;
+  },
+
+
   async dispatch(payload: {
     agent_uuid: string;
     tool: string;
@@ -619,8 +625,11 @@ export const agentsApi = {
     return data;
   },
 
-  async listTasks(tool?: string): Promise<AgentTask[]> {
-    const params = tool ? { tool } : {};
+  async listTasks(opts?: { tool?: string; agent_id?: number; limit?: number }): Promise<AgentTask[]> {
+    const params: Record<string, string | number> = {};
+    if (opts?.tool) params.tool = opts.tool;
+    if (opts?.agent_id != null) params.agent_id = opts.agent_id;
+    if (opts?.limit != null) params.limit = opts.limit;
     const { data } = await api.get<AgentTask[]>("/agents/tasks", { params });
     return data;
   },

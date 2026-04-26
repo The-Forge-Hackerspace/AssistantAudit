@@ -888,6 +888,11 @@ export interface AgentRevokeResponse {
   cancelled_tasks_count: number;
 }
 
+export interface SupportedToolsResponse {
+  tools: string[];
+}
+
+
 export type AgentTaskStatus = "pending" | "dispatched" | "running" | "completed" | "failed" | "cancelled";
 
 export interface AgentTask {

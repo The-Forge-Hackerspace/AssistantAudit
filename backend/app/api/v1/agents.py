@@ -90,6 +90,19 @@ def list_agents(
     ]
 
 
+@router.get("/supported-tools")
+def get_supported_tools(
+    current_user=Depends(get_current_auditeur),
+) -> dict[str, list[str]]:
+    """Liste les outils supportes pour allowed_tools (source de verite backend).
+
+    Permet au frontend de deriver AVAILABLE_TOOLS sans dupliquer la constante.
+    """
+    from ...schemas.agent import SUPPORTED_AGENT_TOOLS
+
+    return {"tools": list(SUPPORTED_AGENT_TOOLS)}
+
+
 @router.delete("/{agent_uuid}", status_code=200)
 def revoke_agent(
     agent_uuid: str,
@@ -199,16 +212,23 @@ def refresh_agent_token(
 @router.get("/tasks")
 def list_tasks(
     tool: str | None = None,
+    agent_id: int | None = None,
+    limit: int = 100,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_auditeur),
 ):
-    """Liste les taches agent du user courant (admin voit tout). Filtrable par tool.
-    Enrichit chaque tache avec site_name et entreprise_name resolus depuis les parametres."""
+    """Liste les taches agent du user courant (admin voit tout).
+
+    Filtrable par tool et/ou agent_id, plafonne par limit (1-500, defaut 100).
+    Enrichit chaque tache avec site_name et entreprise_name resolus depuis les parametres.
+    """
     return AgentService.list_tasks(
         db,
         user_id=current_user.id,
         is_admin=current_user.role == "admin",
         tool=tool,
+        agent_id=agent_id,
+        limit=limit,
     )
 
 

@@ -21,6 +21,20 @@ SUPPORTED_AGENT_TOOLS: tuple[str, ...] = (
 # ── Requetes ──────────────────────────────────────────────────────────
 
 
+def _validate_supported_tools(v: Optional[list[str]]) -> Optional[list[str]]:
+    """Helper partage : valide une liste d'outils contre SUPPORTED_AGENT_TOOLS.
+
+    Renvoie v inchange si valide, leve ValueError sinon. None est accepte
+    et passe-plat (utile pour les schemas d'update partiels).
+    """
+    if v is None:
+        return v
+    invalid = [t for t in v if t not in SUPPORTED_AGENT_TOOLS]
+    if invalid:
+        raise ValueError(f"Outils non supportes : {invalid}")
+    return v
+
+
 class AgentCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     allowed_tools: list[str] = Field(default=list(SUPPORTED_AGENT_TOOLS))
@@ -29,10 +43,7 @@ class AgentCreateRequest(BaseModel):
     @field_validator("allowed_tools")
     @classmethod
     def _validate_tools(cls, v: list[str]) -> list[str]:
-        invalid = [t for t in v if t not in SUPPORTED_AGENT_TOOLS]
-        if invalid:
-            raise ValueError(f"Outils non supportes : {invalid}")
-        return v
+        return _validate_supported_tools(v)  # type: ignore[return-value]
 
 
 class AgentUpdateRequest(BaseModel):
@@ -43,12 +54,7 @@ class AgentUpdateRequest(BaseModel):
     @field_validator("allowed_tools")
     @classmethod
     def _validate_tools(cls, v: Optional[list[str]]) -> Optional[list[str]]:
-        if v is None:
-            return v
-        invalid = [t for t in v if t not in SUPPORTED_AGENT_TOOLS]
-        if invalid:
-            raise ValueError(f"Outils non supportes : {invalid}")
-        return v
+        return _validate_supported_tools(v)
 
 
 class EnrollRequest(BaseModel):

@@ -186,6 +186,11 @@ class AgentService:
         agent = query.first()
         if agent is None:
             raise HTTPException(status_code=404, detail="Agent introuvable")
+        if agent.status == "revoked":
+            raise HTTPException(
+                status_code=409,
+                detail="Impossible de modifier un agent revoque",
+            )
         agent.allowed_tools = allowed_tools
         db.flush()
         logger.info(
@@ -350,18 +355,28 @@ class AgentService:
         user_id: int,
         is_admin: bool = False,
         tool: str | None = None,
+        agent_id: int | None = None,
+        limit: int = 100,
     ) -> list[dict]:
-        """Liste les taches agent avec resolution site/entreprise."""
+        """Liste les taches agent avec resolution site/entreprise.
+
+        agent_id : restreint au scope d'un agent (utile pour le detail).
+        limit : plafond de resultats (1-500).
+        """
         from ..models.entreprise import Entreprise
         from ..models.site import Site
         from ..schemas.agent import TaskResponse
+
+        limit = max(1, min(limit, 500))
 
         query = db.query(AgentTask)
         if not is_admin:
             query = query.filter(AgentTask.owner_id == user_id)
         if tool:
             query = query.filter(AgentTask.tool == tool)
-        tasks = query.order_by(AgentTask.created_at.desc()).limit(100).all()
+        if agent_id is not None:
+            query = query.filter(AgentTask.agent_id == agent_id)
+        tasks = query.order_by(AgentTask.created_at.desc()).limit(limit).all()
 
         # Batch-resolve site and entreprise names
         site_ids = set()
