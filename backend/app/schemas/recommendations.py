@@ -24,3 +24,4 @@ class RecommendationsList(BaseModel):
     audit_id: int
     total: int
     by_severity: dict[str, list[RecommendationDetail]] = Field(default_factory=dict)
+    by_category: dict[str, list[RecommendationDetail]] = Field(default_factory=dict)

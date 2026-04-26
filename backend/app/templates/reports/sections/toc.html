@@ -6,12 +6,10 @@
             {% if section.included and section.section_key != "cover" %}
                 {% set ns.idx = ns.idx + 1 %}
                 {% if section.section_key != "toc" %}
-                <li class="toc-entry" style="--toc-num: '{{ ns.idx }}'">
-                    <a href="#section-{{ section.section_key }}" class="toc-link" data-num="{{ ns.idx }}">
+                <li class="toc-entry">
+                    <a href="#section-{{ section.section_key }}" class="toc-link">
                         <span class="toc-num">{{ ns.idx }}.</span>
                         <span class="toc-title">{{ section.title }}</span>
-                        <span class="toc-leader"></span>
-                        <span class="toc-page"></span>
                     </a>
                 </li>
                 {% endif %}
