@@ -451,8 +451,8 @@ em { font-style: italic; }
     padding: 1.5mm 0;
 }
 
-.toc-link:after {
-    content: leader('.') ' ' target-counter(attr(href), page);
+.toc-link::after {
+    content: leader('.') ' ' target-counter(attr(href url), page);
     color: #6B7280;
 }
 
@@ -481,6 +481,46 @@ em { font-style: italic; }
     padding: 4mm 5mm;
     margin-bottom: 8mm;
     border-radius: 1mm;
+}
+
+/* --- Synthese globale : criteres --- */
+.reco-synth-globale-intro {
+    font-size: 11pt;
+    color: #1F2937;
+    margin-top: 4mm;
+    margin-bottom: 3mm;
+}
+
+.reco-synth-criteres {
+    list-style: none;
+    padding-left: 0;
+    margin: 0 0 8mm 0;
+}
+
+.reco-synth-criteres li {
+    position: relative;
+    padding-left: 6mm;
+    margin-bottom: 3mm;
+    line-height: 1.5;
+    page-break-inside: avoid;
+}
+
+.reco-synth-criteres li::before {
+    content: '–';
+    position: absolute;
+    left: 0;
+    color: #6B7280;
+    font-weight: bold;
+}
+
+.reco-synth-critere-label {
+    font-weight: bold;
+    font-size: 11pt;
+}
+
+.reco-synth-critere-text {
+    color: #1F2937;
+    font-size: 11pt;
 }
 
 /* --- Synthese clickable --- */
@@ -540,7 +580,7 @@ em { font-style: italic; }
 }
 
 .reco-synth-col-head {
-    height: 28mm;
+    width: 12mm;
     vertical-align: bottom !important;
     text-align: center !important;
     padding: 0 !important;
@@ -548,17 +588,28 @@ em { font-style: italic; }
     background: transparent !important;
 }
 
+.reco-rot-wrap {
+    position: relative;
+    width: 12mm;
+    height: 30mm;
+    overflow: visible;
+}
+
 .reco-synth-rot {
-    display: inline-block;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 30mm;
+    height: 12mm;
+    line-height: 12mm;
     transform: rotate(-90deg);
-    transform-origin: center center;
+    transform-origin: bottom left;
+    margin-left: 12mm;
     white-space: nowrap;
     font-size: 9pt;
     font-style: italic;
-    line-height: 1;
-    width: 26mm;
     text-align: left;
-    margin-bottom: 1mm;
+    padding-left: 1mm;
 }
 
 .reco-rot-critique { color: #DC2626; }

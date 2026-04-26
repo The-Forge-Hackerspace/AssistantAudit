@@ -10,11 +10,29 @@
 <p class="reco-intro">
     Cette section liste l'ensemble des <strong>{{ recommendations.total }}</strong>
     non-conformites identifiees lors de l'audit. La synthese ci-dessous regroupe les
-    recommandations par categorie ; cliquez sur un titre pour acceder au detail.
+    recommandations par referentiel ; cliquez sur une recommandation pour acceder au detail.
 </p>
 
 {# ============================================================
-   Synthese : tableau clickable groupe par categorie
+   Synthese globale : criteres de classification
+   ============================================================ #}
+<h2 class="reco-synthesis-title">Synthese globale</h2>
+<p class="reco-synth-globale-intro">
+    Nous avons etabli un ordre de recommandations classe selon plusieurs criteres :
+</p>
+<ul class="reco-synth-criteres">
+    <li><span class="reco-synth-critere-label" style="color: #DC2626;">Risque critique</span>
+        <span class="reco-synth-critere-text">: impact majeur sur la securite et/ou la disponibilite du SI.</span></li>
+    <li><span class="reco-synth-critere-label" style="color: #EA580C;">Risque modere</span>
+        <span class="reco-synth-critere-text">: impact direct ou indirect pouvant alterer la securite et/ou la disponibilite du SI.</span></li>
+    <li><span class="reco-synth-critere-label" style="color: #F59E0B;">Risque mineur</span>
+        <span class="reco-synth-critere-text">: n'ayant pas ou peu d'impact sur la securite et/ou la disponibilite du SI.</span></li>
+    <li><span class="reco-synth-critere-label" style="color: #3B82F6;">Ameliorations</span>
+        <span class="reco-synth-critere-text">: suggestions ou bonnes pratiques de l'informatique.</span></li>
+</ul>
+
+{# ============================================================
+   Synthese : tableau clickable groupe par framework
    ============================================================ #}
 <h2 class="reco-synthesis-title">Synthese des recommandations</h2>
 {% for cat_name, cat_items in recommendations.by_category.items() %}
@@ -30,19 +48,20 @@
         <thead>
             <tr>
                 <th class="reco-synth-cat-header"><em>{{ cat_name }}</em></th>
-                <th class="reco-synth-col-head"><span class="reco-synth-rot reco-rot-critique">Risque critique</span></th>
-                <th class="reco-synth-col-head"><span class="reco-synth-rot reco-rot-modere">Risque modere</span></th>
-                <th class="reco-synth-col-head"><span class="reco-synth-rot reco-rot-mineur">Risque mineur</span></th>
-                <th class="reco-synth-col-head"><span class="reco-synth-rot reco-rot-ameliorations">Ameliorations</span></th>
+                <th class="reco-synth-col-head"><div class="reco-rot-wrap"><span class="reco-synth-rot reco-rot-critique">Risque critique</span></div></th>
+                <th class="reco-synth-col-head"><div class="reco-rot-wrap"><span class="reco-synth-rot reco-rot-modere">Risque modere</span></div></th>
+                <th class="reco-synth-col-head"><div class="reco-rot-wrap"><span class="reco-synth-rot reco-rot-mineur">Risque mineur</span></div></th>
+                <th class="reco-synth-col-head"><div class="reco-rot-wrap"><span class="reco-synth-rot reco-rot-ameliorations">Ameliorations</span></div></th>
             </tr>
         </thead>
         <tbody>
         {% for reco in cat_items %}
         {% set col = sev_to_col.get(reco.severity, 'ameliorations') %}
+        {% set action = reco.remediation if reco.remediation else reco.title %}
         <tr class="reco-synth-row">
             <td class="reco-synth-title-cell">
                 <a href="#reco-{{ reco.control_ref }}" class="reco-synth-link" style="color: {{ col_colors.get(col, '#1F2937') }};">
-                    <em>{{ reco.title }}</em>
+                    <em>{{ action }}</em>
                 </a>
             </td>
             <td class="reco-synth-mark-cell">{% if col == 'critique' %}<span class="reco-synth-mark">X</span>{% endif %}</td>
