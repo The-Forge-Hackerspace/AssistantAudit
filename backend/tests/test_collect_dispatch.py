@@ -377,3 +377,62 @@ class TestCollectEndpoint:
             },
         )
         assert resp.status_code == 403
+
+
+# ── WS task_status: failed → hydratation CollectResult ──────────────────
+
+
+class TestWSTaskStatusFailedHydratesCollect:
+    """Verifie qu'un task_status: failed sur une tache ssh/winrm-collect met
+    bien la CollectResult liee en FAILED. Sans cela, l'agent (qui n'envoie
+    pas de task_result sur erreur) laisse la collecte en RUNNING."""
+
+    def test_ssh_collect_failed_status_hydrates_collect(
+        self, client, db_session, auditeur_user, agent, equipement
+    ):
+        from unittest.mock import patch
+
+        from app.core.security import create_agent_token
+        from app.core.websocket_manager import ws_manager
+
+        ws_manager.user_connections.clear()
+        ws_manager.agent_connections.clear()
+        ws_manager.agent_owners.clear()
+
+        collect = _pending_collect(db_session, equipement.id, method="ssh")
+        task = collect_service.dispatch_collect_to_agent(
+            db=db_session,
+            collect_id=collect.id,
+            agent_uuid=agent.agent_uuid,
+            current_user_id=auditeur_user.id,
+            password="s3cret",
+        )
+        db_session.commit()
+        task_uuid = task.task_uuid
+        collect_id = collect.id
+
+        class _NoCloseSession:
+            def __init__(self, s): self._s = s
+            def __getattr__(self, n):
+                return (lambda: None) if n == "close" else getattr(self._s, n)
+
+        proxy = _NoCloseSession(db_session)
+        token = create_agent_token(agent_uuid=agent.agent_uuid, owner_id=auditeur_user.id)
+        with patch("app.core.database.SessionLocal", lambda: proxy):
+            with client.websocket_connect(f"/ws/agent?token={token}") as ws:
+                ws.send_json({"type": "heartbeat"})
+                ws.receive_json()  # heartbeat_ack
+                ws.send_json({
+                    "type": "task_status",
+                    "data": {
+                        "task_uuid": task_uuid,
+                        "status": "failed",
+                        "error_message": "Connexion SSH refusee",
+                    },
+                })
+
+        db_session.expire_all()
+        reloaded = db_session.get(CollectResult, collect_id)
+        assert reloaded.status == CollectStatus.FAILED
+        assert reloaded.error_message == "Connexion SSH refusee"
+        assert reloaded.completed_at is not None
