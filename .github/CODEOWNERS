@@ -1,0 +1,27 @@
+# CODEOWNERS — AssistantAudit
+#
+# Toute modification d'un fichier matche par un pattern declenche une review
+# obligatoire des owners listes (combinee avec la rule pull_request.require_code_owner_review
+# du ruleset "Main branch protection").
+#
+# Pattern qui match en dernier gagne. Voir
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+# Defaut : tout le repo
+* @T0SAGA97
+
+# Securite & auth (changements sensibles)
+/backend/app/core/security.py     @T0SAGA97
+/backend/app/core/encryption.py   @T0SAGA97
+/backend/app/core/file_encryption.py @T0SAGA97
+/backend/app/core/cert_manager.py @T0SAGA97
+/backend/app/core/deps.py         @T0SAGA97
+/backend/app/core/rate_limit.py   @T0SAGA97
+/backend/app/api/v1/auth.py       @T0SAGA97
+
+# Infra & deploiement
+/Dockerfile           @T0SAGA97
+/Dockerfile.frontend  @T0SAGA97
+/docker-compose.yml   @T0SAGA97
+/.github/             @T0SAGA97
+/backend/alembic/     @T0SAGA97
