@@ -175,6 +175,14 @@ class Settings(BaseSettings):
     # Frequence du sweeper qui detecte les agents timeout.
     AGENT_HEARTBEAT_SWEEP_INTERVAL_SECONDS: int = 15
 
+    # --- Collectes orphelines (TOS-16) ---
+    # Une collecte SSH/WinRM dispatchee sur un agent reste en `running` tant
+    # que l'agent n'a pas renvoye de task_result. Si l'agent disparait (perte
+    # WS, crash) avant de repondre, la collecte resterait bloquee. Le sweeper
+    # marque FAILED toute collecte `running` plus ancienne que ce delai.
+    COLLECT_TIMEOUT_SECONDS: int = 15 * 60
+    COLLECT_SWEEP_INTERVAL_SECONDS: int = 60
+
     # --- Outils intégrés ---
     NMAP_TIMEOUT: int = 600  # secondes
     MONKEY365_PATH: str = ""  # chemin vers Invoke-Monkey365.ps1
