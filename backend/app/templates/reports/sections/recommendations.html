@@ -17,62 +17,42 @@
    Synthese : tableau clickable groupe par categorie
    ============================================================ #}
 <h2 class="reco-synthesis-title">Synthese des recommandations</h2>
-<table class="reco-synthesis">
-    <thead>
-        <tr>
-            <th class="reco-synth-cat-head">Categorie</th>
-            <th class="reco-synth-col reco-synth-col-critique">Risque critique</th>
-            <th class="reco-synth-col reco-synth-col-modere">Risque modere</th>
-            <th class="reco-synth-col reco-synth-col-mineur">Risque mineur</th>
-            <th class="reco-synth-col reco-synth-col-ameliorations">Ameliorations</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for cat_name, cat_items in recommendations.by_category.items() %}
-        <tr class="reco-synth-cat-row">
-            <td colspan="5" class="reco-synth-cat-cell">{{ cat_name }}</td>
-        </tr>
+{% for cat_name, cat_items in recommendations.by_category.items() %}
+<div class="reco-synth-cat-block">
+    <div class="reco-synth-cat-header">
+        <span class="reco-synth-cat-label"><em>{{ cat_name }}</em></span>
+        <span class="reco-synth-col-head reco-synth-col-critique">Risque critique</span>
+        <span class="reco-synth-col-head reco-synth-col-modere">Risque modere</span>
+        <span class="reco-synth-col-head reco-synth-col-mineur">Risque mineur</span>
+        <span class="reco-synth-col-head reco-synth-col-ameliorations">Ameliorations</span>
+    </div>
+    <table class="reco-synthesis">
+        <colgroup>
+            <col class="reco-synth-col-title" />
+            <col class="reco-synth-col-mark" />
+            <col class="reco-synth-col-mark" />
+            <col class="reco-synth-col-mark" />
+            <col class="reco-synth-col-mark" />
+        </colgroup>
+        <tbody>
         {% for reco in cat_items %}
         {% set col = sev_to_col.get(reco.severity, 'ameliorations') %}
         <tr class="reco-synth-row">
-            <td class="reco-synth-cat-spacer"></td>
-            <td class="reco-synth-cell {% if col == 'critique' %}is-active{% endif %}">
-                {% if col == 'critique' %}
-                <a href="#reco-{{ reco.control_ref }}" class="reco-synth-link" style="color: {{ col_colors.critique }};">
-                    <span class="reco-synth-mark">X</span>
+            <td class="reco-synth-title-cell">
+                <a href="#reco-{{ reco.control_ref }}" class="reco-synth-link" style="color: {{ col_colors.get(col, '#1F2937') }};">
                     <em>{{ reco.title }}</em>
                 </a>
-                {% endif %}
             </td>
-            <td class="reco-synth-cell {% if col == 'modere' %}is-active{% endif %}">
-                {% if col == 'modere' %}
-                <a href="#reco-{{ reco.control_ref }}" class="reco-synth-link" style="color: {{ col_colors.modere }};">
-                    <span class="reco-synth-mark">X</span>
-                    <em>{{ reco.title }}</em>
-                </a>
-                {% endif %}
-            </td>
-            <td class="reco-synth-cell {% if col == 'mineur' %}is-active{% endif %}">
-                {% if col == 'mineur' %}
-                <a href="#reco-{{ reco.control_ref }}" class="reco-synth-link" style="color: {{ col_colors.mineur }};">
-                    <span class="reco-synth-mark">X</span>
-                    <em>{{ reco.title }}</em>
-                </a>
-                {% endif %}
-            </td>
-            <td class="reco-synth-cell {% if col == 'ameliorations' %}is-active{% endif %}">
-                {% if col == 'ameliorations' %}
-                <a href="#reco-{{ reco.control_ref }}" class="reco-synth-link" style="color: {{ col_colors.ameliorations }};">
-                    <span class="reco-synth-mark">X</span>
-                    <em>{{ reco.title }}</em>
-                </a>
-                {% endif %}
-            </td>
+            <td class="reco-synth-mark-cell">{% if col == 'critique' %}<span class="reco-synth-mark">X</span>{% endif %}</td>
+            <td class="reco-synth-mark-cell">{% if col == 'modere' %}<span class="reco-synth-mark">X</span>{% endif %}</td>
+            <td class="reco-synth-mark-cell">{% if col == 'mineur' %}<span class="reco-synth-mark">X</span>{% endif %}</td>
+            <td class="reco-synth-mark-cell">{% if col == 'ameliorations' %}<span class="reco-synth-mark">X</span>{% endif %}</td>
         </tr>
         {% endfor %}
-    {% endfor %}
-    </tbody>
-</table>
+        </tbody>
+    </table>
+</div>
+{% endfor %}
 
 {# ============================================================
    Detail : cartes groupees par severite (cible des liens)
