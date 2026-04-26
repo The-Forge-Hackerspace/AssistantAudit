@@ -16,8 +16,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["WebSocket"])
 
-# Taille max d'un message WS entrant (16 Ko — largement suffisant pour des commandes JSON)
-_MAX_WS_MESSAGE_SIZE = 16 * 1024
+# Taille max d'un message WS entrant. Une commande/heartbeat fait quelques Ko,
+# mais un task_result d'une collecte WinRM/SSH peut contenir l'inventaire complet
+# d'un poste (services, users, network) — facilement plusieurs dizaines de Ko.
+_MAX_WS_MESSAGE_SIZE = 4 * 1024 * 1024
 
 
 async def _receive_json_safe(websocket: WebSocket) -> dict | None:
