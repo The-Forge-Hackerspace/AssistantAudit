@@ -7,8 +7,8 @@
     size: A4;
     margin: 20mm 25mm;
     @top-right {
-        content: "Page " counter(page) " / " counter(pages);
-        font-size: 9pt;
+        content: string(project-name);
+        font-size: 8pt;
         color: #6B7280;
     }
     @bottom-left {
@@ -16,10 +16,13 @@
         font-size: 8pt;
         color: #6B7280;
     }
+    @bottom-center {
+        content: "Page " counter(page) " / " counter(pages);
+        font-size: 9pt;
+        color: #4B5563;
+    }
     @bottom-right {
-        content: string(project-name);
-        font-size: 8pt;
-        color: #6B7280;
+        content: "";
     }
 }
 
@@ -27,6 +30,7 @@
 @page :first {
     @top-right { content: none; }
     @bottom-left { content: none; }
+    @bottom-center { content: none; }
     @bottom-right { content: none; }
 }
 
@@ -34,6 +38,7 @@
 @page cover {
     @top-right { content: none; }
     @bottom-left { content: none; }
+    @bottom-center { content: none; }
     @bottom-right { content: none; }
 }
 

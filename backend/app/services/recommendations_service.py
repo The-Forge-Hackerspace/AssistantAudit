@@ -92,7 +92,7 @@ class RecommendationsService:
             # Groupement de la synthese par framework (ex: AD, Firewall, M365),
             # pas par sous-categorie : un audit cible un seul referentiel par bloc.
             framework = ctrl.category.framework if ctrl.category else None
-            group_name = framework.ref_id if framework else "Autres"
+            group_name = framework.name if framework else "Autres"
             detail = RecommendationDetail(
                 control_ref=ctrl.ref_id,
                 title=ctrl.title,
