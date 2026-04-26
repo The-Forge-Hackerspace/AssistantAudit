@@ -121,9 +121,11 @@ class TestRefreshEndpoint:
         assert resp.status_code == 401
 
     def test_refresh_missing_body_fails(self, client):
-        """Un body vide retourne 422."""
+        """Sans cookie ni body, l'endpoint retourne 401 (token requis)."""
+        # Le refresh_token est desormais optionnel dans le body : il peut etre lu
+        # depuis le cookie httpOnly aa_refresh_token. Sans aucune source -> 401.
         resp = client.post("/api/v1/auth/refresh", json={})
-        assert resp.status_code == 422
+        assert resp.status_code == 401
 
     def test_login_returns_refresh_token(self, client, auditeur_user):
         """Les endpoints login retournent un refresh_token."""

@@ -134,16 +134,29 @@ def create_app() -> FastAPI:
             response.headers["X-XSS-Protection"] = "1; mode=block"
             response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
             response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
-            # CSP : restrictif mais compatible avec Swagger UI
-            response.headers["Content-Security-Policy"] = (
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "img-src 'self' data:; "
-                "font-src 'self' https://cdn.jsdelivr.net; "
-                "connect-src 'self'; "
-                "frame-ancestors 'none'"
-            )
+            # CSP : en prod (Swagger desactive) on supprime 'unsafe-inline'
+            # et le CDN externe pour reduire la surface XSS. En dev, on garde
+            # 'unsafe-inline' + cdn.jsdelivr.net pour compatibilite Swagger UI.
+            if is_prod:
+                response.headers["Content-Security-Policy"] = (
+                    "default-src 'self'; "
+                    "script-src 'self'; "
+                    "style-src 'self'; "
+                    "img-src 'self' data:; "
+                    "font-src 'self'; "
+                    "connect-src 'self'; "
+                    "frame-ancestors 'none'"
+                )
+            else:
+                response.headers["Content-Security-Policy"] = (
+                    "default-src 'self'; "
+                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                    "img-src 'self' data:; "
+                    "font-src 'self' https://cdn.jsdelivr.net; "
+                    "connect-src 'self'; "
+                    "frame-ancestors 'none'"
+                )
             # HSTS uniquement si HTTPS détecté
             if request.url.scheme == "https":
                 response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

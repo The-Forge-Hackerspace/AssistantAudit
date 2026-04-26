@@ -40,8 +40,12 @@ async def _receive_json_safe(websocket: WebSocket) -> dict | None:
 async def ws_user(websocket: WebSocket, token: str = ""):
     """
     WebSocket pour les techniciens (frontend).
-    Token JWT passe en query param : /ws/user?token=xxx
+    Source du token JWT (par ordre de priorite) :
+      1. Cookie httpOnly `aa_access_token` (auth principale via SameSite=Strict)
+      2. Query param `?token=...` (compat clients legacy)
     """
+    cookie_token = websocket.cookies.get("aa_access_token", "")
+    token = cookie_token or token
     if not token:
         await websocket.close(code=4001, reason="Token required")
         return

@@ -4,7 +4,7 @@ Routes d'authentification : login, register, refresh, profile.
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError
 from sqlalchemy.orm import Session
@@ -31,15 +31,46 @@ logger = logging.getLogger(__name__)
 
 _settings = get_settings()
 
+ACCESS_COOKIE = "aa_access_token"
+REFRESH_COOKIE = "aa_refresh_token"
+REFRESH_COOKIE_PATH = f"{_settings.API_V1_PREFIX}/auth"
 
-def _clear_legacy_httponly_cookies(response: Response) -> None:
+
+def _is_secure_env() -> bool:
+    """Active le flag Secure des cookies hors dev/test."""
+    return _settings.ENV in ("production", "preprod", "staging")
+
+
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
     """
-    Supprime les anciens cookies httpOnly qui peuvent rester dans le navigateur
-    suite à une version précédente du code. Sans cette suppression, js-cookie
-    ne peut ni lire ni écraser ces cookies → l'auth frontend est cassée.
+    Pose access et refresh tokens en cookies httpOnly + SameSite=Strict.
+    Le refresh est scope au path /api/v1/auth pour limiter sa surface d'envoi.
     """
-    response.delete_cookie("aa_access_token", path="/", httponly=True, samesite="strict")
-    response.delete_cookie("aa_refresh_token", path=f"{_settings.API_V1_PREFIX}/auth", httponly=True, samesite="strict")
+    secure = _is_secure_env()
+    response.set_cookie(
+        key=ACCESS_COOKIE,
+        value=access_token,
+        max_age=_settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+        httponly=True,
+        secure=secure,
+        samesite="strict",
+    )
+    response.set_cookie(
+        key=REFRESH_COOKIE,
+        value=refresh_token,
+        max_age=_settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path=REFRESH_COOKIE_PATH,
+        httponly=True,
+        secure=secure,
+        samesite="strict",
+    )
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    """Supprime les cookies d'auth poses par _set_auth_cookies."""
+    response.delete_cookie(ACCESS_COOKIE, path="/", httponly=True, samesite="strict")
+    response.delete_cookie(REFRESH_COOKIE, path=REFRESH_COOKIE_PATH, httponly=True, samesite="strict")
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -51,10 +82,9 @@ def login(
 ):
     """
     Authentification par username/password → JWT.
-    Accepte le format OAuth2 form (utilisé par Swagger Authorize)
-    et le format JSON classique.
+    Pose les tokens en cookies httpOnly et les retourne aussi en body
+    pour les clients programmatiques (Swagger, agents, scripts).
     """
-    # Rate limiting anti brute-force
     login_rate_limiter.check(request)
     login_rate_limiter.record_attempt(request)
 
@@ -65,17 +95,15 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Identifiant ou mot de passe incorrect",
         )
-    # Login réussi : reset le compteur
     login_rate_limiter.reset(request)
     tokens = AuthService.create_tokens(user)
-    _clear_legacy_httponly_cookies(response)
+    _set_auth_cookies(response, tokens["access_token"], tokens["refresh_token"])
     return tokens
 
 
 @router.post("/login/json", response_model=TokenResponse)
 def login_json(request: Request, response: Response, body: LoginRequest, db: Session = Depends(get_db)):
     """Authentification par JSON body (pour les clients API)"""
-    # Rate limiting anti brute-force
     login_rate_limiter.check(request)
     login_rate_limiter.record_attempt(request)
 
@@ -85,26 +113,37 @@ def login_json(request: Request, response: Response, body: LoginRequest, db: Ses
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Identifiant ou mot de passe incorrect",
         )
-    # Login réussi : reset le compteur
     login_rate_limiter.reset(request)
     tokens = AuthService.create_tokens(user)
-    _clear_legacy_httponly_cookies(response)
+    _set_auth_cookies(response, tokens["access_token"], tokens["refresh_token"])
     return tokens
 
 
 @router.post("/refresh", response_model=TokenResponse)
 def refresh(
     request: Request,
-    body: RefreshRequest,
+    response: Response,
+    body: RefreshRequest | None = None,
+    aa_refresh_token: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
 ):
-    """Renouvelle les tokens a partir d'un refresh token valide."""
-    # Rate limiting (meme limiter que /login)
+    """
+    Renouvelle les tokens a partir d'un refresh token valide.
+    Lit le refresh depuis le cookie httpOnly en priorite, puis depuis le body JSON
+    si necessaire (compat clients legacy).
+    """
     login_rate_limiter.check(request)
     login_rate_limiter.record_attempt(request)
 
+    refresh_token = aa_refresh_token or (body.refresh_token if body and body.refresh_token else None)
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token requis",
+        )
+
     try:
-        payload = validate_refresh_token(body.refresh_token)
+        payload = validate_refresh_token(refresh_token)
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -120,7 +159,9 @@ def refresh(
         )
 
     login_rate_limiter.reset(request)
-    return AuthService.create_tokens(user)
+    tokens = AuthService.create_tokens(user)
+    _set_auth_cookies(response, tokens["access_token"], tokens["refresh_token"])
+    return tokens
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -130,7 +171,6 @@ def register(
     admin: User = Depends(get_current_admin),
 ):
     """Créer un nouvel utilisateur (admin seulement)"""
-    # Vérifier unicité
     existing = db.query(User).filter((User.username == body.username) | (User.email == body.email)).first()
     if existing:
         raise HTTPException(
@@ -172,6 +212,6 @@ def change_password(
 
 @router.post("/logout", response_model=MessageResponse)
 def logout(response: Response):
-    """Déconnexion : supprime les éventuels cookies httpOnly résiduels."""
-    _clear_legacy_httponly_cookies(response)
+    """Déconnexion : supprime les cookies d'auth httpOnly côté client."""
+    _clear_auth_cookies(response)
     return MessageResponse(message="Déconnecté avec succès")

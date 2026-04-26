@@ -30,7 +30,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { attachmentsApi } from "@/services/api";
-import { getAccessToken } from "@/lib/api-client";
 import { toast } from "sonner";
 import type { Attachment } from "@/types";
 
@@ -80,10 +79,8 @@ export function AttachmentSection({
   const blobUrlsRef = useRef<string[]>([]);
 
   const fetchBlob = useCallback(async (url: string) => {
-    const token = getAccessToken() || "";
-    const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    // credentials: "include" -> envoie automatiquement le cookie httpOnly aa_access_token.
+    const resp = await fetch(url, { credentials: "include" });
     const blobUrl = URL.createObjectURL(await resp.blob());
     blobUrlsRef.current.push(blobUrl);
     return blobUrl;
@@ -167,7 +164,7 @@ export function AttachmentSection({
     setLoadingPreview(true);
     try {
       const resp = await fetch(`${API_BASE}/attachments/${att.id}/preview`, {
-        headers: { Authorization: `Bearer ${getAccessToken() || ""}` },
+        credentials: "include",
       });
       const text = await resp.text();
       setTextPreview({ att, content: text });
@@ -181,7 +178,7 @@ export function AttachmentSection({
   const handleDownload = async (att: Attachment) => {
     try {
       const resp = await fetch(`${API_BASE}/attachments/${att.id}/download`, {
-        headers: { Authorization: `Bearer ${getAccessToken() || ""}` },
+        credentials: "include",
       });
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);

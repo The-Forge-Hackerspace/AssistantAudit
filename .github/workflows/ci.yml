@@ -221,7 +221,7 @@ jobs:
         with:
           image-ref: scan-target:latest
           scan-type: image
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: '1'
           format: table

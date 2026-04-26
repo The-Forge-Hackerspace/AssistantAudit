@@ -66,7 +66,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
 import { agentsApi, usersApi } from "@/services/api";
-import { getAccessToken } from "@/lib/api-client";
+// Le token JWT vit dans le cookie httpOnly aa_access_token : le navigateur
+// l'envoie automatiquement avec la requete d'upgrade WebSocket (same-site).
 import { cn } from "@/lib/utils";
 import type { Agent, AgentCreateResponse, AgentStatus, User } from "@/types";
 
@@ -280,9 +281,7 @@ export default function AgentsPage() {
     if (!hasAccess) return;
 
     const connect = () => {
-      const token = getAccessToken();
-      if (!token) return;
-      const ws = new WebSocket(`${WS_BASE}/ws/user?token=${token}`);
+      const ws = new WebSocket(`${WS_BASE}/ws/user`);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {
