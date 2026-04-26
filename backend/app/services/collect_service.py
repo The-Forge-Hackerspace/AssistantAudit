@@ -4,13 +4,11 @@ analyse des résultats et pré-remplissage des contrôles d'audit.
 """
 
 import logging
-import time
 from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from ..core.database import SessionLocal
 from ..models.agent_task import AgentTask
 from ..models.assessment import Assessment, ComplianceStatus, ControlResult
 from ..models.collect_result import CollectMethod, CollectResult, CollectStatus

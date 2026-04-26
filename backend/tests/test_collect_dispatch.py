@@ -15,14 +15,12 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.agent import Agent
-from app.models.agent_task import AgentTask
-from app.models.collect_result import CollectMethod, CollectResult, CollectStatus
+from app.models.collect_result import CollectResult, CollectStatus
 from app.models.entreprise import Entreprise
 from app.models.equipement import EquipementServeur
 from app.models.site import Site
 from app.models.user import User
 from app.services import collect_service
-
 
 # ── Fixtures ────────────────────────────────────────────────────────────
 
