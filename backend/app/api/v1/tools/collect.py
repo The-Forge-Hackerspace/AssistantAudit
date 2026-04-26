@@ -5,14 +5,13 @@ from sqlalchemy.orm import Session
 
 from ....core.database import get_db
 from ....core.deps import get_current_auditeur
-from ....core.task_runner import get_task_runner
 from ....models.user import User
 from ....schemas.common import MessageResponse
 from ....schemas.scan import CollectCreate, CollectResultRead, CollectResultSummary, PrefillResult
 from ....services.collect_service import (
     create_pending_collect,
     delete_collect_result,
-    execute_collect_background,
+    dispatch_collect_to_agent,
     get_collect_result,
     list_collect_results,
     prefill_assessment_from_collect,
@@ -52,18 +51,31 @@ def launch_collect(
     except ValueError as e:
         raise HTTPException(404, str(e))
 
-    task_runner = get_task_runner()
-    task_runner.submit(
-        execute_collect_background,
-        collect_id=collect.id,
-        password=params.password,
-        private_key=params.private_key,
-        passphrase=params.passphrase,
-        use_ssl=params.use_ssl,
-        transport=params.transport,
-    )
+    try:
+        task = dispatch_collect_to_agent(
+            db=db,
+            collect_id=collect.id,
+            agent_uuid=params.agent_uuid,
+            current_user_id=current_user.id,
+            password=params.password,
+            private_key=params.private_key,
+            passphrase=params.passphrase,
+            use_ssl=params.use_ssl,
+            transport=params.transport,
+        )
+        db.commit()
+    except PermissionError as e:
+        db.rollback()
+        raise HTTPException(403, str(e))
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(400, str(e))
 
-    logger.info(f"Collecte #{collect.id} lancée en background ({params.method} → {params.target_host})")
+    from ....services.task_service import notify_agent_new_task
+
+    notify_agent_new_task(params.agent_uuid, task)
+
+    logger.info(f"Collecte #{collect.id} dispatchee vers agent {params.agent_uuid} ({params.method} \u2192 {params.target_host})")
     return collect
 
 

@@ -3,6 +3,7 @@ Service de dispatch de taches vers les agents.
 Implemente la double verification d'ownership pour l'isolation inter-techniciens.
 """
 
+import asyncio
 import logging
 
 from fastapi import HTTPException
@@ -14,6 +15,32 @@ from ..models.audit import Audit
 from ..models.oradad_config import OradadConfig
 
 logger = logging.getLogger(__name__)
+
+
+def notify_agent_new_task(agent_uuid: str, task: AgentTask) -> None:
+    """Pousse l'event `new_task` vers l'agent via WebSocket (best-effort).
+
+    A appeler APRES le commit de la session pour eviter une race entre la
+    reception du task_uuid par l'agent et sa visibilite en base. Tolerant aux
+    erreurs : un echec WS ne doit pas casser le dispatch (l'agent peut aussi
+    recuperer ses taches via HTTP/polling s'il est deconnecte).
+    """
+    try:
+        from ..core.websocket_manager import ws_manager
+
+        asyncio.run(
+            ws_manager.send_to_agent(
+                agent_uuid,
+                "new_task",
+                {
+                    "task_uuid": task.task_uuid,
+                    "tool": task.tool,
+                    "parameters": task.parameters,
+                },
+            )
+        )
+    except Exception:
+        logger.exception("Failed to push new_task WS event (task_uuid=%s)", task.task_uuid)
 
 
 def dispatch_task(

@@ -35,9 +35,10 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
-import { equipementsApi, toolsApi } from "@/services/api";
+import { equipementsApi, toolsApi, agentsApi } from "@/services/api";
 import type {
   Equipement,
+  Agent,
   CollectResultSummary,
   CollectResultRead,
   CollectCreate,
@@ -55,6 +56,9 @@ export default function CollectePage() {
   // ── State ──
   const [equipements, setEquipements] = useState<Equipement[]>([]);
   const [loadingEquipements, setLoadingEquipements] = useState(true);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(true);
+  const [selectedAgentUuid, setSelectedAgentUuid] = useState<string>("");
   const [collects, setCollects] = useState<CollectResultSummary[]>([]);
   const [loadingCollects, setLoadingCollects] = useState(false);
   const [selectedCollect, setSelectedCollect] = useState<CollectResultRead | null>(null);
@@ -97,6 +101,18 @@ export default function CollectePage() {
     }
   }, []);
 
+  const loadAgents = useCallback(async () => {
+    setLoadingAgents(true);
+    try {
+      const data = await agentsApi.list();
+      setAgents(data);
+    } catch {
+      // silently handled
+    } finally {
+      setLoadingAgents(false);
+    }
+  }, []);
+
   const loadCollects = useCallback(async () => {
     setLoadingCollects(true);
     try {
@@ -111,8 +127,9 @@ export default function CollectePage() {
 
   useEffect(() => {
     loadEquipements();
+    loadAgents();
     loadCollects();
-  }, [loadEquipements, loadCollects]);
+  }, [loadEquipements, loadAgents, loadCollects]);
 
   // Polling des collectes en cours
   useEffect(() => {
@@ -140,7 +157,7 @@ export default function CollectePage() {
 
   // ── Actions ──
   const handleLaunch = async () => {
-    if (!selectedEquipementId || !targetHost || !username) {
+    if (!selectedEquipementId || !selectedAgentUuid || !targetHost || !username) {
       toast.error("Veuillez remplir tous les champs obligatoires");
       return;
     }
@@ -149,6 +166,7 @@ export default function CollectePage() {
     try {
       const params: CollectCreate = {
         equipement_id: Number(selectedEquipementId),
+        agent_uuid: selectedAgentUuid,
         method,
         device_profile: method === "ssh" ? deviceProfile : undefined,
         target_host: targetHost,
@@ -273,6 +291,10 @@ export default function CollectePage() {
         setDeviceProfile={setDeviceProfile}
         selectedEquipementId={selectedEquipementId}
         setSelectedEquipementId={setSelectedEquipementId}
+        agents={agents}
+        loadingAgents={loadingAgents}
+        selectedAgentUuid={selectedAgentUuid}
+        setSelectedAgentUuid={setSelectedAgentUuid}
         targetHost={targetHost}
         setTargetHost={setTargetHost}
         targetPort={targetPort}
@@ -306,7 +328,7 @@ export default function CollectePage() {
 
       {/* Detail Dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-[70vw] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-[min(1400px,90vw)] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Terminal className="size-5" />

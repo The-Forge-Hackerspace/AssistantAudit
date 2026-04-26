@@ -81,18 +81,27 @@ async def lifespan(app: FastAPI):
 
     sweeper_task = asyncio.create_task(run_heartbeat_sweeper())
 
+    # Demarrage du sweeper collectes orphelines (TOS-16)
+    from .core.collect_sweeper import run_collect_sweeper
+
+    collect_sweeper_task = asyncio.create_task(run_collect_sweeper())
+
     logger.info(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} démarré ({settings.ENV})")
     try:
         yield
     finally:
-        sweeper_task.cancel()
-        try:
-            await sweeper_task
-        except asyncio.CancelledError:
-            # Annulation attendue lors du shutdown — rien à logger.
-            pass
-        except Exception:
-            logger.exception("Heartbeat sweeper a levé une exception pendant le shutdown")
+        for task, name in (
+            (sweeper_task, "Heartbeat sweeper"),
+            (collect_sweeper_task, "Collect sweeper"),
+        ):
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                # Annulation attendue lors du shutdown — rien à logger.
+                pass
+            except Exception:
+                logger.exception("%s a levé une exception pendant le shutdown", name)
         logger.info(f"🛑 {settings.APP_NAME} arrêté")
 
 

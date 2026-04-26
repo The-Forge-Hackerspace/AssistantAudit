@@ -16,8 +16,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["WebSocket"])
 
-# Taille max d'un message WS entrant (16 Ko — largement suffisant pour des commandes JSON)
-_MAX_WS_MESSAGE_SIZE = 16 * 1024
+# Taille max d'un message WS entrant. Une commande/heartbeat fait quelques Ko,
+# mais un task_result d'une collecte WinRM/SSH peut contenir l'inventaire complet
+# d'un poste (services, users, network) — facilement plusieurs dizaines de Ko.
+_MAX_WS_MESSAGE_SIZE = 4 * 1024 * 1024
 
 
 async def _receive_json_safe(websocket: WebSocket) -> dict | None:
@@ -180,6 +182,29 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                                         task.progress = 100
                                 if ws_data.get("error_message"):
                                     task.error_message = ws_data["error_message"]
+                                # Sur echec d'une collecte SSH/WinRM, l'agent envoie
+                                # uniquement task_status (sans task_result). Hydrater la
+                                # CollectResult liee pour ne pas la laisser en RUNNING.
+                                if new_status in ("failed", "cancelled") and task.tool in (
+                                    "ssh-collect",
+                                    "winrm-collect",
+                                ):
+                                    from ...models.collect_result import CollectResult
+                                    from ...services import collect_service
+
+                                    collect = (
+                                        db.query(CollectResult)
+                                        .filter(CollectResult.agent_task_id == task.id)
+                                        .first()
+                                    )
+                                    if collect is not None:
+                                        collect_service.hydrate_collect_from_agent_result(
+                                            db,
+                                            collect,
+                                            None,
+                                            ws_data.get("error_message")
+                                            or f"Tache agent {new_status}",
+                                        )
                             else:  # task_progress
                                 from ...services.scan_progress import compute_progress
 
@@ -231,6 +256,22 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                             if ws_data.get("error_message"):
                                 task.error_message = ws_data["error_message"]
                                 task.status = "failed"
+                            # Hydrater le CollectResult lie a cette tache si c'est une collecte agent
+                            if task.tool in ("ssh-collect", "winrm-collect"):
+                                from ...models.collect_result import CollectResult
+                                from ...services import collect_service
+                                collect = (
+                                    db.query(CollectResult)
+                                    .filter(CollectResult.agent_task_id == task.id)
+                                    .first()
+                                )
+                                if collect is not None:
+                                    collect_service.hydrate_collect_from_agent_result(
+                                        db,
+                                        collect,
+                                        ws_data.get("result_summary"),
+                                        ws_data.get("error_message"),
+                                    )
                             db.commit()
                             from ...services.scan_progress import reset_task
 

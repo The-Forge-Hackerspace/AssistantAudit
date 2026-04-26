@@ -665,6 +665,7 @@ export interface SSLCheckResult {
 // ── Collecte SSH / WinRM ──
 export interface CollectCreate {
   equipement_id: number;
+  agent_uuid: string;
   method: "ssh" | "winrm";
   device_profile?: string;
   target_host: string;
