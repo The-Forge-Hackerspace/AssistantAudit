@@ -51,7 +51,7 @@ class TestReportRoutes:
         resp = client.get(f"/api/v1/reports/{report_id}", headers=auditeur_headers)
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data["sections"]) == 28
+        assert len(data["sections"]) == 29
         section_keys = [s["section_key"] for s in data["sections"]]
         assert "executive_summary" in section_keys
         # Synthese executive : section apres la page de garde

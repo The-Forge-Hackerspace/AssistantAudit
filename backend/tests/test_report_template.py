@@ -22,7 +22,7 @@ class TestReportService:
             user_id=auditeur_user.id,
             is_admin=False,
         )
-        assert len(report.sections) == 28
+        assert len(report.sections) == 29
         assert report.sections[0].section_key == "cover"
         # TOC suit la cover, puis la synthese executive
         assert report.sections[1].section_key == "toc"
