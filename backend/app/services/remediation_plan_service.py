@@ -23,15 +23,25 @@ from ..schemas.remediation_plan import (
 logger = logging.getLogger(__name__)
 
 
-# Mapping severite -> (horizon_key, effort_days)
-# Charge volontairement basse pour les quick wins (souvent quelques minutes a 2h)
-# et modeste sur le reste : une recommandation = un changement cible, pas un projet.
-SEVERITY_TO_HORIZON: dict[str, tuple[str, float]] = {
-    "critical": ("quick_wins", 0.25),
-    "high": ("short_term", 1.0),
-    "medium": ("mid_term", 3.0),
-    "low": ("long_term", 5.0),
-    "info": ("long_term", 5.0),
+# Mapping severite -> horizon temporel (la charge specifique est lue
+# sur le controle si disponible, sinon on applique le fallback ci-dessous).
+SEVERITY_TO_HORIZON: dict[str, str] = {
+    "critical": "quick_wins",
+    "high": "short_term",
+    "medium": "mid_term",
+    "low": "long_term",
+    "info": "long_term",
+}
+
+# Fallback charge par severite (jours-homme) quand le controle n'a pas
+# d'estimation specifique (effort_days). Vocation a etre remplace par
+# une estimation contextuelle generee par LLM (TOS-7X).
+DEFAULT_EFFORT_BY_SEVERITY: dict[str, float] = {
+    "critical": 0.25,
+    "high": 1.0,
+    "medium": 3.0,
+    "low": 5.0,
+    "info": 5.0,
 }
 
 HORIZONS_ORDER = [
@@ -117,7 +127,12 @@ class RemediationPlanService:
         for item in nc_by_control.values():
             ctrl = item["control"]
             sev = ctrl.severity.value
-            horizon_key, effort = SEVERITY_TO_HORIZON.get(sev, ("long_term", 10.0))
+            horizon_key = SEVERITY_TO_HORIZON.get(sev, "long_term")
+            effort = (
+                ctrl.effort_days
+                if ctrl.effort_days is not None
+                else DEFAULT_EFFORT_BY_SEVERITY.get(sev, 5.0)
+            )
             action = RemediationAction(
                 control_ref=ctrl.ref_id,
                 title=ctrl.title,

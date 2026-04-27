@@ -161,6 +161,44 @@ class TestRemediationPlanService:
         # 1*0.25 + 2*1 = 2.25
         assert plan.total_effort_days == pytest.approx(2.25)
 
+    def test_control_effort_override_takes_precedence_over_heuristic(
+        self, db_session, audit_with_data, auditeur_user
+    ):
+        """Si un controle a effort_days renseigne, il prime sur le fallback severite."""
+        audit, eq, fw, cat = audit_with_data
+        # Critique avec override a 4j (au lieu de 0.25j par defaut)
+        c = Control(
+            ref_id="C-OVER",
+            title="Refonte AD complete",
+            severity=ControlSeverity.CRITICAL,
+            category_id=cat.id,
+            effort_days=4.0,
+        )
+        db_session.add(c)
+        db_session.flush()
+        camp = AssessmentCampaign(name="C", audit_id=audit.id)
+        db_session.add(camp)
+        db_session.flush()
+        a = Assessment(campaign_id=camp.id, equipement_id=eq.id, framework_id=fw.id)
+        db_session.add(a)
+        db_session.flush()
+        db_session.add(
+            ControlResult(
+                assessment_id=a.id,
+                control_id=c.id,
+                status=ComplianceStatus.NON_COMPLIANT,
+            )
+        )
+        db_session.commit()
+
+        plan = RemediationPlanService.generate(
+            db_session, audit.id, user_id=auditeur_user.id, is_admin=False
+        )
+        # Toujours classe en quick_wins (mapping severite) mais avec 4j
+        quick = next(h for h in plan.horizons if h.key == "quick_wins")
+        assert quick.actions[0].effort_days == 4.0
+        assert plan.total_effort_days == 4.0
+
     def test_intra_horizon_sorted_by_occurrences(
         self, db_session, audit_with_data, auditeur_user
     ):
