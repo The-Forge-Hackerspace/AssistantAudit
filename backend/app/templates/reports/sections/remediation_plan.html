@@ -1,6 +1,6 @@
 {# Plan de remediation — actions priorisees par horizon temporel (TOS-25 section 6) #}
 {% set sev_colors = {'critical': '#DC2626', 'high': '#EA580C', 'medium': '#F59E0B', 'low': '#3B82F6', 'info': '#3B82F6'} %}
-{% set sev_labels = {'critical': 'Critique', 'high': 'Eleve', 'medium': 'Moyen', 'low': 'Faible', 'info': 'Info'} %}
+{% set sev_labels = {'critical': 'Critique', 'high': 'Élevé', 'medium': 'Moyen', 'low': 'Faible', 'info': 'Info'} %}
 {% macro effort_label(days) -%}
     {%- if days < 1 -%}
         {{ (days * 8) | round(0) | int }} h

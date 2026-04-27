@@ -19,30 +19,9 @@ from ..schemas.remediation_plan import (
     RemediationHorizon,
     RemediationPlan,
 )
+from ._severity import DEFAULT_EFFORT_BY_SEVERITY, SEVERITY_TO_HORIZON
 
 logger = logging.getLogger(__name__)
-
-
-# Mapping severite -> horizon temporel (la charge specifique est lue
-# sur le controle si disponible, sinon on applique le fallback ci-dessous).
-SEVERITY_TO_HORIZON: dict[str, str] = {
-    "critical": "quick_wins",
-    "high": "short_term",
-    "medium": "mid_term",
-    "low": "long_term",
-    "info": "long_term",
-}
-
-# Fallback charge par severite (jours-homme) quand le controle n'a pas
-# d'estimation specifique (effort_days). Vocation a etre remplace par
-# une estimation contextuelle generee par LLM (TOS-7X).
-DEFAULT_EFFORT_BY_SEVERITY: dict[str, float] = {
-    "critical": 0.25,
-    "high": 1.0,
-    "medium": 3.0,
-    "low": 5.0,
-    "info": 5.0,
-}
 
 HORIZONS_ORDER = [
     (
