@@ -267,6 +267,56 @@ class ReportService:
                 )
                 remediation_plan = None
 
+        # Si la section annexes est incluse, calculer les donnees consolidees
+        annexes = None
+        annexes_section = sections_by_key.get("annexes")
+        if (
+            annexes_section
+            and annexes_section.included
+            and not annexes_section.custom_content
+        ):
+            from .annexes_service import AnnexesService
+
+            try:
+                annexes = AnnexesService.generate(
+                    db,
+                    report.audit_id,
+                    user_id=report.generated_by or 0,
+                    is_admin=True,
+                )
+            except Exception:
+                logger.exception(
+                    "Echec calcul annexes pour audit %s (rapport %s)",
+                    report.audit_id,
+                    report.id,
+                )
+                annexes = None
+
+        # Si la section glossaire est incluse, generer le glossaire dynamique
+        glossary = None
+        glossary_section = sections_by_key.get("glossary")
+        if (
+            glossary_section
+            and glossary_section.included
+            and not glossary_section.custom_content
+        ):
+            from .glossary_service import GlossaryService
+
+            try:
+                glossary = GlossaryService.generate(
+                    db,
+                    report.audit_id,
+                    user_id=report.generated_by or 0,
+                    is_admin=True,
+                )
+            except Exception:
+                logger.exception(
+                    "Echec calcul glossaire pour audit %s (rapport %s)",
+                    report.audit_id,
+                    report.id,
+                )
+                glossary = None
+
 
         # Sections avec un rendu specifique (template + donnees)
         # Les autres sont masquees du PDF si elles n'ont pas de custom_content,
@@ -279,6 +329,13 @@ class ReportService:
             and recommendations.total > 0,
             "remediation_plan": remediation_plan is not None
             and remediation_plan.total_actions > 0,
+            "annexes": annexes is not None
+            and (
+                bool(annexes.equipements)
+                or bool(annexes.results)
+                or bool(annexes.frameworks)
+            ),
+            "glossary": glossary is not None and glossary.total > 0,
         }
 
         def _has_content(section) -> bool:
@@ -304,4 +361,6 @@ class ReportService:
             executive_summary=executive_summary,
             recommendations=recommendations,
             remediation_plan=remediation_plan,
+            annexes=annexes,
+            glossary=glossary,
         )

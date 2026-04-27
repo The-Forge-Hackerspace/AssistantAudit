@@ -1,0 +1,104 @@
+{# Annexes — equipements, recap par controle, frameworks utilises (TOS-25 section 7) #}
+{% set sev_colors = {'critical': '#DC2626', 'high': '#EA580C', 'medium': '#F59E0B', 'low': '#3B82F6', 'info': '#3B82F6'} %}
+{% set sev_labels = {'critical': 'Critique', 'high': 'Élevé', 'medium': 'Moyen', 'low': 'Faible', 'info': 'Info'} %}
+
+{% if annexes %}
+
+<p class="annex-intro">
+    Cette section regroupe les donnees techniques de l'audit a vocation
+    de reference pour le client : liste des equipements concernes, recapitulatif
+    des resultats par point de controle, et referentiels appliques.
+</p>
+
+{# --- A. Equipements audites --- #}
+{% if annexes.equipements %}
+<h2 class="annex-subtitle">A. Equipements audites</h2>
+<table class="annex-table">
+    <thead>
+        <tr>
+            <th class="annex-col-host">Hostname</th>
+            <th class="annex-col-ip">Adresse IP</th>
+            <th class="annex-col-type">Type</th>
+            <th class="annex-col-site">Site</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for eq in annexes.equipements %}
+        <tr>
+            <td>{{ eq.hostname or '—' }}</td>
+            <td>{{ eq.ip_address or '—' }}</td>
+            <td>{{ eq.type_equipement }}</td>
+            <td>{{ eq.site_name or '—' }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+<p class="annex-table-meta">{{ annexes.equipements | length }} equipement(s) audite(s).</p>
+{% endif %}
+
+{# --- B. Recap des resultats par controle --- #}
+{% if annexes.results %}
+<h2 class="annex-subtitle">B. Recapitulatif des resultats par controle</h2>
+<table class="annex-table">
+    <thead>
+        <tr>
+            <th class="annex-col-ref">Ref</th>
+            <th class="annex-col-title">Controle</th>
+            <th class="annex-col-fw">Referentiel</th>
+            <th class="annex-col-sev">Severite</th>
+            <th class="annex-col-status">C / NC / N/A / En attente</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for r in annexes.results %}
+        <tr>
+            <td class="annex-cell-ref"><code>{{ r.control_ref }}</code></td>
+            <td>{{ r.title }}</td>
+            <td class="annex-cell-fw">{{ r.framework_name }}</td>
+            <td class="annex-cell-sev">
+                <span class="annex-sev-badge" style="background: {{ sev_colors.get(r.severity, '#6B7280') }};">
+                    {{ sev_labels.get(r.severity, r.severity) }}
+                </span>
+            </td>
+            <td class="annex-cell-counts">
+                <span class="count-c">{{ r.compliant }}</span> /
+                <span class="count-nc">{{ r.non_compliant }}</span> /
+                <span class="count-na">{{ r.not_applicable }}</span> /
+                <span class="count-pending">{{ r.pending }}</span>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{# --- C. Referentiels utilises --- #}
+{% if annexes.frameworks %}
+<h2 class="annex-subtitle">C. Referentiels appliques</h2>
+<table class="annex-table">
+    <thead>
+        <tr>
+            <th>Reference</th>
+            <th>Nom</th>
+            <th>Version</th>
+            <th>Source</th>
+            <th>Auteur</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for fw in annexes.frameworks %}
+        <tr>
+            <td class="annex-cell-ref"><code>{{ fw.ref_id }}</code></td>
+            <td>{{ fw.name }}</td>
+            <td>{{ fw.version }}</td>
+            <td>{{ fw.source or '—' }}</td>
+            <td>{{ fw.author or '—' }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% else %}
+<p class="annex-empty">Aucune donnee technique disponible pour cet audit.</p>
+{% endif %}

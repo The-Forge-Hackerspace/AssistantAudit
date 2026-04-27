@@ -1,0 +1,30 @@
+{# Glossaire dynamique — termes presents dans les controles non-conformes (TOS-25 section 8) #}
+
+{% if glossary and glossary.total > 0 %}
+
+<p class="gloss-intro">
+    Ce glossaire reprend les <strong>{{ glossary.total }}</strong> termes
+    techniques apparaissant dans les recommandations de cet audit. Les
+    definitions visent a accompagner la lecture du rapport sans presupposer
+    de connaissances cybersecurite specifiques.
+</p>
+
+<dl class="gloss-list">
+    {% for entry in glossary.entries %}
+    <div class="gloss-entry">
+        <dt class="gloss-term">
+            {{ entry.term }}{% if entry.aliases %}
+            <span class="gloss-aliases">({{ entry.aliases | join(', ') }})</span>
+            {% endif %}
+        </dt>
+        <dd class="gloss-def">{{ entry.definition }}</dd>
+    </div>
+    {% endfor %}
+</dl>
+
+{% else %}
+<p class="gloss-empty">
+    Aucun terme du glossaire de reference n'a ete identifie dans les
+    recommandations de cet audit.
+</p>
+{% endif %}
