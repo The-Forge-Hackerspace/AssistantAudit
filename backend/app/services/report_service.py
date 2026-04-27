@@ -247,6 +247,25 @@ class ReportService:
                 recommendations = None
 
 
+        # Sections avec un rendu specifique (template + donnees)
+        # Les autres sont masquees du PDF si elles n'ont pas de custom_content,
+        # pour eviter d'afficher des titres orphelins.
+        AUTO_RENDERED = {"cover", "toc", "introduction", "objectives", "scope"}
+        DATA_RENDERED = {
+            "executive_summary": executive_summary is not None,
+            "recommendations": recommendations is not None
+            and recommendations.total > 0,
+        }
+
+        def _has_content(section) -> bool:
+            if section.custom_content and section.custom_content.strip():
+                return True
+            if section.section_key in AUTO_RENDERED:
+                return True
+            return DATA_RENDERED.get(section.section_key, False)
+
+        renderable_sections = [s for s in ordered_sections if _has_content(s)]
+
         template = env.get_template("report_base.html")
         return template.render(
             css=css,
@@ -256,8 +275,8 @@ class ReportService:
             consultant_name=report.consultant_name,
             consultant_logo=consultant_logo,
             client_logo=client_logo,
-            ordered_sections=ordered_sections,
-            sections=sections_by_key,
+            ordered_sections=renderable_sections,
+            sections={s.section_key: s for s in renderable_sections},
             executive_summary=executive_summary,
             recommendations=recommendations,
         )
