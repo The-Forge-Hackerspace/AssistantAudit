@@ -11,6 +11,8 @@ import type {
   EntrepriseCreate,
   Audit,
   AuditCreate,
+  AuditReport,
+  AuditReportCreate,
   ExecutiveSummary,
   Site,
   SiteCreate,
@@ -217,6 +219,40 @@ export const auditsApi = {
   },
 
 };
+
+// ── Rapports ──
+export const reportsApi = {
+  async list(auditId: number): Promise<AuditReport[]> {
+    const { data } = await api.get<AuditReport[]>("/reports", {
+      params: { audit_id: auditId },
+    });
+    return data;
+  },
+
+  async create(payload: AuditReportCreate): Promise<AuditReport> {
+    const { data } = await api.post<AuditReport>("/reports", payload);
+    return data;
+  },
+
+  async generate(reportId: number): Promise<AuditReport> {
+    const { data } = await api.post<AuditReport>(`/reports/${reportId}/generate`, {
+      format: "pdf",
+    });
+    return data;
+  },
+
+  async download(reportId: number): Promise<Blob> {
+    const { data } = await api.get(`/reports/${reportId}/download`, {
+      responseType: "blob",
+    });
+    return data as Blob;
+  },
+
+  async delete(reportId: number): Promise<void> {
+    await api.delete(`/reports/${reportId}`);
+  },
+};
+
 
 // ── Sites ──
 export const sitesApi = {

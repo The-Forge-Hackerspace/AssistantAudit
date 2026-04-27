@@ -155,6 +155,45 @@ export interface ExecutiveSummary {
   recommendations: ExecutiveSummaryRecommendation[];
 }
 
+export type AuditReportStatus = "draft" | "generating" | "ready" | "error";
+
+export interface AuditReport {
+  id: number;
+  audit_id: number;
+  status: AuditReportStatus;
+  template_name: string;
+  consultant_logo_path: string | null;
+  client_logo_path: string | null;
+  consultant_name: string | null;
+  consultant_contact: string | null;
+  pdf_path: string | null;
+  docx_path: string | null;
+  generated_by: number | null;
+  generated_at: string | null;
+  created_at: string;
+}
+
+export interface AuditReportSection {
+  id: number;
+  section_key: string;
+  title: string;
+  order: number;
+  included: boolean;
+  custom_content: string | null;
+}
+
+export interface AuditReportDetail extends AuditReport {
+  sections: AuditReportSection[];
+}
+
+export interface AuditReportCreate {
+  audit_id: number;
+  template_name?: "complete" | "light" | "compliance";
+  consultant_name?: string | null;
+  consultant_contact?: string | null;
+}
+
+
 
 export interface AuditCreate {
   nom_projet: string;

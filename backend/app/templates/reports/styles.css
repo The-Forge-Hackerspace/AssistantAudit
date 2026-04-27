@@ -7,8 +7,8 @@
     size: A4;
     margin: 20mm 25mm;
     @top-right {
-        content: "Page " counter(page) " / " counter(pages);
-        font-size: 9pt;
+        content: string(project-name);
+        font-size: 8pt;
         color: #6B7280;
     }
     @bottom-left {
@@ -16,10 +16,13 @@
         font-size: 8pt;
         color: #6B7280;
     }
+    @bottom-center {
+        content: "Page " counter(page) " / " counter(pages);
+        font-size: 9pt;
+        color: #4B5563;
+    }
     @bottom-right {
-        content: string(project-name);
-        font-size: 8pt;
-        color: #6B7280;
+        content: "";
     }
 }
 
@@ -27,6 +30,7 @@
 @page :first {
     @top-right { content: none; }
     @bottom-left { content: none; }
+    @bottom-center { content: none; }
     @bottom-right { content: none; }
 }
 
@@ -34,6 +38,7 @@
 @page cover {
     @top-right { content: none; }
     @bottom-left { content: none; }
+    @bottom-center { content: none; }
     @bottom-right { content: none; }
 }
 
@@ -423,4 +428,397 @@ em { font-style: italic; }
     color: #9CA3AF;
     font-style: italic;
 }
+
+/* ============================================================
+   Table des matieres
+   ============================================================ */
+
+.toc-container {
+    margin-top: 4mm;
+}
+
+.toc-list {
+    list-style: none;
+    padding: 0;
+}
+
+.toc-entry {
+    margin-bottom: 3mm;
+    page-break-inside: avoid;
+}
+
+.toc-link {
+    display: block;
+    text-decoration: none;
+    color: #1F2937;
+    font-size: 11pt;
+    line-height: 1.6;
+    padding: 1.5mm 0;
+}
+
+.toc-link::after {
+    content: leader('.') ' ' target-counter(attr(href url), page);
+    color: #6B7280;
+}
+
+.toc-num {
+    font-weight: bold;
+    color: #1D4ED8;
+    margin-right: 3mm;
+    display: inline-block;
+    min-width: 8mm;
+}
+
+.toc-title {
+    color: #1F2937;
+}
+
+/* ============================================================
+   Recommandations prioritaires (section 5 - TOS-25)
+   ============================================================ */
+
+.reco-intro {
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #374151;
+    background: #F9FAFB;
+    border-left: 3px solid #3B82F6;
+    padding: 4mm 5mm;
+    margin-bottom: 8mm;
+    border-radius: 1mm;
+}
+
+/* --- Synthese globale : criteres --- */
+.reco-synth-globale-intro {
+    font-size: 11pt;
+    color: #1F2937;
+    margin-top: 4mm;
+    margin-bottom: 3mm;
+}
+
+.reco-synth-criteres {
+    list-style: none;
+    padding-left: 0;
+    margin: 0 0 8mm 0;
+}
+
+.reco-synth-criteres li {
+    position: relative;
+    padding-left: 6mm;
+    margin-bottom: 3mm;
+    line-height: 1.5;
+    page-break-inside: avoid;
+}
+
+.reco-synth-criteres li::before {
+    content: '–';
+    position: absolute;
+    left: 0;
+    color: #6B7280;
+    font-weight: bold;
+}
+
+.reco-synth-critere-label {
+    font-weight: bold;
+    font-size: 11pt;
+}
+
+.reco-synth-critere-text {
+    color: #1F2937;
+    font-size: 11pt;
+}
+
+/* --- Synthese clickable --- */
+.reco-synthesis-title,
+.reco-detail-title {
+    font-size: 13pt;
+    font-weight: bold;
+    color: #1D4ED8;
+    margin-top: 8mm;
+    margin-bottom: 4mm;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.reco-detail-title {
+    margin-top: 12mm;
+}
+
+.reco-synth-cat-block {
+    margin-bottom: 10mm;
+    page-break-inside: avoid;
+}
+
+.reco-synthesis {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+    font-size: 9.5pt;
+    table-layout: fixed;
+}
+
+.reco-synthesis th,
+.reco-synthesis td {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.reco-synth-col-title { width: auto; }
+.reco-synth-col-mark { width: 12mm; }
+
+/* Ligne d'entete : libelle categorie a gauche + 4 colonnes pivotees */
+.reco-synth-cat-header {
+    text-align: left !important;
+    vertical-align: bottom !important;
+    color: #1F2937 !important;
+    font-size: 12pt !important;
+    font-weight: normal !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    padding: 0 0 2mm 0 !important;
+    border-bottom: 1px solid #9CA3AF !important;
+}
+
+.reco-synth-cat-header em {
+    font-style: italic;
+}
+
+.reco-synth-col-head {
+    width: 12mm;
+    vertical-align: bottom !important;
+    text-align: center !important;
+    padding: 0 !important;
+    border-bottom: 1px solid #9CA3AF !important;
+    background: transparent !important;
+}
+
+.reco-rot-wrap {
+    position: relative;
+    width: 12mm;
+    height: 30mm;
+    overflow: visible;
+}
+
+.reco-synth-rot {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 30mm;
+    height: 12mm;
+    line-height: 12mm;
+    transform: rotate(-90deg);
+    transform-origin: bottom left;
+    margin-left: 12mm;
+    white-space: nowrap;
+    font-size: 9pt;
+    font-style: italic;
+    text-align: left;
+    padding-left: 1mm;
+}
+
+.reco-rot-critique { color: #DC2626; }
+.reco-rot-modere { color: #EA580C; }
+.reco-rot-mineur { color: #F59E0B; }
+.reco-rot-ameliorations { color: #3B82F6; }
+
+.reco-synth-row td {
+    padding: 2mm 2.5mm !important;
+    border-bottom: 1px solid #E5E7EB !important;
+    vertical-align: middle;
+    background: #FFFFFF !important;
+}
+
+.reco-synth-row:last-child td {
+    border-bottom: none !important;
+}
+
+.reco-synth-title-cell {
+    text-align: left;
+    font-size: 9.5pt;
+    line-height: 1.35;
+}
+
+.reco-synth-link {
+    text-decoration: none;
+}
+
+.reco-synth-link em {
+    font-style: italic;
+}
+
+.reco-synth-mark-cell {
+    text-align: center !important;
+    vertical-align: middle;
+}
+
+.reco-synth-mark {
+    font-weight: bold;
+    font-size: 11pt;
+    color: #111827;
+}
+
+.reco-severity-block {
+    margin-bottom: 8mm;
+}
+
+.reco-severity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #FFFFFF;
+    padding: 3mm 5mm;
+    border-radius: 1.5mm 1.5mm 0 0;
+    font-size: 11pt;
+    font-weight: bold;
+    page-break-after: avoid;
+}
+
+.reco-severity-name {
+    letter-spacing: 1.5px;
+}
+
+.reco-severity-count {
+    font-size: 9pt;
+    font-weight: normal;
+    opacity: 0.95;
+}
+
+.reco-card {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-left: 4px solid #6B7280;
+    border-radius: 0 0 1.5mm 1.5mm;
+    padding: 4mm 5mm;
+    margin-bottom: 3mm;
+    page-break-inside: avoid;
+}
+
+.reco-severity-block .reco-card:not(:last-child) {
+    border-radius: 0;
+    border-bottom-color: transparent;
+    margin-bottom: 0;
+}
+
+.reco-severity-block .reco-card + .reco-card {
+    border-top: 1px solid #E5E7EB;
+}
+
+.reco-severity-block .reco-card:last-child {
+    border-radius: 0 0 1.5mm 1.5mm;
+}
+
+.reco-card-header {
+    display: flex;
+    align-items: baseline;
+    gap: 3mm;
+    margin-bottom: 2mm;
+}
+
+.reco-card-title {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #111827;
+    margin: 0;
+    line-height: 1.4;
+    flex: 1;
+}
+
+.reco-meta {
+    font-size: 9pt;
+    color: #6B7280;
+    margin-bottom: 2mm;
+}
+
+.reco-meta-label {
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.reco-description {
+    font-size: 10pt;
+    color: #374151;
+    margin-bottom: 3mm;
+    line-height: 1.5;
+}
+
+.reco-impact {
+    font-size: 9.5pt;
+    color: #4B5563;
+    background: #F9FAFB;
+    padding: 2mm 3mm;
+    border-radius: 1mm;
+    margin-bottom: 3mm;
+}
+
+.reco-impact-occur {
+    color: #1F2937;
+    margin-right: 2mm;
+}
+
+.reco-remediation {
+    background: #EFF6FF;
+    border-left: 3px solid #3B82F6;
+    padding: 3mm 4mm;
+    border-radius: 1mm;
+}
+
+.reco-remediation-label {
+    display: block;
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #1D4ED8;
+    font-weight: bold;
+    margin-bottom: 1.5mm;
+}
+
+.reco-remediation p {
+    font-size: 10pt;
+    color: #1F2937;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.reco-remediation-empty {
+    font-size: 9.5pt;
+    color: #9CA3AF;
+    font-style: italic;
+    padding: 3mm 4mm;
+    border-left: 3px dashed #D1D5DB;
+    background: #FAFAFA;
+    border-radius: 1mm;
+    margin: 0;
+}
+
+.reco-empty {
+    text-align: center;
+    padding: 20mm 10mm;
+    background: #ECFDF5;
+    border: 1px solid #10B981;
+    border-radius: 2mm;
+}
+
+.reco-empty p {
+    color: #065F46;
+    font-size: 14pt;
+}
+
+.reco-empty-detail {
+    font-size: 11pt;
+    color: #047857;
+    margin-top: 3mm;
+}
+
+.reco-ref {
+    font-family: "Courier New", monospace;
+    font-size: 9pt;
+    background: #F3F4F6;
+    padding: 0.5mm 1.5mm;
+    border-radius: 1mm;
+    color: #1D4ED8;
+    flex: 0 0 auto;
+}
+
 

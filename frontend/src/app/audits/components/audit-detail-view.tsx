@@ -31,6 +31,7 @@ import {
   STATUS_ICONS,
 } from "../lib/constants";
 import { CampaignsTab } from "./campaigns-tab";
+import { ReportsTab } from "./reports-tab";
 
 export interface AuditDetailViewProps {
   audit: Audit;
@@ -157,6 +158,7 @@ export function AuditDetailView({
         <TabsList>
           <TabsTrigger value="contexte">Contexte</TabsTrigger>
           <TabsTrigger value="campagnes">Campagnes</TabsTrigger>
+          <TabsTrigger value="rapports">Rapports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contexte">
@@ -197,6 +199,10 @@ export function AuditDetailView({
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="rapports">
+          <ReportsTab auditId={audit.id} />
         </TabsContent>
 
         <TabsContent value="campagnes">

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Rapport d'audit — {{ audit.nom_projet }}</title>
-    <style>{{ css }}</style>
+    <style>{{ css | safe }}</style>
 </head>
 <body>
 
@@ -12,11 +12,13 @@
         {% include "sections/cover.html" %}
     {% endif %}
 
-    {# Sections 2-25 : chaque section conditionnelle #}
+    {# Compteur de sections numerotees (exclut cover) #}
+    {% set ns = namespace(idx=0) %}
     {% for section in ordered_sections %}
         {% if section.included and section.section_key != "cover" %}
+            {% set ns.idx = ns.idx + 1 %}
             <div class="section" id="section-{{ section.section_key }}">
-                <h1 class="section-title">{{ loop.index }}. {{ section.title }}</h1>
+                <h1 class="section-title">{{ ns.idx }}. {{ section.title }}</h1>
                 {% if section.custom_content %}
                     {{ section.custom_content | safe }}
                 {% else %}
