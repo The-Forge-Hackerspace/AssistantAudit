@@ -42,6 +42,7 @@ instance/
 uploads/
 logs/
 data/
+!backend/app/data/
 *.log
 
 # Monkey365

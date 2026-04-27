@@ -1,0 +1,312 @@
+# Glossaire cybersec / IT — termes de reference pour les rapports d'audit
+# Format :
+#   - term: <Terme principal affiche>
+#     definition: <Definition courte (1-3 phrases)>
+#     aliases: [<variantes pour le matching>]
+#
+# Le matching est case-insensitive et applique sur les title/description/
+# remediation des controles non-conformes de l'audit. Aliases sert pour les
+# acronymes ou variantes (ex: "Active Directory" matche aussi via "AD").
+
+glossary:
+  - term: Active Directory
+    definition: >
+      Service d'annuaire de Microsoft qui centralise l'authentification,
+      l'autorisation et la gestion des comptes/ordinateurs dans un domaine Windows.
+    aliases: ["AD", "annuaire Active Directory"]
+
+  - term: Domain Controller
+    definition: >
+      Serveur Active Directory qui heberge la base d'annuaire et repond
+      aux requetes d'authentification et d'autorisation des utilisateurs/machines.
+    aliases: ["DC", "controleur de domaine"]
+
+  - term: GPO
+    definition: >
+      Group Policy Object. Objet de strategie de groupe Windows permettant
+      de configurer de maniere centralisee des parametres de securite,
+      de logiciels et de comportements utilisateur sur les machines liees au domaine.
+    aliases: ["Group Policy", "strategie de groupe"]
+
+  - term: LAPS
+    definition: >
+      Local Administrator Password Solution. Mecanisme Microsoft qui
+      randomise et stocke dans Active Directory le mot de passe du compte
+      administrateur local de chaque machine, evitant le mot de passe partage.
+    aliases: ["Windows LAPS"]
+
+  - term: PSO
+    definition: >
+      Password Settings Object. Strategie de mot de passe granulaire dans
+      Active Directory, applicable a des groupes specifiques (ex: comptes
+      privilegies) en complement de la strategie de domaine.
+    aliases: ["Fine-Grained Password Policy", "FGPP"]
+
+  - term: FSMO
+    definition: >
+      Flexible Single Master Operations. Cinq roles AD detenus par un seul
+      DC chacun (PDC Emulator, RID Master, Infrastructure Master, Schema Master,
+      Domain Naming Master) et critiques pour le bon fonctionnement du domaine.
+    aliases: ["roles FSMO"]
+
+  - term: MFA
+    definition: >
+      Multi-Factor Authentication. Authentification a plusieurs facteurs
+      combinant ce que l'utilisateur sait (mot de passe), possede (token, telephone)
+      ou est (biometrie). Reduit fortement le risque de compromission de compte.
+    aliases: ["2FA", "authentification multi-facteurs", "double authentification"]
+
+  - term: System State
+    definition: >
+      Sauvegarde Windows incluant le registre, les fichiers systeme critiques,
+      la base AD (sur un DC) et le COM+. Indispensable pour restaurer un controleur
+      de domaine apres incident.
+    aliases: ["sauvegarde System State"]
+
+  - term: SMB
+    definition: >
+      Server Message Block. Protocole de partage de fichiers Windows.
+      SMBv1 est obsolete et vulnerable (WannaCry) — seul SMBv3 doit etre actif.
+    aliases: ["SMBv1", "SMBv2", "SMBv3"]
+
+  - term: NTLM
+    definition: >
+      NT LAN Manager. Protocole d'authentification historique de Windows,
+      vulnerable au pass-the-hash et au relay. Doit etre desactive au profit
+      de Kerberos quand c'est possible.
+    aliases: ["NTLMv1", "NTLMv2"]
+
+  - term: Kerberos
+    definition: >
+      Protocole d'authentification reseau base sur des tickets, utilise par
+      defaut dans Active Directory. Plus sur que NTLM mais necessite une
+      configuration correcte (SPN, delegation, kerberoasting).
+    aliases: []
+
+  - term: VLAN
+    definition: >
+      Virtual LAN. Segmentation logique d'un reseau local au niveau 2,
+      permettant d'isoler les flux entre groupes de machines (ex: poste,
+      voix, IoT, management) sur la meme infrastructure physique.
+    aliases: ["Virtual LAN"]
+
+  - term: VPN
+    definition: >
+      Virtual Private Network. Tunnel chiffre permettant a un utilisateur
+      ou un site distant de se connecter au reseau interne comme s'il etait
+      en local. IPsec et SSL/TLS sont les deux familles principales.
+    aliases: ["IPsec VPN", "SSL VPN"]
+
+  - term: WPA2
+    definition: >
+      Wi-Fi Protected Access 2. Standard de chiffrement Wi-Fi base sur AES,
+      remplace par WPA3 mais encore largement deploye. Doit utiliser un
+      mot de passe long (>= 14 caracteres) ou idealement WPA2-Enterprise.
+    aliases: ["WPA2-PSK", "WPA2-Enterprise", "WPA3"]
+
+  - term: SSID
+    definition: >
+      Service Set Identifier. Nom du reseau Wi-Fi diffuse par un point d'acces.
+      Le masquage du SSID n'apporte pas de securite reelle (decouverte triviale).
+    aliases: []
+
+  - term: DNS
+    definition: >
+      Domain Name System. Service de resolution des noms en adresses IP.
+      Critique : un DNS interne mal configure (recursif ouvert, pas de DNSSEC)
+      ouvre la porte au cache poisoning.
+    aliases: ["DNSSEC"]
+
+  - term: DHCP
+    definition: >
+      Dynamic Host Configuration Protocol. Service qui attribue dynamiquement
+      les parametres reseau (IP, masque, passerelle, DNS) aux equipements.
+    aliases: []
+
+  - term: NAS
+    definition: >
+      Network Attached Storage. Baie de stockage accessible via le reseau
+      (SMB, NFS) — souvent utilisee pour les sauvegardes et les fichiers partages.
+      Doit etre sur un VLAN dedie et avec authentification stricte.
+    aliases: []
+
+  - term: RPO
+    definition: >
+      Recovery Point Objective. Quantite maximale de donnees que l'on accepte
+      de perdre en cas d'incident, exprimee en temps (ex: 4h = on accepte de
+      perdre 4h de donnees produites avant la panne).
+    aliases: []
+
+  - term: RTO
+    definition: >
+      Recovery Time Objective. Duree maximale acceptable entre l'incident
+      et le retour au fonctionnement normal du SI.
+    aliases: []
+
+  - term: PRA
+    definition: >
+      Plan de Reprise d'Activite. Procedure documentee de redemarrage du SI
+      apres un sinistre majeur (incendie, ransomware...). Doit etre teste
+      regulierement.
+    aliases: ["Plan de Reprise"]
+
+  - term: PCA
+    definition: >
+      Plan de Continuite d'Activite. Strategie permettant de maintenir
+      l'activite metier malgre un incident, sur une infrastructure
+      eventuellement degradee.
+    aliases: ["Plan de Continuite"]
+
+  - term: EDR
+    definition: >
+      Endpoint Detection and Response. Solution de securite des postes
+      qui detecte, investigue et permet de repondre aux comportements
+      suspects, au-dela de l'antivirus signature classique.
+    aliases: ["XDR"]
+
+  - term: SIEM
+    definition: >
+      Security Information and Event Management. Plateforme de centralisation,
+      correlation et analyse des journaux de securite (logs) provenant de
+      l'ensemble du SI.
+    aliases: []
+
+  - term: SOC
+    definition: >
+      Security Operations Center. Equipe (interne ou externalisee) chargee
+      de la surveillance et de la reponse aux incidents de securite,
+      souvent appuyee sur un SIEM/EDR.
+    aliases: []
+
+  - term: PKI
+    definition: >
+      Public Key Infrastructure. Infrastructure a cles publiques permettant
+      d'emettre, valider et revoquer des certificats X.509 (TLS, signature,
+      chiffrement). ADCS est l'implementation Microsoft.
+    aliases: ["ADCS"]
+
+  - term: Patch management
+    definition: >
+      Processus de deploiement controle des correctifs editeurs (Windows Update,
+      WSUS, SCCM, Intune) sur l'ensemble du parc, avec test prealable et
+      respect des fenetres de maintenance.
+    aliases: ["WSUS", "patching"]
+
+  - term: Antivirus
+    definition: >
+      Logiciel detectant et bloquant les codes malveillants connus a partir
+      de signatures et d'analyse comportementale. Doit etre couple a un EDR
+      pour les menaces avancees.
+    aliases: ["AV"]
+
+  - term: Pare-feu
+    definition: >
+      Equipement (ou logiciel) qui filtre les flux reseau entre zones de
+      confiance differentes (interieur/exterieur, DMZ...). Les regles doivent
+      etre least-privilege et regulierement auditees.
+    aliases: ["firewall"]
+
+  - term: DMZ
+    definition: >
+      Demilitarized Zone. Zone reseau intermediaire hebergeant les services
+      exposes a Internet (web, mail, VPN), isolee a la fois d'Internet et
+      du LAN interne par des filtrages stricts.
+    aliases: []
+
+  - term: Microsoft 365
+    definition: >
+      Suite cloud Microsoft (Exchange Online, SharePoint Online, Teams,
+      OneDrive, Entra ID). Necessite une configuration Conditional Access,
+      MFA et journalisation pour etre securisee.
+    aliases: ["M365", "Office 365", "O365", "Entra ID", "Azure AD"]
+
+  - term: Conditional Access
+    definition: >
+      Mecanisme Entra ID (Azure AD) qui applique des regles d'acces aux
+      ressources Microsoft 365 en fonction du contexte (utilisateur, appareil,
+      localisation, niveau de risque). Pierre angulaire du Zero Trust.
+    aliases: []
+
+  - term: SPF
+    definition: >
+      Sender Policy Framework. Enregistrement DNS listant les serveurs
+      autorises a emettre du courriel pour un domaine. Premiere brique
+      anti-spoofing.
+    aliases: []
+
+  - term: DKIM
+    definition: >
+      DomainKeys Identified Mail. Signature cryptographique des entetes
+      email permettant au destinataire de verifier que le message n'a pas
+      ete modifie en transit.
+    aliases: []
+
+  - term: DMARC
+    definition: >
+      Domain-based Message Authentication, Reporting and Conformance.
+      Politique combinant SPF et DKIM pour indiquer aux destinataires
+      comment traiter les mails non-authentifies (none/quarantine/reject).
+    aliases: []
+
+  - term: TLS
+    definition: >
+      Transport Layer Security. Protocole de chiffrement utilise par HTTPS,
+      SMTPS, IMAPS... TLS 1.0 et 1.1 sont obsoletes ; seuls 1.2 et 1.3
+      doivent etre actifs.
+    aliases: ["SSL", "HTTPS"]
+
+  - term: Hardening
+    definition: >
+      Renforcement de la configuration d'un systeme (OS, equipement reseau,
+      service) pour reduire sa surface d'attaque : desactivation des services
+      inutiles, durcissement des parametres par defaut, application des
+      benchmarks (CIS, ANSSI).
+    aliases: ["durcissement"]
+
+  - term: Shadow IT
+    definition: >
+      Ensemble des outils/services informatiques utilises par les metiers
+      sans validation ni connaissance de la DSI. Risque majeur : fuite de
+      donnees, absence de sauvegarde, conformite RGPD.
+    aliases: []
+
+  - term: RBAC
+    definition: >
+      Role-Based Access Control. Modele d'autorisation ou les permissions
+      sont assignees a des roles, et les utilisateurs heritent des permissions
+      via leur appartenance aux roles. Facilite l'audit des droits.
+    aliases: []
+
+  - term: Privilege escalation
+    definition: >
+      Technique permettant a un attaquant d'augmenter ses droits sur un
+      systeme (de simple utilisateur a admin). A distinguer de la lateralisation
+      (mouvement entre machines).
+    aliases: ["elevation de privileges"]
+
+  - term: Tier model
+    definition: >
+      Modele Microsoft de cloisonnement des comptes administrateurs en niveaux
+      (Tier 0 = controleurs de domaine et infra critique, Tier 1 = serveurs
+      applicatifs, Tier 2 = postes de travail). Empeche le pivot entre niveaux.
+    aliases: ["modele en tiers", "tiering"]
+
+  - term: Least privilege
+    definition: >
+      Principe de securite imposant que tout utilisateur, processus ou systeme
+      n'ait que les droits strictement necessaires a sa fonction.
+    aliases: ["moindre privilege"]
+
+  - term: CIS Benchmark
+    definition: >
+      Recueil de bonnes pratiques de configuration publie par le Center for
+      Internet Security, decline par produit (Windows, Linux, AD, M365...).
+      Reference industrielle pour le hardening.
+    aliases: ["CIS", "Center for Internet Security"]
+
+  - term: ANSSI
+    definition: >
+      Agence nationale de la securite des systemes d'information. Autorite
+      francaise publiant des guides de bonnes pratiques (PA, recommandations
+      Active Directory, hygiene informatique...) qui font reference en France.
+    aliases: []
