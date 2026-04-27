@@ -12,8 +12,8 @@ from app.models.audit import Audit
 from app.models.entreprise import Entreprise
 from app.models.equipement import Equipement
 from app.models.framework import Control, ControlSeverity, Framework, FrameworkCategory
-from app.services.glossary_service import GlossaryService, _entry_matches
 from app.schemas.glossary import GlossaryEntry
+from app.services.glossary_service import GlossaryService, _entry_matches
 
 
 @pytest.fixture
