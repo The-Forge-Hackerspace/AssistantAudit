@@ -24,12 +24,14 @@ logger = logging.getLogger(__name__)
 
 
 # Mapping severite -> (horizon_key, effort_days)
+# Charge volontairement basse pour les quick wins (souvent quelques minutes a 2h)
+# et modeste sur le reste : une recommandation = un changement cible, pas un projet.
 SEVERITY_TO_HORIZON: dict[str, tuple[str, float]] = {
-    "critical": ("quick_wins", 1.0),
-    "high": ("short_term", 2.0),
-    "medium": ("mid_term", 5.0),
-    "low": ("long_term", 10.0),
-    "info": ("long_term", 10.0),
+    "critical": ("quick_wins", 0.25),
+    "high": ("short_term", 1.0),
+    "medium": ("mid_term", 3.0),
+    "low": ("long_term", 5.0),
+    "info": ("long_term", 5.0),
 }
 
 HORIZONS_ORDER = [

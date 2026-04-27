@@ -126,7 +126,7 @@ class TestRemediationPlanService:
     ):
         audit, eq, fw, cat = audit_with_data
 
-        # 1 critique (1j) + 2 high (2j chacun)
+        # 1 critique (0.25j) + 2 high (1j chacun)
         ctrls = []
         for ref, sev in [
             ("C-001", ControlSeverity.CRITICAL),
@@ -158,8 +158,8 @@ class TestRemediationPlanService:
         plan = RemediationPlanService.generate(
             db_session, audit.id, user_id=auditeur_user.id, is_admin=False
         )
-        # 1*1 + 2*2 = 5
-        assert plan.total_effort_days == pytest.approx(5.0)
+        # 1*0.25 + 2*1 = 2.25
+        assert plan.total_effort_days == pytest.approx(2.25)
 
     def test_intra_horizon_sorted_by_occurrences(
         self, db_session, audit_with_data, auditeur_user

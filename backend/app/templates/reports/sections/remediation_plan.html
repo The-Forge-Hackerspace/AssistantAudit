@@ -1,6 +1,13 @@
 {# Plan de remediation — actions priorisees par horizon temporel (TOS-25 section 6) #}
 {% set sev_colors = {'critical': '#DC2626', 'high': '#EA580C', 'medium': '#F59E0B', 'low': '#3B82F6', 'info': '#3B82F6'} %}
 {% set sev_labels = {'critical': 'Critique', 'high': 'Eleve', 'medium': 'Moyen', 'low': 'Faible', 'info': 'Info'} %}
+{% macro effort_label(days) -%}
+    {%- if days < 1 -%}
+        {{ (days * 8) | round(0) | int }} h
+    {%- else -%}
+        {{ days | round(1) }} j
+    {%- endif -%}
+{%- endmacro %}
 
 {% if remediation_plan and remediation_plan.total_actions > 0 %}
 
@@ -8,7 +15,7 @@
     Ce plan regroupe les <strong>{{ remediation_plan.total_actions }}</strong> actions
     de remediation identifiees lors de l'audit, classees par horizon temporel.
     La charge totale estimee est d'environ
-    <strong>{{ remediation_plan.total_effort_days | round(1) }} jour(s)</strong>
+    <strong>{{ effort_label(remediation_plan.total_effort_days) }}</strong>
     (estimation indicative, a ajuster selon le contexte client).
 </p>
 
@@ -19,7 +26,7 @@
         <span class="plan-horizon-label">{{ horizon.label }}</span>
         <span class="plan-horizon-stats">
             {{ horizon.total_actions }} action(s) &middot;
-            ~{{ horizon.total_effort_days | round(1) }} j
+            ~{{ effort_label(horizon.total_effort_days) }}
         </span>
     </div>
     <p class="plan-horizon-desc">{{ horizon.description }}</p>
@@ -50,7 +57,7 @@
                     </span>
                 </td>
                 <td class="plan-cell-occ">{{ action.occurrences }}</td>
-                <td class="plan-cell-effort">{{ action.effort_days | round(1) }} j</td>
+                <td class="plan-cell-effort">{{ effort_label(action.effort_days) }}</td>
             </tr>
         {% endfor %}
         </tbody>
