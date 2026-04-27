@@ -7,10 +7,11 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import HTTPException, Request
+from fastapi import Request
 from sqlalchemy.orm import Session, joinedload
 
 from ..core.config import get_settings
+from ..core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from ..core.rate_limit import enroll_rate_limiter
 from ..core.security import (
     create_agent_token,
@@ -55,7 +56,7 @@ class AgentService:
             query = query.filter(Agent.user_id == user_id)
         agent = query.first()
         if agent is None:
-            raise HTTPException(status_code=404, detail="Agent introuvable")
+            raise NotFoundError("Agent introuvable")
         return agent
 
     @staticmethod
@@ -70,13 +71,10 @@ class AgentService:
 
         if data.target_user_id is not None:
             if user_role != "admin":
-                raise HTTPException(
-                    status_code=403,
-                    detail="Seul un admin peut attribuer un agent a un autre utilisateur",
-                )
+                raise ForbiddenError("Seul un admin peut attribuer un agent a un autre utilisateur")
             target_user = db.query(User).filter(User.id == data.target_user_id).first()
             if target_user is None or not target_user.is_active:
-                raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+                raise NotFoundError("Utilisateur introuvable")
             owner_id = target_user.id
 
         code, code_hash, expiration = create_enrollment_token()
@@ -114,7 +112,7 @@ class AgentService:
             query = query.filter(Agent.user_id == user_id)
         agent = query.first()
         if agent is None:
-            raise HTTPException(status_code=404, detail="Agent introuvable")
+            raise NotFoundError("Agent introuvable")
 
         agent.status = "revoked"
         agent.revoked_at = datetime.now(timezone.utc)
@@ -185,12 +183,9 @@ class AgentService:
             query = query.filter(Agent.user_id == user_id)
         agent = query.first()
         if agent is None:
-            raise HTTPException(status_code=404, detail="Agent introuvable")
+            raise NotFoundError("Agent introuvable")
         if agent.status == "revoked":
-            raise HTTPException(
-                status_code=409,
-                detail="Impossible de modifier un agent revoque",
-            )
+            raise ConflictError("Impossible de modifier un agent revoque")
         agent.allowed_tools = allowed_tools
         db.flush()
         logger.info(
@@ -286,10 +281,7 @@ class AgentService:
         )
 
         if matched_agent is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Code d'enrollment invalide ou expire",
-            )
+            raise BusinessRuleError("Code d'enrollment invalide ou expire")
 
         # Vérifier expiration
         now = datetime.now(timezone.utc)
@@ -297,10 +289,7 @@ class AgentService:
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=timezone.utc)
         if now > exp:
-            raise HTTPException(
-                status_code=400,
-                detail="Code d'enrollment invalide ou expire",
-            )
+            raise BusinessRuleError("Code d'enrollment invalide ou expire")
 
         # Generer le certificat client
         cert_pem = b""
@@ -418,11 +407,11 @@ class AgentService:
         """Supprime une tache. Verifie ownership."""
         task = db.query(AgentTask).filter(AgentTask.task_uuid == task_uuid).first()
         if task is None:
-            raise HTTPException(status_code=404, detail="Tache introuvable")
+            raise NotFoundError("Tache introuvable")
         if task.owner_id != user_id and not is_admin:
-            raise HTTPException(status_code=404, detail="Tache introuvable")
+            raise NotFoundError("Tache introuvable")
         if task.status == "running":
-            raise HTTPException(status_code=400, detail="Impossible de supprimer une tache en cours")
+            raise BusinessRuleError("Impossible de supprimer une tache en cours")
         db.delete(task)
         db.flush()
 
@@ -438,7 +427,7 @@ class AgentService:
             .first()
         )
         if task is None:
-            raise HTTPException(status_code=404, detail="Tache introuvable")
+            raise NotFoundError("Tache introuvable")
         return task
 
     @staticmethod
@@ -458,7 +447,7 @@ class AgentService:
             .first()
         )
         if task is None:
-            raise HTTPException(status_code=404, detail="Tache introuvable")
+            raise NotFoundError("Tache introuvable")
 
         now = datetime.now(timezone.utc)
         task.status = body.status
@@ -495,7 +484,7 @@ class AgentService:
             .first()
         )
         if task is None:
-            raise HTTPException(status_code=404, detail="Tache introuvable")
+            raise NotFoundError("Tache introuvable")
 
         task.status = "completed"
         task.progress = 100
@@ -530,9 +519,9 @@ class AgentService:
             .first()
         )
         if task is None:
-            raise HTTPException(status_code=404, detail="Tache introuvable")
+            raise NotFoundError("Tache introuvable")
         if task.status == "cancelled":
-            raise HTTPException(status_code=400, detail="Tache annulee — upload refuse")
+            raise BusinessRuleError("Tache annulee — upload refuse")
 
         # Chiffrer avec envelope encryption
         from ..core.file_encryption import EnvelopeEncryption
@@ -577,9 +566,9 @@ class AgentService:
         """Liste les artifacts d'une tache avec verification ownership."""
         task = db.query(AgentTask).filter(AgentTask.task_uuid == task_uuid).first()
         if task is None:
-            raise HTTPException(status_code=404, detail="Tache introuvable")
+            raise NotFoundError("Tache introuvable")
         if task.owner_id != user_id and not is_admin:
-            raise HTTPException(status_code=404, detail="Tache introuvable")
+            raise NotFoundError("Tache introuvable")
 
         return (
             db.query(TaskArtifact)

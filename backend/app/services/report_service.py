@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.orm import Session
 from weasyprint import HTML
+from ..core.errors import NotFoundError
 
 from ..models.audit import Audit
 from ..models.entreprise import Entreprise
@@ -38,9 +39,9 @@ class ReportService:
     def _check_audit_access(db: Session, audit_id: int, user_id: int, is_admin: bool) -> Audit:
         audit = db.query(Audit).filter(Audit.id == audit_id).first()
         if not audit:
-            raise HTTPException(status_code=404, detail="Audit non trouvé")
+            raise NotFoundError("Audit non trouvé")
         if not is_admin and audit.owner_id != user_id:
-            raise HTTPException(status_code=404, detail="Audit non trouvé")
+            raise NotFoundError("Audit non trouvé")
         return audit
 
     @staticmethod
@@ -79,7 +80,7 @@ class ReportService:
         """Récupère un rapport avec ses sections."""
         report = db.query(AuditReport).filter(AuditReport.id == report_id).first()
         if not report:
-            raise HTTPException(status_code=404, detail="Rapport non trouvé")
+            raise NotFoundError("Rapport non trouvé")
         ReportService._check_audit_access(db, report.audit_id, user_id, is_admin)
         return report
 
@@ -124,7 +125,7 @@ class ReportService:
             .first()
         )
         if not section:
-            raise HTTPException(status_code=404, detail="Section non trouvée")
+            raise NotFoundError("Section non trouvée")
 
         updates = data.model_dump(exclude_unset=True)
         for key, val in updates.items():

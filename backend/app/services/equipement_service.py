@@ -4,7 +4,7 @@ Service Equipement : CRUD des assets d'infrastructure.
 Gere les sous-types STI (reseau, serveur, firewall) via polymorphisme.
 """
 
-from fastapi import HTTPException
+from ..core.errors import ConflictError, NotFoundError
 from sqlalchemy.orm import Session
 
 from ..core.helpers import get_or_404, user_has_access_to_entreprise
@@ -72,7 +72,7 @@ def _check_site_access(
     if user_id is not None and not is_admin:
         site = db.get(Site, site_id)
         if not site or not user_has_access_to_entreprise(db, site.entreprise_id, user_id):
-            raise HTTPException(status_code=404, detail="Equipement introuvable")
+            raise NotFoundError("Equipement introuvable")
 
 
 class EquipementService:
@@ -143,10 +143,7 @@ class EquipementService:
             .first()
         )
         if existing:
-            raise HTTPException(
-                status_code=409,
-                detail=f"L'IP '{data.ip_address}' existe déjà pour ce site",
-            )
+            raise ConflictError(f"L'IP '{data.ip_address}' existe déjà pour ce site")
 
         cls = _TYPE_MAP.get(data.type_equipement, Equipement)
         common_fields = {

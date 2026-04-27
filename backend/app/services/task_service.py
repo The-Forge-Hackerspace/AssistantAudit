@@ -6,7 +6,7 @@ Implemente la double verification d'ownership pour l'isolation inter-techniciens
 import asyncio
 import logging
 
-from fastapi import HTTPException
+from ..core.errors import ForbiddenError, NotFoundError
 from sqlalchemy.orm import Session
 
 from ..models.agent import Agent
@@ -26,9 +26,18 @@ def notify_agent_new_task(agent_uuid: str, task: AgentTask) -> None:
     recuperer ses taches via HTTP/polling s'il est deconnecte).
     """
     try:
+        from ..core.event_loop import get_app_loop
         from ..core.websocket_manager import ws_manager
 
-        asyncio.run(
+        loop = get_app_loop()
+        if loop is None:
+            logger.warning(
+                "App event loop not initialized; skipping new_task WS notify (task_uuid=%s)",
+                task.task_uuid,
+            )
+            return
+
+        asyncio.run_coroutine_threadsafe(
             ws_manager.send_to_agent(
                 agent_uuid,
                 "new_task",
@@ -37,7 +46,8 @@ def notify_agent_new_task(agent_uuid: str, task: AgentTask) -> None:
                     "tool": task.tool,
                     "parameters": task.parameters,
                 },
-            )
+            ),
+            loop,
         )
     except Exception:
         logger.exception("Failed to push new_task WS event (task_uuid=%s)", task.task_uuid)
@@ -69,7 +79,7 @@ def dispatch_task(
             .first()
         )
         if audit is None:
-            raise HTTPException(status_code=404, detail="Audit introuvable")
+            raise NotFoundError("Audit introuvable")
 
     # Verif 2 : l'agent appartient au bon tech et est actif
     agent = (
@@ -82,14 +92,11 @@ def dispatch_task(
         .first()
     )
     if agent is None:
-        raise HTTPException(status_code=404, detail="Agent introuvable ou inactif")
+        raise NotFoundError("Agent introuvable ou inactif")
 
     # Verif 3 : l'outil est autorise
     if tool not in agent.allowed_tools:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Outil '{tool}' non autorise pour cet agent",
-        )
+        raise ForbiddenError(f"Outil '{tool}' non autorise pour cet agent")
 
     # Injection du XML config pour les taches ORADAD
     if tool in ("oradad", "config-oradad") and parameters.get("config_id"):
@@ -101,7 +108,7 @@ def dispatch_task(
             .first()
         )
         if config is None:
-            raise HTTPException(status_code=404, detail="Profil de configuration introuvable")
+            raise NotFoundError("Profil de configuration introuvable")
         parameters = {**parameters, "config_xml": config.to_xml()}
 
     # Creation de la tache

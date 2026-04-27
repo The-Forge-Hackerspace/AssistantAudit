@@ -1,6 +1,6 @@
 """Service Finding — logique métier pour les non-conformités."""
 
-from fastapi import HTTPException
+from ..core.errors import BusinessRuleError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -127,11 +127,7 @@ class FindingService:
             try:
                 parsed_status = FindingStatus(status)
             except ValueError:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Statut invalide : '{status}'. "
-                    f"Valeurs acceptées : {', '.join(s.value for s in FindingStatus)}",
-                )
+                raise BusinessRuleError(f"Statut invalide : '{status}'. Valeurs acceptées : {', '.join(s.value for s in FindingStatus)}")
             query = query.where(Finding.status == parsed_status)
             count_query = count_query.where(Finding.status == parsed_status)
         if severity is not None:

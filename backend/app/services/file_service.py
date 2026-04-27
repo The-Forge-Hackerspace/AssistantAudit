@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import HTTPException
+from ..core.errors import NotFoundError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -57,7 +57,7 @@ class FileService:
             .first()
         )
         if cr is None:
-            raise HTTPException(status_code=404, detail="Ressource introuvable")
+            raise NotFoundError("Ressource introuvable")
         return cr
 
     def _get_attachment_with_ownership(self, db: Session, attachment_id: int, user_id: int) -> Attachment:
@@ -78,7 +78,7 @@ class FileService:
             .first()
         )
         if attachment is None:
-            raise HTTPException(status_code=404, detail="Fichier introuvable")
+            raise NotFoundError("Fichier introuvable")
         return attachment
 
     def upload_file(
@@ -178,10 +178,10 @@ class FileService:
 
             # Protection path traversal
             if not file_path.is_relative_to(base_data.resolve()):
-                raise HTTPException(status_code=404, detail="Fichier introuvable")
+                raise NotFoundError("Fichier introuvable")
 
             if not file_path.exists():
-                raise HTTPException(status_code=404, detail="Fichier introuvable sur le disque")
+                raise NotFoundError("Fichier introuvable sur le disque")
 
             content = file_path.read_bytes()
 

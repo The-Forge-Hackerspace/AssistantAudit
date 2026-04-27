@@ -2,7 +2,7 @@
 Service Site : CRUD des emplacements physiques.
 """
 
-from fastapi import HTTPException
+from ..core.errors import ConflictError, NotFoundError
 from sqlalchemy.orm import Session
 
 from ..core.helpers import get_or_404, user_has_access_to_entreprise
@@ -23,7 +23,7 @@ class SiteService:
         """Verifie l'acces a l'entreprise pour un non-admin."""
         if user_id is not None and not is_admin:
             if not user_has_access_to_entreprise(db, entreprise_id, user_id):
-                raise HTTPException(status_code=404, detail="Site introuvable")
+                raise NotFoundError("Site introuvable")
 
     @staticmethod
     def list_sites(
@@ -75,10 +75,7 @@ class SiteService:
 
         existing = db.query(Site).filter(Site.entreprise_id == data.entreprise_id, Site.nom == data.nom).first()
         if existing:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Le site '{data.nom}' existe déjà pour cette entreprise",
-            )
+            raise ConflictError(f"Le site '{data.nom}' existe déjà pour cette entreprise")
 
         site = Site(
             nom=data.nom,

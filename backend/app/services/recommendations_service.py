@@ -7,7 +7,7 @@ complete pour le rapport PDF (section recommendations) et la page web.
 import logging
 from collections import defaultdict
 
-from fastapi import HTTPException
+from ..core.errors import NotFoundError
 from sqlalchemy.orm import Session
 
 from ..models.assessment import (
@@ -30,9 +30,9 @@ class RecommendationsService:
     ) -> Audit:
         audit = db.query(Audit).filter(Audit.id == audit_id).first()
         if not audit:
-            raise HTTPException(status_code=404, detail="Audit non trouve")
+            raise NotFoundError("Audit non trouve")
         if not is_admin and audit.owner_id != user_id:
-            raise HTTPException(status_code=404, detail="Audit non trouve")
+            raise NotFoundError("Audit non trouve")
         return audit
 
     @staticmethod

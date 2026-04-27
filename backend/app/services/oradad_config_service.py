@@ -4,7 +4,7 @@ Service OradadConfig : CRUD profils de configuration, taches ORADAD, analyse.
 
 import logging
 
-from fastapi import HTTPException, status
+from ..core.errors import BusinessRuleError, NotFoundError
 from sqlalchemy.orm import Session
 
 from ..models.agent_task import AgentTask
@@ -37,9 +37,9 @@ class OradadConfigService:
     ) -> OradadConfig:
         config = db.query(OradadConfig).filter(OradadConfig.id == config_id).first()
         if config is None:
-            raise HTTPException(status_code=404, detail="Profil de configuration introuvable")
+            raise NotFoundError("Profil de configuration introuvable")
         if config.owner_id != owner_id and not is_admin:
-            raise HTTPException(status_code=404, detail="Profil de configuration introuvable")
+            raise NotFoundError("Profil de configuration introuvable")
         return config
 
     @staticmethod
@@ -128,9 +128,9 @@ class OradadConfigService:
             .first()
         )
         if task is None:
-            raise HTTPException(status_code=404, detail="Tache ORADAD introuvable")
+            raise NotFoundError("Tache ORADAD introuvable")
         if task.owner_id != owner_id and not is_admin:
-            raise HTTPException(status_code=404, detail="Tache ORADAD introuvable")
+            raise NotFoundError("Tache ORADAD introuvable")
         return task
 
     @staticmethod
@@ -148,28 +148,19 @@ class OradadConfigService:
     def analyze(db: Session, task: AgentTask) -> dict:
         """Lance l'analyse ANSSI et persiste le rapport dans result_summary."""
         if task.status != "completed":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"La tache n'est pas terminee (status: {task.status})",
-            )
+            raise BusinessRuleError(f"La tache n'est pas terminee (status: {task.status})")
 
         if task.result_summary and "anssi_report" in task.result_summary:
             return task.result_summary["anssi_report"]
 
         if not task.result_raw:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Aucune donnee brute disponible pour cette tache",
-            )
+            raise BusinessRuleError("Aucune donnee brute disponible pour cette tache")
 
         try:
             raw_bytes = task.result_raw.encode("utf-8") if isinstance(task.result_raw, str) else task.result_raw
             parsed_data = OradadAnalysisService.parse_oradad_tar(raw_bytes)
         except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            )
+            raise BusinessRuleError(str(exc))
 
         findings = OradadAnalysisService.run_anssi_checks(db, parsed_data)
         score = OradadAnalysisService.calculate_score(findings)

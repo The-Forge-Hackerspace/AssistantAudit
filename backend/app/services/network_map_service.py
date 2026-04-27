@@ -2,7 +2,7 @@
 Service NetworkMap : liens reseau, layouts, connexions inter-site, VLANs.
 """
 
-from fastapi import HTTPException
+from ..core.errors import BusinessRuleError, ConflictError, NotFoundError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -22,7 +22,7 @@ def _check_site_access(
     if user_id is not None and not is_admin:
         site = db.get(Site, site_id)
         if not site or not user_has_access_to_entreprise(db, site.entreprise_id, user_id):
-            raise HTTPException(status_code=404, detail="Ressource introuvable")
+            raise NotFoundError("Ressource introuvable")
 
 
 def _check_ent_access(
@@ -33,7 +33,7 @@ def _check_ent_access(
 ) -> None:
     if user_id is not None and not is_admin:
         if not user_has_access_to_entreprise(db, entreprise_id, user_id):
-            raise HTTPException(status_code=404, detail="Ressource introuvable")
+            raise NotFoundError("Ressource introuvable")
 
 
 class NetworkMapService:
@@ -49,11 +49,11 @@ class NetworkMapService:
         source = db.get(Equipement, source_id)
         target = db.get(Equipement, target_id)
         if not source or not target:
-            raise HTTPException(status_code=404, detail="Équipement source/cible introuvable")
+            raise NotFoundError("Équipement source/cible introuvable")
         if source.site_id != site_id or target.site_id != site_id:
-            raise HTTPException(status_code=400, detail="Les équipements doivent appartenir au site demandé")
+            raise BusinessRuleError("Les équipements doivent appartenir au site demandé")
         if source_id == target_id:
-            raise HTTPException(status_code=400, detail="Un lien ne peut pas relier un équipement à lui-même")
+            raise BusinessRuleError("Un lien ne peut pas relier un équipement à lui-même")
 
     @staticmethod
     def list_links(
@@ -168,7 +168,7 @@ class NetworkMapService:
             db.flush()
         except IntegrityError:
             db.rollback()
-            raise HTTPException(status_code=409, detail="Conflit lors de la sauvegarde du layout")
+            raise ConflictError("Conflit lors de la sauvegarde du layout")
 
     # ── Multi-site overview ──────────────────────────────────────────────
 
@@ -223,11 +223,11 @@ class NetworkMapService:
         source_site = db.get(Site, data.source_site_id)
         target_site = db.get(Site, data.target_site_id)
         if not source_site or not target_site:
-            raise HTTPException(status_code=404, detail="Site source/cible introuvable")
+            raise NotFoundError("Site source/cible introuvable")
         if source_site.entreprise_id != data.entreprise_id or target_site.entreprise_id != data.entreprise_id:
-            raise HTTPException(status_code=400, detail="Les deux sites doivent appartenir à la même entreprise")
+            raise BusinessRuleError("Les deux sites doivent appartenir à la même entreprise")
         if data.source_site_id == data.target_site_id:
-            raise HTTPException(status_code=400, detail="Une connexion inter-site doit relier deux sites différents")
+            raise BusinessRuleError("Une connexion inter-site doit relier deux sites différents")
 
         existing = (
             db.query(SiteConnection)
@@ -240,7 +240,7 @@ class NetworkMapService:
             .first()
         )
         if existing:
-            raise HTTPException(status_code=409, detail="Cette connexion inter-site existe déjà")
+            raise ConflictError("Cette connexion inter-site existe déjà")
 
         connection = SiteConnection(**data.model_dump())
         db.add(connection)
@@ -248,7 +248,7 @@ class NetworkMapService:
             db.flush()
         except IntegrityError:
             db.rollback()
-            raise HTTPException(status_code=409, detail="Cette connexion inter-site existe déjà (contrainte d'unicité)")
+            raise ConflictError("Cette connexion inter-site existe déjà (contrainte d'unicité)")
         db.refresh(connection)
         return connection
 
@@ -273,7 +273,7 @@ class NetworkMapService:
             db.flush()
         except IntegrityError:
             db.rollback()
-            raise HTTPException(status_code=409, detail="Conflit de contrainte d'unicité")
+            raise ConflictError("Conflit de contrainte d'unicité")
         db.refresh(connection)
         return connection
 
@@ -333,10 +333,7 @@ class NetworkMapService:
             db.flush()
         except IntegrityError:
             db.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail=f"Un VLAN avec l'ID {data.vlan_id} existe déjà pour ce site",
-            )
+            raise ConflictError(f"Un VLAN avec l'ID {data.vlan_id} existe déjà pour ce site")
         db.refresh(vlan)
         return vlan
 
@@ -356,10 +353,7 @@ class NetworkMapService:
             db.flush()
         except IntegrityError:
             db.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail="Conflit : un VLAN avec cet ID existe déjà pour ce site",
-            )
+            raise ConflictError("Conflit : un VLAN avec cet ID existe déjà pour ce site")
         db.refresh(vlan)
         return vlan
 

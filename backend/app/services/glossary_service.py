@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 import yaml
-from fastapi import HTTPException
+from ..core.errors import NotFoundError
 from sqlalchemy.orm import Session
 
 from ..models.assessment import AssessmentCampaign, ComplianceStatus
@@ -65,9 +65,9 @@ class GlossaryService:
     ) -> Audit:
         audit = db.query(Audit).filter(Audit.id == audit_id).first()
         if not audit:
-            raise HTTPException(status_code=404, detail="Audit non trouve")
+            raise NotFoundError("Audit non trouve")
         if not is_admin and audit.owner_id != user_id:
-            raise HTTPException(status_code=404, detail="Audit non trouve")
+            raise NotFoundError("Audit non trouve")
         return audit
 
     @staticmethod

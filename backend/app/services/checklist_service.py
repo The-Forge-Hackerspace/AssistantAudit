@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from fastapi import HTTPException
+from ..core.errors import ConflictError, NotFoundError
 from sqlalchemy.orm import Session, joinedload
 
 from ..models.audit import Audit
@@ -25,7 +25,7 @@ class ChecklistService:
             query = query.filter(Audit.owner_id == user_id)
         audit = query.first()
         if not audit:
-            raise HTTPException(status_code=404, detail="Audit non trouvé")
+            raise NotFoundError("Audit non trouvé")
         return audit
 
     @staticmethod
@@ -46,7 +46,7 @@ class ChecklistService:
             .first()
         )
         if not tpl:
-            raise HTTPException(status_code=404, detail="Template non trouvé")
+            raise NotFoundError("Template non trouvé")
         return tpl
 
     @staticmethod
@@ -58,7 +58,7 @@ class ChecklistService:
         # Vérifier que le template existe
         tpl = db.query(ChecklistTemplate).filter(ChecklistTemplate.id == data.template_id).first()
         if not tpl:
-            raise HTTPException(status_code=404, detail="Template non trouvé")
+            raise NotFoundError("Template non trouvé")
 
         # Vérifier unicité
         existing = (
@@ -71,7 +71,7 @@ class ChecklistService:
             .first()
         )
         if existing:
-            raise HTTPException(status_code=409, detail="Cette checklist existe déjà pour cet audit")
+            raise ConflictError("Cette checklist existe déjà pour cet audit")
 
         instance = ChecklistInstance(
             template_id=data.template_id,
@@ -95,7 +95,7 @@ class ChecklistService:
             .first()
         )
         if not instance:
-            raise HTTPException(status_code=404, detail="Instance non trouvée")
+            raise NotFoundError("Instance non trouvée")
         # Vérifier accès via l'audit
         ChecklistService._check_audit_access(db, instance.audit_id, user_id, is_admin)
         return instance
@@ -124,7 +124,7 @@ class ChecklistService:
             .first()
         )
         if not item:
-            raise HTTPException(status_code=404, detail="Item non trouvé dans ce template")
+            raise NotFoundError("Item non trouvé dans ce template")
 
         # Upsert
         response = (
@@ -167,7 +167,7 @@ class ChecklistService:
         """Calcule la progression d'une instance."""
         instance = db.query(ChecklistInstance).filter(ChecklistInstance.id == instance_id).first()
         if not instance:
-            raise HTTPException(status_code=404, detail="Instance non trouvée")
+            raise NotFoundError("Instance non trouvée")
 
         # Compter les items du template
         total_items = (
