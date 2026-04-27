@@ -48,17 +48,19 @@ class TestAuditReport:
         db_session.flush()
 
         db_session.refresh(report)
-        assert len(report.sections) == 29
+        assert len(report.sections) == 31
         assert report.sections[0].section_key == "cover"
         assert report.sections[1].section_key == "toc"
         assert report.sections[2].section_key == "executive_summary"
         assert report.sections[26].section_key == "synthesis"
         assert report.sections[27].section_key == "recommendations"
         assert report.sections[28].section_key == "remediation_plan"
+        assert report.sections[29].section_key == "annexes"
+        assert report.sections[30].section_key == "glossary"
 
     def test_sections_defined(self):
         """Le brief §7.7 définit 25 sections + synthèse exécutive + recommandations + plan."""
-        assert len(REPORT_SECTIONS) == 29
+        assert len(REPORT_SECTIONS) == 31
 
     def test_section_keys_unique(self):
         """Chaque section a une clé unique."""

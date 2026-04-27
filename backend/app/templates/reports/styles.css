@@ -981,3 +981,169 @@ em { font-style: italic; }
     font-size: 14pt;
     margin: 0;
 }
+
+/* ============================================================
+   Annexes (section 7 - TOS-25)
+   ============================================================ */
+
+.annex-intro {
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #374151;
+    background: #F9FAFB;
+    border-left: 3px solid #3B82F6;
+    padding: 4mm 5mm;
+    margin-bottom: 8mm;
+    border-radius: 1mm;
+}
+
+.annex-subtitle {
+    font-size: 13pt;
+    font-weight: bold;
+    color: #1D4ED8;
+    margin-top: 8mm;
+    margin-bottom: 4mm;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.annex-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin-bottom: 4mm;
+}
+
+.annex-table thead th {
+    background: #1F2937;
+    color: #FFFFFF;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 2mm 3mm;
+    text-align: left;
+    border: 1px solid #1F2937;
+}
+
+.annex-table tbody td {
+    padding: 1.8mm 3mm;
+    border: 1px solid #E5E7EB;
+    vertical-align: middle;
+    background: #FFFFFF;
+}
+
+.annex-table tbody tr:nth-child(even) td {
+    background: #FAFAFA;
+}
+
+.annex-cell-ref code {
+    font-family: "Courier New", monospace;
+    font-size: 9pt;
+    background: #F3F4F6;
+    padding: 0.5mm 1.5mm;
+    border-radius: 1mm;
+    color: #1D4ED8;
+}
+
+.annex-cell-fw {
+    color: #4B5563;
+    font-size: 9pt;
+}
+
+.annex-cell-sev {
+    text-align: center;
+}
+
+.annex-sev-badge {
+    display: inline-block;
+    padding: 0.5mm 2mm;
+    border-radius: 1mm;
+    color: #FFFFFF;
+    font-size: 8.5pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+}
+
+.annex-cell-counts {
+    text-align: center;
+    font-family: "Courier New", monospace;
+    font-size: 9.5pt;
+}
+
+.annex-cell-counts .count-c { color: #16A34A; font-weight: bold; }
+.annex-cell-counts .count-nc { color: #DC2626; font-weight: bold; }
+.annex-cell-counts .count-na { color: #6B7280; }
+.annex-cell-counts .count-pending { color: #2563EB; }
+
+.annex-table-meta {
+    font-size: 9pt;
+    color: #6B7280;
+    font-style: italic;
+    margin-bottom: 6mm;
+    text-align: right;
+}
+
+.annex-empty {
+    color: #9CA3AF;
+    font-style: italic;
+    text-align: center;
+    padding: 10mm;
+}
+
+/* ============================================================
+   Glossaire (section 8 - TOS-25)
+   ============================================================ */
+
+.gloss-intro {
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #374151;
+    background: #F9FAFB;
+    border-left: 3px solid #3B82F6;
+    padding: 4mm 5mm;
+    margin-bottom: 8mm;
+    border-radius: 1mm;
+}
+
+.gloss-list {
+    margin: 0;
+    padding: 0;
+}
+
+.gloss-entry {
+    page-break-inside: avoid;
+    margin-bottom: 4mm;
+    padding-bottom: 3mm;
+    border-bottom: 1px solid #F3F4F6;
+}
+
+.gloss-term {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #1D4ED8;
+    margin-bottom: 1mm;
+}
+
+.gloss-aliases {
+    font-weight: normal;
+    font-size: 9.5pt;
+    color: #6B7280;
+    font-style: italic;
+}
+
+.gloss-def {
+    font-size: 10pt;
+    color: #1F2937;
+    line-height: 1.5;
+    margin: 0;
+    padding-left: 4mm;
+}
+
+.gloss-empty {
+    color: #9CA3AF;
+    font-style: italic;
+    text-align: center;
+    padding: 10mm;
+}

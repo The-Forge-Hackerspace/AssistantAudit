@@ -52,6 +52,8 @@ REPORT_SECTIONS = [
     ("synthesis", "Synthèse globale"),
     ("recommendations", "Recommandations prioritaires"),
     ("remediation_plan", "Plan de remédiation"),
+    ("annexes", "Annexes"),
+    ("glossary", "Glossaire"),
 ]
 
 
