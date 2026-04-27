@@ -1,0 +1,73 @@
+{# Plan de remediation — actions priorisees par horizon temporel (TOS-25 section 6) #}
+{% set sev_colors = {'critical': '#DC2626', 'high': '#EA580C', 'medium': '#F59E0B', 'low': '#3B82F6', 'info': '#3B82F6'} %}
+{% set sev_labels = {'critical': 'Critique', 'high': 'Élevé', 'medium': 'Moyen', 'low': 'Faible', 'info': 'Info'} %}
+{% macro effort_label(days) -%}
+    {%- if days < 1 -%}
+        {{ (days * 8) | round(0) | int }} h
+    {%- else -%}
+        {{ days | round(1) }} j
+    {%- endif -%}
+{%- endmacro %}
+
+{% if remediation_plan and remediation_plan.total_actions > 0 %}
+
+<p class="plan-intro">
+    Ce plan regroupe les <strong>{{ remediation_plan.total_actions }}</strong> actions
+    de remediation identifiees lors de l'audit, classees par horizon temporel.
+    La charge totale estimee est d'environ
+    <strong>{{ effort_label(remediation_plan.total_effort_days) }}</strong>
+    (estimation indicative, a ajuster selon le contexte client).
+</p>
+
+{% for horizon in remediation_plan.horizons %}
+{% if horizon.total_actions > 0 %}
+<div class="plan-horizon-block">
+    <div class="plan-horizon-header">
+        <span class="plan-horizon-label">{{ horizon.label }}</span>
+        <span class="plan-horizon-stats">
+            {{ horizon.total_actions }} action(s) &middot;
+            ~{{ effort_label(horizon.total_effort_days) }}
+        </span>
+    </div>
+    <p class="plan-horizon-desc">{{ horizon.description }}</p>
+
+    <table class="plan-table">
+        <thead>
+            <tr>
+                <th class="plan-col-ref">Ref</th>
+                <th class="plan-col-action">Action de remediation</th>
+                <th class="plan-col-sev">Severite</th>
+                <th class="plan-col-occ">Occ.</th>
+                <th class="plan-col-effort">Charge</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for action in horizon.actions %}
+            <tr>
+                <td class="plan-cell-ref"><code>{{ action.control_ref }}</code></td>
+                <td class="plan-cell-action">
+                    <strong>{{ action.title }}</strong>
+                    {% if action.remediation %}
+                    <p class="plan-cell-remediation">{{ action.remediation }}</p>
+                    {% endif %}
+                </td>
+                <td class="plan-cell-sev">
+                    <span class="plan-sev-badge" style="background: {{ sev_colors.get(action.severity, '#6B7280') }};">
+                        {{ sev_labels.get(action.severity, action.severity) }}
+                    </span>
+                </td>
+                <td class="plan-cell-occ">{{ action.occurrences }}</td>
+                <td class="plan-cell-effort">{{ effort_label(action.effort_days) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endfor %}
+
+{% else %}
+<div class="plan-empty">
+    <p><strong>Aucune action de remediation requise</strong> — l'audit n'a pas identifie de non-conformite.</p>
+</div>
+{% endif %}

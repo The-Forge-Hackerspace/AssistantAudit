@@ -174,6 +174,7 @@ class FrameworkService:
                     cis_reference=ctrl_data.get("cis_reference"),
                     remediation=ctrl_data.get("remediation"),
                     evidence_required=ctrl_data.get("evidence_required", False),
+                    effort_days=ctrl_data.get("effort_days"),
                     category_id=category.id,
                 )
                 db.add(control)
@@ -311,6 +312,8 @@ class FrameworkService:
                     ctrl_data["engine_rule_id"] = ctrl.engine_rule_id
                 if ctrl.cis_reference:
                     ctrl_data["cis_reference"] = ctrl.cis_reference
+                if ctrl.effort_days is not None:
+                    ctrl_data["effort_days"] = ctrl.effort_days
                 cat_data["controls"].append(ctrl_data)
             data["framework"]["categories"].append(cat_data)
 
@@ -371,6 +374,7 @@ class FrameworkService:
                     cis_reference=ctrl.cis_reference,
                     remediation=ctrl.remediation,
                     evidence_required=ctrl.evidence_required,
+                    effort_days=ctrl.effort_days,
                     category_id=new_cat.id,
                 )
                 db.add(new_ctrl)
@@ -448,6 +452,7 @@ class FrameworkService:
                     cis_reference=ctrl_data.get("cis_reference"),
                     remediation=ctrl_data.get("remediation"),
                     evidence_required=ctrl_data.get("evidence_required", False),
+                    effort_days=ctrl_data.get("effort_days"),
                     category_id=category.id,
                 )
                 db.add(control)

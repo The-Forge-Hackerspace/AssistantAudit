@@ -51,6 +51,7 @@ REPORT_SECTIONS = [
     ("quick_wins", "Quick wins"),
     ("synthesis", "Synthèse globale"),
     ("recommendations", "Recommandations prioritaires"),
+    ("remediation_plan", "Plan de remédiation"),
 ]
 
 

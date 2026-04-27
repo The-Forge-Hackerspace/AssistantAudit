@@ -16,18 +16,9 @@ from ..models.assessment import (
 )
 from ..models.audit import Audit
 from ..schemas.recommendations import RecommendationDetail, RecommendationsList
+from ._severity import SEVERITY_RANK
 
 logger = logging.getLogger(__name__)
-
-# Ordre de severite (du plus critique au moins critique)
-SEVERITY_RANK = {
-    "critical": 0,
-    "high": 1,
-    "medium": 2,
-    "low": 3,
-    "info": 4,
-    "unknown": 5,
-}
 
 
 class RecommendationsService:

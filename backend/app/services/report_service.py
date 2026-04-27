@@ -246,15 +246,39 @@ class ReportService:
                 )
                 recommendations = None
 
+        # Si la section plan de remediation est incluse, le calculer
+        remediation_plan = None
+        plan_section = sections_by_key.get("remediation_plan")
+        if plan_section and plan_section.included and not plan_section.custom_content:
+            from .remediation_plan_service import RemediationPlanService
+
+            try:
+                remediation_plan = RemediationPlanService.generate(
+                    db,
+                    report.audit_id,
+                    user_id=report.generated_by or 0,
+                    is_admin=True,
+                )
+            except Exception:
+                logger.exception(
+                    "Echec calcul plan de remediation pour audit %s (rapport %s)",
+                    report.audit_id,
+                    report.id,
+                )
+                remediation_plan = None
+
 
         # Sections avec un rendu specifique (template + donnees)
         # Les autres sont masquees du PDF si elles n'ont pas de custom_content,
         # pour eviter d'afficher des titres orphelins.
         AUTO_RENDERED = {"cover", "toc", "introduction", "objectives", "scope"}
+        # remediation_plan only rendered if actions exist (handled via DATA_RENDERED below)
         DATA_RENDERED = {
             "executive_summary": executive_summary is not None,
             "recommendations": recommendations is not None
             and recommendations.total > 0,
+            "remediation_plan": remediation_plan is not None
+            and remediation_plan.total_actions > 0,
         }
 
         def _has_content(section) -> bool:
@@ -279,4 +303,5 @@ class ReportService:
             sections={s.section_key: s for s in renderable_sections},
             executive_summary=executive_summary,
             recommendations=recommendations,
+            remediation_plan=remediation_plan,
         )

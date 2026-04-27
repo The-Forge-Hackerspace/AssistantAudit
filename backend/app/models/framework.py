@@ -8,7 +8,7 @@ Les frameworks sont chargés depuis des fichiers YAML et persistés en base pour
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -134,6 +134,11 @@ class Control(Base):
     cis_reference: Mapped[str | None] = mapped_column(String(200))
     remediation: Mapped[str | None] = mapped_column(Text)
     evidence_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # Charge estimee de remediation (jours-homme). Si null, le service applique
+    # une heuristique basee sur la severite. Vocation a etre alimente
+    # par le YAML du framework ou par un LLM contextuel a l'audit.
+    effort_days: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # FK
     category_id: Mapped[int] = mapped_column(Integer, ForeignKey("framework_categories.id"), nullable=False, index=True)
