@@ -17,6 +17,8 @@ from ....schemas.scan import (
 from ....services.config_analysis_service import (
     delete_config_analysis,
     get_config_analysis,
+    list_assessments_for_equipement,
+    list_config_analyses_with_access,
     prefill_assessment_from_config,
     save_config_analysis,
 )
@@ -158,23 +160,14 @@ def list_analyses(
 ):
     """Liste les analyses de configuration sauvegardées, optionnellement filtrées par équipement."""
     uid, adm = _rbac(current_user)
-    from ....models.config_analysis import ConfigAnalysis as CA
-
-    query = db.query(CA)
-    if equipement_id:
-        query = query.filter(CA.equipement_id == equipement_id)
-    if not adm:
-        from ....models.audit import Audit
-        from ....models.equipement import Equipement
-        from ....models.site import Site
-
-        accessible_ent_ids = db.query(Audit.entreprise_id).filter(Audit.owner_id == uid).distinct().scalar_subquery()
-        query = (
-            query.join(Equipement, CA.equipement_id == Equipement.id)
-            .join(Site, Equipement.site_id == Site.id)
-            .filter(Site.entreprise_id.in_(accessible_ent_ids))
-        )
-    analyses = query.order_by(CA.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    analyses = list_config_analyses_with_access(
+        db,
+        user_id=uid,
+        is_admin=adm,
+        equipement_id=equipement_id,
+        page=page,
+        page_size=page_size,
+    )
 
     results = []
     for a in analyses:
@@ -251,9 +244,7 @@ def list_assessments_for_equipment(
     Liste les assessments liés à un équipement (pour sélectionner
     lequel pré-remplir depuis une analyse de configuration).
     """
-    from ....models.assessment import Assessment
-
-    assessments = db.query(Assessment).filter(Assessment.equipement_id == equipement_id).all()
+    assessments = list_assessments_for_equipement(db, equipement_id)
     results = []
     for a in assessments:
         framework_name = a.framework.name if a.framework else "—"

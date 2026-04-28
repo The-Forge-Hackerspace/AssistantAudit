@@ -37,14 +37,14 @@ class ChecklistService:
         return query.order_by(ChecklistTemplate.name).all()
 
     @staticmethod
-    def get_template(db: Session, template_id: int) -> ChecklistTemplate:
-        """Récupère un template avec ses sections et items."""
-        tpl = (
-            db.query(ChecklistTemplate)
-            .options(joinedload(ChecklistTemplate.sections).joinedload(ChecklistSection.items))
-            .filter(ChecklistTemplate.id == template_id)
-            .first()
-        )
+    def get_template(db: Session, template_id: int, eager: bool = True) -> ChecklistTemplate:
+        """Recupere un template par ID. Si eager, charge sections + items."""
+        query = db.query(ChecklistTemplate)
+        if eager:
+            query = query.options(
+                joinedload(ChecklistTemplate.sections).joinedload(ChecklistSection.items)
+            )
+        tpl = query.filter(ChecklistTemplate.id == template_id).first()
         if not tpl:
             raise NotFoundError("Template non trouvé")
         return tpl

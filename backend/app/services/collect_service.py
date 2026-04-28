@@ -1106,6 +1106,44 @@ def dispatch_collect_to_agent(
     return task
 
 
+def dispatch_collect_and_commit(
+    db: Session,
+    collect_id: int,
+    agent_uuid: str,
+    current_user_id: int,
+    *,
+    password: Optional[str] = None,
+    private_key: Optional[str] = None,
+    passphrase: Optional[str] = None,
+    use_ssl: bool = False,
+    transport: str = "ntlm",
+    audit_id: Optional[int] = None,
+) -> AgentTask:
+    """Dispatche une collecte vers un agent puis commit la transaction.
+
+    Rollback automatique sur PermissionError / ValueError pour que le routeur
+    puisse retourner 403 ou 400 sans laisser la session dans un etat sale.
+    """
+    try:
+        task = dispatch_collect_to_agent(
+            db=db,
+            collect_id=collect_id,
+            agent_uuid=agent_uuid,
+            current_user_id=current_user_id,
+            password=password,
+            private_key=private_key,
+            passphrase=passphrase,
+            use_ssl=use_ssl,
+            transport=transport,
+            audit_id=audit_id,
+        )
+        db.commit()
+        return task
+    except Exception:
+        db.rollback()
+        raise
+
+
 def hydrate_collect_from_agent_result(
     db: Session,
     collect: CollectResult,

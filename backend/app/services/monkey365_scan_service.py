@@ -246,12 +246,29 @@ class Monkey365ScanService:
         db: DBSession,
         entreprise_id: int,
         config: Monkey365ConfigSchema,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Monkey365ScanResult:
-        return Monkey365ScanService.create_pending_scan(
+        """Valide l'acces a l'entreprise, cree le scan, commit la transaction.
+
+        Le commit est necessaire avant de soumettre le thread background
+        sinon la nouvelle session du thread ne verrait pas le scan.
+        """
+        if user_id is not None and not is_admin:
+            from ..core.helpers import user_has_access_to_entreprise
+
+            entreprise = cast(Entreprise | None, db.get(Entreprise, entreprise_id))
+            if not entreprise:
+                raise ValueError(f"Entreprise #{entreprise_id} introuvable")
+            if not user_has_access_to_entreprise(db, entreprise_id, user_id):
+                raise ValueError("Ressource introuvable")
+        result = Monkey365ScanService.create_pending_scan(
             db=db,
             entreprise_id=entreprise_id,
             config=config,
         )
+        db.commit()
+        return result
 
     @staticmethod
     def list_scans(
@@ -292,6 +309,33 @@ class Monkey365ScanService:
                 return None
         return result
 
+    @staticmethod
+    def cancel_scan(
+        db: DBSession,
+        scan_id: int,
+        user_id: int | None = None,
+        is_admin: bool = False,
+    ) -> Monkey365ScanResult | None:
+        """Force l'arret d'un scan en cours et le marque CANCELLED.
+
+        Retourne None si le scan est introuvable / hors scope.
+        Leve ValueError si le scan n'est pas dans un statut annulable.
+        """
+        result = Monkey365ScanService.get_scan(db, scan_id, user_id=user_id, is_admin=is_admin)
+        if not result:
+            return None
+        if result.status not in (Monkey365ScanStatus.RUNNING, Monkey365ScanStatus.AUTHENTICATING):
+            raise ValueError("Ce scan n'est pas en cours d'exécution")
+
+        Monkey365ScanService.kill_scan_process(scan_id)
+
+        result.status = Monkey365ScanStatus.CANCELLED
+        result.completed_at = datetime.now(timezone.utc)
+        result.error_message = "Scan annulé manuellement"
+        db.flush()
+        db.refresh(result)
+        return result
+
     # ── Streaming scan (Device Code Flow) ─────────────────────────
 
     @staticmethod
@@ -301,8 +345,15 @@ class Monkey365ScanService:
         tenant_id: str,
         auth_method: str,
         config: Monkey365ConfigSchema,
+        user_id: int | None = None,
+        is_admin: bool = False,
     ) -> Monkey365ScanResult:
         """Cree un scan en mode streaming avec status AUTHENTICATING."""
+        if user_id is not None and not is_admin:
+            from ..core.helpers import user_has_access_to_entreprise
+
+            if not user_has_access_to_entreprise(db, entreprise_id, user_id):
+                raise ValueError("Ressource introuvable")
         entreprise = cast(Entreprise | None, db.get(Entreprise, entreprise_id))
         if not entreprise:
             raise ValueError(f"Entreprise #{entreprise_id} introuvable")

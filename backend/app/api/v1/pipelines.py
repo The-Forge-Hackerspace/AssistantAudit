@@ -51,8 +51,6 @@ def launch_pipeline(
             created_by=current_user.id,
             is_admin=current_user.role == "admin",
         )
-        db.commit()
-        db.refresh(pipeline)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

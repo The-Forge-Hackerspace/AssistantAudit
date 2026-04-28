@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,9 +8,7 @@ from sqlalchemy.orm import Session
 
 from ....core.database import get_db
 from ....core.deps import get_current_auditeur
-from ....core.helpers import user_has_access_to_entreprise
 from ....core.task_runner import get_task_runner
-from ....models.entreprise import Entreprise
 from ....models.monkey365_scan_result import Monkey365ScanStatus
 from ....models.user import User
 from ....schemas.common import MessageResponse
@@ -43,27 +40,19 @@ def launch_monkey365_scan(
     current_user: User = Depends(get_current_auditeur),
 ):
     uid, adm = _rbac(current_user)
-    entreprise = db.get(Entreprise, request.entreprise_id)
-    if not entreprise:
-        raise HTTPException(404, f"Entreprise #{request.entreprise_id} introuvable")
-    if not adm and not user_has_access_to_entreprise(db, request.entreprise_id, uid):
-        raise HTTPException(404, "Ressource introuvable")
-
     try:
         result = Monkey365ScanService.launch_scan(
             db=db,
             entreprise_id=request.entreprise_id,
             config=request.config,
+            user_id=uid,
+            is_admin=adm,
         )
     except ValueError as e:
         raise HTTPException(404, str(e))
     except Exception as e:
         logger.exception("Unexpected error launching monkey365 scan")
         raise HTTPException(500, f"Erreur interne: {e}")
-
-    # Commit avant de lancer le thread background, sinon la nouvelle session
-    # du thread ne verra pas le scan (transaction pas encore commitée).
-    db.commit()
 
     task_runner = get_task_runner()
     task_runner.submit(
@@ -154,19 +143,12 @@ def cancel_monkey365_scan(
 ):
     """Force l'arrêt d'un scan en cours : tue le process PowerShell et met le status à CANCELLED."""
     uid, adm = _rbac(current_user)
-    result = Monkey365ScanService.get_scan(db, result_id, user_id=uid, is_admin=adm)
+    try:
+        result = Monkey365ScanService.cancel_scan(db, result_id, user_id=uid, is_admin=adm)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
-    if result.status not in (Monkey365ScanStatus.RUNNING, Monkey365ScanStatus.AUTHENTICATING):
-        raise HTTPException(400, "Ce scan n'est pas en cours d'exécution")
-
-    Monkey365ScanService.kill_scan_process(result_id)
-
-    result.status = Monkey365ScanStatus.CANCELLED
-    result.completed_at = datetime.now(timezone.utc)
-    result.error_message = "Scan annulé manuellement"
-    db.flush()
-    db.refresh(result)
     return result
 
 
@@ -241,13 +223,6 @@ async def launch_monkey365_streaming_scan(
     Lance un scan Monkey365 en mode streaming avec Device Code Flow.
     """
     uid, adm = _rbac(current_user)
-    entreprise = db.get(Entreprise, request.entreprise_id)
-    if not entreprise:
-        raise HTTPException(404, "Ressource introuvable")
-
-    if not adm and not user_has_access_to_entreprise(db, request.entreprise_id, uid):
-        raise HTTPException(404, "Ressource introuvable")
-
     try:
         result = Monkey365ScanService.create_streaming_scan(
             db=db,
@@ -255,6 +230,8 @@ async def launch_monkey365_streaming_scan(
             tenant_id=request.tenant_id,
             auth_method=request.auth_method.value,
             config=request.config,
+            user_id=uid,
+            is_admin=adm,
         )
     except ValueError as e:
         raise HTTPException(404, str(e))

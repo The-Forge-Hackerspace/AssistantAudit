@@ -80,13 +80,11 @@ def get_instance(
     instance = ChecklistService.get_instance(
         db, instance_id, user_id=current_user.id, is_admin=current_user.role == "admin"
     )
-    from ...models.checklist import ChecklistTemplate
-
-    tpl = db.query(ChecklistTemplate).filter(ChecklistTemplate.id == instance.template_id).first()
+    tpl = ChecklistService.get_template(db, instance.template_id, eager=False)
     return ChecklistInstanceDetail(
         **ChecklistInstanceRead.model_validate(instance).model_dump(),
         responses=[ChecklistResponseRead.model_validate(r) for r in instance.responses],
-        template_name=tpl.name if tpl else "",
+        template_name=tpl.name,
     )
 
 
