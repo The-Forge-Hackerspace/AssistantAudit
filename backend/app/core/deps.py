@@ -89,7 +89,7 @@ async def get_current_agent(
     Dependance pour les routes agent.
     Verifie le token JWT agent et retourne l'objet Agent.
     """
-    from jose import JWTError
+    import jwt
 
     if token is None:
         raise HTTPException(
@@ -100,7 +100,7 @@ async def get_current_agent(
 
     try:
         payload = verify_agent_token(token)
-    except JWTError:
+    except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token agent invalide ou expire",

@@ -5,7 +5,7 @@ Tests pour POST /auth/refresh et validate_refresh_token.
 from datetime import timedelta
 
 import pytest
-from jose import JWTError
+import jwt
 
 from app.core.security import (
     create_access_token,
@@ -31,14 +31,14 @@ class TestValidateRefreshToken:
     def test_access_token_rejected(self, auditeur_user):
         """Un access token est refuse (mauvais type)."""
         token = create_access_token(subject=auditeur_user.id)
-        with pytest.raises(JWTError, match="refresh"):
+        with pytest.raises(jwt.PyJWTError, match="refresh"):
             validate_refresh_token(token)
 
     def test_expired_token_rejected(self, auditeur_user):
         """Un refresh token expire est refuse."""
         from datetime import datetime, timezone
 
-        from jose import jwt
+        import jwt
 
         from app.core.config import get_settings
 
@@ -49,13 +49,13 @@ class TestValidateRefreshToken:
             "exp": datetime.now(timezone.utc) - timedelta(hours=1),
             "iat": datetime.now(timezone.utc) - timedelta(hours=2),
         }
-        token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-        with pytest.raises(JWTError):
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+        with pytest.raises(jwt.PyJWTError):
             validate_refresh_token(token)
 
     def test_garbage_token_rejected(self):
         """Un token invalide est refuse."""
-        with pytest.raises(JWTError):
+        with pytest.raises(jwt.PyJWTError):
             validate_refresh_token("not.a.valid.token")
 
 

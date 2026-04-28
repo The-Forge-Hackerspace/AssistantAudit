@@ -87,10 +87,10 @@ class TestJWTTokens:
 
     def test_access_token_rejected_by_verify_agent(self):
         """Un token access ne doit PAS etre accepte comme agent."""
-        from jose import JWTError
+        import jwt
 
         token = create_access_token(subject=1)
-        with pytest.raises(JWTError, match="Invalid token type"):
+        with pytest.raises(jwt.PyJWTError, match="Invalid token type"):
             verify_agent_token(token)
 
     def test_access_token_extra_claims(self):

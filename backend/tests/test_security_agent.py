@@ -6,7 +6,7 @@ Verifie que les fonctions existantes (user tokens) ne sont pas cassees.
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from jose import JWTError
+import jwt
 
 from app.core.security import (
     # Existing functions — regression check
@@ -75,22 +75,22 @@ class TestAgentToken:
     def test_verify_wrong_type_raises(self):
         """Un token user ne passe pas verify_agent_token."""
         user_token = create_access_token(subject=1)
-        with pytest.raises(JWTError, match="agent"):
+        with pytest.raises(jwt.PyJWTError, match="agent"):
             verify_agent_token(user_token)
 
     def test_verify_refresh_token_wrong_type(self):
         """Un refresh token ne passe pas verify_agent_token."""
         refresh_token = create_refresh_token(subject=1)
-        with pytest.raises(JWTError, match="agent"):
+        with pytest.raises(jwt.PyJWTError, match="agent"):
             verify_agent_token(refresh_token)
 
     def test_verify_invalid_token_raises(self):
-        with pytest.raises(JWTError):
+        with pytest.raises(jwt.PyJWTError):
             verify_agent_token("not.a.valid.jwt")
 
     def test_verify_expired_token_raises(self):
         """Un token agent expire leve JWTError."""
-        from jose import jwt
+        import jwt
 
         from app.core.config import get_settings
 
@@ -103,8 +103,8 @@ class TestAgentToken:
             "exp": datetime.now(timezone.utc) - timedelta(hours=1),
             "iat": datetime.now(timezone.utc) - timedelta(days=31),
         }
-        expired_token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-        with pytest.raises(JWTError):
+        expired_token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+        with pytest.raises(jwt.PyJWTError):
             verify_agent_token(expired_token)
 
     def test_agent_token_not_decoded_by_user_flow(self):
@@ -210,7 +210,7 @@ class TestGetCurrentAgentDep:
     def test_user_token_rejected_as_agent(self):
         """A user access token must not pass verify_agent_token."""
         user_token = create_access_token(subject=1)
-        with pytest.raises(JWTError):
+        with pytest.raises(jwt.PyJWTError):
             verify_agent_token(user_token)
 
 

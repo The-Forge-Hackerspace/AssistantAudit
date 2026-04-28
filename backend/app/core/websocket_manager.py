@@ -84,11 +84,11 @@ class ConnectionManager:
         Authentifie et connecte un agent via JWT agent.
         Retourne agent_uuid si succes, None si auth echoue.
         """
-        from jose import JWTError
+        import jwt
 
         try:
             payload = verify_agent_token(token)
-        except JWTError:
+        except jwt.PyJWTError:
             await websocket.close(code=4001, reason="Invalid or expired agent token")
             return None
 

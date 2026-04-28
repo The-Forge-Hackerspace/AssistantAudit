@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
 
 from .config import get_settings
 
@@ -53,7 +53,7 @@ def create_access_token(
     if extra_claims:
         to_encode.update(extra_claims)
 
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
 
 
 def create_refresh_token(subject: str | int) -> str:
@@ -66,15 +66,15 @@ def create_refresh_token(subject: str | int) -> str:
         "iat": now,
         "type": "refresh",
     }
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
 
 
 def decode_token(token: str) -> Optional[dict]:
     """Decode et valide un token JWT"""
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         return payload
-    except JWTError:
+    except jwt.PyJWTError:
         return None
 
 
@@ -83,9 +83,9 @@ def validate_refresh_token(token: str) -> dict:
     Decode un JWT et verifie que c'est un refresh token.
     Retourne le payload ou raise JWTError si invalide/expire/mauvais type.
     """
-    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
     if payload.get("type") != "refresh":
-        raise JWTError("Type de token invalide : 'refresh' attendu")
+        raise jwt.PyJWTError("Type de token invalide : 'refresh' attendu")
     return payload
 
 
@@ -105,7 +105,7 @@ def create_agent_token(agent_uuid: str, owner_id: int) -> str:
         "exp": now + timedelta(days=30),
         "iat": now,
     }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
 def verify_agent_token(token: str) -> dict:
@@ -113,9 +113,9 @@ def verify_agent_token(token: str) -> dict:
     Verifie un token agent. Raise JWTError si invalide ou mauvais type.
     Retourne {"sub": agent_uuid, "owner_id": int, ...}.
     """
-    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
     if payload.get("type") != "agent":
-        raise JWTError("Invalid token type: expected 'agent'")
+        raise jwt.PyJWTError("Invalid token type: expected 'agent'")
     return payload
 
 
