@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy.orm import Session
-from app.core.errors import ForbiddenError, NotFoundError
 
+from app.core.errors import ForbiddenError, NotFoundError
 from app.models.agent import Agent
 from app.models.collect_result import CollectResult, CollectStatus
 from app.models.entreprise import Entreprise

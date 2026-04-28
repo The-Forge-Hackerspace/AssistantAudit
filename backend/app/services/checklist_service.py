@@ -2,9 +2,9 @@
 
 from datetime import datetime, timezone
 
-from ..core.errors import ConflictError, NotFoundError
 from sqlalchemy.orm import Session, joinedload
 
+from ..core.errors import ConflictError, NotFoundError
 from ..models.audit import Audit
 from ..models.checklist import (
     ChecklistInstance,

@@ -1,9 +1,9 @@
 """Service Finding — logique métier pour les non-conformités."""
 
-from ..core.errors import BusinessRuleError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..core.errors import BusinessRuleError
 from ..models.assessment import Assessment, AssessmentCampaign, ComplianceStatus, ControlResult
 from ..models.audit import Audit
 from ..models.finding import (

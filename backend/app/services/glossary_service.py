@@ -11,9 +11,9 @@ import re
 from pathlib import Path
 
 import yaml
-from ..core.errors import NotFoundError
 from sqlalchemy.orm import Session
 
+from ..core.errors import NotFoundError
 from ..models.assessment import AssessmentCampaign, ComplianceStatus
 from ..models.audit import Audit
 from ..schemas.glossary import Glossary, GlossaryEntry

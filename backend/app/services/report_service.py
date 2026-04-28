@@ -10,8 +10,8 @@ from fastapi import HTTPException
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.orm import Session
 from weasyprint import HTML
-from ..core.errors import NotFoundError
 
+from ..core.errors import NotFoundError
 from ..models.audit import Audit
 from ..models.entreprise import Entreprise
 from ..models.report import REPORT_SECTIONS, AuditReport, ReportSection

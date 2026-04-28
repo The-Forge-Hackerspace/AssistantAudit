@@ -4,9 +4,9 @@ Service Equipement : CRUD des assets d'infrastructure.
 Gere les sous-types STI (reseau, serveur, firewall) via polymorphisme.
 """
 
-from ..core.errors import ConflictError, NotFoundError
 from sqlalchemy.orm import Session
 
+from ..core.errors import ConflictError, NotFoundError
 from ..core.helpers import get_or_404, user_has_access_to_entreprise
 from ..models.audit import Audit
 from ..models.equipement import (

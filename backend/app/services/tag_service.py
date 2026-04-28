@@ -1,8 +1,8 @@
 """Service tags — CRUD, association, filtrage."""
 
-from ..core.errors import ConflictError, NotFoundError
 from sqlalchemy.orm import Session
 
+from ..core.errors import ConflictError, NotFoundError
 from ..models.audit import Audit
 from ..models.tag import Tag, TagAssociation
 from ..schemas.tag import TagCreate, TagUpdate

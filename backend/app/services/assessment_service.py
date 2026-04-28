@@ -8,9 +8,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from ..core.errors import NotFoundError
 from sqlalchemy.orm import Session, selectinload
 
+from ..core.errors import NotFoundError
 from ..core.helpers import get_or_404
 from ..models.assessment import (
     Assessment,

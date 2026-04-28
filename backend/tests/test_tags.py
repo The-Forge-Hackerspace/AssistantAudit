@@ -2,10 +2,10 @@
 
 import pytest
 
+from app.core.errors import ConflictError
 from app.models.tag import Tag, TagAssociation
 from app.schemas.tag import TagCreate
 from app.services.tag_service import TagService
-from app.core.errors import ConflictError
 
 
 class TestTagModel:

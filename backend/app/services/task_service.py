@@ -6,9 +6,9 @@ Implemente la double verification d'ownership pour l'isolation inter-techniciens
 import asyncio
 import logging
 
-from ..core.errors import ForbiddenError, NotFoundError
 from sqlalchemy.orm import Session
 
+from ..core.errors import ForbiddenError, NotFoundError
 from ..models.agent import Agent
 from ..models.agent_task import AgentTask
 from ..models.audit import Audit

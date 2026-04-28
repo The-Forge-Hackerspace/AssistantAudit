@@ -2,10 +2,10 @@
 Service NetworkMap : liens reseau, layouts, connexions inter-site, VLANs.
 """
 
-from ..core.errors import BusinessRuleError, ConflictError, NotFoundError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..core.errors import BusinessRuleError, ConflictError, NotFoundError
 from ..core.helpers import get_or_404, user_has_access_to_entreprise
 from ..models.entreprise import Entreprise
 from ..models.equipement import Equipement, VlanDefinition

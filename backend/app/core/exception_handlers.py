@@ -8,6 +8,7 @@ import logging
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
 from app.core.errors import AppError, BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 
 logger = logging.getLogger(__name__)

@@ -2,11 +2,11 @@
 Service Entreprise : CRUD pour les entreprises et contacts.
 """
 
-from ..core.errors import ConflictError, NotFoundError
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..core.audit_logger import log_access_denied
+from ..core.errors import ConflictError, NotFoundError
 from ..core.helpers import get_or_404, user_has_access_to_entreprise
 from ..models.audit import Audit
 from ..models.entreprise import Contact, Entreprise

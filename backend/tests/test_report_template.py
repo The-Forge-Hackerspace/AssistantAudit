@@ -2,9 +2,9 @@
 
 import pytest
 
+from app.core.errors import NotFoundError
 from app.schemas.report import AuditReportCreate
 from app.services.report_service import ReportService
-from app.core.errors import NotFoundError
 
 
 class TestReportService:

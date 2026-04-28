@@ -7,9 +7,9 @@ complete pour le rapport PDF (section recommendations) et la page web.
 import logging
 from collections import defaultdict
 
-from ..core.errors import NotFoundError
 from sqlalchemy.orm import Session
 
+from ..core.errors import NotFoundError
 from ..models.assessment import (
     AssessmentCampaign,
     ComplianceStatus,

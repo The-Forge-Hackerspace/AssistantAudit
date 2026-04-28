@@ -13,7 +13,6 @@ import logging
 from pathlib import Path
 from uuid import uuid4
 
-from ..core.errors import NotFoundError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
@@ -24,6 +23,8 @@ from app.models.audit import Audit
 from app.models.equipement import Equipement
 from app.models.site import Site
 from app.models.user import User
+
+from ..core.errors import NotFoundError
 
 logger = logging.getLogger(__name__)
 

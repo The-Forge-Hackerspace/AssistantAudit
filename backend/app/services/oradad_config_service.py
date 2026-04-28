@@ -4,9 +4,9 @@ Service OradadConfig : CRUD profils de configuration, taches ORADAD, analyse.
 
 import logging
 
-from ..core.errors import BusinessRuleError, NotFoundError
 from sqlalchemy.orm import Session
 
+from ..core.errors import BusinessRuleError, NotFoundError
 from ..models.agent_task import AgentTask
 from ..models.oradad_config import OradadConfig
 from .oradad_analysis_service import OradadAnalysisService

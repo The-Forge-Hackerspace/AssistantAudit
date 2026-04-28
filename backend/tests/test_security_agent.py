@@ -5,8 +5,8 @@ Verifie que les fonctions existantes (user tokens) ne sont pas cassees.
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
 import jwt
+import pytest
 
 from app.core.security import (
     # Existing functions — regression check

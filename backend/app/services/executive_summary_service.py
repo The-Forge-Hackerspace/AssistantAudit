@@ -8,9 +8,9 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 
-from ..core.errors import NotFoundError
 from sqlalchemy.orm import Session
 
+from ..core.errors import NotFoundError
 from ..models.assessment import (
     AssessmentCampaign,
     ComplianceStatus,

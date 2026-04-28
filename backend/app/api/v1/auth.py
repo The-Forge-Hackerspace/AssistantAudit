@@ -4,9 +4,9 @@ Routes d'authentification : login, register, refresh, profile.
 
 import logging
 
+import jwt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
-import jwt
 from sqlalchemy.orm import Session
 
 from ...core.config import get_settings

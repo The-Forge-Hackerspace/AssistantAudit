@@ -8,9 +8,9 @@ Aggrege les donnees de l'audit pour les annexes :
 
 import logging
 
-from ..core.errors import NotFoundError
 from sqlalchemy.orm import Session
 
+from ..core.errors import NotFoundError
 from ..models.assessment import (
     AssessmentCampaign,
     ComplianceStatus,
