@@ -6,6 +6,7 @@ from app.models.audit import Audit
 from app.models.checklist import ChecklistItem, ChecklistSection, ChecklistTemplate
 from app.schemas.checklist import ChecklistInstanceCreate, ChecklistResponseUpdate
 from app.services.checklist_service import ChecklistService
+from app.core.errors import ConflictError, NotFoundError
 
 
 @pytest.fixture
@@ -56,7 +57,7 @@ class TestChecklistServiceInstances:
         ChecklistService.create_instance(db_session, data, auditeur_user.id, False)
         with pytest.raises(Exception) as exc:
             ChecklistService.create_instance(db_session, data, auditeur_user.id, False)
-        assert exc.value.status_code == 409
+        assert isinstance(exc.value, ConflictError)
 
     def test_other_user_cannot_access_instance(self, db_session, second_auditeur_user, checklist_setup, auditeur_user):
         instance = ChecklistService.create_instance(
@@ -75,7 +76,7 @@ class TestChecklistServiceInstances:
                 user_id=second_auditeur_user.id,
                 is_admin=False,
             )
-        assert exc.value.status_code == 404
+        assert isinstance(exc.value, NotFoundError)
 
 
 class TestChecklistServiceResponses:

@@ -57,9 +57,11 @@ def app(db_session):
     # Import here to avoid loading at conftest import time
     from app.core.database import get_db
     from app.main import create_app
+    from app.core.exception_handlers import register_exception_handlers
 
     # Create app
     app = create_app()
+    register_exception_handlers(app)
 
     # Override dependencies
     app.dependency_overrides[get_db] = lambda: db_session
@@ -77,6 +79,7 @@ def client(db_session):
     from app.core.database import get_db
     from app.core.task_runner import SyncTaskRunner, set_task_runner
     from app.main import create_app
+    from app.core.exception_handlers import register_exception_handlers
 
     # Use synchronous task runner in tests so background tasks
     # complete before assertions run.
@@ -84,6 +87,7 @@ def client(db_session):
 
     # Create app
     app = create_app()
+    register_exception_handlers(app)
     app.dependency_overrides[get_db] = lambda: db_session
 
     # Return test client

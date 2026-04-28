@@ -20,7 +20,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from fastapi import HTTPException
+from app.core.errors import NotFoundError
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token
@@ -149,7 +149,7 @@ class TestFileServiceUpload:
         assert blob_path.exists()
 
     def test_upload_no_ownership_returns_404(self, db_session, full_chain, file_service, tmp_blobs_dir):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(NotFoundError) as exc_info:
             file_service.upload_file(
                 db=db_session,
                 content=b"data",
@@ -158,10 +158,10 @@ class TestFileServiceUpload:
                 control_result_id=full_chain["control_result"].id,
                 user_id=full_chain["other_user"].id,
             )
-        assert exc_info.value.status_code == 404
+        assert isinstance(exc_info.value, NotFoundError)
 
     def test_upload_nonexistent_control_result_returns_404(self, db_session, full_chain, file_service, tmp_blobs_dir):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(NotFoundError) as exc_info:
             file_service.upload_file(
                 db=db_session,
                 content=b"data",
@@ -170,7 +170,7 @@ class TestFileServiceUpload:
                 control_result_id=99999,
                 user_id=full_chain["owner"].id,
             )
-        assert exc_info.value.status_code == 404
+        assert isinstance(exc_info.value, NotFoundError)
 
     def test_upload_with_description(self, db_session, full_chain, file_service, tmp_blobs_dir):
         attachment = file_service.upload_file(
@@ -270,13 +270,13 @@ class TestFileServiceDownload:
         )
         db_session.commit()
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(NotFoundError) as exc_info:
             file_service.download_file(
                 db=db_session,
                 attachment_id=attachment.id,
                 user_id=full_chain["other_user"].id,
             )
-        assert exc_info.value.status_code == 404
+        assert isinstance(exc_info.value, NotFoundError)
 
     def test_download_legacy_file_without_dek(self, db_session, full_chain, tmp_blobs_dir, file_service):
         """Test backward compat : fichier ancien sans encrypted_dek."""
@@ -321,13 +321,13 @@ class TestFileServiceDownload:
         assert filename == "old_file.txt"
 
     def test_download_nonexistent_attachment_returns_404(self, db_session, full_chain, file_service, tmp_blobs_dir):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(NotFoundError) as exc_info:
             file_service.download_file(
                 db=db_session,
                 attachment_id=99999,
                 user_id=full_chain["owner"].id,
             )
-        assert exc_info.value.status_code == 404
+        assert isinstance(exc_info.value, NotFoundError)
 
 
 class TestFileServiceDelete:
@@ -373,13 +373,13 @@ class TestFileServiceDelete:
         )
         db_session.commit()
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(NotFoundError) as exc_info:
             file_service.delete_file(
                 db=db_session,
                 attachment_id=attachment.id,
                 user_id=full_chain["other_user"].id,
             )
-        assert exc_info.value.status_code == 404
+        assert isinstance(exc_info.value, NotFoundError)
 
 
 class TestFileServiceLargeFile:
