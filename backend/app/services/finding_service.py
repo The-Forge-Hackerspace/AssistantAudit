@@ -76,6 +76,7 @@ class FindingService:
             generated += 1
 
         db.flush()
+        db.commit()
         return generated, skipped
 
     @staticmethod
@@ -178,6 +179,7 @@ class FindingService:
             finding.assigned_to = assigned_to
 
         db.flush()
+        db.commit()
         db.refresh(finding)
         return finding
 
@@ -205,6 +207,7 @@ class FindingService:
             finding.remediation_note = original.remediation_note
 
         db.flush()
+        db.commit()
         db.refresh(finding)
         return finding
 

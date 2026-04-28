@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from ...core.database import get_db
 from ...core.deps import PaginationParams, get_current_admin
-from ...core.security import hash_password
 from ...models.user import User
 from ...schemas.common import PaginatedResponse
 from ...schemas.user import UserCreate, UserRead, UserUpdate
@@ -41,13 +40,11 @@ def create_user(
     current_user: User = Depends(get_current_admin),
 ):
     """Crée un nouvel utilisateur (admin uniquement)."""
-    # Vérifier unicité username
-    existing = db.query(User).filter(User.username == body.username).first()
+    existing = AuthService.find_by_username(db, body.username)
     if existing:
         raise HTTPException(status_code=400, detail="Ce nom d'utilisateur est déjà pris")
 
-    # Vérifier unicité email
-    existing = db.query(User).filter(User.email == body.email).first()
+    existing = AuthService.find_by_email(db, body.email)
     if existing:
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
 
@@ -70,28 +67,24 @@ def update_user(
     current_user: User = Depends(get_current_admin),
 ):
     """Modifie un utilisateur (admin uniquement)."""
-    user = db.get(User, user_id)
+    user = AuthService.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
 
     if body.email is not None:
-        existing = db.query(User).filter(User.email == body.email, User.id != user_id).first()
+        existing = AuthService.find_by_email(db, body.email, exclude_id=user_id)
         if existing:
             raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
 
-    if body.email is not None:
-        user.email = body.email
-    if body.full_name is not None:
-        user.full_name = body.full_name
-    if body.role is not None:
-        user.role = body.role
-    if body.is_active is not None:
-        user.is_active = body.is_active
-    if body.password is not None:
-        user.password_hash = hash_password(body.password)
-
-    db.flush()
-    db.refresh(user)
+    user = AuthService.apply_user_updates(
+        db,
+        user,
+        email=body.email,
+        full_name=body.full_name,
+        role=body.role,
+        is_active=body.is_active,
+        password=body.password,
+    )
     return user
 
 
@@ -105,9 +98,9 @@ def delete_user(
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Vous ne pouvez pas vous désactiver vous-même")
 
-    user = db.get(User, user_id)
+    user = AuthService.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
 
-    user.is_active = False
+    AuthService.deactivate_user(db, user)
     return {"message": f"Utilisateur '{user.username}' désactivé"}

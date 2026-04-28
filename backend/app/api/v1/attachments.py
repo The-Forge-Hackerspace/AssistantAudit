@@ -14,42 +14,19 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from ...core.config import get_settings
 from ...core.database import get_db
 from ...core.deps import get_current_auditeur, get_current_user
-from ...models.assessment import Assessment, AssessmentCampaign, ControlResult
+from ...models.assessment import Assessment
 from ...models.attachment import Attachment
-from ...models.audit import Audit
-from ...models.equipement import Equipement
-from ...models.site import Site
 from ...models.user import User
 from ...schemas.attachment import AttachmentRead
+from ...services.file_service import FileService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-def _get_attachment_with_ownership(db: Session, attachment_id: int, user: User) -> Attachment:
-    """
-    Recupere un Attachment avec verification d'ownership via la chaine :
-    Attachment -> ControlResult -> Assessment -> Campaign -> Audit -> owner_id.
-    Admins voient tout. Retourne 404 (pas 403) si non trouve.
-    """
-    query = db.query(Attachment).filter(Attachment.id == attachment_id)
-    if user.role != "admin":
-        query = (
-            query.join(ControlResult, Attachment.control_result_id == ControlResult.id)
-            .join(Assessment, ControlResult.assessment_id == Assessment.id)
-            .join(AssessmentCampaign, Assessment.campaign_id == AssessmentCampaign.id)
-            .join(Audit, AssessmentCampaign.audit_id == Audit.id)
-            .filter(Audit.owner_id == user.id)
-        )
-    att = query.first()
-    if att is None:
-        raise HTTPException(status_code=404, detail="Piece jointe introuvable")
-    return att
 
 
 # Extensions autorisées
@@ -114,19 +91,12 @@ def _sanitize_dirname(name: str) -> str:
     return safe or "unknown"
 
 
-def _build_storage_path(db: Session, control_result: ControlResult) -> Path:
+def _build_storage_path(assessment: Assessment) -> Path:
     """
     Construit le chemin de stockage :
       data/{entreprise_nom}/{site_nom}/{equipement_id}/
-    en suivant la chaîne : ControlResult → Assessment → Equipement → Site → Entreprise
+    en suivant la chaîne : Assessment → Equipement → Site → Entreprise
     """
-    # Charger la chaîne complète avec joinedload pour éviter les lazy-load issues
-    assessment = (
-        db.query(Assessment)
-        .options(joinedload(Assessment.equipement).joinedload(Equipement.site).joinedload(Site.entreprise))
-        .filter(Assessment.id == control_result.assessment_id)
-        .first()
-    )
     if not assessment or not assessment.equipement:
         raise HTTPException(status_code=500, detail="Impossible de résoudre le chemin de stockage")
 
@@ -185,7 +155,7 @@ def upload_attachment(
     max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
     # Vérifier que le control result existe
-    cr = db.query(ControlResult).filter(ControlResult.id == result_id).first()
+    cr = FileService.get_control_result(db, result_id)
     if not cr:
         raise HTTPException(status_code=404, detail="Résultat de contrôle introuvable")
 
@@ -215,7 +185,8 @@ def upload_attachment(
     content = b"".join(chunks)
 
     # Construire le chemin de stockage
-    storage_dir = _build_storage_path(db, cr)
+    assessment = FileService.get_assessment_with_hierarchy(db, cr.assessment_id)
+    storage_dir = _build_storage_path(assessment)
     storage_dir.mkdir(parents=True, exist_ok=True)
 
     # Nom unique pour éviter les conflits
@@ -242,9 +213,7 @@ def upload_attachment(
         description=description,
         uploaded_by=current_user.username,
     )
-    db.add(attachment)
-    db.flush()
-    db.refresh(attachment)
+    attachment = FileService.save_attachment(db, attachment)
 
     logger.info(f"Attachment uploaded: {original_name} ({len(content)} bytes) → {rel_path} by {current_user.username}")
 
@@ -264,20 +233,11 @@ def list_attachments(
     current_user: User = Depends(get_current_user),
 ):
     """Liste les pièces jointes d'un résultat de contrôle."""
-    cr = db.query(ControlResult).filter(ControlResult.id == result_id).first()
+    cr = FileService.get_control_result(db, result_id)
     if not cr:
         raise HTTPException(status_code=404, detail="Résultat de contrôle introuvable")
 
-    query = db.query(Attachment).filter(Attachment.control_result_id == result_id)
-    if current_user.role != "admin":
-        query = (
-            query.join(ControlResult, Attachment.control_result_id == ControlResult.id)
-            .join(Assessment, ControlResult.assessment_id == Assessment.id)
-            .join(AssessmentCampaign, Assessment.campaign_id == AssessmentCampaign.id)
-            .join(Audit, AssessmentCampaign.audit_id == Audit.id)
-            .filter(Audit.owner_id == current_user.id)
-        )
-    attachments = query.order_by(Attachment.uploaded_at.desc()).all()
+    attachments = FileService.list_attachments_for_result(db, result_id, current_user)
     return [_attachment_to_read(a) for a in attachments]
 
 
@@ -291,7 +251,7 @@ def download_attachment(
     current_user: User = Depends(get_current_user),
 ):
     """Telecharge un fichier joint (avec verification d'ownership)."""
-    att = _get_attachment_with_ownership(db, attachment_id, current_user)
+    att = FileService.get_attachment_for_user(db, attachment_id, current_user)
 
     settings = get_settings()
     base_data = Path(settings.FRAMEWORKS_DIR).parent / "data"
@@ -321,7 +281,7 @@ def preview_attachment(
     current_user: User = Depends(get_current_user),
 ):
     """Previsualise un fichier (image ou texte) inline dans le navigateur."""
-    att = _get_attachment_with_ownership(db, attachment_id, current_user)
+    att = FileService.get_attachment_for_user(db, attachment_id, current_user)
 
     if att.mime_type not in PREVIEWABLE_IMAGE_TYPES and att.mime_type not in PREVIEWABLE_TEXT_TYPES:
         raise HTTPException(
@@ -358,7 +318,7 @@ def delete_attachment(
     current_user: User = Depends(get_current_auditeur),
 ):
     """Supprime une piece jointe (fichier + entree BDD) avec verification d'ownership."""
-    att = _get_attachment_with_ownership(db, attachment_id, current_user)
+    att = FileService.get_attachment_for_user(db, attachment_id, current_user)
 
     # Supprimer le fichier physique
     settings = get_settings()
@@ -383,5 +343,5 @@ def delete_attachment(
                 break
 
     # Supprimer de la base
-    db.delete(att)
+    FileService.delete_attachment_record(db, att)
     logger.info(f"Attachment record deleted: id={attachment_id} ({att.original_filename})")

@@ -14,13 +14,16 @@ from pathlib import Path
 from uuid import uuid4
 
 from ..core.errors import NotFoundError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
 from app.core.file_encryption import EnvelopeEncryption
 from app.models.assessment import Assessment, AssessmentCampaign, ControlResult
 from app.models.attachment import Attachment
 from app.models.audit import Audit
+from app.models.equipement import Equipement
+from app.models.site import Site
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -210,3 +213,70 @@ class FileService:
         db.delete(attachment)
         db.flush()
         logger.info("Attachment supprime: id=%d (%s)", attachment_id, attachment.original_filename)
+
+    @staticmethod
+    def get_control_result(db: Session, result_id: int) -> ControlResult | None:
+        """Récupère un ControlResult par ID."""
+        return db.query(ControlResult).filter(ControlResult.id == result_id).first()
+
+    @staticmethod
+    def get_assessment_with_hierarchy(db: Session, assessment_id: int) -> Assessment | None:
+        """Récupère un Assessment avec équipement → site → entreprise chargés."""
+        return (
+            db.query(Assessment)
+            .options(
+                joinedload(Assessment.equipement)
+                .joinedload(Equipement.site)
+                .joinedload(Site.entreprise)
+            )
+            .filter(Assessment.id == assessment_id)
+            .first()
+        )
+
+    @staticmethod
+    def get_attachment_for_user(db: Session, attachment_id: int, user: User) -> Attachment:
+        """
+        Récupère un Attachment avec vérification d'ownership admin-aware.
+        Admins voient tout. Lève NotFoundError si introuvable.
+        """
+        query = db.query(Attachment).filter(Attachment.id == attachment_id)
+        if user.role != "admin":
+            query = (
+                query.join(ControlResult, Attachment.control_result_id == ControlResult.id)
+                .join(Assessment, ControlResult.assessment_id == Assessment.id)
+                .join(AssessmentCampaign, Assessment.campaign_id == AssessmentCampaign.id)
+                .join(Audit, AssessmentCampaign.audit_id == Audit.id)
+                .filter(Audit.owner_id == user.id)
+            )
+        att = query.first()
+        if att is None:
+            raise NotFoundError("Pièce jointe introuvable")
+        return att
+
+    @staticmethod
+    def list_attachments_for_result(db: Session, result_id: int, user: User) -> list[Attachment]:
+        """Liste les pièces jointes d'un ControlResult avec RBAC admin-aware."""
+        query = db.query(Attachment).filter(Attachment.control_result_id == result_id)
+        if user.role != "admin":
+            query = (
+                query.join(ControlResult, Attachment.control_result_id == ControlResult.id)
+                .join(Assessment, ControlResult.assessment_id == Assessment.id)
+                .join(AssessmentCampaign, Assessment.campaign_id == AssessmentCampaign.id)
+                .join(Audit, AssessmentCampaign.audit_id == Audit.id)
+                .filter(Audit.owner_id == user.id)
+            )
+        return query.order_by(Attachment.uploaded_at.desc()).all()
+
+    @staticmethod
+    def save_attachment(db: Session, attachment: Attachment) -> Attachment:
+        """Persiste un Attachment en base."""
+        db.add(attachment)
+        db.flush()
+        db.refresh(attachment)
+        return attachment
+
+    @staticmethod
+    def delete_attachment_record(db: Session, attachment: Attachment) -> None:
+        """Supprime un Attachment de la base."""
+        db.delete(attachment)
+        db.flush()
