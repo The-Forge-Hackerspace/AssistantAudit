@@ -11,10 +11,7 @@ const PASSWORD = process.env.PLAYWRIGHT_ADMIN_PASSWORD!;
 
 test.describe.configure({ mode: 'serial' });
 
-// BUG frontend : voir smoke-public.spec.ts. Le login UI ne peut pas être
-// testé tant que /login reste bloqué sur spinner sans cookies. Réactiver
-// après fix de la boucle /auth/refresh côté api-client.
-test.skip('login UI happy path : redirige hors de /login', async ({ browser, baseURL }) => {
+test('login UI happy path : redirige hors de /login', async ({ browser, baseURL }) => {
   const ctx = await browser.newContext({
     baseURL,
     ignoreHTTPSErrors: true,

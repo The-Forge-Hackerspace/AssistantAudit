@@ -10,11 +10,7 @@ test('GET /api/v1/health répond 200', async ({ request }) => {
   expect(body.status).toBe('healthy');
 });
 
-// BUG frontend : sans cookies, la première visite à /login reste bloquée sur
-// le spinner de l'AuthGuard (boucle /auth/me 401 → /auth/refresh 401 →
-// window.location.href='/login' dans api-client.ts → reload). À fixer dans
-// le frontend (court-circuiter le refresh sur la route publique /login).
-test.skip('/login accessible sans cookies', async ({ browser, baseURL }) => {
+test('/login accessible sans cookies', async ({ browser, baseURL }) => {
   const ctx = await browser.newContext({
     baseURL,
     ignoreHTTPSErrors: true,
