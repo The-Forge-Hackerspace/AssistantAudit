@@ -6,9 +6,9 @@ non-conformites sont incluses ; le client ajustera ensuite selon ses contraintes
 
 import logging
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from ..core.errors import NotFoundError
 from ..models.assessment import (
     AssessmentCampaign,
     ComplianceStatus,
@@ -56,9 +56,9 @@ class RemediationPlanService:
     ) -> Audit:
         audit = db.query(Audit).filter(Audit.id == audit_id).first()
         if not audit:
-            raise HTTPException(status_code=404, detail="Audit non trouve")
+            raise NotFoundError("Audit non trouve")
         if not is_admin and audit.owner_id != user_id:
-            raise HTTPException(status_code=404, detail="Audit non trouve")
+            raise NotFoundError("Audit non trouve")
         return audit
 
     @staticmethod

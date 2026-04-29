@@ -2,6 +2,7 @@
 
 import pytest
 
+from app.core.errors import NotFoundError
 from app.schemas.report import AuditReportCreate
 from app.services.report_service import ReportService
 
@@ -78,7 +79,7 @@ class TestReportService:
                 user_id=second_auditeur_user.id,
                 is_admin=False,
             )
-        assert exc.value.status_code == 404
+        assert isinstance(exc.value, NotFoundError)
 
     def test_excluded_section_not_in_html(self, db_session, auditeur_user):
         """Une section exclue n'apparaît pas dans le HTML."""

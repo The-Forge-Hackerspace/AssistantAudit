@@ -11,7 +11,7 @@ from ....schemas.scan import CollectCreate, CollectResultRead, CollectResultSumm
 from ....services.collect_service import (
     create_pending_collect,
     delete_collect_result,
-    dispatch_collect_to_agent,
+    dispatch_collect_and_commit,
     get_collect_result,
     list_collect_results,
     prefill_assessment_from_collect,
@@ -52,7 +52,7 @@ def launch_collect(
         raise HTTPException(404, str(e))
 
     try:
-        task = dispatch_collect_to_agent(
+        task = dispatch_collect_and_commit(
             db=db,
             collect_id=collect.id,
             agent_uuid=params.agent_uuid,
@@ -63,12 +63,9 @@ def launch_collect(
             use_ssl=params.use_ssl,
             transport=params.transport,
         )
-        db.commit()
     except PermissionError as e:
-        db.rollback()
         raise HTTPException(403, str(e))
     except ValueError as e:
-        db.rollback()
         raise HTTPException(400, str(e))
 
     from ....services.task_service import notify_agent_new_task

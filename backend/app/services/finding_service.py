@@ -1,9 +1,9 @@
 """Service Finding — logique métier pour les non-conformités."""
 
-from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..core.errors import BusinessRuleError
 from ..models.assessment import Assessment, AssessmentCampaign, ComplianceStatus, ControlResult
 from ..models.audit import Audit
 from ..models.finding import (
@@ -76,6 +76,7 @@ class FindingService:
             generated += 1
 
         db.flush()
+        db.commit()
         return generated, skipped
 
     @staticmethod
@@ -127,11 +128,7 @@ class FindingService:
             try:
                 parsed_status = FindingStatus(status)
             except ValueError:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Statut invalide : '{status}'. "
-                    f"Valeurs acceptées : {', '.join(s.value for s in FindingStatus)}",
-                )
+                raise BusinessRuleError(f"Statut invalide : '{status}'. Valeurs acceptées : {', '.join(s.value for s in FindingStatus)}")
             query = query.where(Finding.status == parsed_status)
             count_query = count_query.where(Finding.status == parsed_status)
         if severity is not None:
@@ -182,6 +179,7 @@ class FindingService:
             finding.assigned_to = assigned_to
 
         db.flush()
+        db.commit()
         db.refresh(finding)
         return finding
 
@@ -209,6 +207,7 @@ class FindingService:
             finding.remediation_note = original.remediation_note
 
         db.flush()
+        db.commit()
         db.refresh(finding)
         return finding
 

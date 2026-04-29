@@ -56,10 +56,12 @@ def app(db_session):
     """Create FastAPI application with test database - lazy loaded"""
     # Import here to avoid loading at conftest import time
     from app.core.database import get_db
+    from app.core.exception_handlers import register_exception_handlers
     from app.main import create_app
 
     # Create app
     app = create_app()
+    register_exception_handlers(app)
 
     # Override dependencies
     app.dependency_overrides[get_db] = lambda: db_session
@@ -75,6 +77,7 @@ def client(db_session):
     """Provide FastAPI TestClient - lazy loads app"""
     # Import here to avoid loading at conftest import time
     from app.core.database import get_db
+    from app.core.exception_handlers import register_exception_handlers
     from app.core.task_runner import SyncTaskRunner, set_task_runner
     from app.main import create_app
 
@@ -84,6 +87,7 @@ def client(db_session):
 
     # Create app
     app = create_app()
+    register_exception_handlers(app)
     app.dependency_overrides[get_db] = lambda: db_session
 
     # Return test client

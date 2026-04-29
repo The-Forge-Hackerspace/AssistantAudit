@@ -4,9 +4,9 @@ Routes d'authentification : login, register, refresh, profile.
 
 import logging
 
+import jwt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
-from jose import JWTError
 from sqlalchemy.orm import Session
 
 from ...core.config import get_settings
@@ -144,14 +144,14 @@ def refresh(
 
     try:
         payload = validate_refresh_token(refresh_token)
-    except JWTError:
+    except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token invalide ou expire",
         )
 
     user_id = payload.get("sub")
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    user = AuthService.get_user_by_id(db, int(user_id))
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -171,7 +171,7 @@ def register(
     admin: User = Depends(get_current_admin),
 ):
     """Créer un nouvel utilisateur (admin seulement)"""
-    existing = db.query(User).filter((User.username == body.username) | (User.email == body.email)).first()
+    existing = AuthService.find_user_by_username_or_email(db, body.username, body.email)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

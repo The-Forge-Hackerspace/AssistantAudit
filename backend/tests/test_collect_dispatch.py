@@ -11,9 +11,9 @@ Couvre :
 from __future__ import annotations
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.errors import ForbiddenError, NotFoundError
 from app.models.agent import Agent
 from app.models.collect_result import CollectResult, CollectStatus
 from app.models.entreprise import Entreprise
@@ -197,28 +197,28 @@ class TestDispatchCollectToAgent:
     ):
         collect = _pending_collect(db_session, equipement.id, method="ssh")
 
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(NotFoundError) as exc:
             collect_service.dispatch_collect_to_agent(
                 db=db_session,
                 collect_id=collect.id,
                 agent_uuid=foreign_agent.agent_uuid,
                 current_user_id=auditeur_user.id,
             )
-        assert exc.value.status_code == 404
+        assert isinstance(exc.value, NotFoundError)
 
     def test_dispatch_rejects_when_tool_not_allowed(
         self, db_session, auditeur_user, agent_no_collect, equipement
     ):
         collect = _pending_collect(db_session, equipement.id, method="ssh")
 
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(ForbiddenError) as exc:
             collect_service.dispatch_collect_to_agent(
                 db=db_session,
                 collect_id=collect.id,
                 agent_uuid=agent_no_collect.agent_uuid,
                 current_user_id=auditeur_user.id,
             )
-        assert exc.value.status_code == 403
+        assert isinstance(exc.value, ForbiddenError)
 
 
 # ── hydrate_collect_from_agent_result ───────────────────────────────────

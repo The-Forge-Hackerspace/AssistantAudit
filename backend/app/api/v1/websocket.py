@@ -11,6 +11,7 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ...core.websocket_manager import ws_manager
+from ...services.agent_service import AgentService
 
 logger = logging.getLogger(__name__)
 
@@ -92,32 +93,10 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
     # owner_id de confiance : extrait du JWT a la connexion, pas du message client
     trusted_owner_id = ws_manager.get_agent_owner(agent_uuid)
 
-    # Pour les updates en base (heartbeat last_seen + task status)
-    from datetime import datetime, timezone
-
-    from ...core.database import SessionLocal
-    from ...models.agent import Agent
-    from ...models.agent_task import AgentTask
-
     # Resoudre agent.id depuis agent_uuid pour les checks d'ownership sur les taches.
     # Restaurer le status "active" si l'agent avait ete marque "offline" par le sweeper
     # (cas d'une reconnexion apres un timeout reseau).
-    trusted_agent_id: int | None = None
-    try:
-        db = SessionLocal()
-        _agent = db.query(Agent).filter(Agent.agent_uuid == agent_uuid).first()
-        if _agent:
-            trusted_agent_id = _agent.id
-            if _agent.status == "offline":
-                _agent.status = "active"
-                _agent.last_seen = datetime.now(timezone.utc)
-                db.commit()
-                logger.info("Agent %s reconnected — session restored (offline → active)", agent_log_id)
-    except Exception:
-        logger.exception("Failed to resolve agent_id for %s", agent_log_id)
-    finally:
-        db.close()
-
+    trusted_agent_id = AgentService.ws_resolve_and_activate(agent_uuid)
     if trusted_agent_id is None:
         logger.warning("Agent %s not found in DB, closing WS", agent_log_id)
         await websocket.close(code=4001, reason="Agent not found")
@@ -132,101 +111,23 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
 
             if msg_type == "heartbeat":
                 await websocket.send_json({"type": "heartbeat_ack", "data": {}})
-                # Mettre a jour last_seen en base
-                try:
-                    db = SessionLocal()
-                    agent = db.query(Agent).filter(Agent.agent_uuid == agent_uuid).first()
-                    if agent:
-                        agent.last_seen = datetime.now(timezone.utc)
-                        hb_data = data.get("data", {})
-                        if hb_data.get("agent_version"):
-                            agent.agent_version = hb_data["agent_version"]
-                        if hb_data.get("os_info"):
-                            agent.os_info = hb_data["os_info"]
-                        client_host = websocket.client.host if websocket.client else None
-                        if client_host:
-                            agent.last_ip = client_host
-                        db.commit()
-                except Exception:
-                    logger.exception("Failed to update last_seen for agent %s", agent_log_id)
-                finally:
-                    db.close()
+                # Mettre a jour last_seen + metadonnees en base
+                client_host = websocket.client.host if websocket.client else None
+                AgentService.ws_record_heartbeat(
+                    agent_uuid, data.get("data", {}), client_host
+                )
 
             elif msg_type in ("task_status", "task_progress"):
                 ws_data = data.get("data", {})
                 # Persister le changement de status ou la progression en base
                 if ws_data.get("task_uuid"):
-                    try:
-                        db = SessionLocal()
-                        task = (
-                            db.query(AgentTask)
-                            .filter(
-                                AgentTask.task_uuid == ws_data["task_uuid"],
-                                AgentTask.agent_id == trusted_agent_id,
-                            )
-                            .first()
-                        )
-                        if not task:
-                            logger.warning(
-                                "Agent %s attempted %s on task %s — not owned or not found",
-                                agent_log_id,
-                                msg_type,
-                                ws_data["task_uuid"],
-                            )
-                        if task:
-                            if msg_type == "task_status":
-                                new_status = ws_data.get("status")
-                                if new_status:
-                                    task.status = new_status
-                                if new_status == "running" and task.started_at is None:
-                                    task.started_at = datetime.now(timezone.utc)
-                                if new_status in ("completed", "failed", "cancelled"):
-                                    task.completed_at = datetime.now(timezone.utc)
-                                    if new_status == "completed":
-                                        task.progress = 100
-                                if ws_data.get("error_message"):
-                                    task.error_message = ws_data["error_message"]
-                                # Sur echec d'une collecte SSH/WinRM, l'agent envoie
-                                # uniquement task_status (sans task_result). Hydrater la
-                                # CollectResult liee pour ne pas la laisser en RUNNING.
-                                if new_status in ("failed", "cancelled") and task.tool in (
-                                    "ssh-collect",
-                                    "winrm-collect",
-                                ):
-                                    from ...models.collect_result import CollectResult
-                                    from ...services import collect_service
-
-                                    collect = (
-                                        db.query(CollectResult)
-                                        .filter(CollectResult.agent_task_id == task.id)
-                                        .first()
-                                    )
-                                    if collect is not None:
-                                        collect_service.hydrate_collect_from_agent_result(
-                                            db,
-                                            collect,
-                                            None,
-                                            ws_data.get("error_message")
-                                            or f"Tache agent {new_status}",
-                                        )
-                            else:  # task_progress
-                                from ...services.scan_progress import compute_progress
-
-                                pct = ws_data.get("progress")
-                                if pct is None:
-                                    pct = ws_data.get("percent")
-                                raw_pct = int(pct) if isinstance(pct, (int, float)) else None
-                                lines = ws_data.get("output_lines") or []
-                                # Recalcul hybride (phase + hôtes + monotone)
-                                new_pct = compute_progress(task.task_uuid, lines, raw_pct)
-                                task.progress = new_pct
-                                # On réinjecte le pct corrigé dans le message forwardé au front
-                                ws_data["progress"] = new_pct
-                            db.commit()
-                    except Exception:
-                        logger.exception("Failed to persist %s for %s", msg_type, ws_data.get("task_uuid"))
-                    finally:
-                        db.close()
+                    AgentService.ws_persist_task_status_or_progress(
+                        msg_type,
+                        ws_data["task_uuid"],
+                        trusted_agent_id,
+                        agent_uuid,
+                        ws_data,
+                    )
                 # Forward vers le owner
                 if trusted_owner_id is not None:
                     await ws_manager.send_to_user(trusted_owner_id, msg_type, ws_data)
@@ -235,55 +136,12 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
                 ws_data = data.get("data", {})
                 # Persister le result en base
                 if ws_data.get("task_uuid"):
-                    try:
-                        db = SessionLocal()
-                        task = (
-                            db.query(AgentTask)
-                            .filter(
-                                AgentTask.task_uuid == ws_data["task_uuid"],
-                                AgentTask.agent_id == trusted_agent_id,
-                            )
-                            .first()
-                        )
-                        if not task:
-                            logger.warning(
-                                "Agent %s attempted task_result on task %s — not owned or not found",
-                                agent_log_id,
-                                ws_data["task_uuid"],
-                            )
-                        if task:
-                            task.status = "completed"
-                            task.progress = 100
-                            task.completed_at = datetime.now(timezone.utc)
-                            if ws_data.get("result_summary"):
-                                task.result_summary = ws_data["result_summary"]
-                            if ws_data.get("error_message"):
-                                task.error_message = ws_data["error_message"]
-                                task.status = "failed"
-                            # Hydrater le CollectResult lie a cette tache si c'est une collecte agent
-                            if task.tool in ("ssh-collect", "winrm-collect"):
-                                from ...models.collect_result import CollectResult
-                                from ...services import collect_service
-                                collect = (
-                                    db.query(CollectResult)
-                                    .filter(CollectResult.agent_task_id == task.id)
-                                    .first()
-                                )
-                                if collect is not None:
-                                    collect_service.hydrate_collect_from_agent_result(
-                                        db,
-                                        collect,
-                                        ws_data.get("result_summary"),
-                                        ws_data.get("error_message"),
-                                    )
-                            db.commit()
-                            from ...services.scan_progress import reset_task
-
-                            reset_task(task.task_uuid)
-                    except Exception:
-                        logger.exception("Failed to persist task_result for %s", ws_data.get("task_uuid"))
-                    finally:
-                        db.close()
+                    AgentService.ws_persist_task_result(
+                        ws_data["task_uuid"],
+                        trusted_agent_id,
+                        agent_uuid,
+                        ws_data,
+                    )
                 if trusted_owner_id is not None:
                     await ws_manager.send_to_user(trusted_owner_id, "task_result", ws_data)
 
@@ -296,31 +154,11 @@ async def ws_agent(websocket: WebSocket, token: str = ""):
 
 async def _handle_agent_disconnect(agent_uuid: str, owner_id: int | None) -> None:
     """Nettoie a la deconnexion : marque les taches running comme failed."""
-    agent_log_id = hashlib.sha256(agent_uuid.encode("utf-8")).hexdigest()[:12]
-
-    from ...core.database import SessionLocal
-    from ...models.agent import Agent
-    from ...services.agent_service import AgentService
-
     ws_manager.disconnect_agent(agent_uuid)
 
-    reason = "Agent deconnecte pendant l'execution"
-    events: list[dict] = []
-    try:
-        db = SessionLocal()
-        agent = db.query(Agent).filter(Agent.agent_uuid == agent_uuid).first()
-        if not agent:
-            return
-
-        events = AgentService.mark_agent_offline_and_fail_tasks(db, agent, reason)
-        db.commit()
-
-        for ev in events:
-            logger.warning("Orphan task marked failed: %s (agent %s)", ev["task_uuid"], agent_log_id)
-    except Exception:
-        logger.exception("Failed to handle orphan tasks for agent %s", agent_log_id)
-    finally:
-        db.close()
+    events = AgentService.ws_handle_disconnect(
+        agent_uuid, "Agent deconnecte pendant l'execution"
+    )
 
     # Notifier le frontend hors du bloc DB
     if owner_id is not None:

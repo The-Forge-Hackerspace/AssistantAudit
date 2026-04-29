@@ -1,8 +1,8 @@
 """Service tags — CRUD, association, filtrage."""
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from ..core.errors import ConflictError, NotFoundError
 from ..models.audit import Audit
 from ..models.tag import Tag, TagAssociation
 from ..schemas.tag import TagCreate, TagUpdate
@@ -30,7 +30,7 @@ class TagService:
             if not is_admin:
                 audit = db.query(Audit).filter(Audit.id == audit_id, Audit.owner_id == user_id).first()
                 if not audit:
-                    raise HTTPException(status_code=404, detail="Audit non trouvé")
+                    raise NotFoundError("Audit non trouvé")
             query = query.filter((Tag.scope == "global") | (Tag.audit_id == audit_id))
         elif not is_admin:
             # Sans audit_id : tags globaux + tags des audits de l'utilisateur
@@ -46,12 +46,12 @@ class TagService:
         """Récupère un tag par ID."""
         tag = db.query(Tag).filter(Tag.id == tag_id).first()
         if not tag:
-            raise HTTPException(status_code=404, detail="Tag non trouvé")
+            raise NotFoundError("Tag non trouvé")
         # Vérifier l'accès pour les tags d'audit
         if tag.scope == "audit" and not is_admin:
             audit = db.query(Audit).filter(Audit.id == tag.audit_id, Audit.owner_id == user_id).first()
             if not audit:
-                raise HTTPException(status_code=404, detail="Tag non trouvé")
+                raise NotFoundError("Tag non trouvé")
         return tag
 
     @staticmethod
@@ -61,7 +61,7 @@ class TagService:
         if data.scope == "audit" and data.audit_id is not None and not is_admin:
             audit = db.query(Audit).filter(Audit.id == data.audit_id, Audit.owner_id == user_id).first()
             if not audit:
-                raise HTTPException(status_code=404, detail="Audit non trouvé")
+                raise NotFoundError("Audit non trouvé")
 
         # Vérifier unicité
         existing = (
@@ -74,7 +74,7 @@ class TagService:
             .first()
         )
         if existing:
-            raise HTTPException(status_code=409, detail="Tag déjà existant")
+            raise ConflictError("Tag déjà existant")
 
         tag = Tag(
             name=data.name,

@@ -96,7 +96,6 @@ def generate_findings(
     """Génère des findings depuis les ControlResult non-conformes d'un assessment."""
     uid, _ = _rbac(current_user)
     generated, skipped = FindingService.generate_from_assessment(db, body.assessment_id, user_id=uid)
-    db.commit()
     return FindingGenerateResponse(
         generated=generated,
         skipped=skipped,
@@ -130,8 +129,6 @@ def update_finding_status(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
-    db.commit()
-    db.refresh(updated)
     return FindingDetail.model_validate(updated)
 
 
@@ -153,6 +150,4 @@ def link_duplicate(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
-    db.commit()
-    db.refresh(updated)
     return FindingDetail.model_validate(updated)

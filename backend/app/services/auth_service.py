@@ -95,3 +95,56 @@ class AuthService:
         total = db.query(User).count()
         users = db.query(User).offset(offset).limit(limit).all()
         return users, total
+
+    @staticmethod
+    def find_user_by_username_or_email(db: Session, username: str, email: str) -> Optional[User]:
+        """Cherche un utilisateur par username ou email (vérification d'unicité)."""
+        return (
+            db.query(User)
+            .filter((User.username == username) | (User.email == email))
+            .first()
+        )
+
+    @staticmethod
+    def find_by_username(db: Session, username: str) -> Optional[User]:
+        """Cherche un utilisateur par username exact."""
+        return db.query(User).filter(User.username == username).first()
+
+    @staticmethod
+    def find_by_email(db: Session, email: str, exclude_id: int = None) -> Optional[User]:
+        """Cherche un utilisateur par email, avec exclusion optionnelle d'un ID."""
+        q = db.query(User).filter(User.email == email)
+        if exclude_id is not None:
+            q = q.filter(User.id != exclude_id)
+        return q.first()
+
+    @staticmethod
+    def apply_user_updates(
+        db: Session,
+        user: User,
+        email: str = None,
+        full_name: str = None,
+        role: str = None,
+        is_active: bool = None,
+        password: str = None,
+    ) -> User:
+        """Applique les modifications sur un utilisateur et synchronise la session."""
+        if email is not None:
+            user.email = email
+        if full_name is not None:
+            user.full_name = full_name
+        if role is not None:
+            user.role = role
+        if is_active is not None:
+            user.is_active = is_active
+        if password is not None:
+            user.password_hash = hash_password(password)
+        db.flush()
+        db.refresh(user)
+        return user
+
+    @staticmethod
+    def deactivate_user(db: Session, user: User) -> None:
+        """Désactive un utilisateur (soft delete)."""
+        user.is_active = False
+        db.flush()

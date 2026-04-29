@@ -8,9 +8,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session, selectinload
 
+from ..core.errors import NotFoundError
 from ..core.helpers import get_or_404
 from ..models.assessment import (
     Assessment,
@@ -41,7 +41,7 @@ class AssessmentService:
             return
         audit = get_or_404(db, Audit, audit_id)
         if audit.owner_id != user_id:
-            raise HTTPException(status_code=404, detail="Ressource introuvable")
+            raise NotFoundError("Ressource introuvable")
 
     @staticmethod
     def _check_campaign_access(
@@ -63,7 +63,7 @@ class AssessmentService:
         """Verifie l'acces via Assessment → Campaign → Audit."""
         campaign = db.get(AssessmentCampaign, assessment.campaign_id)
         if not campaign:
-            raise HTTPException(status_code=404, detail="Ressource introuvable")
+            raise NotFoundError("Ressource introuvable")
         AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
 
     # --- Campagnes ---

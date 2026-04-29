@@ -9,6 +9,8 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from app.core.errors import AppError, BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,6 +53,26 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"detail": "Erreur de base de donnees", "error_type": "database_error"},
         )
+
+    @app.exception_handler(NotFoundError)
+    async def not_found_error_handler(request: Request, exc: NotFoundError):
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
+
+    @app.exception_handler(ForbiddenError)
+    async def forbidden_error_handler(request: Request, exc: ForbiddenError):
+        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc)})
+
+    @app.exception_handler(ConflictError)
+    async def conflict_error_handler(request: Request, exc: ConflictError):
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
+
+    @app.exception_handler(BusinessRuleError)
+    async def business_rule_error_handler(request: Request, exc: BusinessRuleError):
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
+
+    @app.exception_handler(AppError)
+    async def app_error_handler(request: Request, exc: AppError):
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):

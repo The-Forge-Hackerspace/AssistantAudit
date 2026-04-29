@@ -2,11 +2,11 @@
 Service Entreprise : CRUD pour les entreprises et contacts.
 """
 
-from fastapi import HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..core.audit_logger import log_access_denied
+from ..core.errors import ConflictError, NotFoundError
 from ..core.helpers import get_or_404, user_has_access_to_entreprise
 from ..models.audit import Audit
 from ..models.entreprise import Contact, Entreprise
@@ -43,7 +43,7 @@ class EntrepriseService:
         if user_id is not None and not is_admin:
             if not user_has_access_to_entreprise(db, entreprise_id, user_id):
                 log_access_denied(user_id, "Entreprise", entreprise_id)
-                raise HTTPException(status_code=404, detail="Entreprise introuvable")
+                raise NotFoundError("Entreprise introuvable")
         return entreprise
 
     @staticmethod
@@ -51,7 +51,7 @@ class EntrepriseService:
         """Cree une entreprise avec ses contacts. Verifie l'unicite du nom et du SIRET."""
         existing = db.query(Entreprise).filter(Entreprise.nom == data.nom).first()
         if existing:
-            raise HTTPException(status_code=409, detail=f"L'entreprise '{data.nom}' existe déjà")
+            raise ConflictError(f"L'entreprise '{data.nom}' existe déjà")
 
         siret = data.siret.strip() if data.siret else None
         siret = siret or None
@@ -59,10 +59,7 @@ class EntrepriseService:
         if siret:
             dup = db.query(Entreprise).filter(Entreprise.siret == siret).first()
             if dup:
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Une entreprise avec le SIRET '{siret}' existe déjà",
-                )
+                raise ConflictError(f"Une entreprise avec le SIRET '{siret}' existe déjà")
 
         entreprise = Entreprise(
             nom=data.nom,
@@ -104,7 +101,7 @@ class EntrepriseService:
         if user_id is not None and not is_admin:
             if not user_has_access_to_entreprise(db, entreprise_id, user_id):
                 log_access_denied(user_id, "Entreprise", entreprise_id, action="update")
-                raise HTTPException(status_code=404, detail="Entreprise introuvable")
+                raise NotFoundError("Entreprise introuvable")
 
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():

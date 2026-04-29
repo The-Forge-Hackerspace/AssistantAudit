@@ -146,6 +146,51 @@ def list_config_analyses(
     )
 
 
+def list_config_analyses_with_access(
+    db: Session,
+    user_id: int,
+    is_admin: bool,
+    equipement_id: int | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> list[ConfigAnalysis]:
+    """Liste paginee des analyses de config avec RBAC (acces via Audit.owner_id)."""
+    from ..models.audit import Audit
+    from ..models.equipement import Equipement as _Equip
+    from ..models.site import Site as _Site
+
+    query = db.query(ConfigAnalysis)
+    if equipement_id:
+        query = query.filter(ConfigAnalysis.equipement_id == equipement_id)
+    if not is_admin:
+        accessible_ent_ids = (
+            db.query(Audit.entreprise_id)
+            .filter(Audit.owner_id == user_id)
+            .distinct()
+            .scalar_subquery()
+        )
+        query = (
+            query.join(_Equip, ConfigAnalysis.equipement_id == _Equip.id)
+            .join(_Site, _Equip.site_id == _Site.id)
+            .filter(_Site.entreprise_id.in_(accessible_ent_ids))
+        )
+    return (
+        query.order_by(ConfigAnalysis.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+
+def list_assessments_for_equipement(db: Session, equipement_id: int) -> list[Assessment]:
+    """Liste les assessments lies a un equipement (pour selection de prefill)."""
+    return (
+        db.query(Assessment)
+        .filter(Assessment.equipement_id == equipement_id)
+        .all()
+    )
+
+
 def _check_config_access(db: Session, config: ConfigAnalysis, user_id: int | None, is_admin: bool) -> bool:
     """Verifie l'acces via Equipement → Site → Entreprise."""
     if user_id is None or is_admin:

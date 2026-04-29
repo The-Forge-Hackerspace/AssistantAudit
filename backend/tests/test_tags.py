@@ -2,6 +2,7 @@
 
 import pytest
 
+from app.core.errors import ConflictError
 from app.models.tag import Tag, TagAssociation
 from app.schemas.tag import TagCreate
 from app.services.tag_service import TagService
@@ -111,7 +112,7 @@ class TestTagService:
         TagService.create_tag(db_session, TagCreate(name="dup-svc"), user_id=auditeur_user.id)
         with pytest.raises(Exception) as exc_info:
             TagService.create_tag(db_session, TagCreate(name="dup-svc"), user_id=auditeur_user.id)
-        assert exc_info.value.status_code == 409
+        assert isinstance(exc_info.value, ConflictError)
 
     def test_list_tags_non_admin_sees_global_only(self, db_session, auditeur_user, second_auditeur_user):
         """Un auditeur ne voit que les tags globaux + ses tags d'audit."""

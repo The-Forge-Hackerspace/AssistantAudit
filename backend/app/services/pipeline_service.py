@@ -376,7 +376,7 @@ def create_pending_pipeline(
         status=PipelineStatus.PENDING,
     )
     db.add(pipeline)
-    db.flush()
+    db.commit()
     db.refresh(pipeline)
     return pipeline
 
