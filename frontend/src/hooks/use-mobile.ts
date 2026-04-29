@@ -1,6 +1,8 @@
 import * as React from "react"
 
-const MOBILE_BREAKPOINT = 768
+// Aligné sur la sidebar shadcn (qui utilise lg: pour le mode desktop) : sous
+// 1024px la sidebar passe en mode sheet pour éviter de déborder sur tablette.
+const MOBILE_BREAKPOINT = 1024
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)

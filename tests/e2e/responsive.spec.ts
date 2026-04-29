@@ -11,22 +11,9 @@ const VIEWPORTS = [
 
 const PATHS = ['/', '/equipements', '/outils/network-map'];
 
-// Combinaisons skippées : la sidebar shadcn fait 256px en mode desktop et
-// le breakpoint est à 768px ; à exactement 768px (tablet), sidebar ouverte
-// + main content = 982px → débordement. Bug layout AppLayout, pas table.
-const KNOWN_LAYOUT_OVERFLOW: ReadonlyArray<{ vp: string; path: string; reason: string }> = [
-  {
-    vp: 'tablet',
-    path: '/equipements',
-    reason: 'sidebar shadcn desktop (256px) + main à 768px = 982px (bug layout, pas table)',
-  },
-];
-
 for (const vp of VIEWPORTS) {
   for (const path of PATHS) {
     test(`${vp.name} ${path} : pas de scroll horizontal`, async ({ page }) => {
-      const known = KNOWN_LAYOUT_OVERFLOW.find((k) => k.vp === vp.name && k.path === path);
-      test.skip(!!known, known?.reason || '');
       await page.setViewportSize({ width: vp.width, height: vp.height });
       const resp = await page.goto(path);
       expect(resp?.status()).toBeLessThan(400);
