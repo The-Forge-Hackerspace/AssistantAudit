@@ -18,11 +18,21 @@ from fastapi import HTTPException, Request, status
 logger = logging.getLogger(__name__)
 
 # ── Configuration par catégorie ──────────────────────────────────────────────
-RATE_LIMITS = {
-    "auth": {"max_attempts": 5, "window_seconds": 60, "block_seconds": 300},
-    "api": {"max_attempts": 30, "window_seconds": 60, "block_seconds": 60},
-    "public": {"max_attempts": 100, "window_seconds": 60, "block_seconds": 30},
-}
+# Les seuils max_attempts sont configurables via .env :
+# RATE_LIMIT_{AUTH,API,PUBLIC}_MAX. Window/block restent codés en dur (les
+# défauts couvrent les cas standards ; à variabiliser en cas de besoin réel).
+def _build_rate_limits() -> dict[str, dict[str, int]]:
+    from .config import get_settings
+
+    s = get_settings()
+    return {
+        "auth": {"max_attempts": s.RATE_LIMIT_AUTH_MAX, "window_seconds": 60, "block_seconds": 300},
+        "api": {"max_attempts": s.RATE_LIMIT_API_MAX, "window_seconds": 60, "block_seconds": 60},
+        "public": {"max_attempts": s.RATE_LIMIT_PUBLIC_MAX, "window_seconds": 60, "block_seconds": 30},
+    }
+
+
+RATE_LIMITS = _build_rate_limits()
 
 CLEANUP_INTERVAL = 120  # nettoyage mémoire toutes les 2 minutes
 

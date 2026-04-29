@@ -196,6 +196,14 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = str(BASE_DIR / "logs")
 
+    # --- Rate limiting (par IP, in-memory, voir core/rate_limit.py) ---
+    # Nombre max de requêtes par minute avant blocage. Défauts sains pour la
+    # production ; à relâcher temporairement en staging si une suite de tests
+    # E2E a besoin de plus de débit (ex. RATE_LIMIT_API_MAX=10000).
+    RATE_LIMIT_AUTH_MAX: int = 5  # /auth/login, /auth/enroll
+    RATE_LIMIT_API_MAX: int = 30  # endpoints authentifiés
+    RATE_LIMIT_PUBLIC_MAX: int = 100  # health, metrics, readiness
+
     # --- Monitoring: Sentry ---
     SENTRY_DSN: str = ""  # Sentry error tracking DSN (optional)
     SENTRY_TRACING_ENABLED: bool = False  # Enable performance tracing (uses more resources)
