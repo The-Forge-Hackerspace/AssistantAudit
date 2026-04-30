@@ -434,8 +434,14 @@ def _notify(user_id: int | None, event_type: str, data: dict) -> None:
         return
     try:
         from ..core.websocket_manager import ws_manager
-
-        asyncio.run(ws_manager.send_to_user(user_id, event_type, data))
+        from app.core.event_loop import get_app_loop
+        loop = get_app_loop()
+        if loop is None:
+            logger.warning("app_loop not available, skipping WS notification")
+            return
+        asyncio.run_coroutine_threadsafe(
+            ws_manager.send_to_user(user_id, event_type, data), loop
+        )
     except Exception:
         logger.exception("Pipeline WS notify failed (event=%s)", event_type)
 
