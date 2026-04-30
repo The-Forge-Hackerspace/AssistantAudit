@@ -138,6 +138,7 @@ class FileService:
         )
         db.add(attachment)
         db.flush()
+        db.refresh(attachment)
 
         logger.info(
             "Fichier uploade: %s (%d octets) -> blobs/%s.enc par user %s",
@@ -184,10 +185,10 @@ class FileService:
             if not file_path.is_relative_to(base_data.resolve()):
                 raise NotFoundError("Fichier introuvable")
 
-            if not file_path.exists():
+            try:
+                content = file_path.read_bytes()
+            except FileNotFoundError:
                 raise NotFoundError("Fichier introuvable sur le disque")
-
-            content = file_path.read_bytes()
 
         return content, attachment.original_filename, attachment.mime_type
 
@@ -206,9 +207,11 @@ class FileService:
             base_data = Path(settings.FRAMEWORKS_DIR).parent / "data"
             file_path = (base_data / attachment.file_path).resolve()
 
-        if file_path.exists():
+        try:
             file_path.unlink()
             logger.info("Fichier supprime du disque: %s", file_path)
+        except FileNotFoundError:
+            logger.debug("Fichier deja absent du disque: %s", file_path)
 
         # Supprimer de la base
         db.delete(attachment)

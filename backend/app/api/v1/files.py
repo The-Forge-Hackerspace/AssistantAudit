@@ -113,8 +113,6 @@ def upload_file(
         user_id=current_user.id,
         description=description,
     )
-    db.flush()
-    db.refresh(attachment)
 
     result = AttachmentRead.model_validate(attachment)
     result.download_url = f"/api/v1/files/download/{attachment.id}"

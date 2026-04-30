@@ -11,6 +11,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session, joinedload
 
 from ..core.config import get_settings
+from ..core.database import get_db_session
 from ..core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from ..core.rate_limit import enroll_rate_limiter
 from ..core.security import (
@@ -321,8 +322,10 @@ class AgentService:
         # Lire le certificat CA
         ca_cert_pem = ""
         ca_cert_path = Path(settings.CA_CERT_PATH)
-        if ca_cert_path.exists():
+        try:
             ca_cert_pem = ca_cert_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            logger.warning("CA cert introuvable (%s) — ca_cert_pem vide", ca_cert_path)
 
         logger.info(f"Agent enrolled: uuid={matched_agent.agent_uuid}")
         return {
@@ -585,7 +588,6 @@ class AgentService:
         Si l'agent etait "offline" (sweeper), restaure status=active +
         last_seen pour signaler la reconnexion. Ouvre/ferme sa propre session.
         """
-        from ..core.database import get_db_session
 
         trusted_agent_id: int | None = None
         try:
@@ -613,7 +615,6 @@ class AgentService:
         client_host: str | None,
     ) -> None:
         """Persiste le heartbeat WS (last_seen, agent_version, os_info, last_ip)."""
-        from ..core.database import get_db_session
 
         try:
             with get_db_session() as db:
@@ -644,7 +645,6 @@ class AgentService:
         par compute_progress (afin que le forward au front utilise la valeur
         corrigee).
         """
-        from ..core.database import get_db_session
 
         try:
             with get_db_session() as db:
@@ -723,7 +723,6 @@ class AgentService:
         ws_data: dict,
     ) -> None:
         """Persiste un message task_result recu par WS (status, result, hydrate collect)."""
-        from ..core.database import get_db_session
 
         try:
             task_uuid_to_reset: str | None = None
@@ -785,7 +784,6 @@ class AgentService:
 
         Retourne la liste d'evenements task_status a forwarder vers le owner.
         """
-        from ..core.database import get_db_session
 
         events: list[dict] = []
         try:
