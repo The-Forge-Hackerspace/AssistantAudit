@@ -7,10 +7,9 @@ en `failed` avec le motif "Agent timeout". Notifie le frontend du owner via
 le WebSocket manager.
 
 Le sweeper tourne en tache asyncio pendant toute la duree de vie de l'app
-(start/stop via le lifespan FastAPI). Il est concu pour :
-- tolerer les erreurs (une exception loggee n'interrompt pas la boucle),
-- respecter l'ordonnancement du reste de l'event loop (sleep entre passes),
-- utiliser une session SQLAlchemy dediee par iteration.
+(start/stop via le lifespan FastAPI). Le travail DB est delegue a
+`asyncio.to_thread` pour ne pas bloquer l'event loop ; seules les
+notifications WebSocket restent sur la boucle.
 """
 
 from __future__ import annotations
@@ -21,13 +20,14 @@ from datetime import datetime, timedelta, timezone
 
 from .config import get_settings
 from .database import SessionLocal
+from .sweeper_runtime import run_sweep_iteration
 from .websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
 
-async def _sweep_once() -> None:
-    """Effectue une passe de detection des agents timeout."""
+def _sync_sweep_iteration() -> list[tuple[int, dict]]:
+    """Effectue la passe DB synchrone, retourne les notifications a emettre."""
     # Imports locaux pour eviter les cycles au chargement.
     from ..models.agent import Agent
     from ..services.agent_service import AgentService
@@ -36,6 +36,7 @@ async def _sweep_once() -> None:
     timeout = timedelta(seconds=settings.AGENT_HEARTBEAT_TIMEOUT_SECONDS)
     cutoff = datetime.now(timezone.utc) - timeout
 
+    notifications: list[tuple[int, dict]] = []
     db = SessionLocal()
     try:
         stale = (
@@ -48,7 +49,6 @@ async def _sweep_once() -> None:
             .all()
         )
 
-        notifications: list[tuple[int, dict]] = []
         for agent in stale:
             # La connexion WS est-elle encore vivante ? Si oui, on laisse le
             # handler gerer — ca evite les faux-positifs en debut de boucle.
@@ -75,16 +75,16 @@ async def _sweep_once() -> None:
     except Exception:
         logger.exception("Heartbeat sweeper iteration failed")
         db.rollback()
-        return
+        return []
     finally:
         db.close()
 
-    # Notifications hors du bloc DB.
-    for owner_id, ev in notifications:
-        try:
-            await ws_manager.send_to_user(owner_id, "task_status", ev)
-        except Exception:
-            logger.exception("Failed to notify owner %s of sweep failure", owner_id)
+    return notifications
+
+
+async def _sweep_once() -> None:
+    """Wrapper async : execute la passe DB hors event loop puis notifie."""
+    await run_sweep_iteration(_sync_sweep_iteration, event_type="task_status")
 
 
 async def run_heartbeat_sweeper() -> None:

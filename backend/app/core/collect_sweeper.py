@@ -5,6 +5,9 @@ Detecte les `CollectResult` au statut `running` dont la creation est anterieure
 au timeout configure (`COLLECT_TIMEOUT_SECONDS`). Sans ce sweeper, une collecte
 dispatchee sur un agent qui disparait avant de repondre resterait `running`
 indefiniment. Symetrique du `heartbeat_sweeper`.
+
+Le travail DB est delegue a `asyncio.to_thread` pour ne pas bloquer l'event
+loop ; seules les notifications WebSocket restent sur la boucle.
 """
 
 from __future__ import annotations
@@ -15,12 +18,13 @@ from datetime import datetime, timedelta, timezone
 
 from .config import get_settings
 from .database import SessionLocal
-from .websocket_manager import ws_manager
+from .sweeper_runtime import run_sweep_iteration
+from .websocket_manager import ws_manager  # noqa: F401 (expose pour les tests qui patchent collect_sweeper.ws_manager)
 
 logger = logging.getLogger(__name__)
 
 
-async def _sweep_once() -> None:
+def _sync_collect_sweep() -> list[tuple[int, dict]]:
     """Marque FAILED toute collecte running depassant le timeout."""
     from ..models.agent_task import AgentTask
     from ..models.collect_result import CollectResult, CollectStatus
@@ -28,8 +32,8 @@ async def _sweep_once() -> None:
     settings = get_settings()
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=settings.COLLECT_TIMEOUT_SECONDS)
 
-    db = SessionLocal()
     notifications: list[tuple[int, dict]] = []
+    db = SessionLocal()
     try:
         stale = (
             db.query(CollectResult)
@@ -68,15 +72,16 @@ async def _sweep_once() -> None:
     except Exception:
         logger.exception("Collect sweeper iteration failed")
         db.rollback()
-        return
+        return []
     finally:
         db.close()
 
-    for owner_id, ev in notifications:
-        try:
-            await ws_manager.send_to_user(owner_id, "collect_status", ev)
-        except Exception:
-            logger.exception("Failed to notify owner %s of collect timeout", owner_id)
+    return notifications
+
+
+async def _sweep_once() -> None:
+    """Wrapper async : execute la passe DB hors event loop puis notifie."""
+    await run_sweep_iteration(_sync_collect_sweep, event_type="collect_status")
 
 
 async def run_collect_sweeper() -> None:
