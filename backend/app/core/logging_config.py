@@ -5,6 +5,7 @@ Provides production-ready JSON logging with context support and filtering.
 
 import logging
 import sys
+from contextvars import ContextVar
 from logging import LogRecord
 from typing import Any, Dict
 
@@ -132,32 +133,47 @@ def get_logger(name: str) -> logging.Logger:
 # ────────────────────────────────────────────────────────────────────────
 
 
+_request_id: ContextVar[str] = ContextVar("request_id", default="")
+_user_id: ContextVar[int | None] = ContextVar("user_id", default=None)
+_operation: ContextVar[str] = ContextVar("operation", default="")
+
+
 class LogContext:
     """Context manager for adding structured logging context"""
-
-    _contexts: dict = {}
 
     @classmethod
     def set_request_id(cls, request_id: str) -> None:
         """Set request ID for current context"""
-        cls._contexts["request_id"] = request_id
+        _request_id.set(request_id)
 
     @classmethod
     def set_user_id(cls, user_id: int) -> None:
         """Set user ID for current context"""
-        cls._contexts["user_id"] = user_id
+        _user_id.set(user_id)
 
     @classmethod
     def set_operation(cls, operation: str) -> None:
         """Set operation type for current context"""
-        cls._contexts["operation"] = operation
+        _operation.set(operation)
 
     @classmethod
     def clear(cls) -> None:
         """Clear all context"""
-        cls._contexts.clear()
+        _request_id.set("")
+        _user_id.set(None)
+        _operation.set("")
 
     @classmethod
     def get(cls) -> dict:
         """Get current context"""
-        return cls._contexts.copy()
+        ctx: dict = {}
+        rid = _request_id.get()
+        if rid:
+            ctx["request_id"] = rid
+        uid = _user_id.get()
+        if uid is not None:
+            ctx["user_id"] = uid
+        op = _operation.get()
+        if op:
+            ctx["operation"] = op
+        return ctx
