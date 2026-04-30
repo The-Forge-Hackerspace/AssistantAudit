@@ -56,6 +56,7 @@ class Monkey365Service:
         findings = Monkey365Parser.parse_raw_results(simulated_findings)
 
         mapping_results = Monkey365Mapper.map_findings_to_assessment(db, assessment, findings, assessed_by="simulation")
+        db.commit()
         manual_controls = Monkey365Mapper.get_unmapped_controls(assessment)
 
         return ScanResult(
