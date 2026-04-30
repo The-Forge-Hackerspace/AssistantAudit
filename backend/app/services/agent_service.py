@@ -265,8 +265,7 @@ class AgentService:
         Enrolle un agent avec un code d'enrollment.
         Valide le code, signe le cert, retourne {agent_uuid, agent_token, certs}.
         """
-        enroll_rate_limiter.check(request)
-        enroll_rate_limiter.record_attempt(request)
+        enroll_rate_limiter.acquire_attempt(request)
 
         code_hash = hashlib.sha256(enrollment_code.encode()).hexdigest()
         matched_agent = (

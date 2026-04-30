@@ -38,7 +38,13 @@ CLEANUP_INTERVAL = 120  # nettoyage mémoire toutes les 2 minutes
 
 
 class _RateLimiter:
-    """Compteur de tentatives par IP avec fenêtre glissante."""
+    """Compteur de tentatives par IP avec fenêtre glissante.
+
+    L'API publique se résume à `acquire_attempt(request)` : la vérification
+    de seuil et l'enregistrement de la tentative sont effectués en un seul
+    bloc verrouillé pour empêcher les bursts concurrents au-delà de la
+    limite (ex. brute-force sur /auth/login).
+    """
 
     def __init__(
         self,
@@ -56,29 +62,26 @@ class _RateLimiter:
         self._lock = Lock()
         self._last_cleanup = time.time()
 
-    def _cleanup(self):
-        """Supprime les anciennes entrées pour éviter les fuites mémoire."""
-        now = time.time()
+    def _cleanup_locked(self, now: float) -> None:
+        """Purge périodique mémoire — à appeler avec self._lock déjà détenu."""
         if now - self._last_cleanup < CLEANUP_INTERVAL:
             return
+        self._last_cleanup = now
+        cutoff = now - self.window_seconds
 
-        with self._lock:
-            self._last_cleanup = now
-            cutoff = now - self.window_seconds
+        # Nettoyer les tentatives expirées
+        expired_ips: list[str] = []
+        for ip, timestamps in self._attempts.items():
+            self._attempts[ip] = [t for t in timestamps if t > cutoff]
+            if not self._attempts[ip]:
+                expired_ips.append(ip)
+        for ip in expired_ips:
+            del self._attempts[ip]
 
-            # Nettoyer les tentatives expirées
-            expired_ips = []
-            for ip, timestamps in self._attempts.items():
-                self._attempts[ip] = [t for t in timestamps if t > cutoff]
-                if not self._attempts[ip]:
-                    expired_ips.append(ip)
-            for ip in expired_ips:
-                del self._attempts[ip]
-
-            # Nettoyer les blocages expirés
-            expired_blocks = [ip for ip, until in self._blocked.items() if until < now]
-            for ip in expired_blocks:
-                del self._blocked[ip]
+        # Nettoyer les blocages expirés
+        expired_blocks = [ip for ip, until in self._blocked.items() if until < now]
+        for ip in expired_blocks:
+            del self._blocked[ip]
 
     def _get_client_ip(self, request: Request) -> str:
         """
@@ -96,17 +99,26 @@ class _RateLimiter:
                 return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
-    def check(self, request: Request) -> None:
+    def acquire_attempt(self, request: Request) -> None:
+        """Vérifie le seuil et enregistre la tentative en un seul bloc verrouillé.
+
+        Lève HTTPException 429 si l'IP est bloquée ou si le seuil est atteint
+        — dans ce dernier cas, l'IP est immédiatement marquée bloquée pour
+        `block_seconds`. Sinon la tentative est ajoutée à la fenêtre courante
+        et la fonction retourne normalement.
+
+        Cette méthode remplace l'ancien couple `check()` + `record_attempt()`,
+        dont la séparation laissait passer un burst de requêtes concurrentes
+        au-dessus du seuil (chacune voyait `count < max` avant que la première
+        ne soit enregistrée).
         """
-        Vérifie si l'IP est autorisée à effectuer la requête.
-        Lève HTTP 429 si le rate limit est dépassé.
-        """
-        self._cleanup()
         ip = self._get_client_ip(request)
         now = time.time()
 
         with self._lock:
-            # Vérifier si l'IP est bloquée
+            self._cleanup_locked(now)
+
+            # Blocage actif ?
             if ip in self._blocked:
                 remaining = int(self._blocked[ip] - now)
                 if remaining > 0:
@@ -116,14 +128,13 @@ class _RateLimiter:
                         detail=f"Trop de requêtes. Réessayez dans {remaining} secondes.",
                         headers={"Retry-After": str(remaining)},
                     )
-                else:
-                    del self._blocked[ip]
+                del self._blocked[ip]
 
             # Nettoyer les tentatives hors fenêtre pour cette IP
             cutoff = now - self.window_seconds
             self._attempts[ip] = [t for t in self._attempts[ip] if t > cutoff]
 
-            # Vérifier le nombre de tentatives
+            # Seuil atteint : bloquer et refuser
             if len(self._attempts[ip]) >= self.max_attempts:
                 self._blocked[ip] = now + self.block_seconds
                 self._attempts[ip].clear()
@@ -136,11 +147,7 @@ class _RateLimiter:
                     headers={"Retry-After": str(self.block_seconds)},
                 )
 
-    def record_attempt(self, request: Request) -> None:
-        """Enregistre une tentative (appelé à chaque requête)."""
-        ip = self._get_client_ip(request)
-        now = time.time()
-        with self._lock:
+            # Tentative acceptée : enregistrer dans la même section critique
             self._attempts[ip].append(now)
 
     def reset(self, request: Request) -> None:

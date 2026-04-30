@@ -109,10 +109,9 @@ class TestRateLimiterConfigurable:
         limiter = _RateLimiter(max_attempts=3, window_seconds=60, block_seconds=10)
         req = self._make_request()
         for _ in range(3):
-            limiter.check(req)
-            limiter.record_attempt(req)
+            limiter.acquire_attempt(req)
         with pytest.raises(HTTPException) as exc_info:
-            limiter.check(req)
+            limiter.acquire_attempt(req)
         assert exc_info.value.status_code == 429
         assert "Retry-After" in exc_info.value.headers
 
@@ -121,10 +120,9 @@ class TestRateLimiterConfigurable:
         limiter = _RateLimiter(**RATE_LIMITS["api"])
         req = self._make_request()
         for _ in range(30):
-            limiter.check(req)
-            limiter.record_attempt(req)
+            limiter.acquire_attempt(req)
         with pytest.raises(HTTPException) as exc_info:
-            limiter.check(req)
+            limiter.acquire_attempt(req)
         assert exc_info.value.status_code == 429
 
     def test_public_limiter_allows_100_requests(self):
@@ -132,10 +130,9 @@ class TestRateLimiterConfigurable:
         limiter = _RateLimiter(**RATE_LIMITS["public"])
         req = self._make_request()
         for _ in range(100):
-            limiter.check(req)
-            limiter.record_attempt(req)
+            limiter.acquire_attempt(req)
         with pytest.raises(HTTPException) as exc_info:
-            limiter.check(req)
+            limiter.acquire_attempt(req)
         assert exc_info.value.status_code == 429
 
 

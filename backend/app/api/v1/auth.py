@@ -85,8 +85,7 @@ def login(
     Pose les tokens en cookies httpOnly et les retourne aussi en body
     pour les clients programmatiques (Swagger, agents, scripts).
     """
-    login_rate_limiter.check(request)
-    login_rate_limiter.record_attempt(request)
+    login_rate_limiter.acquire_attempt(request)
 
     logger.info(f"[LOGIN] Tentative login user='{form_data.username}'")
     user = AuthService.authenticate(db, form_data.username, form_data.password)
@@ -104,8 +103,7 @@ def login(
 @router.post("/login/json", response_model=TokenResponse)
 def login_json(request: Request, response: Response, body: LoginRequest, db: Session = Depends(get_db)):
     """Authentification par JSON body (pour les clients API)"""
-    login_rate_limiter.check(request)
-    login_rate_limiter.record_attempt(request)
+    login_rate_limiter.acquire_attempt(request)
 
     user = AuthService.authenticate(db, body.username, body.password)
     if not user:
@@ -132,8 +130,7 @@ def refresh(
     Lit le refresh depuis le cookie httpOnly en priorite, puis depuis le body JSON
     si necessaire (compat clients legacy).
     """
-    login_rate_limiter.check(request)
-    login_rate_limiter.record_attempt(request)
+    login_rate_limiter.acquire_attempt(request)
 
     refresh_token = aa_refresh_token or (body.refresh_token if body and body.refresh_token else None)
     if not refresh_token:

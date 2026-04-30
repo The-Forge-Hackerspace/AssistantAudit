@@ -228,15 +228,13 @@ def create_app() -> FastAPI:
             try:
                 # Routes publiques
                 if path in PUBLIC_PATHS:
-                    public_rate_limiter.check(request)
-                    public_rate_limiter.record_attempt(request)
+                    public_rate_limiter.acquire_attempt(request)
                 # Routes API (sauf auth — géré inline dans les routes)
                 elif path.startswith(settings.API_V1_PREFIX):
                     auth_prefix = f"{settings.API_V1_PREFIX}/auth/"
                     agents_enroll = f"{settings.API_V1_PREFIX}/agents/enroll"
                     if not path.startswith(auth_prefix) and path != agents_enroll:
-                        api_rate_limiter.check(request)
-                        api_rate_limiter.record_attempt(request)
+                        api_rate_limiter.acquire_attempt(request)
             except HTTPException as exc:
                 from starlette.responses import JSONResponse
 
