@@ -12,7 +12,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from ..core.audit_logger import log_access_denied
-from ..core.database import SessionLocal
+from ..core.database import get_db_session
 from ..models.ad_audit_result import ADAuditResultModel, ADAuditStatus
 from ..models.assessment import Assessment, ComplianceStatus, ControlResult
 from ..models.equipement import Equipement
@@ -120,74 +120,71 @@ def execute_ad_audit_background(
     Exécute l'audit AD en arrière-plan.
     Appelé dans un thread séparé.
     """
-    db = SessionLocal()
     try:
-        audit = db.get(ADAuditResultModel, audit_id)
-        if not audit:
-            logger.error(f"[AD_AUDIT] Audit #{audit_id} introuvable en BDD")
-            return
+        with get_db_session() as db:
+            audit = db.get(ADAuditResultModel, audit_id)
+            if not audit:
+                logger.error(f"[AD_AUDIT] Audit #{audit_id} introuvable en BDD")
+                return
 
-        start_time = time.time()
+            start_time = time.time()
 
-        auditor = ADAuditor(
-            host=audit.target_host,
-            port=audit.target_port,
-            use_ssl=use_ssl,
-            username=audit.username,
-            password=password,
-            domain=audit.domain,
-            auth_method=auth_method,
-        )
+            auditor = ADAuditor(
+                host=audit.target_host,
+                port=audit.target_port,
+                use_ssl=use_ssl,
+                username=audit.username,
+                password=password,
+                domain=audit.domain,
+                auth_method=auth_method,
+            )
 
-        result = auditor.audit()
-        elapsed = int(time.time() - start_time)
+            result = auditor.audit()
+            elapsed = int(time.time() - start_time)
 
-        # Persister les résultats
-        if result.success:
-            audit.status = ADAuditStatus.SUCCESS
-            audit.domain_name = result.domain_name
-            audit.domain_functional_level = result.domain_functional_level
-            audit.forest_functional_level = result.forest_functional_level
-            audit.total_users = result.total_users
-            audit.enabled_users = result.enabled_users
-            audit.disabled_users = result.disabled_users
-            audit.dc_list = [dict(dc) for dc in result.dc_list]
-            audit.domain_admins = [dict(m) for m in result.domain_admins]
-            audit.enterprise_admins = [dict(m) for m in result.enterprise_admins]
-            audit.schema_admins = [dict(m) for m in result.schema_admins]
-            audit.inactive_users = [dict(u) for u in result.inactive_users[:50]]  # limiter
-            audit.never_expire_password = [dict(u) for u in result.never_expire_password[:50]]
-            audit.never_logged_in = [dict(u) for u in result.never_logged_in[:50]]
-            audit.admin_account_status = dict(result.admin_account_status) if result.admin_account_status else None
-            audit.password_policy = dict(result.password_policy) if result.password_policy else None
-            audit.fine_grained_policies = [dict(p) for p in result.fine_grained_policies]
-            audit.gpo_list = [dict(g) for g in result.gpo_list]
-            audit.laps_deployed = result.laps_deployed
-            audit.findings = [asdict(f) for f in result.findings]
-            audit.summary = result.summary
-        else:
-            audit.status = ADAuditStatus.FAILED
-            audit.error_message = result.error
+            # Persister les résultats
+            if result.success:
+                audit.status = ADAuditStatus.SUCCESS
+                audit.domain_name = result.domain_name
+                audit.domain_functional_level = result.domain_functional_level
+                audit.forest_functional_level = result.forest_functional_level
+                audit.total_users = result.total_users
+                audit.enabled_users = result.enabled_users
+                audit.disabled_users = result.disabled_users
+                audit.dc_list = [dict(dc) for dc in result.dc_list]
+                audit.domain_admins = [dict(m) for m in result.domain_admins]
+                audit.enterprise_admins = [dict(m) for m in result.enterprise_admins]
+                audit.schema_admins = [dict(m) for m in result.schema_admins]
+                audit.inactive_users = [dict(u) for u in result.inactive_users[:50]]  # limiter
+                audit.never_expire_password = [dict(u) for u in result.never_expire_password[:50]]
+                audit.never_logged_in = [dict(u) for u in result.never_logged_in[:50]]
+                audit.admin_account_status = dict(result.admin_account_status) if result.admin_account_status else None
+                audit.password_policy = dict(result.password_policy) if result.password_policy else None
+                audit.fine_grained_policies = [dict(p) for p in result.fine_grained_policies]
+                audit.gpo_list = [dict(g) for g in result.gpo_list]
+                audit.laps_deployed = result.laps_deployed
+                audit.findings = [asdict(f) for f in result.findings]
+                audit.summary = result.summary
+            else:
+                audit.status = ADAuditStatus.FAILED
+                audit.error_message = result.error
 
-        audit.completed_at = datetime.now(timezone.utc)
-        audit.duration_seconds = elapsed
-        db.commit()
+            audit.completed_at = datetime.now(timezone.utc)
+            audit.duration_seconds = elapsed
 
-        logger.info(f"[AD_AUDIT] Audit #{audit_id} terminé en {elapsed}s (status={audit.status.value})")
+            logger.info(f"[AD_AUDIT] Audit #{audit_id} terminé en {elapsed}s (status={audit.status.value})")
 
     except Exception as e:
         logger.exception(f"[AD_AUDIT] Erreur fatale audit #{audit_id}")
         try:
-            audit = db.get(ADAuditResultModel, audit_id)
-            if audit:
-                audit.status = ADAuditStatus.FAILED
-                audit.error_message = str(e)
-                audit.completed_at = datetime.now(timezone.utc)
-                db.commit()
+            with get_db_session() as db:
+                audit = db.get(ADAuditResultModel, audit_id)
+                if audit:
+                    audit.status = ADAuditStatus.FAILED
+                    audit.error_message = str(e)
+                    audit.completed_at = datetime.now(timezone.utc)
         except Exception:
             pass
-    finally:
-        db.close()
 
 
 def list_ad_audit_results(

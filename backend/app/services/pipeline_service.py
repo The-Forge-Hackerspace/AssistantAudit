@@ -17,7 +17,7 @@ from typing import Any, Literal, Optional, TypedDict
 from sqlalchemy.orm import Session
 
 from ..core.audit_logger import log_access_denied
-from ..core.database import SessionLocal
+from ..core.database import get_db_session
 from ..core.helpers import user_has_access_to_entreprise
 from ..models.agent import Agent
 from ..models.agent_task import AgentTask
@@ -712,73 +712,78 @@ def execute_pipeline_background(
     etape est isolee : un echec de collecte individuelle n'arrete pas la boucle.
     """
     del agent_uuid  # l'agent est lu depuis pipeline.agent_id
-    db = SessionLocal()
     try:
-        pipeline = db.get(CollectPipeline, pipeline_id)
-        if pipeline is None:
-            logger.error("Pipeline #%s introuvable", pipeline_id)
-            return
+        with get_db_session() as db:
+            pipeline = db.get(CollectPipeline, pipeline_id)
+            if pipeline is None:
+                logger.error("Pipeline #%s introuvable", pipeline_id)
+                return
 
-        pipeline.status = PipelineStatus.RUNNING
-        pipeline.started_at = _utcnow()
-        db.commit()
-        _notify(pipeline.created_by, "pipeline_started", _pipeline_event(pipeline))
-
-        # Phase 1 — Scan agent
-        hosts = _run_scan_phase(db, pipeline, current_user_id)
-        db.commit()
-        _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
-        if hosts is None:
-            pipeline.status = PipelineStatus.FAILED
-            pipeline.completed_at = _utcnow()
+            pipeline.status = PipelineStatus.RUNNING
+            pipeline.started_at = _utcnow()
             db.commit()
-            _notify(pipeline.created_by, "pipeline_completed", _pipeline_event(pipeline))
-            return
+            _notify(pipeline.created_by, "pipeline_started", _pipeline_event(pipeline))
 
-        # Phase 2 — Equipements
-        targets = _run_equipments_phase(db, pipeline, hosts)
-        _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
+            # Phase 1 — Scan agent
+            hosts = _run_scan_phase(db, pipeline, current_user_id)
+            db.commit()
+            _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
+            if hosts is None:
+                pipeline.status = PipelineStatus.FAILED
+                pipeline.completed_at = _utcnow()
+                _notify(pipeline.created_by, "pipeline_completed", _pipeline_event(pipeline))
+                return
 
-        # Phase 3 — Collectes
-        agent = db.get(Agent, pipeline.agent_id) if pipeline.agent_id else None
-        if agent is None:
-            logger.error("Pipeline #%s : agent introuvable pour la phase collectes", pipeline_id)
-            pipeline.collects_status = PipelineStepStatus.FAILED
-            pipeline.error_message = pipeline.error_message or "Agent introuvable pour collectes"
-        else:
-            _run_collects_phase(
-                db,
-                pipeline,
-                targets,
-                agent_uuid=agent.agent_uuid,
-                current_user_id=current_user_id,
-                username=username,
-                password=password,
-                private_key=private_key,
-                passphrase=passphrase,
-                use_ssl=use_ssl,
-                transport=transport,
-            )
+            # Phase 2 — Equipements
+            targets = _run_equipments_phase(db, pipeline, hosts)
+            _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
 
-        if pipeline.collects_status == PipelineStepStatus.FAILED:
-            pipeline.status = PipelineStatus.FAILED
-        else:
-            pipeline.status = PipelineStatus.COMPLETED
-        pipeline.completed_at = _utcnow()
-        db.commit()
-        _notify(pipeline.created_by, "pipeline_completed", _pipeline_event(pipeline))
+            # Phase 3 — Collectes
+            agent = db.get(Agent, pipeline.agent_id) if pipeline.agent_id else None
+            if agent is None:
+                logger.error("Pipeline #%s : agent introuvable pour la phase collectes", pipeline_id)
+                pipeline.collects_status = PipelineStepStatus.FAILED
+                pipeline.error_message = pipeline.error_message or "Agent introuvable pour collectes"
+            else:
+                _run_collects_phase(
+                    db,
+                    pipeline,
+                    targets,
+                    agent_uuid=agent.agent_uuid,
+                    current_user_id=current_user_id,
+                    username=username,
+                    password=password,
+                    private_key=private_key,
+                    passphrase=passphrase,
+                    use_ssl=use_ssl,
+                    transport=transport,
+                )
+
+            if pipeline.collects_status == PipelineStepStatus.FAILED:
+                pipeline.status = PipelineStatus.FAILED
+            else:
+                pipeline.status = PipelineStatus.COMPLETED
+            pipeline.completed_at = _utcnow()
+            created_by = pipeline.created_by
+            event_payload = _pipeline_event(pipeline)
+
+        _notify(created_by, "pipeline_completed", event_payload)
 
     except Exception as exc:
         logger.exception("Pipeline #%s : erreur inattendue", pipeline_id)
         try:
-            pipeline = db.get(CollectPipeline, pipeline_id)
-            if pipeline is not None:
-                pipeline.status = PipelineStatus.FAILED
-                pipeline.error_message = str(exc)
-                pipeline.completed_at = _utcnow()
-                db.commit()
-                _notify(pipeline.created_by, "pipeline_completed", _pipeline_event(pipeline))
+            with get_db_session() as db:
+                pipeline = db.get(CollectPipeline, pipeline_id)
+                if pipeline is not None:
+                    pipeline.status = PipelineStatus.FAILED
+                    pipeline.error_message = str(exc)
+                    pipeline.completed_at = _utcnow()
+                    created_by = pipeline.created_by
+                    event_payload = _pipeline_event(pipeline)
+                else:
+                    created_by = None
+                    event_payload = None
+            if created_by is not None and event_payload is not None:
+                _notify(created_by, "pipeline_completed", event_payload)
         except Exception:
             logger.exception("Impossible de marquer le pipeline #%s comme failed", pipeline_id)
-    finally:
-        db.close()
