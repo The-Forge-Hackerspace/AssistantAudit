@@ -12,7 +12,7 @@ test('UI : page agents charge avec header', async ({ page }) => {
 });
 
 test('API : GET /api/v1/agents répond une liste', async ({ request }) => {
-  const r = await request.get('/api/v1/agents');
+  const r = await request.get('/api/v1/agents/');
   expect(r.status()).toBe(200);
   const data = await r.json();
   // L'endpoint renvoie un tableau (vu lors du probe).
