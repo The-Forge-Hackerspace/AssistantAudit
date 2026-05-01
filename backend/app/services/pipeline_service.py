@@ -433,8 +433,9 @@ def _notify(user_id: int | None, event_type: str, data: dict) -> None:
     if user_id is None:
         return
     try:
+        from ..core.event_loop import get_app_loop
         from ..core.websocket_manager import ws_manager
-        from app.core.event_loop import get_app_loop
+
         loop = get_app_loop()
         if loop is None:
             logger.warning("app_loop not available, skipping WS notification")
