@@ -17,5 +17,5 @@ test('API /api/v1/auth/me répond 200 avec le cookie', async ({ request }) => {
   const resp = await request.get('/api/v1/auth/me');
   expect(resp.status(), 'GET /auth/me').toBe(200);
   const body = await resp.json();
-  expect(body.email).toBe(process.env.PLAYWRIGHT_ADMIN_EMAIL || 'admin@assistantaudit.local');
+  expect(body.email).toBe(process.env.PLAYWRIGHT_ADMIN_EMAIL || 'admin@assistantaudit.fr');
 });

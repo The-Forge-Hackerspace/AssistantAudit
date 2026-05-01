@@ -6,7 +6,7 @@
  *   PLAYWRIGHT_BASE_URL          URL du frontend — fallback http://localhost:3000
  *   PLAYWRIGHT_API_URL           URL backend — par défaut, dérivée du baseURL
  *                                (Caddy proxie /api/* sur le même hôte)
- *   PLAYWRIGHT_ADMIN_EMAIL       Email admin — fallback admin@assistantaudit.local
+ *   PLAYWRIGHT_ADMIN_EMAIL       Email admin — fallback admin@assistantaudit.fr
  *   PLAYWRIGHT_ADMIN_PASSWORD    Password admin — fallback Admin1234!
  */
 import { FullConfig, request } from '@playwright/test';
@@ -45,7 +45,7 @@ async function loginWithRetry(
 async function globalSetup(config: FullConfig) {
   const baseURL = config.projects[0]?.use?.baseURL || 'http://localhost:3000';
   const apiURL = process.env.PLAYWRIGHT_API_URL || baseURL;
-  const adminEmail = process.env.PLAYWRIGHT_ADMIN_EMAIL || 'admin@assistantaudit.local';
+  const adminEmail = process.env.PLAYWRIGHT_ADMIN_EMAIL || 'admin@assistantaudit.fr';
   const adminPassword = process.env.PLAYWRIGHT_ADMIN_PASSWORD || 'Admin1234!';
 
   // Réutilise un storageState récent pour éviter de spammer /auth/login.
