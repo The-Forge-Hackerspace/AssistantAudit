@@ -40,6 +40,14 @@ jobs:
     - name: Start stack (Docker Compose)
       run: docker compose up -d --build db backend frontend
 
+    # Le rewrite Next.js /api/* -> backend:8000 fait que les redirects 307
+    # trailing-slash de Starlette renvoient un Location avec netloc=backend:8000.
+    # Playwright tournant sur le runner GH (hors Docker) ne peut pas resoudre
+    # ce hostname interne. Le port 8000 etant publie sur 127.0.0.1, on mappe
+    # le hostname pour que Playwright puisse suivre les redirects.
+    - name: Mappe le hostname Docker 'backend' sur 127.0.0.1 pour les redirects
+      run: echo "127.0.0.1 backend" | sudo tee -a /etc/hosts
+
     - name: Wait for backend health
       run: |
         for i in $(seq 1 60); do
