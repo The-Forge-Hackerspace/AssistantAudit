@@ -147,42 +147,67 @@ class TestRateLimiter:
         limiter = _RateLimiter()
         req = self._make_request()
         for _ in range(4):
-            limiter.check(req)
-            limiter.record_attempt(req)
+            limiter.acquire_attempt(req)
         # 4 tentatives < 5 max : pas de blocage
 
     def test_blocks_at_limit(self):
         limiter = _RateLimiter()
         req = self._make_request()
         for _ in range(5):
-            limiter.check(req)
-            limiter.record_attempt(req)
+            limiter.acquire_attempt(req)
         # 6eme tentative bloquee
         with pytest.raises(HTTPException) as exc_info:
-            limiter.check(req)
+            limiter.acquire_attempt(req)
         assert exc_info.value.status_code == 429
 
     def test_reset_clears_counter(self):
         limiter = _RateLimiter()
         req = self._make_request()
         for _ in range(4):
-            limiter.check(req)
-            limiter.record_attempt(req)
+            limiter.acquire_attempt(req)
         limiter.reset(req)
         # Apres reset, on peut refaire des tentatives
-        limiter.check(req)
-        limiter.record_attempt(req)
+        limiter.acquire_attempt(req)
 
     def test_different_ips_independent(self):
         limiter = _RateLimiter()
         req_a = self._make_request("10.0.0.1")
         req_b = self._make_request("10.0.0.2")
         for _ in range(5):
-            limiter.check(req_a)
-            limiter.record_attempt(req_a)
-        # IP A bloquee, IP B pas affectee
-        limiter.check(req_b)
-        limiter.record_attempt(req_b)
+            limiter.acquire_attempt(req_a)
+        # IP A a atteint le seuil, IP B reste independante
+        limiter.acquire_attempt(req_b)
+
+    def test_concurrent_burst_does_not_exceed_threshold(self):
+        """Vérifie qu'un burst concurrent ne laisse pas passer plus de
+        max_attempts requêtes (régression : avant la fusion check+record,
+        la séquence non-atomique laissait passer N+threads requêtes)."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        limiter = _RateLimiter(max_attempts=5, window_seconds=60, block_seconds=10)
+        req = self._make_request("10.0.0.42")
+
+        successes = 0
+        failures = 0
+
+        def hit() -> bool:
+            try:
+                limiter.acquire_attempt(req)
+                return True
+            except HTTPException:
+                return False
+
+        with ThreadPoolExecutor(max_workers=20) as pool:
+            results = list(pool.map(lambda _: hit(), range(50)))
+
+        for ok in results:
+            if ok:
+                successes += 1
+            else:
+                failures += 1
+
+        assert successes == 5, f"Expected exactly 5 successes, got {successes}"
+        assert failures == 45
 
 
 # ══════════════════════════════════════════════════════════════════════

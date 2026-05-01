@@ -9,12 +9,11 @@ from collections import defaultdict
 
 from sqlalchemy.orm import Session
 
-from ..core.errors import NotFoundError
+from ..core.helpers import check_audit_access
 from ..models.assessment import (
     AssessmentCampaign,
     ComplianceStatus,
 )
-from ..models.audit import Audit
 from ..schemas.recommendations import RecommendationDetail, RecommendationsList
 from ._severity import SEVERITY_RANK
 
@@ -25,17 +24,6 @@ class RecommendationsService:
     """Calcule la liste exhaustive des recommandations d'un audit."""
 
     @staticmethod
-    def _check_audit_access(
-        db: Session, audit_id: int, user_id: int, is_admin: bool
-    ) -> Audit:
-        audit = db.query(Audit).filter(Audit.id == audit_id).first()
-        if not audit:
-            raise NotFoundError("Audit non trouve")
-        if not is_admin and audit.owner_id != user_id:
-            raise NotFoundError("Audit non trouve")
-        return audit
-
-    @staticmethod
     def generate(
         db: Session, audit_id: int, user_id: int, is_admin: bool
     ) -> RecommendationsList:
@@ -44,7 +32,7 @@ class RecommendationsService:
         Une recommandation = un controle non-conforme aggrege sur ses occurrences.
         Tri intra-severite : nombre d'occurrences decroissant.
         """
-        RecommendationsService._check_audit_access(db, audit_id, user_id, is_admin)
+        check_audit_access(db, audit_id, user_id, is_admin)
 
         campaigns = (
             db.query(AssessmentCampaign)

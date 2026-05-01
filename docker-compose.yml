@@ -52,6 +52,11 @@ services:
       # Restreindre aux IPs du reverse proxy en prod (NPMPlus). '*' par defaut
       # car le port 8000 du backend n'est pas publie via le proxy.
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+      # Seuils du rate-limiter in-memory (defaults backend : 5/30/100 par minute).
+      # Surchargeables via .env pour relacher en E2E (ex. 10000) ou durcir en prod.
+      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-5}
+      RATE_LIMIT_API_MAX: ${RATE_LIMIT_API_MAX:-30}
+      RATE_LIMIT_PUBLIC_MAX: ${RATE_LIMIT_PUBLIC_MAX:-100}
     volumes:
       - ./data:/app/data
       - app-certs:/app/certs
@@ -78,12 +83,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        # /api/v1 (relatif) : le bundle tape la meme origine, Next.js proxie
+        # /api/* vers BACKEND_INTERNAL_URL via la rewrite next.config.ts.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+        # rewrites() Next.js est evaluee au BUILD : l'URL doit etre dispo ici.
+        BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
-    environment:
-      NEXT_PUBLIC_API_URL: http://backend:8000
     ports:
       - "3000:3000"
     healthcheck:

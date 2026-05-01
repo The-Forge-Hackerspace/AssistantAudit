@@ -414,7 +414,10 @@ function EquipementsContent() {
           </div>
         ) : (
           <>
-            <Table>
+            {/* overflow-x-auto pour les viewports < 768px : la table déborde
+                sinon en mode tablette / mobile (scroll horizontal global). */}
+            <div className="w-full overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Type</TableHead>
@@ -468,6 +471,7 @@ function EquipementsContent() {
                 ))}
               </TableBody>
             </Table>
+            </div>
 
             {/* Pagination */}
             <CardFooter className="flex items-center justify-between">

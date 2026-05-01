@@ -117,7 +117,9 @@ class Monkey365Mapper:
             )
             mapped_count += 1
 
-        db.commit()
+        # Pas de commit ici : la couche tools/ ne possède pas la transaction.
+        # Le service appelant est responsable du commit.
+        db.flush()
 
         logger.info(
             f"Monkey365 Mapper : {mapped_count}/{len(findings)} findings mappés sur assessment #{assessment.id}"

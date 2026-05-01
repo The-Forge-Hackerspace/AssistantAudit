@@ -98,4 +98,8 @@ tests/manual/results/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
-/playwright-results/
+/playwright-results/.env.playwright
+playwright-report/
+playwright-results/
+test-results/
+tests/playwright/.auth/

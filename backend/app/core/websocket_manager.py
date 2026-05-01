@@ -9,6 +9,7 @@ Les evenements destines a un user deconnecte sont bufferises (30 min, max 1000)
 et rejoues a la reconnexion.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -28,6 +29,17 @@ class ConnectionManager:
         self.agent_connections: dict[str, WebSocket] = {}
         self.agent_owners: dict[str, int] = {}  # agent_uuid -> owner_id (from JWT, trusted)
         self.user_event_buffer: dict[int, list[tuple[datetime, dict]]] = {}
+        # Verrou par agent_uuid pour serialiser les reconnexions concurrentes
+        # (evite que deux WS en parallele ne s'invalident mutuellement).
+        self._agent_locks: dict[str, asyncio.Lock] = {}
+
+    def _get_agent_lock(self, agent_uuid: str) -> asyncio.Lock:
+        """Retourne le verrou de l'agent, le cree au besoin (single-threaded loop)."""
+        lock = self._agent_locks.get(agent_uuid)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._agent_locks[agent_uuid] = lock
+        return lock
 
     # ── User connections ──────────────────────────────────────────────
 
@@ -95,23 +107,29 @@ class ConnectionManager:
         agent_uuid = payload["sub"]
         owner_id = payload.get("owner_id")
 
-        # Si une connexion precedente existe pour ce meme agent, la fermer proprement
-        # avant d'en accepter une nouvelle (evite les WS zombie apres reseau instable).
-        old_ws = self.agent_connections.get(agent_uuid)
-        if old_ws is not None:
-            try:
-                await old_ws.close(code=1000, reason="Superseded by new connection")
-            except Exception:
-                logger.debug("Failed to close superseded agent WS", exc_info=True)
+        # Serialiser supersede + register sous un verrou par agent_uuid pour
+        # eviter qu'une reconnexion concurrente (meme agent) ne ferme la
+        # nouvelle WS ou ne laisse une ancienne en zombie dans le dict.
+        async with self._get_agent_lock(agent_uuid):
+            # Si une connexion precedente existe, on la remplace dans le dict
+            # AVANT toute await pour qu'aucune autre tache ne voie un slot vide.
+            old_ws = self.agent_connections.get(agent_uuid)
+            self.agent_connections[agent_uuid] = websocket
+            # Reinitialiser le mapping owner : si le nouveau JWT n'a pas
+            # d'owner_id, on evite de conserver l'ancien propriétaire
+            # (attributions erronées de tâches/notifications).
+            self.agent_owners.pop(agent_uuid, None)
+            if owner_id is not None:
+                self.agent_owners[agent_uuid] = int(owner_id)
 
-        await websocket.accept()
-        self.agent_connections[agent_uuid] = websocket
-        # Reinitialiser le mapping owner : si le nouveau JWT n'a pas d'owner_id,
-        # on evite de conserver l'ancien propriétaire (attributions erronées de
-        # tâches/notifications). Le mapping est restauré juste après si fourni.
-        self.agent_owners.pop(agent_uuid, None)
-        if owner_id is not None:
-            self.agent_owners[agent_uuid] = int(owner_id)
+            await websocket.accept()
+
+            if old_ws is not None:
+                try:
+                    await old_ws.close(code=1012, reason="Superseded by new connection")
+                except Exception:
+                    logger.debug("Failed to close superseded agent WS", exc_info=True)
+
         logger.info(f"WebSocket agent connected: owner={owner_id}")
         return agent_uuid
 

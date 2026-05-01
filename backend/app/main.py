@@ -76,6 +76,12 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
+    # Capture du loop principal pour permettre au code sync (threadpool FastAPI)
+    # d'y planifier des coroutines via asyncio.run_coroutine_threadsafe.
+    from .core.event_loop import set_app_loop
+
+    set_app_loop(asyncio.get_running_loop())
+
     # Demarrage du sweeper heartbeat agents (TOS-12)
     from .core.heartbeat_sweeper import run_heartbeat_sweeper
 
@@ -102,6 +108,12 @@ async def lifespan(app: FastAPI):
                 pass
             except Exception:
                 logger.exception("%s a levé une exception pendant le shutdown", name)
+
+        # Libère le pool de connexions SQLAlchemy avant l'arrêt du process.
+        from .core.database import engine
+
+        engine.dispose()
+
         logger.info(f"🛑 {settings.APP_NAME} arrêté")
 
 
@@ -228,15 +240,13 @@ def create_app() -> FastAPI:
             try:
                 # Routes publiques
                 if path in PUBLIC_PATHS:
-                    public_rate_limiter.check(request)
-                    public_rate_limiter.record_attempt(request)
+                    public_rate_limiter.acquire_attempt(request)
                 # Routes API (sauf auth — géré inline dans les routes)
                 elif path.startswith(settings.API_V1_PREFIX):
                     auth_prefix = f"{settings.API_V1_PREFIX}/auth/"
                     agents_enroll = f"{settings.API_V1_PREFIX}/agents/enroll"
                     if not path.startswith(auth_prefix) and path != agents_enroll:
-                        api_rate_limiter.check(request)
-                        api_rate_limiter.record_attempt(request)
+                        api_rate_limiter.acquire_attempt(request)
             except HTTPException as exc:
                 from starlette.responses import JSONResponse
 

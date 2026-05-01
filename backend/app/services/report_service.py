@@ -6,12 +6,11 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import HTTPException
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.orm import Session
 from weasyprint import HTML
 
-from ..core.errors import NotFoundError
+from ..core.errors import NotFoundError, ServerError
 from ..models.audit import Audit
 from ..models.entreprise import Entreprise
 from ..models.report import REPORT_SECTIONS, AuditReport, ReportSection
@@ -169,7 +168,9 @@ class ReportService:
         except Exception as e:
             report.status = "error"
             db.flush()
-            raise HTTPException(status_code=500, detail=f"Erreur génération PDF: {str(e)}")
+            # La cause technique reste côté logs (server_error_handler la
+            # relogue avec exc_info via __cause__) ; pas de fuite client.
+            raise ServerError("Erreur lors de la génération du rapport") from e
 
     @staticmethod
     def delete_report(db: Session, report_id: int, user_id: int, is_admin: bool) -> str:

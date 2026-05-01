@@ -43,6 +43,10 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY backend/ ./backend/
 COPY frameworks/ ./frameworks/
 
+# Le runtime opère depuis backend/ : alembic.ini y vit, et `docker compose exec
+# backend alembic upgrade head` doit fonctionner sans -c explicite.
+WORKDIR /app/backend
+
 # Frontend build statique
 COPY --from=frontend-builder /app/frontend/.next ./frontend/.next
 COPY --from=frontend-builder /app/frontend/public ./frontend/public
@@ -86,4 +90,4 @@ EXPOSE 8000
 # pour declencher HSTS, et X-Forwarded-For utilisable pour le rate-limit IP.
 # --forwarded-allow-ips : par defaut '*' (port 8000 non publie via NPMPlus).
 # A restreindre via FORWARDED_ALLOW_IPS=10.0.0.5 si le backend devient public.
-CMD ["sh", "-c", "cd /app/backend && python docker_entrypoint.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-*}\""]
+CMD ["sh", "-c", "python docker_entrypoint.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-*}\""]

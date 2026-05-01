@@ -8,12 +8,11 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from ..core.errors import NotFoundError
+from ..core.helpers import check_audit_access
 from ..models.assessment import (
     AssessmentCampaign,
     ComplianceStatus,
 )
-from ..models.audit import Audit
 from ..schemas.remediation_plan import (
     RemediationAction,
     RemediationHorizon,
@@ -51,17 +50,6 @@ class RemediationPlanService:
     """Calcule le plan de remediation d'un audit."""
 
     @staticmethod
-    def _check_audit_access(
-        db: Session, audit_id: int, user_id: int, is_admin: bool
-    ) -> Audit:
-        audit = db.query(Audit).filter(Audit.id == audit_id).first()
-        if not audit:
-            raise NotFoundError("Audit non trouve")
-        if not is_admin and audit.owner_id != user_id:
-            raise NotFoundError("Audit non trouve")
-        return audit
-
-    @staticmethod
     def generate(
         db: Session, audit_id: int, user_id: int, is_admin: bool
     ) -> RemediationPlan:
@@ -70,7 +58,7 @@ class RemediationPlanService:
         Toutes les non-conformites sont incluses. L'horizon et la charge sont
         derives de la severite du controle (heuristique par defaut).
         """
-        RemediationPlanService._check_audit_access(db, audit_id, user_id, is_admin)
+        check_audit_access(db, audit_id, user_id, is_admin)
 
         campaigns = (
             db.query(AssessmentCampaign)

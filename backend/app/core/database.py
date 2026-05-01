@@ -4,6 +4,7 @@ Supporte PostgreSQL (psycopg2) et SQLite (dev/tests).
 Fournit le moteur, la session factory et le modele de base.
 """
 
+from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import create_engine, event
@@ -78,6 +79,22 @@ def get_db():
     Generateur de session DB pour injection de dependance FastAPI.
     Auto-commit on success, auto-rollback on exception.
     Usage: db: Session = Depends(get_db)
+    """
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+@contextmanager
+def get_db_session():
+    """Session DB pour contextes hors HTTP (threads, WS handlers, sweepers).
+    Gère commit/rollback/close automatiquement.
     """
     db = SessionLocal()
     try:

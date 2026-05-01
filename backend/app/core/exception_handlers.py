@@ -9,7 +9,14 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.core.errors import AppError, BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
+from app.core.errors import (
+    AppError,
+    BusinessRuleError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ServerError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +76,22 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(BusinessRuleError)
     async def business_rule_error_handler(request: Request, exc: BusinessRuleError):
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)})
+
+    @app.exception_handler(ServerError)
+    async def server_error_handler(request: Request, exc: ServerError):
+        # 500 ciblé : défaillance interne attendue (PDF, dépendance externe…).
+        # Loguer la cause complète si présente ; ne pas l'exposer au client.
+        logger.error(
+            "ServerError on %s %s: %s",
+            request.method,
+            request.url.path,
+            exc,
+            exc_info=exc.__cause__ or exc,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": str(exc), "error_type": "server_error"},
+        )
 
     @app.exception_handler(AppError)
     async def app_error_handler(request: Request, exc: AppError):

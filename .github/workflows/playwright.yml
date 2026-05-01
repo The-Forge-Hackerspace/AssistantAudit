@@ -20,6 +20,15 @@ jobs:
     env:
       ENV: testing
       POSTGRES_PASSWORD: changeme
+      # Relache le rate-limiter pour les tests E2E parallelisables
+      # (3 navigateurs * N tests * retries depuis l'IP unique du runner).
+      RATE_LIMIT_AUTH_MAX: 10000
+      RATE_LIMIT_API_MAX: 10000
+      RATE_LIMIT_PUBLIC_MAX: 10000
+      # Credentials admin pour les specs Playwright qui s'authentifient via UI
+      # (auth.spec.ts:14). Sans ces vars, locator.fill plante avec 'value: undefined'.
+      PLAYWRIGHT_ADMIN_EMAIL: admin@assistantaudit.fr
+      PLAYWRIGHT_ADMIN_PASSWORD: Admin1234!
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
@@ -34,6 +43,14 @@ jobs:
 
     - name: Start stack (Docker Compose)
       run: docker compose up -d --build db backend frontend
+
+    # Le rewrite Next.js /api/* -> backend:8000 fait que les redirects 307
+    # trailing-slash de Starlette renvoient un Location avec netloc=backend:8000.
+    # Playwright tournant sur le runner GH (hors Docker) ne peut pas resoudre
+    # ce hostname interne. Le port 8000 etant publie sur 127.0.0.1, on mappe
+    # le hostname pour que Playwright puisse suivre les redirects.
+    - name: Mappe le hostname Docker 'backend' sur 127.0.0.1 pour les redirects
+      run: echo "127.0.0.1 backend" | sudo tee -a /etc/hosts
 
     - name: Wait for backend health
       run: |
@@ -68,7 +85,7 @@ jobs:
     - name: Seed admin user for E2E tests
       run: |
         docker compose exec -T \
-          -e ADMIN_EMAIL=admin@assistantaudit.local \
+          -e ADMIN_EMAIL=admin@assistantaudit.fr \
           -e ADMIN_PASSWORD=Admin1234! \
           backend python /app/backend/init_db.py
 
@@ -79,7 +96,7 @@ jobs:
           code=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST "http://127.0.0.1:8000/api/v1/auth/login" \
             -H "Content-Type: application/x-www-form-urlencoded" \
-            --data-urlencode "username=admin@assistantaudit.local" \
+            --data-urlencode "username=admin@assistantaudit.fr" \
             --data-urlencode "password=Admin1234!")
           if [ "$code" = "200" ]; then
             echo "Admin auth OK"
@@ -93,7 +110,18 @@ jobs:
         exit 1
 
     - name: Run Playwright tests
+      env:
+        # Le frontend Next.js ne proxie pas /api/* ; on pointe explicitement
+        # le global-setup et les requetes API sur le backend Docker.
+        PLAYWRIGHT_API_URL: http://127.0.0.1:8000
       run: npx playwright test
+    - name: Dump backend + frontend logs on failure
+      if: failure()
+      run: |
+        echo "===== backend logs ====="
+        docker compose logs backend --no-color --tail=400 || true
+        echo "===== frontend logs ====="
+        docker compose logs frontend --no-color --tail=200 || true
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
