@@ -98,6 +98,13 @@ jobs:
         # le global-setup et les requetes API sur le backend Docker.
         PLAYWRIGHT_API_URL: http://127.0.0.1:8000
       run: npx playwright test
+    - name: Dump backend + frontend logs on failure
+      if: failure()
+      run: |
+        echo "===== backend logs ====="
+        docker compose logs backend --no-color --tail=400 || true
+        echo "===== frontend logs ====="
+        docker compose logs frontend --no-color --tail=200 || true
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
