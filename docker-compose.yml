@@ -52,6 +52,11 @@ services:
       # Restreindre aux IPs du reverse proxy en prod (NPMPlus). '*' par defaut
       # car le port 8000 du backend n'est pas publie via le proxy.
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+      # Seuils du rate-limiter in-memory (defaults backend : 5/30/100 par minute).
+      # Surchargeables via .env pour relacher en E2E (ex. 10000) ou durcir en prod.
+      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-5}
+      RATE_LIMIT_API_MAX: ${RATE_LIMIT_API_MAX:-30}
+      RATE_LIMIT_PUBLIC_MAX: ${RATE_LIMIT_PUBLIC_MAX:-100}
     volumes:
       - ./data:/app/data
       - app-certs:/app/certs
