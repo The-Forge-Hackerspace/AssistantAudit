@@ -4,6 +4,11 @@ WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci --prefer-offline
 COPY frontend/ ./
+# NEXT_PUBLIC_* doit etre disponible au build (bake dans le bundle JS).
+# Defaut /api/v1 (relatif) : le client tape la meme origine et Next.js
+# proxie /api/* vers le backend via BACKEND_INTERNAL_URL au runtime.
+ARG NEXT_PUBLIC_API_URL=/api/v1
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 ENV PORT=3000
 EXPOSE 3000

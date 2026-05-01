@@ -78,12 +78,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        # /api/v1 (relatif) : le bundle tape la meme origine, Next.js proxie
+        # /api/* vers BACKEND_INTERNAL_URL via la rewrite next.config.ts.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8000
+      # Cible interne du proxy /api/* (cf. next.config.ts rewrites).
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
     ports:
       - "3000:3000"
     healthcheck:
