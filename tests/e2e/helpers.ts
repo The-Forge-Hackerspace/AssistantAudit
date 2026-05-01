@@ -3,12 +3,13 @@
  *  - construction de noms uniques par run
  *  - création/suppression de ressources via l'API (setup propre, pas via UI)
  */
+import { randomBytes, randomInt } from 'crypto';
 import type { APIRequestContext } from '@playwright/test';
 
 let counter = 0;
 export function uniq(prefix: string): string {
   counter += 1;
-  return `${prefix}-${Date.now()}-${counter}-${Math.random().toString(36).slice(2, 7)}`;
+  return `${prefix}-${Date.now()}-${counter}-${randomBytes(3).toString('hex')}`;
 }
 
 export interface CreatedEntreprise {
@@ -77,9 +78,7 @@ export async function createEquipement(
 ): Promise<CreatedEquipement> {
   const ip =
     overrides.ip_address ??
-    `10.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}.${
-      Math.floor(Math.random() * 250) + 1
-    }`;
+    `10.${randomInt(1, 251)}.${randomInt(1, 251)}.${randomInt(1, 251)}`;
   const r = await api.post('/api/v1/equipements', {
     data: {
       site_id: siteId,
