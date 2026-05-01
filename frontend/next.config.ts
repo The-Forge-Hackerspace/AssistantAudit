@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
     const backendUrl = process.env.BACKEND_INTERNAL_URL;
     if (!backendUrl) return [];
     return [
+      // Pattern slashe en premier : preserve le trailing slash quand il est present.
+      // Sans ca, ':path*' drop le slash et le backend renvoie un 307 absolute vers
+      // backend:8000/...slashed, ce qui casse les cookies httpOnly cross-origin.
+      { source: '/api/:path*/', destination: `${backendUrl}/api/:path*/` },
       { source: '/api/:path*', destination: `${backendUrl}/api/:path*` },
     ];
   },
