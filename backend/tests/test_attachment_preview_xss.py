@@ -12,7 +12,6 @@ Réf. OWASP ASVS V14.4.5 + OWASP API Top 10 2025 « Unsafe File Upload ».
 
 import uuid
 
-from app.models.attachment import Attachment
 from tests.factories import (
     AssessmentCampaignFactory,
     AssessmentFactory,

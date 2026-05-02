@@ -18,7 +18,7 @@ from app.models.agent import Agent
 from app.models.collect_pipeline import CollectPipeline, PipelineStatus, PipelineStepStatus
 from app.models.entreprise import Entreprise
 from app.models.site import Site
-from app.core.errors import BusinessRuleError, NotFoundError
+from app.core.errors import NotFoundError
 
 # ── Fixtures ───────────────────────────────────────────────────────────────
 

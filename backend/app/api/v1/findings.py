@@ -2,7 +2,7 @@
 
 import math
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ...core.deps import PaginationParams, RbacContext, get_db, get_rbac_context

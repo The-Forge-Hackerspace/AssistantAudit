@@ -8,9 +8,8 @@ fois (au minimum une fois par phase + une fois par itération de polling).
 from __future__ import annotations
 
 from contextlib import contextmanager
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from app.services import pipeline_service
 
