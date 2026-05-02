@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ...core.config import get_settings
 from ...core.database import get_db
 from ...core.deps import get_current_admin, get_current_user
+from ...core.logging_config import hash_username
 from ...core.rate_limit import login_rate_limiter
 from ...core.security import validate_refresh_token
 from ...models.user import User
@@ -87,7 +88,10 @@ def login(
     """
     login_rate_limiter.acquire_attempt(request)
 
-    logger.info(f"[LOGIN] Tentative login user='{form_data.username}'")
+    logger.info(
+        "login_attempt",
+        extra={"event": "login_attempt", "username_hash": hash_username(form_data.username)},
+    )
     user = AuthService.authenticate(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -105,6 +109,10 @@ def login_json(request: Request, response: Response, body: LoginRequest, db: Ses
     """Authentification par JSON body (pour les clients API)"""
     login_rate_limiter.acquire_attempt(request)
 
+    logger.info(
+        "login_attempt",
+        extra={"event": "login_attempt", "username_hash": hash_username(body.username)},
+    )
     user = AuthService.authenticate(db, body.username, body.password)
     if not user:
         raise HTTPException(
@@ -210,5 +218,6 @@ def change_password(
 @router.post("/logout", response_model=MessageResponse)
 def logout(response: Response):
     """Déconnexion : supprime les cookies d'auth httpOnly côté client."""
+    logger.info("logout", extra={"event": "logout"})
     _clear_auth_cookies(response)
     return MessageResponse(message="Déconnecté avec succès")

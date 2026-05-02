@@ -41,92 +41,100 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         if request.scope.get("type") == "websocket":
             return await call_next(request)
 
-        # Generate request ID
+        # Generate request ID + capture le Token pour reset() en finally (TOS-82).
+        # Sans reset, l'ID fuit entre requêtes partageant le même thread du
+        # threadpool FastAPI (ContextVar persiste hors du scope d'origine).
         request_id = str(uuid.uuid4())
-        LogContext.set_request_id(request_id)
+        request_id_token = LogContext.push_request_id(request_id)
 
-        # Extract user info if available
         try:
-            user_id = getattr(request.state, "user_id", None)
-            if user_id:
-                LogContext.set_user_id(user_id)
-        except Exception:
-            pass
-
-        # Skip health check endpoints from audit logging
-        if request.url.path in ["/health", "/healthz", "/ready", "/liveness"]:
-            return await call_next(request)
-
-        # Request start
-        start_time = time.time()
-
-        # Try to capture request body for POST/PUT/PATCH
-        if request.method in ["POST", "PUT", "PATCH"]:
+            # Extract user info if available
             try:
-                body = await request.body()
-                if body:
-                    try:
-                        body.decode("utf-8")[:500]  # Validate decodable
-                    except UnicodeDecodeError:
-                        pass
+                user_id = getattr(request.state, "user_id", None)
+                if user_id:
+                    LogContext.set_user_id(user_id)
+            except Exception:
+                pass
 
-                # Ensure request body is accessible later
-                async def receive():
-                    return {"type": "http.request", "body": body}
+            # Skip health check endpoints from audit logging
+            if request.url.path in ["/health", "/healthz", "/ready", "/liveness"]:
+                return await call_next(request)
 
-                request._receive = receive
-            except Exception as e:
-                self.logger.debug(f"Could not capture request body: {e}")
+            # Request start
+            start_time = time.time()
 
-        # Log request received
-        self.logger.info(
-            "HTTP request received",
-            extra={
-                "request_id": request_id,
-                "method": request.method,
-                "path": request.url.path,
-                "query_params": dict(request.query_params),
-                "user_agent": request.headers.get("user-agent", "unknown"),
-            },
-        )
+            # Try to capture request body for POST/PUT/PATCH
+            if request.method in ["POST", "PUT", "PATCH"]:
+                try:
+                    body = await request.body()
+                    if body:
+                        try:
+                            body.decode("utf-8")[:500]  # Validate decodable
+                        except UnicodeDecodeError:
+                            pass
 
-        # Call the actual endpoint
-        try:
-            response = await call_next(request)
-        except Exception as exc:
-            duration_ms = (time.time() - start_time) * 1000
-            self.logger.error(
-                "HTTP request failed with exception",
+                    # Ensure request body is accessible later
+                    async def receive():
+                        return {"type": "http.request", "body": body}
+
+                    request._receive = receive
+                except Exception as e:
+                    self.logger.debug(f"Could not capture request body: {e}")
+
+            # Log request received
+            self.logger.info(
+                "HTTP request received",
                 extra={
                     "request_id": request_id,
                     "method": request.method,
                     "path": request.url.path,
-                    "duration_ms": duration_ms,
-                    "error": str(exc),
+                    "query_params": dict(request.query_params),
+                    "user_agent": request.headers.get("user-agent", "unknown"),
                 },
             )
-            raise
 
-        # Log response
-        duration_ms = (time.time() - start_time) * 1000
-        log_level = "info" if response.status_code < 400 else "warning"
+            # Call the actual endpoint
+            try:
+                response = await call_next(request)
+            except Exception as exc:
+                duration_ms = (time.time() - start_time) * 1000
+                self.logger.error(
+                    "HTTP request failed with exception",
+                    extra={
+                        "request_id": request_id,
+                        "method": request.method,
+                        "path": request.url.path,
+                        "duration_ms": duration_ms,
+                        "error": str(exc),
+                    },
+                )
+                raise
 
-        log_method = getattr(self.logger, log_level)
-        log_method(
-            "HTTP response sent",
-            extra={
-                "request_id": request_id,
-                "method": request.method,
-                "path": request.url.path,
-                "status_code": response.status_code,
-                "duration_ms": round(duration_ms, 2),
-            },
-        )
+            # Log response
+            duration_ms = (time.time() - start_time) * 1000
+            log_level = "info" if response.status_code < 400 else "warning"
 
-        # Add request ID to response header for tracing
-        response.headers["X-Request-ID"] = request_id
+            log_method = getattr(self.logger, log_level)
+            log_method(
+                "HTTP response sent",
+                extra={
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": response.status_code,
+                    "duration_ms": round(duration_ms, 2),
+                },
+            )
 
-        return response
+            # Add request ID to response header for tracing
+            response.headers["X-Request-ID"] = request_id
+
+            return response
+        finally:
+            # Reset the ContextVar pour libérer la valeur entre requêtes (TOS-82).
+            # Sans cela, l'ID persiste sur le thread et fuit dans les logs de la
+            # requête suivante exécutée sur le même thread du threadpool.
+            LogContext.reset_request_id(request_id_token)
 
 
 # ────────────────────────────────────────────────────────────────────────
