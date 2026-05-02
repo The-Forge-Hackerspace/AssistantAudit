@@ -9,12 +9,12 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from ..core.errors import NotFoundError
 from ..models.assessment import Assessment, ComplianceStatus, ControlResult
 from ..models.config_analysis import ConfigAnalysis
 from ..models.equipement import Equipement, EquipementFirewall
 from ..models.site import Site
 from ..schemas.scan import ConfigAnalysisResult
-from ..core.errors import NotFoundError
 
 logger = logging.getLogger(__name__)
 

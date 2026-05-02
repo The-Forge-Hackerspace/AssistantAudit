@@ -15,7 +15,6 @@ from pythonjsonlogger import json as jsonlogger
 
 from .config import get_settings
 
-
 # ────────────────────────────────────────────────────────────────────────
 # PII Masking Helpers (TOS-82)
 # ────────────────────────────────────────────────────────────────────────

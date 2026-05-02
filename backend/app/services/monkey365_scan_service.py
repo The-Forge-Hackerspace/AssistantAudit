@@ -10,13 +10,13 @@ from typing import Protocol, cast
 
 from ..core.config import get_settings
 from ..core.database import get_db_session
+from ..core.errors import BusinessRuleError, NotFoundError
 from ..core.storage import ensure_scan_directory, slugify, write_meta_json
 from ..models.entreprise import Entreprise
 from ..models.enums import AuthMethod
 from ..models.monkey365_scan_result import Monkey365ScanResult, Monkey365ScanStatus
 from ..schemas.scan import Monkey365ConfigSchema
 from ..tools.monkey365_runner.executor import Monkey365Config, Monkey365Executor
-from ..core.errors import BusinessRuleError, NotFoundError
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

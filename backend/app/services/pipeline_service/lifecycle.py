@@ -14,7 +14,6 @@ from typing import Optional
 
 from ...models.agent import Agent
 from ...models.collect_pipeline import CollectPipeline, PipelineStatus, PipelineStepStatus
-
 from . import _pkg
 from .crud import _utcnow
 

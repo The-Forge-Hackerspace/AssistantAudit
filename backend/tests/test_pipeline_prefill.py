@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.orm import Session
 
+from app.core.errors import BusinessRuleError, NotFoundError
 from app.models.agent import Agent
 from app.models.agent_task import AgentTask
 from app.models.assessment import ComplianceStatus
@@ -25,7 +26,6 @@ from tests.factories import (
     FrameworkCategoryFactory,
     FrameworkFactory,
 )
-from app.core.errors import BusinessRuleError, NotFoundError
 
 # ── Fixtures ───────────────────────────────────────────────────────────────
 

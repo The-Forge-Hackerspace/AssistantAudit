@@ -12,12 +12,11 @@ import logging
 from ...models.agent import Agent
 from ...models.collect_pipeline import CollectPipeline, PipelineStepStatus
 from ...models.equipement import Equipement
-
 from . import _pkg
 from .profile import (
+    _PROFILE_METHOD,
     AutoCollectProfile,
     NmapHost,
-    _PROFILE_METHOD,
     _normalize_host,
 )
 

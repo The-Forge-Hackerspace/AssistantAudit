@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from ..models.anssi_checklist import AnssiCheckpoint
 from ..core.errors import ValidationError
+from ..models.anssi_checklist import AnssiCheckpoint
 
 logger = logging.getLogger(__name__)
 

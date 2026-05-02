@@ -18,8 +18,8 @@ from sqlalchemy.orm import Session
 
 from ...core.config import get_settings
 from ...core.database import get_db
-from ...core.http_helpers import safe_content_disposition
 from ...core.deps import get_current_auditeur, get_current_user
+from ...core.http_helpers import safe_content_disposition
 from ...models.assessment import Assessment
 from ...models.attachment import Attachment
 from ...models.user import User

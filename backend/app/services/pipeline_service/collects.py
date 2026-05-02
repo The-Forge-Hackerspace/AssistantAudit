@@ -14,10 +14,9 @@ from typing import Optional
 from ...models.collect_pipeline import CollectPipeline, PipelineStepStatus
 from ...models.collect_result import CollectResult, CollectStatus
 from ...models.equipement import Equipement
-
 from . import _pkg
 from .crud import _utcnow
-from .profile import AutoCollectProfile, _PROFILE_METHOD
+from .profile import _PROFILE_METHOD, AutoCollectProfile
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +40,7 @@ def _run_collects_phase(
     transport: str,
 ) -> None:
     """Phase 3 : dispatcher une collecte par equipement vers l'agent et poller le resultat."""
-    from .. import collect_service
-    from .. import task_service
+    from .. import collect_service, task_service
     pkg = _pkg.get()
 
     if not targets:

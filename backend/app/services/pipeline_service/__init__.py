@@ -30,25 +30,7 @@ from ...models.collect_pipeline import (  # noqa: F401
     PipelineStatus,
     PipelineStepStatus,
 )
-
-# API publique : profil
-from .profile import (  # noqa: F401
-    AutoCollectProfile,
-    NmapHost,
-    NmapPort,
-    _PROFILE_METHOD,
-    _host_signals,
-    _matches,
-    _normalize_host,
-    _open_port_numbers,
-    detect_collect_profile,
-)
-
-# API publique : pré-remplissage
-from .prefill import (  # noqa: F401
-    NMAP_CONTROL_MAP,
-    prefill_assessment_from_pipeline,
-)
+from .collects import _run_collects_phase  # noqa: F401
 
 # API publique : CRUD
 from .crud import (  # noqa: F401
@@ -57,6 +39,9 @@ from .crud import (  # noqa: F401
     get_pipeline,
     list_pipelines,
 )
+
+# API publique : orchestration top-level
+from .lifecycle import execute_pipeline_background  # noqa: F401
 
 # API publique : notifications + polling
 from .notifications import (  # noqa: F401
@@ -71,11 +56,24 @@ from .phases import (  # noqa: F401
     _run_scan_phase,
 )
 
-from .collects import _run_collects_phase  # noqa: F401
+# API publique : pré-remplissage
+from .prefill import (  # noqa: F401
+    NMAP_CONTROL_MAP,
+    prefill_assessment_from_pipeline,
+)
 
-# API publique : orchestration top-level
-from .lifecycle import execute_pipeline_background  # noqa: F401
-
+# API publique : profil
+from .profile import (  # noqa: F401
+    _PROFILE_METHOD,
+    AutoCollectProfile,
+    NmapHost,
+    NmapPort,
+    _host_signals,
+    _matches,
+    _normalize_host,
+    _open_port_numbers,
+    detect_collect_profile,
+)
 
 __all__ = [
     # types

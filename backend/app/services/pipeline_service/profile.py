@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional, TypedDict
 
-
 # Profils supportés par la détection automatique.
 # Les profils "stormshield" / "fortigate" existent côté collecteur mais ne
 # sont pas auto-détectables de façon fiable depuis un scan Nmap : ils doivent

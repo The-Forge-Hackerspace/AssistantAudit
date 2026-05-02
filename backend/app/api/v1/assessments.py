@@ -6,7 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import PaginationParams, RbacContext, get_current_auditeur, get_rbac_context, get_rbac_context_auditeur
+from ...core.deps import (
+    PaginationParams,
+    RbacContext,
+    get_current_auditeur,
+    get_rbac_context,
+    get_rbac_context_auditeur,
+)
 from ...models.user import User
 from ...schemas.assessment import (
     AssessmentCreate,

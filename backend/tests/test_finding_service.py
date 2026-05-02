@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
+from app.core.errors import BusinessRuleError, NotFoundError
 from app.models.assessment import (
     Assessment,
     AssessmentCampaign,
@@ -20,7 +21,6 @@ from app.models.framework import CheckType, Control, ControlSeverity, Framework,
 from app.models.site import Site
 from app.models.user import User
 from app.services.finding_service import FindingService
-from app.core.errors import BusinessRuleError, NotFoundError
 
 
 @pytest.fixture(scope="module")

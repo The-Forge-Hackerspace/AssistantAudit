@@ -11,7 +11,6 @@ from ...core.errors import BusinessRuleError, NotFoundError
 from ...models.agent_task import AgentTask
 from ...models.assessment import Assessment, ComplianceStatus, ControlResult
 from ...models.collect_pipeline import CollectPipeline, PipelineStatus
-
 from .profile import NmapHost, _normalize_host
 
 logger = logging.getLogger(__name__)

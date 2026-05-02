@@ -168,7 +168,8 @@ def refresh(
     old_jti = payload.get("jti")
     old_exp = payload.get("exp")
     if old_jti and old_exp is not None:
-        from datetime import datetime as _dt, timezone as _tz
+        from datetime import datetime as _dt
+        from datetime import timezone as _tz
         revoke_refresh_jti(old_jti, _dt.fromtimestamp(int(old_exp), tz=_tz.utc))
 
     login_rate_limiter.reset(request)

@@ -23,7 +23,6 @@ import pytest
 from app.core.task_runner import LocalTaskRunner, TaskStatus
 from app.core.websocket_manager import ConnectionManager
 
-
 # ── LocalTaskRunner.shutdown ────────────────────────────────────────────
 
 

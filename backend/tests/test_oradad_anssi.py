@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy.orm import Session
 
+from app.core.errors import ValidationError
 from app.models.anssi_checklist import AnssiCheckpoint
 from app.services.oradad_analysis_service import (
     UAC_ACCOUNTDISABLE,
@@ -21,7 +22,6 @@ from app.services.oradad_analysis_service import (
     OradadAnalysisService,
 )
 from scripts.seed_anssi_checkpoints import ANSSI_CHECKPOINTS, seed
-from app.core.errors import ValidationError
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 

@@ -14,7 +14,6 @@ from typing import Optional
 
 from ...models.agent_task import AgentTask
 from ...models.collect_pipeline import CollectPipeline
-
 from . import _pkg
 
 logger = logging.getLogger(__name__)
