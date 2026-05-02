@@ -465,134 +465,176 @@ def _pipeline_event(pipeline: CollectPipeline) -> dict:
     }
 
 
+def _poll_agent_task(task_id: int, timeout_sec: int, poll_interval_sec: int) -> Optional[AgentTask]:
+    """Poll l'AgentTask via une session courte par iteration (TOS-81).
+
+    Retourne l'AgentTask en etat terminal (`completed`/`failed`/`cancelled`),
+    ou None si introuvable / timeout. Aucune session n'est tenue entre deux
+    iterations : chaque tick ouvre/ferme un `get_db_session()` pour ne pas
+    saturer le pool SQLAlchemy ni geler un snapshot REPEATABLE READ.
+    """
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        time.sleep(poll_interval_sec)
+        with get_db_session() as poll_db:
+            logger.debug("Pipeline polling : open short session for AgentTask #%s", task_id)
+            task_reloaded = poll_db.get(AgentTask, task_id)
+            if task_reloaded is None:
+                return None
+            if task_reloaded.status in ("completed", "failed", "cancelled"):
+                # Detacher : la session se ferme apres ce bloc
+                poll_db.expunge(task_reloaded)
+                return task_reloaded
+            # Forcer la fin de transaction implicite avant fermeture
+            poll_db.rollback()
+    return None  # timeout
+
+
 def _run_scan_phase(
-    db: Session,
-    pipeline: CollectPipeline,
+    pipeline_id: int,
     current_user_id: int,
 ) -> list[NmapHost] | None:
     """Phase 1 : dispatch du scan Nmap vers l'agent, polling jusqu'au résultat.
 
-    Retourne la liste des hôtes normalisés (ou None si échec/timeout).
+    Ouvre/ferme sa propre session courte (TOS-81). Retourne la liste des
+    hôtes normalisés (ou None si échec/timeout).
     """
     from . import task_service
 
-    agent = db.get(Agent, pipeline.agent_id) if pipeline.agent_id else None
-    if agent is None:
-        pipeline.scan_status = PipelineStepStatus.FAILED
-        pipeline.error_message = "Agent introuvable"
-        return None
-
-    try:
-        task = task_service.dispatch_task(
-            db=db,
-            agent_uuid=agent.agent_uuid,
-            tool="nmap",
-            parameters={
-                "target": pipeline.target,
-                "scan_type": "port_scan",
-            },
-            current_user_id=current_user_id,
-        )
-    except Exception as exc:
-        logger.exception("Pipeline #%s : dispatch nmap échoué", pipeline.id)
-        pipeline.scan_status = PipelineStepStatus.FAILED
-        pipeline.error_message = f"Dispatch nmap échoué : {exc}"
-        return None
-
-    pipeline.scan_task_uuid = task.task_uuid
-    pipeline.scan_status = PipelineStepStatus.RUNNING
-    db.commit()
-
-    task_service.notify_agent_new_task(agent.agent_uuid, task)
-
-    # Polling jusqu'à completed/failed/timeout
-    deadline = time.monotonic() + _SCAN_TIMEOUT_SEC
-    while time.monotonic() < deadline:
-        time.sleep(_SCAN_POLL_INTERVAL_SEC)
-        db.expire_all()
-        task_reloaded = db.get(AgentTask, task.id)
-        if task_reloaded is None:
-            pipeline.scan_status = PipelineStepStatus.FAILED
-            pipeline.error_message = "Tâche agent introuvable"
+    logger.debug("Pipeline #%s : open scan-phase session", pipeline_id)
+    with get_db_session() as db:
+        pipeline = db.get(CollectPipeline, pipeline_id)
+        if pipeline is None:
             return None
-        if task_reloaded.status in ("completed", "failed", "cancelled"):
-            task = task_reloaded
-            break
-    else:
-        pipeline.scan_status = PipelineStepStatus.FAILED
-        pipeline.error_message = "Timeout du scan agent"
-        return None
+        agent = db.get(Agent, pipeline.agent_id) if pipeline.agent_id else None
+        if agent is None:
+            pipeline.scan_status = PipelineStepStatus.FAILED
+            pipeline.error_message = "Agent introuvable"
+            db.commit()
+            return None
 
-    if task.status != "completed":
-        pipeline.scan_status = PipelineStepStatus.FAILED
-        pipeline.error_message = task.error_message or f"Scan {task.status}"
-        return None
+        try:
+            task = task_service.dispatch_task(
+                db=db,
+                agent_uuid=agent.agent_uuid,
+                tool="nmap",
+                parameters={
+                    "target": pipeline.target,
+                    "scan_type": "port_scan",
+                },
+                current_user_id=current_user_id,
+            )
+        except Exception as exc:
+            logger.exception("Pipeline #%s : dispatch nmap échoué", pipeline_id)
+            pipeline.scan_status = PipelineStepStatus.FAILED
+            pipeline.error_message = f"Dispatch nmap échoué : {exc}"
+            db.commit()
+            return None
 
-    raw_hosts = (task.result_summary or {}).get("hosts") or []
-    hosts: list[NmapHost] = [_normalize_host(h) for h in raw_hosts if isinstance(h, dict)]
-    pipeline.hosts_discovered = len(hosts)
-    pipeline.scan_status = PipelineStepStatus.COMPLETED
-    return hosts
+        pipeline.scan_task_uuid = task.task_uuid
+        pipeline.scan_status = PipelineStepStatus.RUNNING
+        db.commit()
+        agent_uuid_local = agent.agent_uuid
+        task_id_local = task.id
+
+    # Notification hors session (pas de DB I/O dans le notify).
+    task_service.notify_agent_new_task(agent_uuid_local, task)
+    logger.debug("Pipeline #%s : scan-phase session closed before polling", pipeline_id)
+
+    # Polling : sessions courtes, une par iteration.
+    final_task = _poll_agent_task(task_id_local, _SCAN_TIMEOUT_SEC, _SCAN_POLL_INTERVAL_SEC)
+
+    logger.debug("Pipeline #%s : open scan-phase finalize session", pipeline_id)
+    with get_db_session() as db:
+        pipeline = db.get(CollectPipeline, pipeline_id)
+        if pipeline is None:
+            return None
+
+        if final_task is None:
+            pipeline.scan_status = PipelineStepStatus.FAILED
+            pipeline.error_message = "Timeout du scan agent ou tâche agent introuvable"
+            db.commit()
+            return None
+
+        if final_task.status != "completed":
+            pipeline.scan_status = PipelineStepStatus.FAILED
+            pipeline.error_message = final_task.error_message or f"Scan {final_task.status}"
+            db.commit()
+            return None
+
+        raw_hosts = (final_task.result_summary or {}).get("hosts") or []
+        hosts: list[NmapHost] = [_normalize_host(h) for h in raw_hosts if isinstance(h, dict)]
+        pipeline.hosts_discovered = len(hosts)
+        pipeline.scan_status = PipelineStepStatus.COMPLETED
+        db.commit()
+        return hosts
 
 
 def _run_equipments_phase(
-    db: Session,
-    pipeline: CollectPipeline,
+    pipeline_id: int,
     hosts: list[NmapHost],
-) -> list[tuple[Equipement, AutoCollectProfile]]:
+) -> list[tuple[int, AutoCollectProfile]]:
     """Phase 2 : pour chaque host, detecter le profil et creer/dedupliquer l'equipement.
 
-    Retourne la liste (equipement, profile) a collecter ensuite.
+    Ouvre/ferme sa propre session courte (TOS-81). Retourne la liste
+    (equipement_id, profile) a collecter ensuite — on renvoie les ids
+    plutôt que des objets pour eviter qu'ils survivent a la session.
     """
-    pipeline.equipments_status = PipelineStepStatus.RUNNING
-    db.commit()
+    logger.debug("Pipeline #%s : open equipments-phase session", pipeline_id)
+    with get_db_session() as db:
+        pipeline = db.get(CollectPipeline, pipeline_id)
+        if pipeline is None:
+            return []
 
-    to_collect: list[tuple[Equipement, AutoCollectProfile]] = []
+        pipeline.equipments_status = PipelineStepStatus.RUNNING
+        db.commit()
 
-    for host in hosts:
-        profile = detect_collect_profile(host)
-        ip = host.get("ip") or ""
-        if profile is None or not ip:
-            pipeline.hosts_skipped += 1
-            continue
+        to_collect: list[tuple[int, AutoCollectProfile]] = []
 
-        equip_type = _PROFILE_METHOD[profile][2]
-        existing = (
-            db.query(Equipement)
-            .filter(
-                Equipement.site_id == pipeline.site_id,
-                Equipement.ip_address == ip,
+        for host in hosts:
+            profile = detect_collect_profile(host)
+            ip = host.get("ip") or ""
+            if profile is None or not ip:
+                pipeline.hosts_skipped += 1
+                continue
+
+            equip_type = _PROFILE_METHOD[profile][2]
+            existing = (
+                db.query(Equipement)
+                .filter(
+                    Equipement.site_id == pipeline.site_id,
+                    Equipement.ip_address == ip,
+                )
+                .first()
             )
-            .first()
-        )
-        if existing is not None:
-            equip = existing
-        else:
-            equip = Equipement(
-                site_id=pipeline.site_id,
-                type_equipement=equip_type,
-                ip_address=ip,
-                hostname=host.get("hostname") or None,
-                mac_address=host.get("mac") or None,
-                fabricant=host.get("vendor") or None,
-                os_detected=host.get("os") or None,
-            )
-            db.add(equip)
-            db.flush()
-            pipeline.equipments_created += 1
+            if existing is not None:
+                equip = existing
+            else:
+                equip = Equipement(
+                    site_id=pipeline.site_id,
+                    type_equipement=equip_type,
+                    ip_address=ip,
+                    hostname=host.get("hostname") or None,
+                    mac_address=host.get("mac") or None,
+                    fabricant=host.get("vendor") or None,
+                    os_detected=host.get("os") or None,
+                )
+                db.add(equip)
+                db.flush()
+                pipeline.equipments_created += 1
 
-        to_collect.append((equip, profile))
+            to_collect.append((equip.id, profile))
 
-    pipeline.equipments_status = PipelineStepStatus.COMPLETED
-    pipeline.collects_total = len(to_collect)
-    db.commit()
-    return to_collect
+        pipeline.equipments_status = PipelineStepStatus.COMPLETED
+        pipeline.collects_total = len(to_collect)
+        db.commit()
+        logger.debug("Pipeline #%s : equipments-phase session closed", pipeline_id)
+        return to_collect
 
 
 def _run_collects_phase(
-    db: Session,
-    pipeline: CollectPipeline,
-    targets: list[tuple[Equipement, AutoCollectProfile]],
+    pipeline_id: int,
+    targets: list[tuple[int, AutoCollectProfile]],
     *,
     agent_uuid: str,
     current_user_id: int,
@@ -603,102 +645,137 @@ def _run_collects_phase(
     use_ssl: bool,
     transport: str,
 ) -> None:
-    """Phase 3 : dispatcher une collecte par equipement vers l'agent et poller le resultat."""
+    """Phase 3 : dispatcher une collecte par equipement vers l'agent et poller le resultat.
+
+    Sessions courtes par etape (TOS-81) : dispatch dans une session, polling
+    avec sessions courtes par iteration via _poll_agent_task, finalisation
+    dans une nouvelle session courte.
+    """
     from . import collect_service
+    from . import task_service
 
     if not targets:
-        pipeline.collects_status = PipelineStepStatus.SKIPPED
-        db.commit()
+        logger.debug("Pipeline #%s : open collects-skip session", pipeline_id)
+        with get_db_session() as db:
+            pipeline = db.get(CollectPipeline, pipeline_id)
+            if pipeline is not None:
+                pipeline.collects_status = PipelineStepStatus.SKIPPED
+                db.commit()
         return
 
-    pipeline.collects_status = PipelineStepStatus.RUNNING
-    db.commit()
+    logger.debug("Pipeline #%s : open collects-init session", pipeline_id)
+    with get_db_session() as db:
+        pipeline = db.get(CollectPipeline, pipeline_id)
+        if pipeline is None:
+            return
+        pipeline.collects_status = PipelineStepStatus.RUNNING
+        db.commit()
 
-    for equip, profile in targets:
+    for equip_id, profile in targets:
         method, default_port, _ = _PROFILE_METHOD[profile]
         target_port = default_port
         if profile == "windows_server" and use_ssl:
             target_port = 5986
 
+        # 1) Dispatch (session courte)
+        collect_id: Optional[int] = None
+        task_id: Optional[int] = None
+        dispatched_task = None
         try:
-            collect = collect_service.create_pending_collect(
-                db=db,
-                equipement_id=equip.id,
-                method=method,
-                target_host=equip.ip_address,
-                target_port=target_port,
-                username=username,
-                device_profile=profile,
-            )
-            db.commit()
-            collect_id = collect.id
+            logger.debug("Pipeline #%s : open collect-dispatch session (equip=%s)", pipeline_id, equip_id)
+            with get_db_session() as db:
+                equip = db.get(Equipement, equip_id)
+                if equip is None:
+                    raise RuntimeError(f"Equipement #{equip_id} introuvable")
 
-            task = collect_service.dispatch_collect_to_agent(
-                db=db,
-                collect_id=collect_id,
-                agent_uuid=agent_uuid,
-                current_user_id=current_user_id,
-                password=password,
-                private_key=private_key,
-                passphrase=passphrase,
-                use_ssl=use_ssl,
-                transport=transport,
-            )
-            db.commit()
-            task_id = task.id
-
-            from . import task_service
-
-            task_service.notify_agent_new_task(agent_uuid, task)
-
-            # Polling de la tache agent jusqu'a completion/echec/timeout.
-            # L'hydration du CollectResult est faite par le handler WebSocket.
-            deadline = time.monotonic() + _COLLECT_TIMEOUT_SEC
-            timed_out = True
-            while time.monotonic() < deadline:
-                time.sleep(_COLLECT_POLL_INTERVAL_SEC)
-                db.expire_all()
-                task_reloaded = db.get(AgentTask, task_id)
-                if task_reloaded is None:
-                    timed_out = False
-                    break
-                if task_reloaded.status in ("completed", "failed", "cancelled"):
-                    timed_out = False
-                    break
-
-            db.expire_all()
-            final = db.get(CollectResult, collect_id)
-            if timed_out and final is not None and final.status == CollectStatus.RUNNING:
-                final.status = CollectStatus.FAILED
-                final.error_message = "Timeout de la collecte agent"
-                final.completed_at = _utcnow()
-                logger.warning(
-                    "Pipeline #%s : collecte #%s timeout (task #%s)",
-                    pipeline.id,
-                    collect_id,
-                    task_id,
+                collect = collect_service.create_pending_collect(
+                    db=db,
+                    equipement_id=equip.id,
+                    method=method,
+                    target_host=equip.ip_address,
+                    target_port=target_port,
+                    username=username,
+                    device_profile=profile,
                 )
-            if final is not None and final.status == CollectStatus.SUCCESS:
-                pipeline.collects_done += 1
-            else:
-                pipeline.collects_failed += 1
+                db.commit()
+                collect_id = collect.id
+
+                dispatched_task = collect_service.dispatch_collect_to_agent(
+                    db=db,
+                    collect_id=collect_id,
+                    agent_uuid=agent_uuid,
+                    current_user_id=current_user_id,
+                    password=password,
+                    private_key=private_key,
+                    passphrase=passphrase,
+                    use_ssl=use_ssl,
+                    transport=transport,
+                )
+                db.commit()
+                task_id = dispatched_task.id
+                # Detacher la task pour la passer hors session
+                db.expunge(dispatched_task)
         except Exception:
             logger.exception(
-                "Pipeline #%s : collecte echouee pour equipement #%s",
-                pipeline.id,
-                equip.id,
+                "Pipeline #%s : dispatch collecte echoue (equipement=%s)",
+                pipeline_id,
+                equip_id,
             )
-            pipeline.collects_failed += 1
-        finally:
-            db.commit()
-            _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
+            with get_db_session() as db:
+                pipeline = db.get(CollectPipeline, pipeline_id)
+                if pipeline is not None:
+                    pipeline.collects_failed += 1
+                    db.commit()
+                    _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
+            continue
 
-    # Statut final de la phase : completed si tout s'est passe, failed si 100% KO
-    if pipeline.collects_failed == pipeline.collects_total and pipeline.collects_total > 0:
-        pipeline.collects_status = PipelineStepStatus.FAILED
-    else:
-        pipeline.collects_status = PipelineStepStatus.COMPLETED
-    db.commit()
+        # Notification hors session
+        if dispatched_task is not None:
+            task_service.notify_agent_new_task(agent_uuid, dispatched_task)
+
+        # 2) Polling : sessions courtes par iteration
+        final_task = _poll_agent_task(task_id, _COLLECT_TIMEOUT_SEC, _COLLECT_POLL_INTERVAL_SEC)
+        timed_out = final_task is None or (
+            final_task.status not in ("completed", "failed", "cancelled")
+        )
+
+        # 3) Finalisation (session courte)
+        logger.debug("Pipeline #%s : open collect-finalize session (collect=%s)", pipeline_id, collect_id)
+        with get_db_session() as db:
+            pipeline = db.get(CollectPipeline, pipeline_id)
+            if pipeline is None:
+                continue
+            try:
+                final = db.get(CollectResult, collect_id) if collect_id else None
+                if timed_out and final is not None and final.status == CollectStatus.RUNNING:
+                    final.status = CollectStatus.FAILED
+                    final.error_message = "Timeout de la collecte agent"
+                    final.completed_at = _utcnow()
+                    logger.warning(
+                        "Pipeline #%s : collecte #%s timeout (task #%s)",
+                        pipeline_id,
+                        collect_id,
+                        task_id,
+                    )
+                if final is not None and final.status == CollectStatus.SUCCESS:
+                    pipeline.collects_done += 1
+                else:
+                    pipeline.collects_failed += 1
+            finally:
+                db.commit()
+                _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
+
+    # Statut final de la phase : session courte de cloture
+    logger.debug("Pipeline #%s : open collects-final session", pipeline_id)
+    with get_db_session() as db:
+        pipeline = db.get(CollectPipeline, pipeline_id)
+        if pipeline is None:
+            return
+        if pipeline.collects_failed == pipeline.collects_total and pipeline.collects_total > 0:
+            pipeline.collects_status = PipelineStepStatus.FAILED
+        else:
+            pipeline.collects_status = PipelineStepStatus.COMPLETED
+        db.commit()
 
 
 def execute_pipeline_background(
@@ -720,60 +797,96 @@ def execute_pipeline_background(
     """
     del agent_uuid  # l'agent est lu depuis pipeline.agent_id
     try:
+        # --- Init : session courte 1 ---
+        logger.debug("Pipeline #%s : open init session", pipeline_id)
         with get_db_session() as db:
             pipeline = db.get(CollectPipeline, pipeline_id)
             if pipeline is None:
                 logger.error("Pipeline #%s introuvable", pipeline_id)
                 return
-
             pipeline.status = PipelineStatus.RUNNING
             pipeline.started_at = _utcnow()
             db.commit()
-            _notify(pipeline.created_by, "pipeline_started", _pipeline_event(pipeline))
+            init_event = _pipeline_event(pipeline)
+            init_user = pipeline.created_by
+        _notify(init_user, "pipeline_started", init_event)
 
-            # Phase 1 — Scan agent
-            hosts = _run_scan_phase(db, pipeline, current_user_id)
-            db.commit()
-            _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
-            if hosts is None:
+        # --- Phase 1 — Scan agent (session courte interne) ---
+        hosts = _run_scan_phase(pipeline_id, current_user_id)
+        with get_db_session() as db:
+            pipeline = db.get(CollectPipeline, pipeline_id)
+            if pipeline is None:
+                return
+            progress_event = _pipeline_event(pipeline)
+            progress_user = pipeline.created_by
+        _notify(progress_user, "pipeline_progress", progress_event)
+        if hosts is None:
+            with get_db_session() as db:
+                pipeline = db.get(CollectPipeline, pipeline_id)
+                if pipeline is None:
+                    return
                 pipeline.status = PipelineStatus.FAILED
                 pipeline.completed_at = _utcnow()
-                _notify(pipeline.created_by, "pipeline_completed", _pipeline_event(pipeline))
+                db.commit()
+                done_event = _pipeline_event(pipeline)
+                done_user = pipeline.created_by
+            _notify(done_user, "pipeline_completed", done_event)
+            return
+
+        # --- Phase 2 — Equipements (session courte interne) ---
+        targets = _run_equipments_phase(pipeline_id, hosts)
+        with get_db_session() as db:
+            pipeline = db.get(CollectPipeline, pipeline_id)
+            if pipeline is None:
                 return
+            progress_event = _pipeline_event(pipeline)
+            progress_user = pipeline.created_by
+        _notify(progress_user, "pipeline_progress", progress_event)
 
-            # Phase 2 — Equipements
-            targets = _run_equipments_phase(db, pipeline, hosts)
-            _notify(pipeline.created_by, "pipeline_progress", _pipeline_event(pipeline))
-
-            # Phase 3 — Collectes
+        # --- Phase 3 — Collectes ---
+        # Resoudre l'agent dans une session courte avant de lancer les collectes.
+        with get_db_session() as db:
+            pipeline = db.get(CollectPipeline, pipeline_id)
+            if pipeline is None:
+                return
             agent = db.get(Agent, pipeline.agent_id) if pipeline.agent_id else None
             if agent is None:
                 logger.error("Pipeline #%s : agent introuvable pour la phase collectes", pipeline_id)
                 pipeline.collects_status = PipelineStepStatus.FAILED
                 pipeline.error_message = pipeline.error_message or "Agent introuvable pour collectes"
+                db.commit()
+                agent_uuid_local = None
             else:
-                _run_collects_phase(
-                    db,
-                    pipeline,
-                    targets,
-                    agent_uuid=agent.agent_uuid,
-                    current_user_id=current_user_id,
-                    username=username,
-                    password=password,
-                    private_key=private_key,
-                    passphrase=passphrase,
-                    use_ssl=use_ssl,
-                    transport=transport,
-                )
+                agent_uuid_local = agent.agent_uuid
 
+        if agent_uuid_local is not None:
+            _run_collects_phase(
+                pipeline_id,
+                targets,
+                agent_uuid=agent_uuid_local,
+                current_user_id=current_user_id,
+                username=username,
+                password=password,
+                private_key=private_key,
+                passphrase=passphrase,
+                use_ssl=use_ssl,
+                transport=transport,
+            )
+
+        # --- Finalisation : session courte ---
+        logger.debug("Pipeline #%s : open finalize session", pipeline_id)
+        with get_db_session() as db:
+            pipeline = db.get(CollectPipeline, pipeline_id)
+            if pipeline is None:
+                return
             if pipeline.collects_status == PipelineStepStatus.FAILED:
                 pipeline.status = PipelineStatus.FAILED
             else:
                 pipeline.status = PipelineStatus.COMPLETED
             pipeline.completed_at = _utcnow()
+            db.commit()
             created_by = pipeline.created_by
             event_payload = _pipeline_event(pipeline)
-
         _notify(created_by, "pipeline_completed", event_payload)
 
     except Exception as exc:
@@ -785,6 +898,7 @@ def execute_pipeline_background(
                     pipeline.status = PipelineStatus.FAILED
                     pipeline.error_message = str(exc)
                     pipeline.completed_at = _utcnow()
+                    db.commit()
                     created_by = pipeline.created_by
                     event_payload = _pipeline_event(pipeline)
                 else:
