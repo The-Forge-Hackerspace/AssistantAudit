@@ -48,11 +48,11 @@
 
 ## Improvement Candidates (focus areas pour ce run)
 
-1. **ln-300 internal runtime guard** — bypass systématique sur 14/14 stories suggère un bug ou un contrat mal documenté. À filer en issue agile-workflow upstream.
-2. **Quota subagent fragility** — 3/14 quotas mid-execution. Pattern défensif à adopter : faire commiter/push le subagent **avant** Stage 3 (quality gate) pour rendre la reprise quota-cheap. Le prompt subagent contenait déjà cette consigne ; elle a été respectée à partir de TOS-79.
-4. **Hex-line bash hook bruit** — pre-tool nudges "Use hex-line for X" déclenchés sur des bash non-file (ssh/pytest/git). À filtrer côté hook par command name. Non-bloquant mais pollue la lecture des outputs.
-5. **CLI schema strict** — payload `record-stage-summary` rejette les champs extra (e.g. `agents_info`). Seuls `stage|story_status|verdict|readiness_score|warnings` acceptés. Documenter en SKILL.md ou relâcher la contrainte.
-6. **Out-of-scope creep** — TOS-83 a forcé 1 ligne de migration `pythonjsonlogger`. Petit mais signal qu'un AC peut être contradictoire avec son scope déclaré. À auditer côté ln-220 story-coordinator.
+1. **ln-300 internal runtime guard** — bypass systématique sur 14/14 stories. Confirmé après inspection : **contrat upstream intentionnel** (le runtime force la chaîne `task-plan-worker-runtime → ln-301 → record-plan` complète). Pas un bug — ne fit simplement pas le pattern « subagent partial completion ». Workaround documenté en mémoire projet (`ln1000_epic_workarounds.md`).
+2. **Quota subagent fragility** — 3/14 quotas mid-execution. Pattern défensif validé : commit/push avant Stage 3, lesson propagée aux subagents suivants. Worktree partagé = aucune perte de travail.
+3. **CLI `record-stage-summary` schema strict** — payload rejette les champs extra (e.g. `agents_info`). Seuls `stage|story_status|verdict|readiness_score|warnings` acceptés. **Contrat upstream intentionnel** ; les infos additionnelles vont dans `stage_N_notes_{id}.md` libres. Documenté en mémoire.
+4. **`pipeline advance --to DONE` skip stages refusé** — bloquant pour les finalisations manuelles. **Safety feature upstream** ; bypass via `pipeline pause --reason "manual completion: ..."`. Documenté en mémoire.
+5. **Out-of-scope creep** — TOS-83 a forcé 1 ligne de migration `pythonjsonlogger`. Petit mais signal qu'un AC peut être contradictoire avec son scope déclaré. À auditer côté ln-220 story-coordinator (création des stories).
 
 ## Trend Tracking
 
