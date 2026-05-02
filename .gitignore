@@ -20,34 +20,25 @@ venv/
 *.swp
 *.swo
 
-# Tools (vendored external tools at repo root — ne pas versionner le contenu)
+# Tools (vendored external code at repo root — ne pas versionner le contenu)
 /tools/*
 !/tools/.gitkeep
-.tools/
-./tool
 
 # Environment
 .env
 .env.*
-
-# Wiki
-wiki/
 
 # Database
 instance/
 *.db
 *.sqlite3
 
-# Uploads & logs
+# Uploads, logs, runtime data
 uploads/
 logs/
 data/
 !backend/app/data/
 *.log
-
-# Monkey365
-monkey365_output/
-integrations/monkey365/
 
 # Node (frontend)
 node_modules/
@@ -62,35 +53,11 @@ desktop.ini
 # Docker
 docker-compose.override.yml
 
-# Alembic versions are tracked in git
-
-
 # Tests
 .pytest_cache/
+.ruff_cache/
 htmlcov/
 .coverage
-
-# AI assistant metadata (Claude Code, GitHub Copilot, Gemini, etc.)
-.claude/
-CLAUDE.md
-**/CLAUDE.md
-GEMINI.md
-**/GEMINI.md
-AGENTS.md
-**/AGENTS.md
-.copilot/
-.github/copilot*
-*.copilot*
-.hex-skills/
-
-# Dev-only local files
-.archive/
-docs/
-# Monkey365 (code tiers, à cloner manuellement dans tools/monkey365/)
-tools/monkey365/
-
-# Manual test results
-tests/manual/results/
 
 # Playwright
 /test-results/
@@ -102,4 +69,20 @@ tests/manual/results/
 playwright-report/
 playwright-results/
 test-results/
-tests/playwright/.auth/
+
+# Manual test results
+tests/manual/results/
+
+# AI assistant local state (NOT versioned — chacun sa machine)
+.claude/
+.copilot/
+.github/copilot*
+*.copilot*
+.hex-skills/
+GEMINI.md
+**/GEMINI.md
+
+# Local archives & audit reports (générés localement, hors-repo)
+.archive/
+docs/project/.audit/
+docs/project/.local/
