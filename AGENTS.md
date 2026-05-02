@@ -158,6 +158,8 @@ Détail complet : [`docs/project/architecture.md`](docs/project/architecture.md)
 
 Le hub de documentation est disponible dans [`docs/README.md`](docs/README.md). Pour la liste exhaustive des standards (SCOPE, Maintenance, NO_CODE, etc.) : [`docs/documentation_standards.md`](docs/documentation_standards.md).
 
+Pour une vue **narrative human-friendly** avec exemples concrets, ASCII diagrams et long-form prose, voir le [GitHub Wiki](https://github.com/The-Forge-Hackerspace/AssistantAudit/wiki) (audience : humains qui découvrent le projet via GitHub UI). Le wiki et `docs/` se complètent : `docs/` reste la source canonique pour les agents IA et les contributeurs en train d'éditer le code (métadonnées HTML, NO_CODE, tables-first), le wiki développe l'aspect pédagogique.
+
 ## Anti-patterns
 
 - Ne jamais commiter `.env`
