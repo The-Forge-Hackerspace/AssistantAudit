@@ -1,0 +1,9 @@
+# ==============================================================================
+# AssistantAudit v2 — Production Dependencies (TOS-102 / AC-4)
+# ==============================================================================
+# Inclut base + outils production-only (monitoring, metrics).
+-r base.txt
+
+# --- Monitoring & Metrics ---
+prometheus-client==0.24.1
+sentry-sdk==2.55.0

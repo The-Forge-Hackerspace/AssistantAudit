@@ -9,6 +9,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from ..core.errors import NotFoundError
 from ..models.assessment import Assessment, ComplianceStatus, ControlResult
 from ..models.config_analysis import ConfigAnalysis
 from ..models.equipement import Equipement, EquipementFirewall
@@ -89,7 +90,7 @@ def save_config_analysis(
     """
     equipement = db.get(Equipement, equipement_id)
     if not equipement:
-        raise ValueError(f"Équipement {equipement_id} introuvable")
+        raise NotFoundError(f"Équipement {equipement_id} introuvable")
 
     # Sérialiser les listes Pydantic → dicts pour JSON
     config = ConfigAnalysis(
@@ -257,11 +258,11 @@ def prefill_assessment_from_config(
     """
     config = db.get(ConfigAnalysis, config_analysis_id)
     if not config:
-        raise ValueError(f"Analyse de configuration #{config_analysis_id} introuvable")
+        raise NotFoundError(f"Analyse de configuration #{config_analysis_id} introuvable")
 
     assessment = db.get(Assessment, assessment_id)
     if not assessment:
-        raise ValueError(f"Assessment #{assessment_id} introuvable")
+        raise NotFoundError(f"Assessment #{assessment_id} introuvable")
 
     # Récupérer les findings de l'analyse
     findings: list[dict] = config.findings or []

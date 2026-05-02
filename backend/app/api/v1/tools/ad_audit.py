@@ -32,18 +32,15 @@ def launch_ad_audit(
     Lance un audit Active Directory via LDAP.
     L'audit s'exécute en arrière-plan.
     """
-    try:
-        audit = create_pending_ad_audit(
-            db=db,
-            equipement_id=params.equipement_id,
-            target_host=params.target_host,
-            target_port=params.target_port,
-            username=params.username,
-            domain=params.domain,
-            owner_id=current_user.id,
-        )
-    except ValueError as e:
-        raise HTTPException(404, str(e))
+    audit = create_pending_ad_audit(
+        db=db,
+        equipement_id=params.equipement_id,
+        target_host=params.target_host,
+        target_port=params.target_port,
+        username=params.username,
+        domain=params.domain,
+        owner_id=current_user.id,
+    )
 
     task_runner = get_task_runner()
     task_runner.submit(
@@ -120,8 +117,5 @@ def prefill_from_ad_audit(
     current_user: User = Depends(get_current_auditeur),
 ):
     """Pré-remplit un assessment à partir des résultats d'un audit AD."""
-    try:
-        result = prefill_assessment_from_ad_audit(db, audit_id, assessment_id)
-    except ValueError as e:
-        raise HTTPException(404, str(e))
+    result = prefill_assessment_from_ad_audit(db, audit_id, assessment_id)
     return result

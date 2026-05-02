@@ -33,8 +33,9 @@ RUN apt-get update \
 WORKDIR /app
 
 # Dépendances Python (gcc requis pour compiler les extensions C)
-COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt \
+# TOS-102 / AC-4: install runtime + monitoring (sans pytest/ruff) en prod.
+COPY backend/requirements/ ./requirements/
+RUN pip install --no-cache-dir -r requirements/prod.txt \
     && apt-get update && apt-get purge -y --auto-remove gcc apt-transport-https \
     && rm -rf /var/lib/apt/lists/* \
     && find /usr/local/lib/python3.*/site-packages -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true

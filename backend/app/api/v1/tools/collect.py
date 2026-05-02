@@ -4,8 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ....core.database import get_db
-from ....core.deps import get_current_auditeur
-from ....models.user import User
+from ....core.deps import RbacContext, get_rbac_context_auditeur
 from ....schemas.common import MessageResponse
 from ....schemas.scan import CollectCreate, CollectResultRead, CollectResultSummary, PrefillResult
 from ....services.collect_service import (
@@ -21,15 +20,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _rbac(u: User) -> tuple[int, bool]:
-    return u.id, u.role == "admin"
-
-
 @router.post("/collect", response_model=CollectResultSummary)
 def launch_collect(
     params: CollectCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """
     Lance une collecte d'informations système via SSH ou WinRM.
@@ -38,25 +33,22 @@ def launch_collect(
     if params.method not in ("ssh", "winrm"):
         raise HTTPException(400, "Méthode invalide. Utilisez 'ssh' ou 'winrm'.")
 
-    try:
-        collect = create_pending_collect(
-            db=db,
-            equipement_id=params.equipement_id,
-            method=params.method,
-            target_host=params.target_host,
-            target_port=params.target_port,
-            username=params.username,
-            device_profile=params.device_profile,
-        )
-    except ValueError as e:
-        raise HTTPException(404, str(e))
+    collect = create_pending_collect(
+        db=db,
+        equipement_id=params.equipement_id,
+        method=params.method,
+        target_host=params.target_host,
+        target_port=params.target_port,
+        username=params.username,
+        device_profile=params.device_profile,
+    )
 
     try:
         task = dispatch_collect_and_commit(
             db=db,
             collect_id=collect.id,
             agent_uuid=params.agent_uuid,
-            current_user_id=current_user.id,
+            current_user_id=rbac.user_id,
             password=params.password,
             private_key=params.private_key,
             passphrase=params.passphrase,
@@ -65,8 +57,6 @@ def launch_collect(
         )
     except PermissionError as e:
         raise HTTPException(403, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
 
     from ....services.task_service import notify_agent_new_task
 
@@ -82,10 +72,10 @@ def list_collects(
     page: int = Query(1, ge=1, description="Numéro de page"),
     page_size: int = Query(20, ge=1, le=100, description="Éléments par page"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Liste les collectes, optionnellement filtrées par équipement."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return list_collect_results(
         db,
         equipement_id=equipement_id,
@@ -100,10 +90,10 @@ def list_collects(
 def get_collect(
     collect_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Récupère le détail d'une collecte."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     collect = get_collect_result(db, collect_id, user_id=uid, is_admin=adm)
     if not collect:
         raise HTTPException(404, f"Collecte #{collect_id} introuvable")
@@ -114,10 +104,10 @@ def get_collect(
 def delete_collect(
     collect_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Supprime une collecte."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     if not delete_collect_result(db, collect_id, user_id=uid, is_admin=adm):
         raise HTTPException(404, f"Collecte #{collect_id} introuvable")
     return MessageResponse(message=f"Collecte #{collect_id} supprimée")
@@ -128,11 +118,8 @@ def prefill_from_collect(
     collect_id: int,
     assessment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Pré-remplit un assessment à partir des résultats d'une collecte."""
-    try:
-        result = prefill_assessment_from_collect(db, collect_id, assessment_id)
-    except ValueError as e:
-        raise HTTPException(404, str(e))
+    result = prefill_assessment_from_collect(db, collect_id, assessment_id)
     return result

@@ -42,17 +42,14 @@ def launch_pipeline(
     en arrière-plan. Les identifiants fournis sont transmis au job
     mais ne sont pas persistés.
     """
-    try:
-        pipeline = pipeline_service.create_pending_pipeline(
-            db=db,
-            site_id=payload.site_id,
-            agent_id=payload.agent_id,
-            target=payload.target,
-            created_by=current_user.id,
-            is_admin=current_user.role == "admin",
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    pipeline = pipeline_service.create_pending_pipeline(
+        db=db,
+        site_id=payload.site_id,
+        agent_id=payload.agent_id,
+        target=payload.target,
+        created_by=current_user.id,
+        is_admin=current_user.role == "admin",
+    )
 
     task_runner = get_task_runner()
     task_runner.submit(
@@ -134,9 +131,6 @@ def prefill_from_pipeline(
 ):
     """Mappe les ports ouverts détectés par le scan en findings non-conformes."""
     del current_user
-    try:
-        return pipeline_service.prefill_assessment_from_pipeline(
-            db, pipeline_id, assessment_id
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    return pipeline_service.prefill_assessment_from_pipeline(
+        db, pipeline_id, assessment_id
+    )

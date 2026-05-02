@@ -96,6 +96,12 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        # Shutdown gracieux (TOS-79 / US046 — findings L-001, L-002, C-004) :
+        # ordre strict pour eviter les CollectResult/AgentTask en `running`
+        # et permettre aux agents Windows de recevoir un close frame 1001
+        # plutot qu'un timeout TCP.
+        logger.info("graceful shutdown initiated")
+
         for task, name in (
             (sweeper_task, "Heartbeat sweeper"),
             (collect_sweeper_task, "Collect sweeper"),
@@ -109,7 +115,32 @@ async def lifespan(app: FastAPI):
             except Exception:
                 logger.exception("%s a levé une exception pendant le shutdown", name)
 
-        # Libère le pool de connexions SQLAlchemy avant l'arrêt du process.
+        # (a) Annulation des tasks de fond enregistrees via register_bg_task
+        # (TOS-80 / US047 — scans Monkey365 streaming, etc.)
+        from .core.event_loop import cancel_background_tasks
+
+        try:
+            await cancel_background_tasks(timeout=5.0)
+        except Exception:
+            logger.exception("Erreur pendant l'annulation des tasks de fond")
+
+        # (b) Drainage WebSocket : close frame 1001 pour les users + agents.
+        from .core.websocket_manager import ws_manager
+
+        try:
+            await ws_manager.shutdown()
+        except Exception:
+            logger.exception("Erreur pendant le shutdown WebSocket")
+
+        # (c) Arret du LocalTaskRunner : pose _stop, join threads (timeout 10s).
+        from .core.task_runner import get_task_runner
+
+        try:
+            get_task_runner().shutdown(wait=True, timeout=10.0)
+        except Exception:
+            logger.exception("Erreur pendant le shutdown du TaskRunner")
+
+        # (d) Libère le pool de connexions SQLAlchemy avant l'arrêt du process.
         from .core.database import engine
 
         engine.dispose()
@@ -149,26 +180,31 @@ def create_app() -> FastAPI:
             # CSP : en prod (Swagger desactive) on supprime 'unsafe-inline'
             # et le CDN externe pour reduire la surface XSS. En dev, on garde
             # 'unsafe-inline' + cdn.jsdelivr.net pour compatibilite Swagger UI.
-            if is_prod:
-                response.headers["Content-Security-Policy"] = (
-                    "default-src 'self'; "
-                    "script-src 'self'; "
-                    "style-src 'self'; "
-                    "img-src 'self' data:; "
-                    "font-src 'self'; "
-                    "connect-src 'self'; "
-                    "frame-ancestors 'none'"
-                )
-            else:
-                response.headers["Content-Security-Policy"] = (
-                    "default-src 'self'; "
-                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                    "img-src 'self' data:; "
-                    "font-src 'self' https://cdn.jsdelivr.net; "
-                    "connect-src 'self'; "
-                    "frame-ancestors 'none'"
-                )
+            # Exception (TOS-75 / S-002) : si la route a deja pose un CSP
+            # `sandbox` (preview attachment), on ne l'ecrase pas — la policy
+            # route-level est strictement plus restrictive.
+            existing_csp = response.headers.get("Content-Security-Policy", "")
+            if "sandbox" not in existing_csp:
+                if is_prod:
+                    response.headers["Content-Security-Policy"] = (
+                        "default-src 'self'; "
+                        "script-src 'self'; "
+                        "style-src 'self'; "
+                        "img-src 'self' data:; "
+                        "font-src 'self'; "
+                        "connect-src 'self'; "
+                        "frame-ancestors 'none'"
+                    )
+                else:
+                    response.headers["Content-Security-Policy"] = (
+                        "default-src 'self'; "
+                        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                        "img-src 'self' data:; "
+                        "font-src 'self' https://cdn.jsdelivr.net; "
+                        "connect-src 'self'; "
+                        "frame-ancestors 'none'"
+                    )
             # HSTS uniquement si HTTPS détecté
             if request.url.scheme == "https":
                 response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

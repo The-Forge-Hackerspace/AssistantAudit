@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy.orm import Session
 
+from app.core.errors import ValidationError
 from app.models.anssi_checklist import AnssiCheckpoint
 from app.services.oradad_analysis_service import (
     UAC_ACCOUNTDISABLE,
@@ -215,7 +216,7 @@ class TestParseTar:
         assert result == {}
 
     def test_parse_invalid_tar(self):
-        with pytest.raises(ValueError, match="Archive ORADAD invalide"):
+        with pytest.raises(ValidationError, match="Archive ORADAD invalide"):
             OradadAnalysisService.parse_oradad_tar(b"not a tar file")
 
 

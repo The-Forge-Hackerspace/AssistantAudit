@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from ...core.config import get_settings
 from ...core.database import get_db
 from ...core.deps import get_current_auditeur, get_current_user
+from ...core.http_helpers import safe_content_disposition
 from ...models.assessment import Assessment
 from ...models.attachment import Attachment
 from ...models.user import User
@@ -68,15 +69,17 @@ ALLOWED_EXTENSIONS = {
     ".cap",
 }
 
-# Types MIME prévisualisables inline
-PREVIEWABLE_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/svg+xml"}
+# Types MIME prévisualisables inline.
+# SVG/XML/HTML retirés volontairement (TOS-75 / S-002 ln-620) : un SVG ou XML
+# servi inline depuis l'origine API peut embarquer du JS exécuté dans le
+# contexte des cookies `aa_access_token` (stored XSS). Ces formats restent
+# uploadables mais sont servis exclusivement via `/file` (download forcé).
+PREVIEWABLE_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"}
 PREVIEWABLE_TEXT_TYPES = {
     "text/plain",
     "text/csv",
     "text/markdown",
     "application/json",
-    "application/xml",
-    "text/xml",
     "application/x-yaml",
     "text/yaml",
 }
@@ -150,14 +153,22 @@ def upload_attachment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),
 ):
-    """Upload un fichier (capture d'écran, config, etc.) pour un résultat de contrôle."""
+    """Upload un fichier (capture d'écran, config, etc.) pour un résultat de contrôle.
+
+    Vérifie l'ownership du control_result via FileService._verify_control_result_ownership
+    AVANT toute lecture de chunks ou écriture disque/DB. Un non-owner non-admin reçoit
+    NotFoundError (traduite en 404 générique par le handler global), aligné sur
+    api/v1/files.py:upload (BOLA fix S-001).
+    """
     settings = get_settings()
     max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
-    # Vérifier que le control result existe
-    cr = FileService.get_control_result(db, result_id)
-    if not cr:
-        raise HTTPException(status_code=404, detail="Résultat de contrôle introuvable")
+    # Vérifier l'ownership du control result AVANT toute IO disque/DB (BOLA fix).
+    # NotFoundError → handler global = 404 générique (pas de leak d'existence).
+    service = FileService()
+    cr = service._verify_control_result_ownership(
+        db, result_id, current_user.id, is_admin=(current_user.role == "admin")
+    )
 
     # Vérifier l'extension
     original_name = file.filename or "unknown"
@@ -300,11 +311,21 @@ def preview_attachment(
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Fichier introuvable sur le disque")
 
-    # Pour la preview inline, on ne force pas le téléchargement
+    # Defense-in-depth contre stored XSS (TOS-75 / S-002 ln-620) :
+    # 1. CSP `sandbox` neutralise tout JS embarqué (cookies inaccessibles, pas de network).
+    # 2. `frame-ancestors 'none'` bloque l'embed cross-site.
+    # 3. `X-Content-Type-Options: nosniff` empêche le browser de deviner un type exécutable.
+    # 4. `Content-Disposition: attachment` force le téléchargement plutôt que l'exécution
+    #    inline. Utiliser `safe_content_disposition` strippe CR/LF (cf. TOS-76).
+    headers = {
+        "Content-Security-Policy": "sandbox; default-src 'none'; frame-ancestors 'none'",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": safe_content_disposition(att.original_filename, "attachment"),
+    }
     return FileResponse(
         path=str(file_path),
         media_type=att.mime_type,
-        # Pas de content-disposition attachment → s'affiche inline
+        headers=headers,
     )
 
 

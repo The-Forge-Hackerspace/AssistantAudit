@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from ..core.errors import ValidationError
 from ..models.anssi_checklist import AnssiCheckpoint
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ class OradadAnalysisService:
 
         except tarfile.TarError as e:
             logger.error("Erreur lors du parsing de l'archive ORADAD: %s", e)
-            raise ValueError(f"Archive ORADAD invalide: {e}") from e
+            raise ValidationError(f"Archive ORADAD invalide: {e}") from e
 
         return result
 

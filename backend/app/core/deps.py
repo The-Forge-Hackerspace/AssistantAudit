@@ -2,12 +2,13 @@
 Dépendances FastAPI réutilisables :
   - Session de base de données
   - Utilisateur courant (authentifié via JWT)
+  - Contexte RBAC (user_id, is_admin, role)
   - Pagination
 """
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from fastapi import Cookie, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .database import get_db
+from .errors import NotFoundError
 from .security import decode_token, verify_agent_token
 
 settings = get_settings()
@@ -146,6 +148,54 @@ async def get_current_auditeur(current_user=Depends(get_current_user)):
             detail="Droits auditeur requis (rôle lecteur insuffisant)",
         )
     return current_user
+
+
+class RbacContext(NamedTuple):
+    """Contexte RBAC injecté via Depends(get_rbac_context).
+
+    Centralise le pattern (user_id, is_admin) historiquement dupliqué dans les routeurs.
+    Tuple-friendly : `uid, adm, _ = rbac` reste possible si besoin.
+    """
+
+    user_id: int
+    is_admin: bool
+    role: str
+
+    def assert_owner_or_admin(self, owner_id: int | None, resource_label: str) -> None:
+        """Vérifie que l'utilisateur est admin ou propriétaire de la ressource.
+
+        Lève `NotFoundError(resource_label)` si non autorisé (pattern hide-as-404 :
+        on ne révèle pas l'existence d'une ressource à un utilisateur non autorisé).
+        """
+        if self.is_admin:
+            return
+        if owner_id is None or owner_id != self.user_id:
+            raise NotFoundError(resource_label)
+
+
+def get_rbac_context(current_user=Depends(get_current_user)) -> RbacContext:
+    """Dépendance : retourne le contexte RBAC (user_id, is_admin, role).
+
+    Remplace les helpers privés `_rbac()` dupliqués dans les routeurs et
+    les checks inline `current_user.role == "admin"`.
+    """
+    return RbacContext(
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
+        role=current_user.role,
+    )
+
+
+def get_rbac_context_auditeur(current_user=Depends(get_current_auditeur)) -> RbacContext:
+    """Variante auditeur : exige rôle admin ou auditeur (lecteur rejeté en 403).
+
+    À utiliser sur les endpoints qui exigeaient `Depends(get_current_auditeur)`.
+    """
+    return RbacContext(
+        user_id=current_user.id,
+        is_admin=current_user.role == "admin",
+        role=current_user.role,
+    )
 
 
 class PaginationParams:

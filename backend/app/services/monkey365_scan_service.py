@@ -10,6 +10,7 @@ from typing import Protocol, cast
 
 from ..core.config import get_settings
 from ..core.database import get_db_session
+from ..core.errors import BusinessRuleError, NotFoundError
 from ..core.storage import ensure_scan_directory, slugify, write_meta_json
 from ..models.entreprise import Entreprise
 from ..models.enums import AuthMethod
@@ -53,7 +54,7 @@ class Monkey365ScanService:
     ) -> Monkey365ScanResult:
         entreprise = cast(Entreprise | None, db.get(Entreprise, entreprise_id))
         if not entreprise:
-            raise ValueError(f"Entreprise #{entreprise_id} introuvable")
+            raise NotFoundError(f"Entreprise #{entreprise_id} introuvable")
 
         scan_id = str(uuid.uuid4())
         entreprise_slug = slugify(entreprise.nom)
@@ -253,9 +254,9 @@ class Monkey365ScanService:
 
             entreprise = cast(Entreprise | None, db.get(Entreprise, entreprise_id))
             if not entreprise:
-                raise ValueError(f"Entreprise #{entreprise_id} introuvable")
+                raise NotFoundError(f"Entreprise #{entreprise_id} introuvable")
             if not user_has_access_to_entreprise(db, entreprise_id, user_id):
-                raise ValueError("Ressource introuvable")
+                raise NotFoundError("Ressource introuvable")
         result = Monkey365ScanService.create_pending_scan(
             db=db,
             entreprise_id=entreprise_id,
@@ -319,7 +320,7 @@ class Monkey365ScanService:
         if not result:
             return None
         if result.status not in (Monkey365ScanStatus.RUNNING, Monkey365ScanStatus.AUTHENTICATING):
-            raise ValueError("Ce scan n'est pas en cours d'exécution")
+            raise BusinessRuleError("Ce scan n'est pas en cours d'exécution")
 
         Monkey365ScanService.kill_scan_process(scan_id)
 
@@ -347,10 +348,10 @@ class Monkey365ScanService:
             from ..core.helpers import user_has_access_to_entreprise
 
             if not user_has_access_to_entreprise(db, entreprise_id, user_id):
-                raise ValueError("Ressource introuvable")
+                raise NotFoundError("Ressource introuvable")
         entreprise = cast(Entreprise | None, db.get(Entreprise, entreprise_id))
         if not entreprise:
-            raise ValueError(f"Entreprise #{entreprise_id} introuvable")
+            raise NotFoundError(f"Entreprise #{entreprise_id} introuvable")
 
         scan_id = str(uuid.uuid4())
         entreprise_slug = slugify(entreprise.nom)

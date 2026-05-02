@@ -9,6 +9,7 @@ from typing import Optional
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from ..core.logging_config import hash_username
 from ..core.security import create_access_token, create_refresh_token, hash_password, verify_password
 from ..models.user import User
 
@@ -31,17 +32,26 @@ class AuthService:
             .first()
         )
         if user is None or not verify_password(password, user.password_hash):
-            logger.warning(f"Tentative de connexion échouée pour: {identifier}")
+            logger.warning(
+                "login_failure",
+                extra={"event": "login_failure", "username_hash": hash_username(identifier), "reason": "bad_credentials"},
+            )
             return None
         if not user.is_active:
-            logger.warning(f"Connexion refusée (compte désactivé): {identifier}")
+            logger.warning(
+                "login_failure",
+                extra={"event": "login_failure", "username_hash": hash_username(identifier), "reason": "account_disabled"},
+            )
             return None
 
         # Mettre à jour la dernière connexion
         user.last_login = datetime.now(timezone.utc)
         db.flush()
 
-        logger.info(f"Connexion réussie: {user.username}")
+        logger.info(
+            "login_success",
+            extra={"event": "login_success", "user_id": user.id, "username_hash": hash_username(user.username)},
+        )
         return user
 
     @staticmethod
@@ -73,7 +83,10 @@ class AuthService:
         db.add(user)
         db.flush()
         db.refresh(user)
-        logger.info(f"Utilisateur créé: {username} (role={role})")
+        logger.info(
+            "user_created",
+            extra={"event": "user_created", "user_id": user.id, "username_hash": hash_username(username), "role": role},
+        )
         return user
 
     @staticmethod
@@ -83,7 +96,10 @@ class AuthService:
             return False
         user.password_hash = hash_password(new_password)
         db.flush()
-        logger.info(f"Mot de passe changé pour: {user.username}")
+        logger.info(
+            "password_changed",
+            extra={"event": "password_changed", "user_id": user.id, "username_hash": hash_username(user.username)},
+        )
         return True
 
     @staticmethod

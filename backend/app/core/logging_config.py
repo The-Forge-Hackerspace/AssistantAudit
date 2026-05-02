@@ -3,15 +3,63 @@ Structured JSON logging configuration for AssistantAudit.
 Provides production-ready JSON logging with context support and filtering.
 """
 
+import hashlib
+import ipaddress
 import logging
 import sys
 from contextvars import ContextVar
 from logging import LogRecord
 from typing import Any, Dict
 
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger import json as jsonlogger
 
 from .config import get_settings
+
+# ────────────────────────────────────────────────────────────────────────
+# PII Masking Helpers (TOS-82)
+# ────────────────────────────────────────────────────────────────────────
+
+
+def hash_username(username: str | None) -> str:
+    """Hash un username via SHA-256 et retourne les 12 premiers chars hex.
+
+    Sufficant pour corrélation logs sans révéler la valeur claire (cf NIST SP 800-63B).
+    """
+    if not username:
+        return ""
+    return hashlib.sha256(username.encode("utf-8")).hexdigest()[:12]
+
+
+def mask_email(email: str | None) -> str:
+    """Masque un email : `user@example.com` -> `u***@example.com`.
+
+    Conserve le domaine complet (utile pour debug) et la première lettre du local-part.
+    """
+    if not email or "@" not in email:
+        return ""
+    local, _, domain = email.partition("@")
+    if not local:
+        return f"***@{domain}"
+    return f"{local[0]}***@{domain}"
+
+
+def mask_ip(ip: str | None) -> str:
+    """Masque un IP en zéro-isant le dernier octet IPv4 (/24) ou les 80 derniers bits IPv6 (/48).
+
+    Retourne `""` si l'entrée n'est pas une IP valide.
+    """
+    if not ip:
+        return ""
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return ""
+    if isinstance(addr, ipaddress.IPv4Address):
+        parts = str(addr).split(".")
+        return ".".join(parts[:3] + ["0"])
+    # IPv6 : conserver les 3 premiers segments (48 bits), reset le reste.
+    segments = addr.exploded.split(":")
+    return ":".join(segments[:3] + ["0", "0", "0", "0", "0"])
 
 # ────────────────────────────────────────────────────────────────────────
 # Custom JSON Formatter
@@ -104,14 +152,23 @@ def configure_structured_logging(log_level: str = "INFO") -> None:
     root_logger.addHandler(console_handler)
 
     # File handler for persistent logs (if enabled)
+    # TOS-102 / AC-2: rotation via RotatingFileHandler pour éviter l'accumulation
+    # de logs > 1 GB en prod. Taille max et nombre de backups configurables
+    # via env (défauts: 50 MB × 10 backups = 500 MB max sur disque).
     if settings.LOG_DIR:
+        from logging.handlers import RotatingFileHandler
         from pathlib import Path
 
         log_dir = Path(settings.LOG_DIR)
         log_dir.mkdir(parents=True, exist_ok=True)
 
         log_file = log_dir / "assistantaudit.json"
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=settings.LOG_FILE_MAX_BYTES,
+            backupCount=settings.LOG_FILE_BACKUP_COUNT,
+            encoding="utf-8",
+        )
         file_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
@@ -145,6 +202,20 @@ class LogContext:
     def set_request_id(cls, request_id: str) -> None:
         """Set request ID for current context"""
         _request_id.set(request_id)
+
+    @classmethod
+    def push_request_id(cls, request_id: str):
+        """Set request ID and return the ContextVar Token for later reset() (TOS-82).
+
+        À utiliser dans un middleware avec un bloc try/finally pour éviter le leak
+        de l'ID entre requêtes partageant le même thread (threadpool FastAPI).
+        """
+        return _request_id.set(request_id)
+
+    @classmethod
+    def reset_request_id(cls, token) -> None:
+        """Reset the request ID ContextVar via the Token returned by push_request_id."""
+        _request_id.reset(token)
 
     @classmethod
     def set_user_id(cls, user_id: int) -> None:

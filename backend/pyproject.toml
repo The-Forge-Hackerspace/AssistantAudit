@@ -1,0 +1,11 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = [
+    "error::DeprecationWarning:pythonjsonlogger",
+    "ignore::DeprecationWarning:sentry_sdk",
+]
+markers = [
+    "slow: tests longs (> 1s)",
+    "integration: tests qui dépendent d'un service externe",
+]

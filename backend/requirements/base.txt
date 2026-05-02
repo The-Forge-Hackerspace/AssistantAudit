@@ -1,0 +1,60 @@
+# ==============================================================================
+# AssistantAudit v2 — Backend Runtime Dependencies (TOS-102 / AC-4)
+# ==============================================================================
+# Installées dans tous les environnements (dev, test, preprod, prod).
+
+# --- Framework web ---
+fastapi==0.135.1
+uvicorn[standard]==0.42.0
+
+# --- Base de données ---
+SQLAlchemy==2.0.48
+alembic==1.18.4
+psycopg2-binary>=2.9.0  # installed only in production (PostgreSQL)
+
+# --- Chiffrement & Certificats ---
+cryptography==46.0.7
+
+# --- WebSocket ---
+websockets==16.0
+
+# --- Validation & Sérialisation ---
+pydantic==2.12.5
+pydantic-settings==2.13.1
+email-validator==2.3.0
+
+# --- Authentification ---
+PyJWT>=2.10
+bcrypt==5.0.0
+python-multipart==0.0.26  # >=0.0.26 patch GHSA-mj87-hwqh-73pj (DoS via multipart preamble)
+
+# --- YAML (référentiels) ---
+PyYAML==6.0.3
+
+# --- Sécurité XML (scan Nmap) ---
+defusedxml==0.7.1
+
+# --- Collecte SSH / WinRM ---
+paramiko==4.0.0
+pywinrm==0.5.0
+python-dateutil==2.9.0.post0
+
+# --- Audit Active Directory (LDAP) ---
+ldap3==2.9.1
+
+# --- Logging & Config ---
+python-dotenv==1.2.2
+
+# --- HTTP client (pour futures intégrations) ---
+httpx==0.28.1
+
+# --- Rate-limiter backend (TOS-77, optionnel ; memory par defaut) ---
+redis>=5.0
+
+# --- Logging Structure ---
+python-json-logger==4.0.0
+
+# --- Génération de rapports ---
+WeasyPrint==68.0
+python-docx==1.1.2
+Jinja2==3.1.6

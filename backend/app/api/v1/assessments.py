@@ -6,7 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import PaginationParams, get_current_auditeur, get_current_user
+from ...core.deps import (
+    PaginationParams,
+    RbacContext,
+    get_current_auditeur,
+    get_rbac_context,
+    get_rbac_context_auditeur,
+)
 from ...models.user import User
 from ...schemas.assessment import (
     AssessmentCreate,
@@ -26,10 +32,6 @@ from ...services.monkey365_service import Monkey365Service
 router = APIRouter()
 
 
-def _rbac(current_user: User) -> tuple[int, bool]:
-    return current_user.id, current_user.role == "admin"
-
-
 # --- Campagnes ---
 
 
@@ -38,10 +40,10 @@ def list_campaigns(
     audit_id: int = None,
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Liste les campagnes d'évaluation"""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     campaigns, total = AssessmentService.list_campaigns(
         db,
         audit_id=audit_id,
@@ -76,10 +78,10 @@ def list_campaigns(
 def create_campaign(
     body: CampaignCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Crée une nouvelle campagne d'évaluation"""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     campaign = AssessmentService.create_campaign(
         db,
         name=body.name,
@@ -103,10 +105,10 @@ def create_campaign(
 def get_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Détail d'une campagne avec ses assessments"""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     campaign = AssessmentService.get_campaign(db, campaign_id, user_id=uid, is_admin=adm)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campagne introuvable")
@@ -118,73 +120,61 @@ def update_campaign(
     campaign_id: int,
     body: CampaignUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Met à jour une campagne (nom, description, statut)"""
-    uid, adm = _rbac(current_user)
-    try:
-        campaign = AssessmentService.update_campaign(
-            db,
-            campaign_id,
-            body,
-            user_id=uid,
-            is_admin=adm,
-        )
-        return CampaignSummary(
-            id=campaign.id,
-            name=campaign.name,
-            status=campaign.status.value,
-            audit_id=campaign.audit_id,
-            created_at=campaign.created_at,
-            compliance_score=campaign.compliance_score,
-            total_assessments=len(campaign.assessments),
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    uid, adm = rbac.user_id, rbac.is_admin
+    campaign = AssessmentService.update_campaign(
+        db,
+        campaign_id,
+        body,
+        user_id=uid,
+        is_admin=adm,
+    )
+    return CampaignSummary(
+        id=campaign.id,
+        name=campaign.name,
+        status=campaign.status.value,
+        audit_id=campaign.audit_id,
+        created_at=campaign.created_at,
+        compliance_score=campaign.compliance_score,
+        total_assessments=len(campaign.assessments),
+    )
 
 
 @router.post("/campaigns/{campaign_id}/start", response_model=MessageResponse)
 def start_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Démarre une campagne"""
-    uid, adm = _rbac(current_user)
-    try:
-        AssessmentService.start_campaign(db, campaign_id, user_id=uid, is_admin=adm)
-        return MessageResponse(message="Campagne démarrée")
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    uid, adm = rbac.user_id, rbac.is_admin
+    AssessmentService.start_campaign(db, campaign_id, user_id=uid, is_admin=adm)
+    return MessageResponse(message="Campagne démarrée")
 
 
 @router.post("/campaigns/{campaign_id}/complete", response_model=MessageResponse)
 def complete_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Termine une campagne"""
-    uid, adm = _rbac(current_user)
-    try:
-        AssessmentService.complete_campaign(db, campaign_id, user_id=uid, is_admin=adm)
-        return MessageResponse(message="Campagne terminée")
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    uid, adm = rbac.user_id, rbac.is_admin
+    AssessmentService.complete_campaign(db, campaign_id, user_id=uid, is_admin=adm)
+    return MessageResponse(message="Campagne terminée")
 
 
 @router.delete("/campaigns/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_campaign(
     campaign_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Supprime une campagne et toutes ses évaluations"""
-    uid, adm = _rbac(current_user)
-    try:
-        AssessmentService.delete_campaign(db, campaign_id, user_id=uid, is_admin=adm)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    uid, adm = rbac.user_id, rbac.is_admin
+    AssessmentService.delete_campaign(db, campaign_id, user_id=uid, is_admin=adm)
 
 
 # --- Assessments ---
@@ -196,34 +186,32 @@ def create_assessment(
     campaign_id: int = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Crée un assessment (évaluation d'un équipement selon un référentiel)"""
     if not campaign_id:
         raise HTTPException(status_code=400, detail="campaign_id est requis en query param")
-    uid, adm = _rbac(current_user)
-    try:
-        assessment = AssessmentService.create_assessment(
-            db,
-            campaign_id=campaign_id,
-            equipement_id=body.equipement_id,
-            framework_id=body.framework_id,
-            assessed_by=current_user.username,
-            user_id=uid,
-            is_admin=adm,
-        )
-        return assessment
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    uid, adm = rbac.user_id, rbac.is_admin
+    assessment = AssessmentService.create_assessment(
+        db,
+        campaign_id=campaign_id,
+        equipement_id=body.equipement_id,
+        framework_id=body.framework_id,
+        assessed_by=current_user.username,
+        user_id=uid,
+        is_admin=adm,
+    )
+    return assessment
 
 
 @router.get("/{assessment_id}", response_model=AssessmentRead)
 def get_assessment(
     assessment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Détail d'un assessment avec tous ses résultats de contrôle"""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     assessment = AssessmentService.get_assessment(db, assessment_id, user_id=uid, is_admin=adm)
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment introuvable")
@@ -234,14 +222,11 @@ def get_assessment(
 def delete_assessment(
     assessment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Supprime un assessment et tous ses résultats"""
-    uid, adm = _rbac(current_user)
-    try:
-        AssessmentService.delete_assessment(db, assessment_id, user_id=uid, is_admin=adm)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    uid, adm = rbac.user_id, rbac.is_admin
+    AssessmentService.delete_assessment(db, assessment_id, user_id=uid, is_admin=adm)
 
 
 # --- Résultats de contrôle ---
@@ -253,24 +238,22 @@ def update_control_result(
     body: ControlResultUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Met à jour le résultat d'un contrôle"""
-    uid, adm = _rbac(current_user)
-    try:
-        AssessmentService.update_control_result(
-            db,
-            result_id=result_id,
-            status=body.status,
-            evidence=body.evidence,
-            comment=body.comment,
-            remediation_note=body.remediation_note,
-            assessed_by=current_user.username,
-            user_id=uid,
-            is_admin=adm,
-        )
-        return MessageResponse(message="Résultat mis à jour")
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    uid, adm = rbac.user_id, rbac.is_admin
+    AssessmentService.update_control_result(
+        db,
+        result_id=result_id,
+        status=body.status,
+        evidence=body.evidence,
+        comment=body.comment,
+        remediation_note=body.remediation_note,
+        assessed_by=current_user.username,
+        user_id=uid,
+        is_admin=adm,
+    )
+    return MessageResponse(message="Résultat mis à jour")
 
 
 # --- Scoring ---
@@ -280,10 +263,10 @@ def update_control_result(
 def get_assessment_score(
     assessment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Calcule le score de conformité d'un assessment"""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     result = AssessmentService.get_assessment_score(db, assessment_id, user_id=uid, is_admin=adm)
     if result is None:
         raise HTTPException(status_code=404, detail="Assessment introuvable")
@@ -294,10 +277,10 @@ def get_assessment_score(
 def get_campaign_score(
     campaign_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Calcule le score de conformité agrégé d'une campagne"""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     result = AssessmentService.get_campaign_score(db, campaign_id, user_id=uid, is_admin=adm)
     if result is None:
         raise HTTPException(status_code=404, detail="Campagne introuvable")
@@ -312,7 +295,7 @@ def simulate_m365_scan(
     assessment_id: int,
     body: M365ScanSimulateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """
     Simule un scan Monkey365 en injectant des findings manuels.
