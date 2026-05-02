@@ -9,7 +9,7 @@ from contextvars import ContextVar
 from logging import LogRecord
 from typing import Any, Dict
 
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger import json as jsonlogger
 
 from .config import get_settings
 

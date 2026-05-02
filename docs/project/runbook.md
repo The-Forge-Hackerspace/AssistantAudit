@@ -96,11 +96,17 @@ Ne jamais renommer une colonne existante : ajouter une nouvelle colonne. Le `doc
 
 | Type | Commande |
 |---|---|
-| Backend (pytest, 688+ tests) | `cd backend && pytest -q` |
+| Backend (pytest, 909+ tests) | `cd backend && pytest -q` |
 | E2E Playwright | `npx playwright test` (depuis la racine) |
 | Tests manuels (bash + curl + jq) | `bash tests/manual/test-all.sh` |
 | Lint backend | `cd backend && ruff check .` |
 | Lint frontend | `cd frontend && npm run lint` |
+
+Configuration pytest centralisee dans `backend/pyproject.toml` (`[tool.pytest.ini_options]`) :
+
+- `testpaths = ["tests"]` — collecte limitee a `backend/tests/`.
+- `markers = ["slow", "integration"]` — utiliser `@pytest.mark.slow` ou `@pytest.mark.integration` pour cibler les tests longs ou dependants d'un service externe ; filtrage via `pytest -m "not slow"` ou `pytest -m integration`.
+- `filterwarnings` : les `DeprecationWarning` issus de `pythonjsonlogger` sont escalades en erreur (signal pour la migration vers `pythonjsonlogger.json`) ; ceux de `sentry_sdk.push_scope` sont ignores (legacy hors de notre controle).
 
 CI connue : redirection 307 fuite hostname Docker, rate-limiter in-memory non partage entre processus, `EmailStr` refuse les TLD reserves — adapter les fixtures en consequence.
 
