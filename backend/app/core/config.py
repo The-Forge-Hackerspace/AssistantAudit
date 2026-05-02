@@ -215,6 +215,9 @@ class Settings(BaseSettings):
     # --- Logging ---
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = str(BASE_DIR / "logs")
+    # Rotation logs (TOS-102 / AC-2). 50 MB × 10 backups par défaut → cap ~500 MB.
+    LOG_FILE_MAX_BYTES: int = 50 * 1024 * 1024
+    LOG_FILE_BACKUP_COUNT: int = 10
 
     # --- Rate limiting (par IP, voir core/rate_limit.py) ---
     # Nombre max de requêtes par minute avant blocage. Défauts sains pour la

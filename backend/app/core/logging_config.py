@@ -153,14 +153,23 @@ def configure_structured_logging(log_level: str = "INFO") -> None:
     root_logger.addHandler(console_handler)
 
     # File handler for persistent logs (if enabled)
+    # TOS-102 / AC-2: rotation via RotatingFileHandler pour éviter l'accumulation
+    # de logs > 1 GB en prod. Taille max et nombre de backups configurables
+    # via env (défauts: 50 MB × 10 backups = 500 MB max sur disque).
     if settings.LOG_DIR:
+        from logging.handlers import RotatingFileHandler
         from pathlib import Path
 
         log_dir = Path(settings.LOG_DIR)
         log_dir.mkdir(parents=True, exist_ok=True)
 
         log_file = log_dir / "assistantaudit.json"
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=settings.LOG_FILE_MAX_BYTES,
+            backupCount=settings.LOG_FILE_BACKUP_COUNT,
+            encoding="utf-8",
+        )
         file_handler.setLevel(getattr(logging, log_level.upper(), logging.INFO))
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)

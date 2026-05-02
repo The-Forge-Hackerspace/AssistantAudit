@@ -108,6 +108,89 @@ def init_sentry(
         return False
 
 
+# TOS-102 / AC-3: liste de clés considérées comme PII et scrubbées avant envoi.
+_PII_KEY_PATTERNS = (
+    "password",
+    "passwd",
+    "token",
+    "secret",
+    "authorization",
+    "cookie",
+    "set-cookie",
+    "api_key",
+    "apikey",
+    "x-api-key",
+    "session",
+    "csrf",
+)
+_PII_REDACTED = "[Filtered]"
+
+
+def _scrub_dict(data: dict) -> dict:
+    """Remplace par `[Filtered]` toute clé sensible (cf. _PII_KEY_PATTERNS).
+
+    Récursif sur dicts/listes imbriqués. Mutate-in-place pour rester O(n).
+    """
+    if not isinstance(data, dict):
+        return data
+    for key in list(data.keys()):
+        lk = str(key).lower()
+        if any(pat in lk for pat in _PII_KEY_PATTERNS):
+            data[key] = _PII_REDACTED
+            continue
+        value = data[key]
+        if isinstance(value, dict):
+            _scrub_dict(value)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    _scrub_dict(item)
+    return data
+
+
+def _scrub_event_pii(event: dict) -> dict:
+    """Strip PII de l'event Sentry (TOS-102 / AC-3).
+
+    Cibles : `request.headers`, `request.cookies`, `request.data`, `extra`,
+    `contexts`, `user.email`, `user.ip_address`, breadcrumbs.
+    """
+    request = event.get("request")
+    if isinstance(request, dict):
+        for field in ("headers", "cookies", "data", "env"):
+            sub = request.get(field)
+            if isinstance(sub, dict):
+                _scrub_dict(sub)
+
+    user = event.get("user")
+    if isinstance(user, dict):
+        # Conserver l'id technique mais masquer email/ip qui sont du PII direct.
+        if "email" in user:
+            user["email"] = _PII_REDACTED
+        if "ip_address" in user:
+            user["ip_address"] = _PII_REDACTED
+
+    extra = event.get("extra")
+    if isinstance(extra, dict):
+        _scrub_dict(extra)
+
+    contexts = event.get("contexts")
+    if isinstance(contexts, dict):
+        _scrub_dict(contexts)
+
+    breadcrumbs = event.get("breadcrumbs")
+    # breadcrumbs can be {"values": [...]} ou directement liste
+    if isinstance(breadcrumbs, dict):
+        values = breadcrumbs.get("values")
+        if isinstance(values, list):
+            for crumb in values:
+                if isinstance(crumb, dict):
+                    crumb_data = crumb.get("data")
+                    if isinstance(crumb_data, dict):
+                        _scrub_dict(crumb_data)
+
+    return event
+
+
 def before_send_hook(event: dict, hint: dict) -> Optional[dict]:
     """
     Hook called before sending event to Sentry.
@@ -128,6 +211,10 @@ def before_send_hook(event: dict, hint: dict) -> Optional[dict]:
             # Skip client errors we've already logged
             if error_type in ["HTTPException", "ValidationError"]:
                 return None
+
+    # TOS-102 / AC-3: scrub PII (headers, cookies, extra, breadcrumbs, user)
+    # avant tout envoi vers Sentry. Doit être la dernière étape avant return.
+    _scrub_event_pii(event)
 
     return event
 
