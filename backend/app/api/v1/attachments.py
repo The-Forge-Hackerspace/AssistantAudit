@@ -150,14 +150,22 @@ def upload_attachment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditeur),
 ):
-    """Upload un fichier (capture d'écran, config, etc.) pour un résultat de contrôle."""
+    """Upload un fichier (capture d'écran, config, etc.) pour un résultat de contrôle.
+
+    Vérifie l'ownership du control_result via FileService._verify_control_result_ownership
+    AVANT toute lecture de chunks ou écriture disque/DB. Un non-owner non-admin reçoit
+    NotFoundError (traduite en 404 générique par le handler global), aligné sur
+    api/v1/files.py:upload (BOLA fix S-001).
+    """
     settings = get_settings()
     max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
-    # Vérifier que le control result existe
-    cr = FileService.get_control_result(db, result_id)
-    if not cr:
-        raise HTTPException(status_code=404, detail="Résultat de contrôle introuvable")
+    # Vérifier l'ownership du control result AVANT toute IO disque/DB (BOLA fix).
+    # NotFoundError → handler global = 404 générique (pas de leak d'existence).
+    service = FileService()
+    cr = service._verify_control_result_ownership(
+        db, result_id, current_user.id, is_admin=(current_user.role == "admin")
+    )
 
     # Vérifier l'extension
     original_name = file.filename or "unknown"

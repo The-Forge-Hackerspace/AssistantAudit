@@ -43,23 +43,34 @@ class FileService:
     def __init__(self) -> None:
         self.envelope = EnvelopeEncryption()
 
-    def _verify_control_result_ownership(self, db: Session, control_result_id: int, user_id: int) -> ControlResult:
+    def _verify_control_result_ownership(
+        self,
+        db: Session,
+        control_result_id: int,
+        user_id: int,
+        is_admin: bool = False,
+    ) -> ControlResult:
         """
         Verifie que le control_result appartient au user via la chaine :
         ControlResult -> Assessment -> Campaign -> Audit -> owner_id.
-        Retourne le ControlResult ou leve 404.
+
+        Quand is_admin=True, le filtre owner_id est omis : un admin peut
+        accéder à tout audit existant. Le filtre par défaut (is_admin=False)
+        garde la sémantique BOLA-safe : non-owner non-admin reçoit
+        NotFoundError (pas de leak d'existence).
+
+        Retourne le ControlResult ou leve NotFoundError.
         """
-        cr = (
+        query = (
             db.query(ControlResult)
             .join(Assessment, ControlResult.assessment_id == Assessment.id)
             .join(AssessmentCampaign, Assessment.campaign_id == AssessmentCampaign.id)
             .join(Audit, AssessmentCampaign.audit_id == Audit.id)
-            .filter(
-                ControlResult.id == control_result_id,
-                Audit.owner_id == user_id,
-            )
-            .first()
+            .filter(ControlResult.id == control_result_id)
         )
+        if not is_admin:
+            query = query.filter(Audit.owner_id == user_id)
+        cr = query.first()
         if cr is None:
             raise NotFoundError("Ressource introuvable")
         return cr
