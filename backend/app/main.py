@@ -149,26 +149,31 @@ def create_app() -> FastAPI:
             # CSP : en prod (Swagger desactive) on supprime 'unsafe-inline'
             # et le CDN externe pour reduire la surface XSS. En dev, on garde
             # 'unsafe-inline' + cdn.jsdelivr.net pour compatibilite Swagger UI.
-            if is_prod:
-                response.headers["Content-Security-Policy"] = (
-                    "default-src 'self'; "
-                    "script-src 'self'; "
-                    "style-src 'self'; "
-                    "img-src 'self' data:; "
-                    "font-src 'self'; "
-                    "connect-src 'self'; "
-                    "frame-ancestors 'none'"
-                )
-            else:
-                response.headers["Content-Security-Policy"] = (
-                    "default-src 'self'; "
-                    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                    "img-src 'self' data:; "
-                    "font-src 'self' https://cdn.jsdelivr.net; "
-                    "connect-src 'self'; "
-                    "frame-ancestors 'none'"
-                )
+            # Exception (TOS-75 / S-002) : si la route a deja pose un CSP
+            # `sandbox` (preview attachment), on ne l'ecrase pas — la policy
+            # route-level est strictement plus restrictive.
+            existing_csp = response.headers.get("Content-Security-Policy", "")
+            if "sandbox" not in existing_csp:
+                if is_prod:
+                    response.headers["Content-Security-Policy"] = (
+                        "default-src 'self'; "
+                        "script-src 'self'; "
+                        "style-src 'self'; "
+                        "img-src 'self' data:; "
+                        "font-src 'self'; "
+                        "connect-src 'self'; "
+                        "frame-ancestors 'none'"
+                    )
+                else:
+                    response.headers["Content-Security-Policy"] = (
+                        "default-src 'self'; "
+                        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                        "img-src 'self' data:; "
+                        "font-src 'self' https://cdn.jsdelivr.net; "
+                        "connect-src 'self'; "
+                        "frame-ancestors 'none'"
+                    )
             # HSTS uniquement si HTTPS détecté
             if request.url.scheme == "https":
                 response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
