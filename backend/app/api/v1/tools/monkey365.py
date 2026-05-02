@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ....core.database import get_db
-from ....core.deps import get_current_auditeur
+from ....core.deps import RbacContext, get_current_auditeur, get_rbac_context_auditeur
 from ....core.event_loop import register_bg_task
 from ....core.task_runner import get_task_runner
 from ....models.monkey365_scan_result import Monkey365ScanStatus
@@ -29,17 +29,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _rbac(u: User) -> tuple[int, bool]:
-    return u.id, u.role == "admin"
-
-
 @router.post("/monkey365/run", response_model=Monkey365ScanResultSummary, status_code=201)
 def launch_monkey365_scan(
     request: Monkey365ScanCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     try:
         result = Monkey365ScanService.launch_scan(
             db=db,
@@ -75,10 +71,10 @@ def list_monkey365_scans(
     page: int = Query(1, ge=1, description="Numéro de page, commence à 1"),
     page_size: int = Query(50, ge=1, le=500, description="Nombre de résultats par page"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Liste paginée des audits Monkey365 pour une entreprise."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return Monkey365ScanService.list_scans(
         db=db,
         entreprise_id=entreprise_id,
@@ -93,9 +89,9 @@ def list_monkey365_scans(
 def get_monkey365_scan_result(
     result_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     result = Monkey365ScanService.get_scan(db, result_id, user_id=uid, is_admin=adm)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
@@ -106,10 +102,10 @@ def get_monkey365_scan_result(
 def get_monkey365_scan_logs(
     result_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Retourne les dernières lignes du log PowerShell du scan (lecture directe du fichier)."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     result = Monkey365ScanService.get_scan(db, result_id, user_id=uid, is_admin=adm)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
@@ -140,10 +136,10 @@ def get_monkey365_scan_logs(
 def cancel_monkey365_scan(
     result_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Force l'arrêt d'un scan en cours : tue le process PowerShell et met le status à CANCELLED."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     result = Monkey365ScanService.cancel_scan(db, result_id, user_id=uid, is_admin=adm)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
@@ -154,10 +150,10 @@ def cancel_monkey365_scan(
 def get_monkey365_scan_report(
     result_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Retourne le fichier HTML du rapport Monkey365."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     result = Monkey365ScanService.get_scan(db, result_id, user_id=uid, is_admin=adm)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
@@ -216,12 +212,12 @@ def import_monkey365_to_audit(
 async def launch_monkey365_streaming_scan(
     request: Monkey365StreamingScanCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """
     Lance un scan Monkey365 en mode streaming avec Device Code Flow.
     """
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     result = Monkey365ScanService.create_streaming_scan(
         db=db,
         entreprise_id=request.entreprise_id,
@@ -235,7 +231,7 @@ async def launch_monkey365_streaming_scan(
     register_bg_task(
         Monkey365ScanService.execute_streaming_scan(
             result_id=result.id,
-            user_id=current_user.id,
+            user_id=rbac.user_id,
             tenant_id=request.tenant_id,
             subscriptions=request.subscriptions,
             ruleset=request.ruleset,
@@ -247,7 +243,7 @@ async def launch_monkey365_streaming_scan(
     logger.info(
         "[MONKEY365-STREAM] Scan #%s lance (user=%s, entreprise=%s)",
         result.id,
-        current_user.id,
+        rbac.user_id,
         request.entreprise_id,
     )
     return Monkey365StreamingScanResponse(
@@ -262,10 +258,10 @@ async def launch_monkey365_streaming_scan(
 def delete_monkey365_scan(
     result_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Supprime un audit Monkey365 et nettoie les fichiers associés."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     if not Monkey365ScanService.delete_scan(db, result_id, user_id=uid, is_admin=adm):
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
     return MessageResponse(message=f"Audit Monkey365 #{result_id} supprimé")

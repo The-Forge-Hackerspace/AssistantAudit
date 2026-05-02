@@ -2,8 +2,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from ...core.database import get_db
-from ...core.deps import get_current_auditeur, get_current_user
-from ...models.user import User
+from ...core.deps import RbacContext, get_rbac_context, get_rbac_context_auditeur
 from ...schemas.common import MessageResponse
 from ...schemas.network_map import (
     MultiSiteEdge,
@@ -26,17 +25,13 @@ from ...services.network_map_service import NetworkMapService
 router = APIRouter()
 
 
-def _rbac(u: User) -> tuple[int, bool]:
-    return u.id, u.role == "admin"
-
-
 @router.get("/links", response_model=list[NetworkLinkRead])
 def list_network_links(
     site_id: int = Query(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.list_links(db, site_id, user_id=uid, is_admin=adm)
 
 
@@ -44,9 +39,9 @@ def list_network_links(
 def get_network_link(
     link_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.get_link(db, link_id, user_id=uid, is_admin=adm)
 
 
@@ -54,9 +49,9 @@ def get_network_link(
 def create_network_link(
     body: NetworkLinkCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.create_link(db, body, user_id=uid, is_admin=adm)
 
 
@@ -65,9 +60,9 @@ def update_network_link(
     link_id: int,
     body: NetworkLinkUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.update_link(db, link_id, body, user_id=uid, is_admin=adm)
 
 
@@ -75,9 +70,9 @@ def update_network_link(
 def delete_network_link(
     link_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     NetworkMapService.delete_link(db, link_id, user_id=uid, is_admin=adm)
     return MessageResponse(message="Lien supprimé")
 
@@ -86,9 +81,9 @@ def delete_network_link(
 def get_site_network_map(
     site_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     data = NetworkMapService.get_site_map_data(db, site_id, user_id=uid, is_admin=adm)
     equipements = data["equipements"]
     links = data["links"]
@@ -146,9 +141,9 @@ def save_site_network_layout(
     site_id: int,
     body: NetworkLayoutSaveRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     NetworkMapService.save_layout(db, site_id, body.layout_data, user_id=uid, is_admin=adm)
     return MessageResponse(message="Layout sauvegardé")
 
@@ -157,9 +152,9 @@ def save_site_network_layout(
 def get_multi_site_overview(
     entreprise_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     data = NetworkMapService.get_overview_data(db, entreprise_id, user_id=uid, is_admin=adm)
 
     nodes = [
@@ -194,9 +189,9 @@ def get_multi_site_overview(
 def list_site_connections(
     entreprise_id: int = Query(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.list_connections(db, entreprise_id, user_id=uid, is_admin=adm)
 
 
@@ -204,9 +199,9 @@ def list_site_connections(
 def get_site_connection(
     connection_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.get_connection(db, connection_id, user_id=uid, is_admin=adm)
 
 
@@ -214,9 +209,9 @@ def get_site_connection(
 def create_site_connection(
     body: SiteConnectionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.create_connection(db, body, user_id=uid, is_admin=adm)
 
 
@@ -225,9 +220,9 @@ def update_site_connection(
     connection_id: int,
     body: SiteConnectionUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.update_connection(db, connection_id, body, user_id=uid, is_admin=adm)
 
 
@@ -235,9 +230,9 @@ def update_site_connection(
 def delete_site_connection(
     connection_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     NetworkMapService.delete_connection(db, connection_id, user_id=uid, is_admin=adm)
     return MessageResponse(message="Connexion inter-site supprimée")
 
@@ -249,9 +244,9 @@ def delete_site_connection(
 def list_vlans(
     site_id: int = Query(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.list_vlans(db, site_id, user_id=uid, is_admin=adm)
 
 
@@ -259,9 +254,9 @@ def list_vlans(
 def get_vlan(
     vlan_def_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.get_vlan(db, vlan_def_id, user_id=uid, is_admin=adm)
 
 
@@ -269,9 +264,9 @@ def get_vlan(
 def create_vlan(
     body: VlanDefinitionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.create_vlan(db, body, user_id=uid, is_admin=adm)
 
 
@@ -280,9 +275,9 @@ def update_vlan(
     vlan_def_id: int,
     body: VlanDefinitionUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     return NetworkMapService.update_vlan(db, vlan_def_id, body, user_id=uid, is_admin=adm)
 
 
@@ -290,8 +285,8 @@ def update_vlan(
 def delete_vlan(
     vlan_def_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     NetworkMapService.delete_vlan(db, vlan_def_id, user_id=uid, is_admin=adm)
     return MessageResponse(message="Définition VLAN supprimée")

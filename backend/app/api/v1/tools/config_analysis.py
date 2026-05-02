@@ -4,8 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.orm import Session
 
 from ....core.database import get_db
-from ....core.deps import get_current_auditeur, get_current_user
-from ....models.user import User
+from ....core.deps import RbacContext, get_rbac_context, get_rbac_context_auditeur
 from ....schemas.common import MessageResponse
 from ....schemas.scan import (
     ConfigAnalysisRead,
@@ -28,16 +27,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _rbac(u: User) -> tuple[int, bool]:
-    return u.id, u.role == "admin"
-
-
 @router.post("/config-analysis", response_model=ConfigUploadResponse)
 def analyze_config(
     file: UploadFile = File(...),
     equipement_id: int | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """
     Upload un fichier de configuration réseau et retourne l'analyse.
@@ -104,7 +99,7 @@ def analyze_config(
 def analyze_config_raw(
     content: str = Form(...),
     vendor_hint: str | None = Form(None),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """
     Analyse une configuration envoyée en texte brut (sans upload de fichier).
@@ -126,7 +121,7 @@ def analyze_config_raw(
 
 @router.get("/config-analysis/vendors")
 def list_vendors(
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Liste les vendors supportés par les parsers de configuration."""
     return {
@@ -153,10 +148,10 @@ def list_analyses(
     page: int = Query(1, ge=1, description="Numéro de page"),
     page_size: int = Query(20, ge=1, le=100, description="Éléments par page"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Liste les analyses de configuration sauvegardées, optionnellement filtrées par équipement."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     analyses = list_config_analyses_with_access(
         db,
         user_id=uid,
@@ -187,10 +182,10 @@ def list_analyses(
 def get_analysis(
     config_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Récupère le détail d'une analyse de configuration."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     config = get_config_analysis(db, config_id, user_id=uid, is_admin=adm)
     if not config:
         raise HTTPException(404, "Analyse de configuration introuvable")
@@ -201,10 +196,10 @@ def get_analysis(
 def remove_analysis(
     config_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """Supprime une analyse de configuration."""
-    uid, adm = _rbac(current_user)
+    uid, adm = rbac.user_id, rbac.is_admin
     if not delete_config_analysis(db, config_id, user_id=uid, is_admin=adm):
         raise HTTPException(404, "Analyse de configuration introuvable")
     return MessageResponse(message="Analyse supprimée")
@@ -215,7 +210,7 @@ def prefill_audit(
     config_id: int,
     assessment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_auditeur),
+    rbac: RbacContext = Depends(get_rbac_context_auditeur),
 ):
     """
     Pré-remplit les contrôles d'un assessment à partir des findings
@@ -236,7 +231,7 @@ def prefill_audit(
 def list_assessments_for_equipment(
     equipement_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """
     Liste les assessments liés à un équipement (pour sélectionner

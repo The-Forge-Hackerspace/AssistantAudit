@@ -5,8 +5,7 @@ import math
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from ...core.deps import PaginationParams, get_current_user, get_db
-from ...models.user import User
+from ...core.deps import PaginationParams, RbacContext, get_db, get_rbac_context
 from ...schemas.common import PaginatedResponse
 from ...schemas.finding import (
     FindingCountsByStatus,
@@ -22,10 +21,6 @@ from ...services.finding_service import FindingService
 router = APIRouter()
 
 
-def _rbac(current_user: User) -> tuple[int, bool]:
-    return current_user.id, current_user.role == "admin"
-
-
 # ── Liste des findings ──────────────────────────────────────────────
 @router.get("", response_model=PaginatedResponse[FindingResponse])
 def list_findings(
@@ -35,10 +30,10 @@ def list_findings(
     severity: str | None = Query(None, description="Filtrer par sévérité"),
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Liste les findings avec filtres et pagination."""
-    uid, is_admin = _rbac(current_user)
+    uid, is_admin = rbac.user_id, rbac.is_admin
     findings, total = FindingService.list_findings(
         db,
         assessment_id=assessment_id,
@@ -65,7 +60,7 @@ def list_findings(
 def get_counts(
     assessment_id: int | None = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Compteurs de findings par statut."""
     counts = FindingService.counts_by_status(db, assessment_id=assessment_id)
@@ -77,7 +72,7 @@ def get_counts(
 def get_finding(
     finding_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Récupère le détail d'un finding avec historique."""
     finding = FindingService.get_finding(db, finding_id)
@@ -91,10 +86,10 @@ def get_finding(
 def generate_findings(
     body: FindingGenerateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Génère des findings depuis les ControlResult non-conformes d'un assessment."""
-    uid, _ = _rbac(current_user)
+    uid = rbac.user_id
     generated, skipped = FindingService.generate_from_assessment(db, body.assessment_id, user_id=uid)
     return FindingGenerateResponse(
         generated=generated,
@@ -109,14 +104,14 @@ def update_finding_status(
     finding_id: int,
     body: FindingStatusUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Transition de statut d'un finding."""
     finding = FindingService.get_finding(db, finding_id)
     if finding is None:
         raise HTTPException(status_code=404, detail="Finding introuvable")
 
-    uid, _ = _rbac(current_user)
+    uid = rbac.user_id
     updated = FindingService.update_status(
         db,
         finding,
@@ -135,7 +130,7 @@ def link_duplicate(
     finding_id: int,
     body: FindingLinkDuplicate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    rbac: RbacContext = Depends(get_rbac_context),
 ):
     """Lie un finding comme doublon d'un autre."""
     finding = FindingService.get_finding(db, finding_id)
