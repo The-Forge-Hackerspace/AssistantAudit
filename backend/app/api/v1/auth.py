@@ -14,7 +14,7 @@ from ...core.database import get_db
 from ...core.deps import get_current_admin, get_current_user
 from ...core.logging_config import hash_username
 from ...core.rate_limit import login_rate_limiter
-from ...core.security import validate_refresh_token
+from ...core.security import revoke_refresh_jti, validate_refresh_token
 from ...models.user import User
 from ...schemas.common import MessageResponse
 from ...schemas.user import (
@@ -162,6 +162,14 @@ def refresh(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Utilisateur introuvable ou desactive",
         )
+
+    # TOS-102 / AC-1b: rotation refresh — révoquer l'ancien JTI avant d'émettre
+    # un nouveau couple de tokens. Tout re-usage du même refresh sera rejeté.
+    old_jti = payload.get("jti")
+    old_exp = payload.get("exp")
+    if old_jti and old_exp is not None:
+        from datetime import datetime as _dt, timezone as _tz
+        revoke_refresh_jti(old_jti, _dt.fromtimestamp(int(old_exp), tz=_tz.utc))
 
     login_rate_limiter.reset(request)
     tokens = AuthService.create_tokens(user)

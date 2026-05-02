@@ -56,8 +56,46 @@ def create_access_token(
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
 
 
+# TOS-102 / AC-1b: rotation des refresh tokens. Chaque refresh contient un JTI
+# unique ; lorsqu'il est consommé, le JTI passe dans une denylist en mémoire
+# avec son expiration. Tout ré-usage du même token lève PyJWTError.
+#
+# Limitation: la denylist est in-process (cf. lockout rate_limiter pour la
+# même contrainte multi-worker). En déploiement multi-worker, brancher Redis
+# (cf. core/rate_limit.py RedisBackend) sur un futur RefreshTokenStore.
+_revoked_refresh_jtis: dict[str, float] = {}
+_revoked_lock = __import__("threading").Lock()
+
+
+def _prune_revoked_jtis(now_ts: float) -> None:
+    """Retire de la denylist les JTI dont l'expiration est dépassée."""
+    expired = [jti for jti, exp in _revoked_refresh_jtis.items() if exp <= now_ts]
+    for jti in expired:
+        _revoked_refresh_jtis.pop(jti, None)
+
+
+def revoke_refresh_jti(jti: str, expires_at: datetime) -> None:
+    """Marque un JTI comme révoqué jusqu'à son expiration originelle."""
+    if not jti:
+        return
+    exp_ts = expires_at.timestamp() if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc).timestamp()
+    with _revoked_lock:
+        _prune_revoked_jtis(datetime.now(timezone.utc).timestamp())
+        _revoked_refresh_jtis[jti] = exp_ts
+
+
+def is_refresh_jti_revoked(jti: str) -> bool:
+    if not jti:
+        return False
+    with _revoked_lock:
+        now_ts = datetime.now(timezone.utc).timestamp()
+        _prune_revoked_jtis(now_ts)
+        exp = _revoked_refresh_jtis.get(jti)
+        return exp is not None and exp > now_ts
+
+
 def create_refresh_token(subject: str | int) -> str:
-    """Crée un refresh token JWT"""
+    """Crée un refresh token JWT (avec JTI pour rotation)"""
     now = datetime.now(timezone.utc)
     expire = now + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode = {
@@ -65,6 +103,7 @@ def create_refresh_token(subject: str | int) -> str:
         "exp": expire,
         "iat": now,
         "type": "refresh",
+        "jti": secrets.token_urlsafe(16),
     }
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
 
@@ -80,12 +119,15 @@ def decode_token(token: str) -> Optional[dict]:
 
 def validate_refresh_token(token: str) -> dict:
     """
-    Decode un JWT et verifie que c'est un refresh token.
-    Retourne le payload ou raise JWTError si invalide/expire/mauvais type.
+    Decode un JWT et verifie que c'est un refresh token NON révoqué.
+    Retourne le payload ou raise PyJWTError si invalide/expire/mauvais type/révoqué.
     """
     payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
     if payload.get("type") != "refresh":
         raise jwt.PyJWTError("Type de token invalide : 'refresh' attendu")
+    jti = payload.get("jti")
+    if jti and is_refresh_jti_revoked(jti):
+        raise jwt.PyJWTError("Refresh token déjà utilisé (rotation)")
     return payload
 
 
