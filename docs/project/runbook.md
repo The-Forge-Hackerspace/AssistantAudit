@@ -218,12 +218,41 @@ Avant tout deploiement en production, valider la checklist (issue de `.env.examp
 - [ ] Reverse proxy (NPMPlus prod / Caddy staging) termine TLS et applique HSTS
 - [ ] `DEMO` reste a `false` en production
 - [ ] Sauvegardes `pgdata`, `app-certs`, `./data` testees et chiffrees au repos
+- [ ] `RATE_LIMIT_BACKEND=redis` + `RATE_LIMIT_REDIS_URL` configures (requis en production multi-worker, voir ci-dessous)
+
+### Deploiement multi-worker + rate limit
+
+Le rate-limiter (`backend/app/core/rate_limit.py`) supporte deux backends pluggables, selectionnes par la variable `RATE_LIMIT_BACKEND` :
+
+| Backend | `RATE_LIMIT_BACKEND` | Etat partage entre workers ? | Quand l'utiliser |
+|---|---|---|---|
+| Memoire | `memory` (defaut) | Non — un dict par process | Dev local, tests, mono-worker uniquement |
+| Redis | `redis` (+ `RATE_LIMIT_REDIS_URL`) | Oui — clefs `rl:count:*` / `rl:block:*` | Production multi-worker, multi-instance |
+
+**Boot guard (S-004 / TOS-77).** Si `ENV=production` (ou `staging`/`preprod`) et `RATE_LIMIT_BACKEND=memory`, l'application refuse de demarrer (`ValueError` au boot). Raison : avec plusieurs workers Uvicorn, chaque process maintient son propre compteur ; un attaquant peut donc multiplier ses tentatives par le nombre de workers et bypass la protection brute-force.
+
+**Activation de Redis en docker compose.**
+
+1. Decommenter le service `redis` dans `docker-compose.yml` (bloc `# redis:` deja prepare).
+2. Ajouter dans `.env` :
+   ```
+   RATE_LIMIT_BACKEND=redis
+   RATE_LIMIT_REDIS_URL=redis://redis:6379/0
+   ```
+3. `docker compose up -d redis backend` (ordre : Redis d'abord).
+4. Verifier : `docker compose logs backend | grep RATE_LIMIT` doit afficher `backend=redis url=redis://redis:6379/0`.
+
+**Verifications operationnelles.**
+
+- 6 tentatives `/auth/login` depuis la meme IP en 1 minute -> la 6e doit etre bloquee 429 quel que soit le worker servant la requete.
+- Compteurs visibles via `redis-cli KEYS 'rl:*'` (debug uniquement, ne pas activer en prod sans audit).
+- En cas d'indisponibilite de Redis : le backend leve `RuntimeError` au boot ; restaurer Redis avant de relancer la stack.
 
 ## Maintenance
 
 **Update Triggers** : modification du contenu source, changement de structure, correction de reference, evolution de la stack ou de la spec.
 **Verification** : revue manuelle annuelle ou a chaque changement majeur ; relance du verifier docs-quality apres edit.
-**Last Updated** : 2026-05-01
+**Last Updated** : 2026-05-02
 
 | Champ | Valeur |
 |---|---|

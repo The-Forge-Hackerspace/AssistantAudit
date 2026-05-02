@@ -145,6 +145,26 @@ class Settings(BaseSettings):
                         f"CORS_ORIGINS invalide : '{origin}' — chaque origine doit commencer par http:// ou https://"
                     )
 
+        # --- Rate limiter (S-004 / TOS-77) ---
+        # Rejet après la validation CORS pour ne pas masquer les erreurs CORS
+        # (qui sont prioritaires dans la perception opérationnelle).
+        if is_safe_env and (self.RATE_LIMIT_BACKEND or "memory").lower() == "memory":
+            raise ValueError(
+                "RATE_LIMIT_BACKEND=memory est interdit en production : les workers "
+                "Uvicorn ne partagent pas leur état, ce qui permet de bypass le quota "
+                "en multipliant les tentatives. Configurez RATE_LIMIT_BACKEND=redis et "
+                "RATE_LIMIT_REDIS_URL=redis://<host>:6379/0 (voir docs/project/runbook.md "
+                "§ Déploiement multi-worker + rate limit)."
+            )
+        if (
+            (self.RATE_LIMIT_BACKEND or "memory").lower() == "redis"
+            and not self.RATE_LIMIT_REDIS_URL
+        ):
+            raise ValueError(
+                "RATE_LIMIT_BACKEND=redis nécessite RATE_LIMIT_REDIS_URL "
+                "(ex. redis://redis:6379/0)."
+            )
+
     # --- CORS ---
     CORS_ALLOW_METHODS: list[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     CORS_ALLOW_HEADERS: list[str] = [
@@ -196,13 +216,20 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = str(BASE_DIR / "logs")
 
-    # --- Rate limiting (par IP, in-memory, voir core/rate_limit.py) ---
+    # --- Rate limiting (par IP, voir core/rate_limit.py) ---
     # Nombre max de requêtes par minute avant blocage. Défauts sains pour la
     # production ; à relâcher temporairement en staging si une suite de tests
     # E2E a besoin de plus de débit (ex. RATE_LIMIT_API_MAX=10000).
     RATE_LIMIT_AUTH_MAX: int = 5  # /auth/login, /auth/enroll
     RATE_LIMIT_API_MAX: int = 30  # endpoints authentifiés
     RATE_LIMIT_PUBLIC_MAX: int = 100  # health, metrics, readiness
+
+    # Backend du rate-limiter. `memory` = compteur in-process (OK en dev/test
+    # mono-worker, refusé en production car les workers Uvicorn ne partagent
+    # pas leur état → contournement trivial du quota). `redis` = compteur
+    # partagé via Redis (`RATE_LIMIT_REDIS_URL`), cohérent multi-worker.
+    RATE_LIMIT_BACKEND: str = "memory"  # memory | redis
+    RATE_LIMIT_REDIS_URL: str = ""  # ex. redis://redis:6379/0
 
     # --- Monitoring: Sentry ---
     SENTRY_DSN: str = ""  # Sentry error tracking DSN (optional)

@@ -52,11 +52,16 @@ services:
       # Restreindre aux IPs du reverse proxy en prod (NPMPlus). '*' par defaut
       # car le port 8000 du backend n'est pas publie via le proxy.
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
-      # Seuils du rate-limiter in-memory (defaults backend : 5/30/100 par minute).
+      # Seuils du rate-limiter (defaults backend : 5/30/100 par minute).
       # Surchargeables via .env pour relacher en E2E (ex. 10000) ou durcir en prod.
       RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-5}
       RATE_LIMIT_API_MAX: ${RATE_LIMIT_API_MAX:-30}
       RATE_LIMIT_PUBLIC_MAX: ${RATE_LIMIT_PUBLIC_MAX:-100}
+      # Backend du rate-limiter. En production multi-worker (S-004 / TOS-77),
+      # forcer RATE_LIMIT_BACKEND=redis et fournir RATE_LIMIT_REDIS_URL ;
+      # `memory` est refusé au boot par la validation de config en prod.
+      RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-memory}
+      RATE_LIMIT_REDIS_URL: ${RATE_LIMIT_REDIS_URL:-}
     volumes:
       - ./data:/app/data
       - app-certs:/app/certs
@@ -109,6 +114,24 @@ services:
         reservations:
           cpus: '0.25'
           memory: 128M
+
+# Service Redis optionnel pour le rate-limiter multi-worker (TOS-77).
+# Décommenter et fixer RATE_LIMIT_BACKEND=redis +
+# RATE_LIMIT_REDIS_URL=redis://redis:6379/0 dans .env pour l'activer.
+#  redis:
+#    image: redis:7-alpine
+#    restart: unless-stopped
+#    command: ["redis-server", "--save", "", "--appendonly", "no"]
+#    healthcheck:
+#      test: ["CMD", "redis-cli", "ping"]
+#      interval: 5s
+#      timeout: 3s
+#      retries: 5
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.25'
+#          memory: 128M
 
 volumes:
   pgdata:

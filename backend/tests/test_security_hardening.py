@@ -243,6 +243,8 @@ class TestCorsValidation:
                 "ENCRYPTION_KEY": "ab" * 32,
                 "FILE_ENCRYPTION_KEY": "cd" * 32,
                 "CORS_ORIGINS": '["https://audit.example.com"]',
+                "RATE_LIMIT_BACKEND": "redis",
+                "RATE_LIMIT_REDIS_URL": "redis://redis:6379/0",
             },
             clear=False,
         ):
