@@ -26,6 +26,7 @@ from ..models.collect_pipeline import CollectPipeline, PipelineStatus, PipelineS
 from ..models.collect_result import CollectResult, CollectStatus
 from ..models.equipement import Equipement
 from ..models.site import Site
+from ..core.errors import BusinessRuleError, NotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -240,26 +241,26 @@ def prefill_assessment_from_pipeline(
     """
     pipeline = db.get(CollectPipeline, pipeline_id)
     if pipeline is None:
-        raise ValueError(f"Pipeline #{pipeline_id} introuvable")
+        raise NotFoundError(f"Pipeline #{pipeline_id} introuvable")
     if pipeline.status != PipelineStatus.COMPLETED:
-        raise ValueError(
+        raise BusinessRuleError(
             f"Pipeline #{pipeline_id} n'est pas terminé (status={pipeline.status.value})"
         )
 
     assessment = db.get(Assessment, assessment_id)
     if assessment is None:
-        raise ValueError(f"Assessment #{assessment_id} introuvable")
+        raise NotFoundError(f"Assessment #{assessment_id} introuvable")
 
     if not pipeline.scan_task_uuid:
-        raise ValueError("Aucun résultat à exploiter — scan vide")
+        raise BusinessRuleError("Aucun résultat à exploiter — scan vide")
     task = db.query(AgentTask).filter(AgentTask.task_uuid == pipeline.scan_task_uuid).first()
     if task is None:
-        raise ValueError("Aucun résultat à exploiter — scan vide")
+        raise BusinessRuleError("Aucun résultat à exploiter — scan vide")
 
     raw_hosts = (task.result_summary or {}).get("hosts") or []
     hosts: list[NmapHost] = [_normalize_host(h) for h in raw_hosts if isinstance(h, dict)]
     if not hosts:
-        raise ValueError("Aucun résultat à exploiter — scan vide")
+        raise BusinessRuleError("Aucun résultat à exploiter — scan vide")
 
     control_results = (
         db.query(ControlResult).filter(ControlResult.assessment_id == assessment_id).all()
@@ -352,21 +353,21 @@ def create_pending_pipeline(
     """
     site = db.get(Site, site_id)
     if not site:
-        raise ValueError(f"Site {site_id} introuvable")
+        raise NotFoundError(f"Site {site_id} introuvable")
     if not is_admin and not user_has_access_to_entreprise(db, site.entreprise_id, created_by):
         log_access_denied(created_by, "Site", site_id, action="launch_pipeline")
-        raise ValueError(f"Site {site_id} introuvable")
+        raise NotFoundError(f"Site {site_id} introuvable")
 
     agent = db.get(Agent, agent_id)
     if agent is None:
-        raise ValueError(f"Agent {agent_id} introuvable")
+        raise NotFoundError(f"Agent {agent_id} introuvable")
     if not is_admin and agent.user_id != created_by:
         log_access_denied(created_by, "Agent", agent_id, action="launch_pipeline")
-        raise ValueError(f"Agent {agent_id} introuvable")
+        raise NotFoundError(f"Agent {agent_id} introuvable")
     if agent.status != "active":
-        raise ValueError(f"Agent {agent_id} inactif")
+        raise NotFoundError(f"Agent {agent_id} inactif")
     if "nmap" not in (agent.allowed_tools or []):
-        raise ValueError(f"Agent {agent_id} non autorisé à exécuter nmap")
+        raise NotFoundError(f"Agent {agent_id} non autorisé à exécuter nmap")
 
     pipeline = CollectPipeline(
         site_id=site_id,

@@ -122,25 +122,22 @@ def update_campaign(
 ):
     """Met à jour une campagne (nom, description, statut)"""
     uid, adm = _rbac(current_user)
-    try:
-        campaign = AssessmentService.update_campaign(
-            db,
-            campaign_id,
-            body,
-            user_id=uid,
-            is_admin=adm,
-        )
-        return CampaignSummary(
-            id=campaign.id,
-            name=campaign.name,
-            status=campaign.status.value,
-            audit_id=campaign.audit_id,
-            created_at=campaign.created_at,
-            compliance_score=campaign.compliance_score,
-            total_assessments=len(campaign.assessments),
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    campaign = AssessmentService.update_campaign(
+        db,
+        campaign_id,
+        body,
+        user_id=uid,
+        is_admin=adm,
+    )
+    return CampaignSummary(
+        id=campaign.id,
+        name=campaign.name,
+        status=campaign.status.value,
+        audit_id=campaign.audit_id,
+        created_at=campaign.created_at,
+        compliance_score=campaign.compliance_score,
+        total_assessments=len(campaign.assessments),
+    )
 
 
 @router.post("/campaigns/{campaign_id}/start", response_model=MessageResponse)
@@ -151,11 +148,8 @@ def start_campaign(
 ):
     """Démarre une campagne"""
     uid, adm = _rbac(current_user)
-    try:
-        AssessmentService.start_campaign(db, campaign_id, user_id=uid, is_admin=adm)
-        return MessageResponse(message="Campagne démarrée")
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    AssessmentService.start_campaign(db, campaign_id, user_id=uid, is_admin=adm)
+    return MessageResponse(message="Campagne démarrée")
 
 
 @router.post("/campaigns/{campaign_id}/complete", response_model=MessageResponse)
@@ -166,11 +160,8 @@ def complete_campaign(
 ):
     """Termine une campagne"""
     uid, adm = _rbac(current_user)
-    try:
-        AssessmentService.complete_campaign(db, campaign_id, user_id=uid, is_admin=adm)
-        return MessageResponse(message="Campagne terminée")
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    AssessmentService.complete_campaign(db, campaign_id, user_id=uid, is_admin=adm)
+    return MessageResponse(message="Campagne terminée")
 
 
 @router.delete("/campaigns/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -181,10 +172,7 @@ def delete_campaign(
 ):
     """Supprime une campagne et toutes ses évaluations"""
     uid, adm = _rbac(current_user)
-    try:
-        AssessmentService.delete_campaign(db, campaign_id, user_id=uid, is_admin=adm)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    AssessmentService.delete_campaign(db, campaign_id, user_id=uid, is_admin=adm)
 
 
 # --- Assessments ---
@@ -201,19 +189,16 @@ def create_assessment(
     if not campaign_id:
         raise HTTPException(status_code=400, detail="campaign_id est requis en query param")
     uid, adm = _rbac(current_user)
-    try:
-        assessment = AssessmentService.create_assessment(
-            db,
-            campaign_id=campaign_id,
-            equipement_id=body.equipement_id,
-            framework_id=body.framework_id,
-            assessed_by=current_user.username,
-            user_id=uid,
-            is_admin=adm,
-        )
-        return assessment
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    assessment = AssessmentService.create_assessment(
+        db,
+        campaign_id=campaign_id,
+        equipement_id=body.equipement_id,
+        framework_id=body.framework_id,
+        assessed_by=current_user.username,
+        user_id=uid,
+        is_admin=adm,
+    )
+    return assessment
 
 
 @router.get("/{assessment_id}", response_model=AssessmentRead)
@@ -238,10 +223,7 @@ def delete_assessment(
 ):
     """Supprime un assessment et tous ses résultats"""
     uid, adm = _rbac(current_user)
-    try:
-        AssessmentService.delete_assessment(db, assessment_id, user_id=uid, is_admin=adm)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    AssessmentService.delete_assessment(db, assessment_id, user_id=uid, is_admin=adm)
 
 
 # --- Résultats de contrôle ---
@@ -256,21 +238,18 @@ def update_control_result(
 ):
     """Met à jour le résultat d'un contrôle"""
     uid, adm = _rbac(current_user)
-    try:
-        AssessmentService.update_control_result(
-            db,
-            result_id=result_id,
-            status=body.status,
-            evidence=body.evidence,
-            comment=body.comment,
-            remediation_note=body.remediation_note,
-            assessed_by=current_user.username,
-            user_id=uid,
-            is_admin=adm,
-        )
-        return MessageResponse(message="Résultat mis à jour")
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    AssessmentService.update_control_result(
+        db,
+        result_id=result_id,
+        status=body.status,
+        evidence=body.evidence,
+        comment=body.comment,
+        remediation_note=body.remediation_note,
+        assessed_by=current_user.username,
+        user_id=uid,
+        is_admin=adm,
+    )
+    return MessageResponse(message="Résultat mis à jour")
 
 
 # --- Scoring ---

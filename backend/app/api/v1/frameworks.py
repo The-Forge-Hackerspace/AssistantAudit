@@ -75,13 +75,10 @@ def clone_framework(
     _: User = Depends(get_current_admin),
 ):
     """Clone un référentiel en nouvelle version (désactive l'ancienne)"""
-    try:
-        clone = FrameworkService.clone_as_new_version(
-            db, framework_id, new_version=body.new_version, new_name=body.new_name
-        )
-        return clone
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    clone = FrameworkService.clone_as_new_version(
+        db, framework_id, new_version=body.new_version, new_name=body.new_name
+    )
+    return clone
 
 
 @router.get("/{framework_id}/export")
@@ -153,22 +150,19 @@ def create_framework(
         for ctrl in cat.controls:
             cat_dict["controls"].append(ctrl.model_dump())
         categories_data.append(cat_dict)
-    try:
-        framework = FrameworkService.create_framework(
-            db,
-            ref_id=body.ref_id,
-            name=body.name,
-            version=body.version,
-            description=body.description,
-            engine=body.engine,
-            engine_config=body.engine_config,
-            source=body.source,
-            author=body.author,
-            categories=categories_data,
-        )
-        return framework
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+    framework = FrameworkService.create_framework(
+        db,
+        ref_id=body.ref_id,
+        name=body.name,
+        version=body.version,
+        description=body.description,
+        engine=body.engine,
+        engine_config=body.engine_config,
+        source=body.source,
+        author=body.author,
+        categories=categories_data,
+    )
+    return framework
 
 
 @router.put("/{framework_id}", response_model=FrameworkRead)
@@ -187,11 +181,8 @@ def update_framework(
             cat_dict["controls"].append(ctrl.model_dump())
         categories_data.append(cat_dict)
     data["categories"] = categories_data
-    try:
-        framework = FrameworkService.update_framework(db, framework_id, data)
-        return framework
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    framework = FrameworkService.update_framework(db, framework_id, data)
+    return framework
 
 
 @router.delete("/{framework_id}", response_model=MessageResponse)
@@ -201,11 +192,8 @@ def delete_framework(
     _: User = Depends(get_current_admin),
 ):
     """Supprime un référentiel (admin uniquement)"""
-    try:
-        FrameworkService.delete_framework(db, framework_id)
-        return {"message": "Référentiel supprimé"}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    FrameworkService.delete_framework(db, framework_id)
+    return {"message": "Référentiel supprimé"}
 
 
 @router.post("/import", response_model=MessageResponse)
@@ -240,7 +228,3 @@ def import_single_framework(
         return framework
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Fichier introuvable")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))

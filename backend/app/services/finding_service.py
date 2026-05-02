@@ -3,7 +3,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..core.errors import BusinessRuleError
+from ..core.errors import BusinessRuleError, NotFoundError
 from ..models.assessment import Assessment, AssessmentCampaign, ComplianceStatus, ControlResult
 from ..models.audit import Audit
 from ..models.finding import (
@@ -158,7 +158,7 @@ class FindingService:
         old_status = finding.status
 
         if new_status not in VALID_TRANSITIONS.get(old_status, set()):
-            raise ValueError(
+            raise BusinessRuleError(
                 f"Transition invalide : {old_status.value} → {new_status.value}. "
                 f"Transitions autorisées : {', '.join(s.value for s in VALID_TRANSITIONS.get(old_status, set()))}"
             )
@@ -195,10 +195,10 @@ class FindingService:
         """
         original = db.get(Finding, duplicate_of_id)
         if original is None:
-            raise ValueError(f"Finding original #{duplicate_of_id} introuvable")
+            raise NotFoundError(f"Finding original #{duplicate_of_id} introuvable")
 
         if original.id == finding.id:
-            raise ValueError("Un finding ne peut pas être doublon de lui-même")
+            raise BusinessRuleError("Un finding ne peut pas être doublon de lui-même")
 
         finding.duplicate_of_id = duplicate_of_id
 

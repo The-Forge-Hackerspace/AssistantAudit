@@ -17,6 +17,7 @@ from ..models.ad_audit_result import ADAuditResultModel, ADAuditStatus
 from ..models.assessment import Assessment, ComplianceStatus, ControlResult
 from ..models.equipement import Equipement
 from ..tools.ad_auditor.auditor import ADAuditor
+from ..core.errors import BusinessRuleError, NotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ def create_pending_ad_audit(
     if equipement_id:
         equip = db.get(Equipement, equipement_id)
         if not equip:
-            raise ValueError(f"Équipement #{equipement_id} introuvable")
+            raise NotFoundError(f"Équipement #{equipement_id} introuvable")
 
     audit = ADAuditResultModel(
         equipement_id=equipement_id,
@@ -247,13 +248,13 @@ def prefill_assessment_from_ad_audit(
     """
     audit = db.get(ADAuditResultModel, audit_id)
     if not audit:
-        raise ValueError(f"Audit AD #{audit_id} introuvable")
+        raise NotFoundError(f"Audit AD #{audit_id} introuvable")
     if audit.status != ADAuditStatus.SUCCESS:
-        raise ValueError(f"Audit AD #{audit_id} n'est pas terminé avec succès")
+        raise BusinessRuleError(f"Audit AD #{audit_id} n'est pas terminé avec succès")
 
     assessment = db.get(Assessment, assessment_id)
     if not assessment:
-        raise ValueError(f"Assessment #{assessment_id} introuvable")
+        raise NotFoundError(f"Assessment #{assessment_id} introuvable")
 
     # Charger les control results de l'assessment
     control_results = db.query(ControlResult).filter(ControlResult.assessment_id == assessment_id).all()

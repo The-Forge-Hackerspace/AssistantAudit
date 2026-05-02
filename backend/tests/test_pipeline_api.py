@@ -18,6 +18,7 @@ from app.models.agent import Agent
 from app.models.collect_pipeline import CollectPipeline, PipelineStatus, PipelineStepStatus
 from app.models.entreprise import Entreprise
 from app.models.site import Site
+from app.core.errors import BusinessRuleError, NotFoundError
 
 # ── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -381,7 +382,7 @@ class TestPipelineServiceHelpers:
     ):
         from app.services.pipeline_service import create_pending_pipeline
 
-        with pytest.raises(ValueError, match="introuvable"):
+        with pytest.raises(NotFoundError, match="introuvable"):
             create_pending_pipeline(
                 db_session,
                 site_id=999999,
@@ -395,7 +396,7 @@ class TestPipelineServiceHelpers:
     ):
         from app.services.pipeline_service import create_pending_pipeline
 
-        with pytest.raises(ValueError, match="introuvable"):
+        with pytest.raises(NotFoundError, match="introuvable"):
             create_pending_pipeline(
                 db_session,
                 site_id=_site.id,
@@ -409,7 +410,7 @@ class TestPipelineServiceHelpers:
     ):
         from app.services.pipeline_service import create_pending_pipeline
 
-        with pytest.raises(ValueError, match="Agent.*introuvable"):
+        with pytest.raises(NotFoundError, match="Agent.*introuvable"):
             create_pending_pipeline(
                 db_session,
                 site_id=_site.id,
@@ -433,7 +434,7 @@ class TestPipelineServiceHelpers:
         db_session.commit()
         db_session.refresh(agent)
 
-        with pytest.raises(ValueError, match="inactif"):
+        with pytest.raises(NotFoundError, match="inactif"):
             create_pending_pipeline(
                 db_session,
                 site_id=_site.id,
@@ -457,7 +458,7 @@ class TestPipelineServiceHelpers:
         db_session.commit()
         db_session.refresh(agent)
 
-        with pytest.raises(ValueError, match="non autoris"):
+        with pytest.raises(NotFoundError, match="non autoris"):
             create_pending_pipeline(
                 db_session,
                 site_id=_site.id,

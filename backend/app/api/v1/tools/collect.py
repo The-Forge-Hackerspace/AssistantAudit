@@ -38,18 +38,15 @@ def launch_collect(
     if params.method not in ("ssh", "winrm"):
         raise HTTPException(400, "Méthode invalide. Utilisez 'ssh' ou 'winrm'.")
 
-    try:
-        collect = create_pending_collect(
-            db=db,
-            equipement_id=params.equipement_id,
-            method=params.method,
-            target_host=params.target_host,
-            target_port=params.target_port,
-            username=params.username,
-            device_profile=params.device_profile,
-        )
-    except ValueError as e:
-        raise HTTPException(404, str(e))
+    collect = create_pending_collect(
+        db=db,
+        equipement_id=params.equipement_id,
+        method=params.method,
+        target_host=params.target_host,
+        target_port=params.target_port,
+        username=params.username,
+        device_profile=params.device_profile,
+    )
 
     try:
         task = dispatch_collect_and_commit(
@@ -65,8 +62,6 @@ def launch_collect(
         )
     except PermissionError as e:
         raise HTTPException(403, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
 
     from ....services.task_service import notify_agent_new_task
 
@@ -131,8 +126,5 @@ def prefill_from_collect(
     current_user: User = Depends(get_current_auditeur),
 ):
     """Pré-remplit un assessment à partir des résultats d'une collecte."""
-    try:
-        result = prefill_assessment_from_collect(db, collect_id, assessment_id)
-    except ValueError as e:
-        raise HTTPException(404, str(e))
+    result = prefill_assessment_from_collect(db, collect_id, assessment_id)
     return result

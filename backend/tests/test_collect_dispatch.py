@@ -184,7 +184,7 @@ class TestDispatchCollectToAgent:
     def test_dispatch_raises_value_error_when_collect_missing(
         self, db_session, auditeur_user, agent
     ):
-        with pytest.raises(ValueError, match="introuvable"):
+        with pytest.raises(NotFoundError, match="introuvable"):
             collect_service.dispatch_collect_to_agent(
                 db=db_session,
                 collect_id=999_999,

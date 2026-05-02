@@ -82,17 +82,14 @@ def analyze_config(
 
     config_analysis_id = None
     if equipement_id:
-        try:
-            saved = save_config_analysis(
-                db=db,
-                equipement_id=equipement_id,
-                filename=file.filename,
-                analysis=result,
-                raw_config=content,
-            )
-            config_analysis_id = saved.id
-        except ValueError as ve:
-            raise HTTPException(404, str(ve)) from ve
+        saved = save_config_analysis(
+            db=db,
+            equipement_id=equipement_id,
+            filename=file.filename,
+            analysis=result,
+            raw_config=content,
+        )
+        config_analysis_id = saved.id
 
     return ConfigUploadResponse(
         filename=file.filename,
@@ -226,9 +223,10 @@ def prefill_audit(
     """
     try:
         result = prefill_assessment_from_config(db, config_id, assessment_id)
-    except ValueError as ve:
-        raise HTTPException(404, str(ve)) from ve
     except Exception as exc:
+        from ....core.errors import AppError
+        if isinstance(exc, AppError):
+            raise
         logger.exception("Erreur lors du pré-remplissage")
         raise HTTPException(500, "Erreur interne lors du pré-remplissage.") from exc
     return PrefillResult(**result)

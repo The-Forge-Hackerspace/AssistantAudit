@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
 from ..models.framework import CheckType, Control, ControlSeverity, Framework, FrameworkCategory
+from ..core.errors import ConflictError, NotFoundError, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class FrameworkService:
         séparateur, aucun '..', aucune traversée possible.
         """
         if not isinstance(filename, str) or not _SAFE_YAML_FILENAME.fullmatch(filename):
-            raise ValueError("Nom de fichier YAML invalide")
+            raise ValidationError("Nom de fichier YAML invalide")
         frameworks_dir = Path(get_settings().FRAMEWORKS_DIR).resolve()
         # filename ne contient que [A-Za-z0-9_.-] — aucun risque de traversée.
         return frameworks_dir / filename
@@ -273,7 +274,7 @@ class FrameworkService:
         """Exporte un framework en YAML"""
         fw = db.get(Framework, framework_id)
         if not fw:
-            raise ValueError(f"Framework {framework_id} introuvable")
+            raise NotFoundError(f"Framework {framework_id} introuvable")
 
         output_path = Path(output_path)
         data = {
@@ -333,7 +334,7 @@ class FrameworkService:
         """
         original = db.get(Framework, framework_id)
         if not original:
-            raise ValueError(f"Framework {framework_id} introuvable")
+            raise NotFoundError(f"Framework {framework_id} introuvable")
 
         # Créer le clone
         clone = Framework(
@@ -415,7 +416,7 @@ class FrameworkService:
         """Crée un nouveau framework depuis l'éditeur (pas YAML)."""
         existing = db.query(Framework).filter(Framework.ref_id == ref_id, Framework.version == version).first()
         if existing:
-            raise ValueError(f"Un référentiel '{ref_id}' v{version} existe déjà")
+            raise ConflictError(f"Un référentiel '{ref_id}' v{version} existe déjà")
 
         framework = Framework(
             ref_id=ref_id,
@@ -486,7 +487,7 @@ class FrameworkService:
         """
         framework = db.get(Framework, framework_id)
         if not framework:
-            raise ValueError(f"Framework {framework_id} introuvable")
+            raise NotFoundError(f"Framework {framework_id} introuvable")
 
         # Champs simples
         for field in ("name", "description", "engine", "engine_config", "source", "author"):
@@ -544,7 +545,7 @@ class FrameworkService:
         """Supprime un framework et toutes ses catégories/contrôles en cascade."""
         framework = db.get(Framework, framework_id)
         if not framework:
-            raise ValueError(f"Framework {framework_id} introuvable")
+            raise NotFoundError(f"Framework {framework_id} introuvable")
         ref = f"{framework.ref_id} v{framework.version}"
         source_file = framework.source_file
         db.delete(framework)

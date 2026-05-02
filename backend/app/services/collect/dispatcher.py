@@ -18,6 +18,7 @@ from .evaluators import (
     _evaluate_windows_check,
 )
 from .findings import _analyze_collect_findings, _generate_summary
+from ...core.errors import BusinessRuleError, NotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ def create_pending_collect(
     """Crée un enregistrement de collecte en statut 'running'."""
     equipement = db.get(Equipement, equipement_id)
     if not equipement:
-        raise ValueError(f"Équipement {equipement_id} introuvable")
+        raise NotFoundError(f"Équipement {equipement_id} introuvable")
 
     collect = CollectResult(
         equipement_id=equipement_id,
@@ -73,7 +74,7 @@ def dispatch_collect_to_agent(
 
     collect = db.get(CollectResult, collect_id)
     if collect is None:
-        raise ValueError(f"CollectResult #{collect_id} introuvable")
+        raise NotFoundError(f"CollectResult #{collect_id} introuvable")
 
     if collect.method == CollectMethod.SSH:
         tool = "ssh-collect"
@@ -100,7 +101,7 @@ def dispatch_collect_to_agent(
             "transport": transport,
         }
     else:
-        raise ValueError(f"Methode de collecte non supportee : {collect.method}")
+        raise BusinessRuleError(f"Methode de collecte non supportee : {collect.method}")
 
     task = task_service.dispatch_task(
         db=db,
@@ -314,13 +315,13 @@ def prefill_assessment_from_collect(
     """
     collect = db.get(CollectResult, collect_id)
     if not collect:
-        raise ValueError(f"Collecte #{collect_id} introuvable")
+        raise NotFoundError(f"Collecte #{collect_id} introuvable")
     if collect.status != CollectStatus.SUCCESS:
-        raise ValueError(f"Collecte #{collect_id} n'est pas en succès (status={collect.status.value})")
+        raise BusinessRuleError(f"Collecte #{collect_id} n'est pas en succès (status={collect.status.value})")
 
     assessment = db.get(Assessment, assessment_id)
     if not assessment:
-        raise ValueError(f"Assessment #{assessment_id} introuvable")
+        raise NotFoundError(f"Assessment #{assessment_id} introuvable")
 
     # Déterminer le jeu de mappings
     is_windows = collect.method == CollectMethod.WINRM

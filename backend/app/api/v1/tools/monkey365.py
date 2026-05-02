@@ -48,9 +48,10 @@ def launch_monkey365_scan(
             user_id=uid,
             is_admin=adm,
         )
-    except ValueError as e:
-        raise HTTPException(404, str(e))
     except Exception as e:
+        from ....core.errors import AppError
+        if isinstance(e, AppError):
+            raise
         logger.exception("Unexpected error launching monkey365 scan")
         raise HTTPException(500, f"Erreur interne: {e}")
 
@@ -143,10 +144,7 @@ def cancel_monkey365_scan(
 ):
     """Force l'arrêt d'un scan en cours : tue le process PowerShell et met le status à CANCELLED."""
     uid, adm = _rbac(current_user)
-    try:
-        result = Monkey365ScanService.cancel_scan(db, result_id, user_id=uid, is_admin=adm)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    result = Monkey365ScanService.cancel_scan(db, result_id, user_id=uid, is_admin=adm)
     if not result:
         raise HTTPException(404, f"Audit Monkey365 #{result_id} introuvable")
     return result
@@ -204,9 +202,10 @@ def import_monkey365_to_audit(
             audit_id=request.audit_id,
             assessed_by=current_user.username,
         )
-    except ValueError as e:
-        raise HTTPException(400, str(e))
     except Exception as e:
+        from ....core.errors import AppError
+        if isinstance(e, AppError):
+            raise
         logger.exception("Erreur lors de l'import Monkey365 vers l'audit")
         raise HTTPException(500, f"Erreur interne: {e}")
 
@@ -223,18 +222,15 @@ async def launch_monkey365_streaming_scan(
     Lance un scan Monkey365 en mode streaming avec Device Code Flow.
     """
     uid, adm = _rbac(current_user)
-    try:
-        result = Monkey365ScanService.create_streaming_scan(
-            db=db,
-            entreprise_id=request.entreprise_id,
-            tenant_id=request.tenant_id,
-            auth_method=request.auth_method.value,
-            config=request.config,
-            user_id=uid,
-            is_admin=adm,
-        )
-    except ValueError as e:
-        raise HTTPException(404, str(e))
+    result = Monkey365ScanService.create_streaming_scan(
+        db=db,
+        entreprise_id=request.entreprise_id,
+        tenant_id=request.tenant_id,
+        auth_method=request.auth_method.value,
+        config=request.config,
+        user_id=uid,
+        is_admin=adm,
+    )
 
     register_bg_task(
         Monkey365ScanService.execute_streaming_scan(

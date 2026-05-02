@@ -10,7 +10,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session, selectinload
 
-from ..core.errors import NotFoundError
+from ..core.errors import BusinessRuleError, ConflictError, NotFoundError
 from ..core.helpers import get_or_404
 from ..models.assessment import (
     Assessment,
@@ -142,7 +142,7 @@ class AssessmentService:
         """Met à jour une campagne (nom, description, statut)"""
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
-            raise ValueError(f"Campagne {campaign_id} introuvable")
+            raise NotFoundError(f"Campagne {campaign_id} introuvable")
         AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
         update_data = data.model_dump(exclude_unset=True)
 
@@ -171,7 +171,7 @@ class AssessmentService:
         """Démarre une campagne et passe les équipements associés en EN_COURS."""
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
-            raise ValueError(f"Campagne {campaign_id} introuvable")
+            raise NotFoundError(f"Campagne {campaign_id} introuvable")
         AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
         campaign.status = CampaignStatus.IN_PROGRESS
         campaign.started_at = datetime.now(timezone.utc)
@@ -197,7 +197,7 @@ class AssessmentService:
         """Termine une campagne et met à jour le statut des équipements."""
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
-            raise ValueError(f"Campagne {campaign_id} introuvable")
+            raise NotFoundError(f"Campagne {campaign_id} introuvable")
         AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
         campaign.status = CampaignStatus.COMPLETED
         campaign.completed_at = datetime.now(timezone.utc)
@@ -231,7 +231,7 @@ class AssessmentService:
         """Supprime une campagne et tous ses assessments/résultats associés."""
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
-            raise ValueError(f"Campagne {campaign_id} introuvable")
+            raise NotFoundError(f"Campagne {campaign_id} introuvable")
         AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
         db.delete(campaign)
         db.flush()
@@ -256,16 +256,16 @@ class AssessmentService:
         # Vérifications
         campaign = db.get(AssessmentCampaign, campaign_id)
         if not campaign:
-            raise ValueError(f"Campagne {campaign_id} introuvable")
+            raise NotFoundError(f"Campagne {campaign_id} introuvable")
         AssessmentService._check_campaign_access(db, campaign, user_id, is_admin)
 
         equipement = db.get(Equipement, equipement_id)
         if not equipement:
-            raise ValueError(f"Équipement {equipement_id} introuvable")
+            raise NotFoundError(f"Équipement {equipement_id} introuvable")
 
         framework = db.get(Framework, framework_id)
         if not framework:
-            raise ValueError(f"Framework {framework_id} introuvable")
+            raise NotFoundError(f"Framework {framework_id} introuvable")
 
         # Vérifier qu'il n'existe pas déjà un assessment pour cette combinaison
         existing = (
@@ -278,7 +278,7 @@ class AssessmentService:
             .first()
         )
         if existing:
-            raise ValueError(
+            raise ConflictError(
                 f"Un assessment existe déjà pour cette combinaison "
                 f"(campagne={campaign_id}, équipement={equipement_id}, framework={framework_id})"
             )
@@ -341,7 +341,7 @@ class AssessmentService:
         """Supprime un assessment et tous ses résultats de contrôle / pièces jointes."""
         assessment = db.get(Assessment, assessment_id)
         if not assessment:
-            raise ValueError(f"Assessment {assessment_id} introuvable")
+            raise NotFoundError(f"Assessment {assessment_id} introuvable")
         AssessmentService._check_assessment_access(db, assessment, user_id, is_admin)
         db.delete(assessment)
         db.flush()
@@ -364,7 +364,7 @@ class AssessmentService:
         """Met à jour le résultat d'un contrôle"""
         result = db.get(ControlResult, result_id)
         if not result:
-            raise ValueError(f"ControlResult {result_id} introuvable")
+            raise NotFoundError(f"ControlResult {result_id} introuvable")
         assessment = db.get(Assessment, result.assessment_id)
         if assessment:
             AssessmentService._check_assessment_access(db, assessment, user_id, is_admin)
@@ -518,21 +518,21 @@ class AssessmentService:
         # Charger et valider le scan
         scan = db.get(Monkey365ScanResult, scan_result_id)
         if not scan:
-            raise ValueError(f"Scan Monkey365 #{scan_result_id} introuvable")
+            raise NotFoundError(f"Scan Monkey365 #{scan_result_id} introuvable")
         if scan.status != Monkey365ScanStatus.SUCCESS:
-            raise ValueError("L'import n'est possible que pour les scans réussis")
+            raise BusinessRuleError("L'import n'est possible que pour les scans réussis")
 
         # Charger et valider l'audit
         audit = db.get(Audit, audit_id)
         if not audit:
-            raise ValueError(f"Audit #{audit_id} introuvable")
+            raise NotFoundError(f"Audit #{audit_id} introuvable")
         if audit.entreprise_id != scan.entreprise_id:
-            raise ValueError("Le scan Monkey365 appartient à une entreprise différente de l'audit cible")
+            raise BusinessRuleError("Le scan Monkey365 appartient à une entreprise différente de l'audit cible")
 
         # Trouver le framework CIS-M365-V5
         framework = db.query(Framework).filter(Framework.ref_id == "CIS-M365-V5").first()
         if not framework:
-            raise ValueError("Framework CIS-M365-V5 introuvable — vérifiez que le YAML a bien été importé")
+            raise NotFoundError("Framework CIS-M365-V5 introuvable — vérifiez que le YAML a bien été importé")
 
         # Trouver ou créer le site dédié aux audits Microsoft 365.
         # On cherche explicitement nom='Cloud' pour éviter de prendre

@@ -25,6 +25,7 @@ from tests.factories import (
     FrameworkCategoryFactory,
     FrameworkFactory,
 )
+from app.core.errors import BusinessRuleError, NotFoundError
 
 # ── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -211,7 +212,7 @@ class TestPrefillService:
         assert sw030.is_auto_assessed is False
 
     def test_prefill_unknown_pipeline_raises(self, db_session, _assessment_with_controls):
-        with pytest.raises(ValueError, match="introuvable"):
+        with pytest.raises(NotFoundError, match="introuvable"):
             prefill_assessment_from_pipeline(
                 db_session, 999999, _assessment_with_controls["assessment"].id
             )
@@ -230,13 +231,13 @@ class TestPrefillService:
         db_session.commit()
         db_session.refresh(p)
 
-        with pytest.raises(ValueError, match="n'est pas terminé"):
+        with pytest.raises(BusinessRuleError, match="n'est pas terminé"):
             prefill_assessment_from_pipeline(
                 db_session, p.id, _assessment_with_controls["assessment"].id
             )
 
     def test_prefill_unknown_assessment_raises(self, db_session, _pipeline):
-        with pytest.raises(ValueError, match="introuvable"):
+        with pytest.raises(NotFoundError, match="introuvable"):
             prefill_assessment_from_pipeline(db_session, _pipeline.id, 999999)
 
     def test_prefill_empty_scan_raises(
@@ -254,7 +255,7 @@ class TestPrefillService:
         db_session.commit()
         db_session.refresh(p)
 
-        with pytest.raises(ValueError, match="scan vide"):
+        with pytest.raises(BusinessRuleError, match="scan vide"):
             prefill_assessment_from_pipeline(
                 db_session, p.id, _assessment_with_controls["assessment"].id
             )

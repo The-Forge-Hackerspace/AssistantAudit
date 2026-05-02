@@ -20,6 +20,7 @@ from app.models.framework import CheckType, Control, ControlSeverity, Framework,
 from app.models.site import Site
 from app.models.user import User
 from app.services.finding_service import FindingService
+from app.core.errors import BusinessRuleError, NotFoundError
 
 
 @pytest.fixture(scope="module")
@@ -275,7 +276,7 @@ class TestStatusTransition:
     def test_invalid_transition_raises(self, db, seed_data):
         """Transition OPEN → VERIFIED lève ValueError."""
         finding = self._get_first_finding(db, seed_data)
-        with pytest.raises(ValueError, match="Transition invalide"):
+        with pytest.raises(BusinessRuleError, match="Transition invalide"):
             FindingService.update_status(db, finding, "verified")
 
     def test_full_lifecycle(self, db, seed_data):
@@ -356,12 +357,12 @@ class TestDuplicate:
         """Un finding ne peut pas être doublon de lui-même."""
         FindingService.generate_from_assessment(db, seed_data["assessment"].id)
         findings, _ = FindingService.list_findings(db)
-        with pytest.raises(ValueError, match="doublon de lui-même"):
+        with pytest.raises(BusinessRuleError, match="doublon de lui-même"):
             FindingService.link_duplicate(db, findings[0], findings[0].id)
 
     def test_invalid_duplicate_raises(self, db, seed_data):
         """Finding original inexistant lève ValueError."""
         FindingService.generate_from_assessment(db, seed_data["assessment"].id)
         findings, _ = FindingService.list_findings(db)
-        with pytest.raises(ValueError, match="introuvable"):
+        with pytest.raises(NotFoundError, match="introuvable"):
             FindingService.link_duplicate(db, findings[0], 99999)

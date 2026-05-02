@@ -21,6 +21,7 @@ from app.services.oradad_analysis_service import (
     OradadAnalysisService,
 )
 from scripts.seed_anssi_checkpoints import ANSSI_CHECKPOINTS, seed
+from app.core.errors import ValidationError
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -215,7 +216,7 @@ class TestParseTar:
         assert result == {}
 
     def test_parse_invalid_tar(self):
-        with pytest.raises(ValueError, match="Archive ORADAD invalide"):
+        with pytest.raises(ValidationError, match="Archive ORADAD invalide"):
             OradadAnalysisService.parse_oradad_tar(b"not a tar file")
 
 

@@ -117,17 +117,14 @@ def update_finding_status(
         raise HTTPException(status_code=404, detail="Finding introuvable")
 
     uid, _ = _rbac(current_user)
-    try:
-        updated = FindingService.update_status(
-            db,
-            finding,
-            new_status_str=body.status,
-            user_id=uid,
-            comment=body.comment,
-            assigned_to=body.assigned_to,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    updated = FindingService.update_status(
+        db,
+        finding,
+        new_status_str=body.status,
+        user_id=uid,
+        comment=body.comment,
+        assigned_to=body.assigned_to,
+    )
 
     return FindingDetail.model_validate(updated)
 
@@ -145,9 +142,6 @@ def link_duplicate(
     if finding is None:
         raise HTTPException(status_code=404, detail="Finding introuvable")
 
-    try:
-        updated = FindingService.link_duplicate(db, finding, body.duplicate_of_id)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    updated = FindingService.link_duplicate(db, finding, body.duplicate_of_id)
 
     return FindingDetail.model_validate(updated)
