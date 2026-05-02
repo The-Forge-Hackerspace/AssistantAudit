@@ -96,6 +96,12 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        # Shutdown gracieux (TOS-79 / US046 — findings L-001, L-002, C-004) :
+        # ordre strict pour eviter les CollectResult/AgentTask en `running`
+        # et permettre aux agents Windows de recevoir un close frame 1001
+        # plutot qu'un timeout TCP.
+        logger.info("graceful shutdown initiated")
+
         for task, name in (
             (sweeper_task, "Heartbeat sweeper"),
             (collect_sweeper_task, "Collect sweeper"),
@@ -109,7 +115,7 @@ async def lifespan(app: FastAPI):
             except Exception:
                 logger.exception("%s a levé une exception pendant le shutdown", name)
 
-        # Annulation des tasks de fond enregistrees via register_bg_task
+        # (a) Annulation des tasks de fond enregistrees via register_bg_task
         # (TOS-80 / US047 — scans Monkey365 streaming, etc.)
         from .core.event_loop import cancel_background_tasks
 
@@ -118,7 +124,23 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.exception("Erreur pendant l'annulation des tasks de fond")
 
-        # Libère le pool de connexions SQLAlchemy avant l'arrêt du process.
+        # (b) Drainage WebSocket : close frame 1001 pour les users + agents.
+        from .core.websocket_manager import ws_manager
+
+        try:
+            await ws_manager.shutdown()
+        except Exception:
+            logger.exception("Erreur pendant le shutdown WebSocket")
+
+        # (c) Arret du LocalTaskRunner : pose _stop, join threads (timeout 10s).
+        from .core.task_runner import get_task_runner
+
+        try:
+            get_task_runner().shutdown(wait=True, timeout=10.0)
+        except Exception:
+            logger.exception("Erreur pendant le shutdown du TaskRunner")
+
+        # (d) Libère le pool de connexions SQLAlchemy avant l'arrêt du process.
         from .core.database import engine
 
         engine.dispose()

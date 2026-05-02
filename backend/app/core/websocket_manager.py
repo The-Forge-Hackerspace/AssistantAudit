@@ -176,6 +176,38 @@ class ConnectionManager:
 
         buf.append((now, event))
 
+    # ── Shutdown gracieux (TOS-79 / AC3) ──────────────────────────────
+
+    async def shutdown(self, code: int = 1001, reason: str = "Server shutting down") -> int:
+        """Ferme proprement toutes les WS users + agents (close frame 1001).
+
+        - Snapshot les connexions, vide les dicts (refus implicite des nouveaux
+          envois apres shutdown).
+        - Lance `ws.close(code, reason)` en parallele via asyncio.gather avec
+          `return_exceptions=True` : une connexion deja morte n'empeche pas
+          la fermeture des autres (AC3 du report ln-620).
+        - Retourne le nombre de WS draines (visibilite ops).
+        """
+        # Snapshot + reset des dicts pour eviter de servir une nouvelle requete
+        # sur une WS qu'on est en train de fermer.
+        users = list(self.user_connections.values())
+        agents = list(self.agent_connections.values())
+        self.user_connections.clear()
+        self.agent_connections.clear()
+        self.agent_owners.clear()
+
+        all_ws = users + agents
+        if not all_ws:
+            logger.info("WebSocket shutdown: 0 WS clients drained")
+            return 0
+
+        await asyncio.gather(
+            *(ws.close(code=code, reason=reason) for ws in all_ws),
+            return_exceptions=True,
+        )
+        logger.info("WebSocket shutdown: %d WS clients drained (users=%d, agents=%d)", len(all_ws), len(users), len(agents))
+        return len(all_ws)
+
     async def _replay_buffered_events(self, user_id: int, websocket: WebSocket) -> None:
         """Rejoue les evenements bufferises pour un user qui se reconnecte."""
         buf = self.user_event_buffer.pop(user_id, [])
