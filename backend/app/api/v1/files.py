@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from ...core.config import get_settings
 from ...core.database import get_db
 from ...core.deps import get_current_auditeur, get_current_user
+from ...core.http_helpers import safe_content_disposition
 from ...models.user import User
 from ...schemas.attachment import AttachmentRead
 from ...services.file_service import FileService
@@ -135,7 +136,8 @@ def download_file(
         content=content,
         media_type=mime_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            # RFC 5987 + strip CR/LF/quote pour bloquer l'injection de header (S-003 ln-620).
+            "Content-Disposition": safe_content_disposition(filename),
             "Content-Length": str(len(content)),
         },
     )
