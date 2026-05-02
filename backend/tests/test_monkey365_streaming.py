@@ -340,7 +340,7 @@ class TestStreamingRoute:
 
         with (
             patch("app.api.v1.tools.monkey365.Monkey365ScanService.create_streaming_scan") as mock_create,
-            patch("app.api.v1.tools.monkey365.asyncio.create_task"),
+            patch("app.api.v1.tools.monkey365.register_bg_task"),
         ):
             mock_result = MagicMock()
             mock_result.id = 99
@@ -393,7 +393,7 @@ class TestStreamingRoute:
 
         with (
             patch("app.api.v1.tools.monkey365.Monkey365ScanService.create_streaming_scan") as mock_create,
-            patch("app.api.v1.tools.monkey365.asyncio.create_task"),
+            patch("app.api.v1.tools.monkey365.register_bg_task"),
         ):
             mock_result = MagicMock()
             mock_result.id = 1

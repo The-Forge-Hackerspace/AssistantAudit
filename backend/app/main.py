@@ -109,6 +109,15 @@ async def lifespan(app: FastAPI):
             except Exception:
                 logger.exception("%s a levé une exception pendant le shutdown", name)
 
+        # Annulation des tasks de fond enregistrees via register_bg_task
+        # (TOS-80 / US047 — scans Monkey365 streaming, etc.)
+        from .core.event_loop import cancel_background_tasks
+
+        try:
+            await cancel_background_tasks(timeout=5.0)
+        except Exception:
+            logger.exception("Erreur pendant l'annulation des tasks de fond")
+
         # Libère le pool de connexions SQLAlchemy avant l'arrêt du process.
         from .core.database import engine
 

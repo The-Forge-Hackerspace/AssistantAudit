@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from pathlib import Path
 
@@ -8,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ....core.database import get_db
 from ....core.deps import get_current_auditeur
+from ....core.event_loop import register_bg_task
 from ....core.task_runner import get_task_runner
 from ....models.monkey365_scan_result import Monkey365ScanStatus
 from ....models.user import User
@@ -236,7 +236,7 @@ async def launch_monkey365_streaming_scan(
     except ValueError as e:
         raise HTTPException(404, str(e))
 
-    asyncio.create_task(
+    register_bg_task(
         Monkey365ScanService.execute_streaming_scan(
             result_id=result.id,
             user_id=current_user.id,
@@ -244,7 +244,8 @@ async def launch_monkey365_streaming_scan(
             subscriptions=request.subscriptions,
             ruleset=request.ruleset,
             auth_method_str=request.auth_method.value,
-        )
+        ),
+        name=f"monkey365-scan-{result.id}",
     )
 
     logger.info(
