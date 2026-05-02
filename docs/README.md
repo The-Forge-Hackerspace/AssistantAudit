@@ -37,7 +37,6 @@ Sources primaires (auto-discovery) : `AGENTS.md, docs/project/architecture.md`
 | [docs/project/runbook.md](project/runbook.md) | Guide d'exploitation |
 | [docs/principles.md](principles.md) | Principes de développement |
 | [docs/documentation_standards.md](documentation_standards.md) | Standards de documentation |
-| [docs/tools_config.md](tools_config.md) | Configuration des outils |
 | [docs/reference/](reference/) | ADRs, guides, manuels |
 | [docs/tasks/README.md](tasks/README.md) | Backlog et gestion des tâches |
 
